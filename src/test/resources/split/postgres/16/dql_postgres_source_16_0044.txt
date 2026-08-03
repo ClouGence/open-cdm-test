@@ -1,0 +1,291 @@
+SELECT 0x1EEE_FFFF
+;
+SELECT NULL IS JSON
+;
+explain (costs off) select * from rparted_by_int2 where a > 100_000_000_000_000
+;
+SELECT JSON_OBJECT(json '[1]': 123)
+;
+SELECT xmlserialize(CONTENT  NULL AS text INDENT)
+;
+select json_object ( returning text )
+;
+SELECT JSON_OBJECTAGG(k: v ABSENT ON NULL WITH UNIQUE KEYS)
+FROM (VALUES (1, 1), (0, NULL), (3, NULL), (2, 2), (4, NULL)) foo(k, v)
+;
+SELECT JSON_ARRAY(RETURNING json FORMAT JSON)
+;
+SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%#"x|g' ESCAPE '#') AS "bcdef"
+;
+SELECT xmlserialize(CONTENT  '<foo><bar><val x="y">42</val></bar></foo>' AS text) = xmlserialize(CONTENT '<foo><bar><val x="y">42</val></bar></foo>' AS text NO INDENT)
+;
+SELECT k, count(*) AS n
+FROM (VALUES ('a'), ('a'), ('b')) AS t(k)
+GROUP BY ALL k
+ORDER BY k
+;
+SELECT JSON_ARRAY(RETURNING jsonb)
+;
+SELECT xmlserialize(CONTENT  '<foo><bar></bar></foo>' AS text INDENT)
+;
+-- Check the timestamp offsets for v7.
+--
+-- generate UUIDv7 values with timestamps ranging from 1970 (the Unix epoch year)
+-- to 10888 (one year before the maximum possible year), and then verify that
+-- the extracted timestamps from these UUIDv7 values have not overflowed.
+WITH uuidts AS (
+    SELECT y, ts as ts, lag(ts) OVER (ORDER BY y) AS prev_ts
+    FROM (SELECT y, uuid_extract_timestamp(uuidv7((y || ' years')::interval)) AS ts
+        FROM generate_series(1970 - extract(year from now())::int, 10888 - extract(year from now())::int) y)
+)
+SELECT y, ts, prev_ts FROM uuidts WHERE ts < prev_ts
+;
+SELECT joined.id, l.left_val, r.right_val
+FROM (VALUES (1, 'left'), (2, 'missing')) AS l(id, left_val)
+JOIN (VALUES (1, 'right'), (3, 'extra')) AS r(id, right_val)
+USING (id) AS joined
+ORDER BY joined.id
+;
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i))
+;
+EXPLAIN (verbose, costs off)
+           MERGE INTO tgt USING src ON tgt.id = src.id
+             WHEN MATCHED THEN UPDATE SET val = src.val
+             WHEN NOT MATCHED THEN INSERT VALUES (src.id, src.val)
+;
+-- ok
+SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+SELECT xmlserialize(CONTENT  '' AS text INDENT)
+;
+SELECT * FROM (SELECT * FROM int4_tbl), (VALUES (123456)) WHERE f1 = column1
+;
+select array_agg(distinct val)
+from (select null as val from generate_series(1, 2))
+;
+EXPLAIN (costs off)
+MERGE INTO rw_view2 t
+  USING (SELECT x, 'R'||x FROM generate_series(0,3) x) AS s(a,b) ON t.a = s.a
+  WHEN MATCHED AND t.a <= 1 THEN DELETE
+  WHEN MATCHED THEN UPDATE SET b = s.b
+  WHEN NOT MATCHED AND s.a > 0 THEN INSERT VALUES (s.a, s.b)
+;
+SELECT min(r), max(r), count(r) FROM (
+  SELECT DISTINCT random(-0.5, 0.49) r FROM generate_series(1, 2500))
+;
+SELECT JSON_ARRAYAGG(i RETURNING jsonb) FILTER (WHERE i > 1) FROM (VALUES (1), (2), (3)) AS t(i)
+;
+SELECT JSON_OBJECT('a': JSON_OBJECT('b': 1 RETURNING varchar(2)))
+;
+SELECT test_slru_page_write(0x1234500000000, 'Test SLRU 64-bit')
+;
+-- Ensure we don't ship FETCH FIRST .. WITH TIES
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.c2 FROM ft1 t1 WHERE t1.c1 > 960 ORDER BY t1.c2 FETCH FIRST 2 ROWS WITH TIES
+;
+SELECT -0x80000000
+;
+--SELECT JSON_OBJECT('a' || 2 VALUE 1);
+--SELECT JSON_OBJECT(KEY 'a' || 2 VALUE 1);
+SELECT JSON_OBJECT('a': 2::text)
+;
+SELECT JSON_OBJECT(RETURNING jsonb FORMAT JSON)
+;
+-- search+cycle
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+  cycle f, t set is_cycle using path
+select * from search_graph
+;
+select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by all rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) OVER (PARTITION BY i % 2)
+FROM generate_series(1,5) i
+;
+SELECT JSON_OBJECT('a': '123', 'b': JSON_OBJECT('a': 111, 'b': 'aaa' RETURNING jsonb))
+;
+WITH RECURSIVE graph(f, t, label) AS (
+    VALUES (1, 2, 'arc 1 -> 2'),
+           (1, 3, 'arc 1 -> 3'),
+           (2, 4, 'arc 2 -> 4'),
+           (4, 1, 'arc 4 -> 1')
+), search_graph(f, t, label) AS (
+    SELECT * FROM graph WHERE f = 1
+    UNION ALL
+    SELECT g.* FROM graph g JOIN search_graph sg ON g.f = sg.t
+) SEARCH BREADTH FIRST BY f, t SET seq
+  CYCLE f, t SET is_cycle USING path
+SELECT f, t, label, is_cycle FROM search_graph ORDER BY seq LIMIT 8
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT 0x1EEE_FFFF
+;
+----------
+[SELECT] SELECT NULL IS JSON
+;
+----------
+[PERFORMANCE] explain (costs off) select * from rparted_by_int2 where a > 100_000_000_000_000
+;
+----------
+[SELECT] SELECT JSON_OBJECT(json '[1]': 123)
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  NULL AS text INDENT)
+;
+----------
+[SELECT] select json_object ( returning text )
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v ABSENT ON NULL WITH UNIQUE KEYS)
+FROM (VALUES (1, 1), (0, NULL), (3, NULL), (2, 2), (4, NULL)) foo(k, v)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING json FORMAT JSON)
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%#"x|g' ESCAPE '#') AS "bcdef"
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '<foo><bar><val x="y">42</val></bar></foo>' AS text) = xmlserialize(CONTENT '<foo><bar><val x="y">42</val></bar></foo>' AS text NO INDENT)
+;
+----------
+[SELECT] SELECT k, count(*) AS n
+FROM (VALUES ('a'), ('a'), ('b')) AS t(k)
+GROUP BY ALL k
+ORDER BY k
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING jsonb)
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '<foo><bar></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] -- Check the timestamp offsets for v7.
+--
+-- generate UUIDv7 values with timestamps ranging from 1970 (the Unix epoch year)
+-- to 10888 (one year before the maximum possible year), and then verify that
+-- the extracted timestamps from these UUIDv7 values have not overflowed.
+WITH uuidts AS (
+    SELECT y, ts as ts, lag(ts) OVER (ORDER BY y) AS prev_ts
+    FROM (SELECT y, uuid_extract_timestamp(uuidv7((y || ' years')::interval)) AS ts
+        FROM generate_series(1970 - extract(year from now())::int, 10888 - extract(year from now())::int) y)
+)
+SELECT y, ts, prev_ts FROM uuidts WHERE ts < prev_ts
+;
+----------
+[SELECT] SELECT joined.id, l.left_val, r.right_val
+FROM (VALUES (1, 'left'), (2, 'missing')) AS l(id, left_val)
+JOIN (VALUES (1, 'right'), (3, 'extra')) AS r(id, right_val)
+USING (id) AS joined
+ORDER BY joined.id
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i))
+;
+----------
+[PERFORMANCE] EXPLAIN (verbose, costs off)
+           MERGE INTO tgt USING src ON tgt.id = src.id
+             WHEN MATCHED THEN UPDATE SET val = src.val
+             WHEN NOT MATCHED THEN INSERT VALUES (src.id, src.val)
+;
+----------
+[SELECT] -- ok
+SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '' AS text INDENT)
+;
+----------
+[SELECT] SELECT * FROM (SELECT * FROM int4_tbl), (VALUES (123456)) WHERE f1 = column1
+;
+----------
+[SELECT] select array_agg(distinct val)
+from (select null as val from generate_series(1, 2))
+;
+----------
+[PERFORMANCE] EXPLAIN (costs off)
+MERGE INTO rw_view2 t
+  USING (SELECT x, 'R'||x FROM generate_series(0,3) x) AS s(a,b) ON t.a = s.a
+  WHEN MATCHED AND t.a <= 1 THEN DELETE
+  WHEN MATCHED THEN UPDATE SET b = s.b
+  WHEN NOT MATCHED AND s.a > 0 THEN INSERT VALUES (s.a, s.b)
+;
+----------
+[SELECT] SELECT min(r), max(r), count(r) FROM (
+  SELECT DISTINCT random(-0.5, 0.49) r FROM generate_series(1, 2500))
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(i RETURNING jsonb) FILTER (WHERE i > 1) FROM (VALUES (1), (2), (3)) AS t(i)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': JSON_OBJECT('b': 1 RETURNING varchar(2)))
+;
+----------
+[SELECT] SELECT test_slru_page_write(0x1234500000000, 'Test SLRU 64-bit')
+;
+----------
+[PERFORMANCE] -- Ensure we don't ship FETCH FIRST .. WITH TIES
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.c2 FROM ft1 t1 WHERE t1.c1 > 960 ORDER BY t1.c2 FETCH FIRST 2 ROWS WITH TIES
+;
+----------
+[SELECT] SELECT -0x80000000
+;
+----------
+[SELECT] --SELECT JSON_OBJECT('a' || 2 VALUE 1);
+--SELECT JSON_OBJECT(KEY 'a' || 2 VALUE 1);
+SELECT JSON_OBJECT('a': 2::text)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING jsonb FORMAT JSON)
+;
+----------
+[SELECT] -- search+cycle
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+  cycle f, t set is_cycle using path
+select * from search_graph
+;
+----------
+[SELECT] select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by all rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) OVER (PARTITION BY i % 2)
+FROM generate_series(1,5) i
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': '123', 'b': JSON_OBJECT('a': 111, 'b': 'aaa' RETURNING jsonb))
+;
+----------
+[SELECT] WITH RECURSIVE graph(f, t, label) AS (
+    VALUES (1, 2, 'arc 1 -> 2'),
+           (1, 3, 'arc 1 -> 3'),
+           (2, 4, 'arc 2 -> 4'),
+           (4, 1, 'arc 4 -> 1')
+), search_graph(f, t, label) AS (
+    SELECT * FROM graph WHERE f = 1
+    UNION ALL
+    SELECT g.* FROM graph g JOIN search_graph sg ON g.f = sg.t
+) SEARCH BREADTH FIRST BY f, t SET seq
+  CYCLE f, t SET is_cycle USING path
+SELECT f, t, label, is_cycle FROM search_graph ORDER BY seq LIMIT 8
+;

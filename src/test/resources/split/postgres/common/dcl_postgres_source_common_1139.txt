@@ -1,0 +1,78 @@
+-- and again with a constant ON clause
+BEGIN
+;
+-- superuser is allowed to bypass RLS checks
+RESET SESSION AUTHORIZATION
+;
+EXECUTE dumpBaseType('18542')
+;
+GRANT pg_monitor TO regress_current_logfile
+;
+-- Build an index with different opclasses - minmax, bloom and minmax-multi.
+--
+-- For minmax and opclass this is simple, but for minmax-multi we need to be
+-- careful, because the result depends on the order in which values are added
+-- to the summary, which in turn affects how are values merged etc. The order
+-- of merging results from workers has similar effect. All those summaries
+-- should produce correct query results, but it means we can't compare them
+-- using equality (which is what EXCEPT does). To work around this issue, we
+-- generated the data to only have very small number of distinct values per
+-- range, so that no merging is needed. This makes the results deterministic.
+
+-- build index without parallelism
+SET max_parallel_maintenance_workers = 0
+;
+EXECUTE dumpTableAttach('43688')
+;
+set enable_indexonlyscan to off
+;
+EXECUTE dumpOpr('3825')
+;
+EXECUTE dumpTableAttach('39714')
+;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE
+;
+------------------------------------------------------------------------------------------
+[TRANSACTION] -- and again with a constant ON clause
+BEGIN
+;
+----------
+[SWITCH_USER] -- superuser is allowed to bypass RLS checks
+RESET SESSION AUTHORIZATION
+;
+----------
+[UNSAFE] EXECUTE dumpBaseType('18542')
+;
+----------
+[GRANT] GRANT pg_monitor TO regress_current_logfile
+;
+----------
+[SESSION_SETTING_WRITE] -- Build an index with different opclasses - minmax, bloom and minmax-multi.
+--
+-- For minmax and opclass this is simple, but for minmax-multi we need to be
+-- careful, because the result depends on the order in which values are added
+-- to the summary, which in turn affects how are values merged etc. The order
+-- of merging results from workers has similar effect. All those summaries
+-- should produce correct query results, but it means we can't compare them
+-- using equality (which is what EXCEPT does). To work around this issue, we
+-- generated the data to only have very small number of distinct values per
+-- range, so that no merging is needed. This makes the results deterministic.
+
+-- build index without parallelism
+SET max_parallel_maintenance_workers = 0
+;
+----------
+[UNSAFE] EXECUTE dumpTableAttach('43688')
+;
+----------
+[SESSION_SETTING_WRITE] set enable_indexonlyscan to off
+;
+----------
+[UNSAFE] EXECUTE dumpOpr('3825')
+;
+----------
+[UNSAFE] EXECUTE dumpTableAttach('39714')
+;
+----------
+[TRANSACTION] SET TRANSACTION ISOLATION LEVEL SERIALIZABLE
+;

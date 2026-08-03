@@ -1,0 +1,386 @@
+WITH uuidts AS (
+    SELECT y, ts as ts, lag(ts) OVER (ORDER BY y) AS prev_ts
+    FROM (SELECT y, uuid_extract_timestamp(uuidv7((y || ' years')::interval)) AS ts
+        FROM generate_series(1970 - extract(year from now())::int, 10888 - extract(year from now())::int) y)
+)
+SELECT y, ts, prev_ts FROM uuidts WHERE ts < prev_ts
+;
+SELECT
+	JSON_OBJECTAGG(i: i),
+--	JSON_OBJECTAGG(i VALUE i),
+--	JSON_OBJECTAGG(KEY i VALUE i),
+	JSON_OBJECTAGG(i: i RETURNING jsonb)
+FROM
+	generate_series(1, 5) i
+;
+SELECT JSON_OBJECT(RETURNING bytea FORMAT JSON)
+;
+-- JSON_OBJECTAGG()
+SELECT	JSON_OBJECTAGG('key': 1) IS NULL,
+		JSON_OBJECTAGG('key': 1 RETURNING jsonb) IS NULL
+WHERE FALSE
+;
+SELECT JSON_ARRAY(NULL, NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+SELECT JSON_OBJECT(RETURNING text)
+;
+-- Null inputs should return NULL
+SELECT SUBSTRING('abcdefg' SIMILAR '%' ESCAPE NULL) IS NULL AS "True"
+;
+SELECT 0x12345678::int4::bytea AS "\x12345678", (-0x12345678)::int4::bytea AS "\xedcba988"
+;
+SELECT 0x7FFFFFFF
+;
+with test1 as (select * from table1) select * from (with test2 as (select * from table2) select * from test2)
+;
+SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' RETURNING text))
+;
+SELECT JSON_OBJECT('a': 2::text)
+;
+-- error
+
+-- Subselects without aliases
+
+SELECT count FROM (SELECT COUNT(DISTINCT name) FROM road)
+;
+SELECT NULL::json IS JSON
+;
+SELECT 0b_10_0101
+;
+SELECT -0x80000001
+;
+SELECT JSON_OBJECT('a' || 2: 1)
+;
+select x, lag(x, 1) over (order by x), lead(x, 3) over (order by x)
+from (select x::numeric as x from generate_series(1,10) x)
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+  cycle f, t set is_cycle using path
+select * from search_graph
+;
+-- "group by distinct" behavior...
+select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by distinct rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+SELECT JSON_ARRAYAGG(JSON_ARRAY(i, i + 1 RETURNING text) FORMAT JSON NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (2)) AS t(i)
+;
+SELECT JSON_OBJECTAGG(NULL: 1 RETURNING jsonb)
+;
+SELECT -0b10000000000000000000000000000001
+;
+SELECT SUBSTRING('abcdefg' SIMILAR 'a#"(b_d)#"%' ESCAPE '#') AS "bcd"
+;
+explain (analyze,buffers off,costs off) select sum(n) over(partition by m) from (SELECT n < 3 as m, n from generate_series(1,2500) a(n))
+;
+-- Reading page not in buffer with read-only
+SELECT test_slru_page_readonly(0x1234500000001)
+;
+SELECT NULL::text IS JSON
+;
+SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+SELECT 0o2_73
+;
+SELECT xmlserialize(DOCUMENT '<foo><bar></bar></foo>' AS text INDENT)
+;
+SELECT pair.id, pair.code, l.left_val, r.right_val
+FROM (VALUES (1, 'x', 'left')) AS l(id, code, left_val)
+LEFT JOIN (VALUES (1, 'x', 'right'), (1, 'y', 'other')) AS r(id, code, right_val)
+USING (id, code) AS pair
+WHERE pair.code = 'x'
+;
+SELECT xmlserialize(DOCUMENT '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+SELECT js IS JSON ARRAY WITH UNIQUE KEYS AS array_unique,
+       js IS JSON ARRAY WITHOUT UNIQUE KEYS AS array_without_unique,
+       js IS NOT JSON OBJECT AS not_object
+FROM (VALUES ('[{"a":"1"}, {"b":"2","b":"3"}]')) AS foo(js)
+;
+-- cases near int4 overflow
+SELECT 0b1111111111111111111111111111111
+;
+SELECT JSON_ARRAYAGG(i ORDER BY i DESC RETURNING jsonb) FROM (VALUES (1), (2), (NULL), (3)) AS t(i)
+;
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (3), (1), (NULL), (2)) foo(i) ORDER BY i)
+;
+SELECT -0o20000000000
+;
+EXPLAIN (COSTS OFF) MERGE INTO stats_track_tab USING (SELECT id FROM generate_series(1, 10) id) ON x = id
+  WHEN MATCHED THEN UPDATE SET x = id
+  WHEN NOT MATCHED THEN INSERT (x) VALUES (id)
+;
+SELECT JSON_OBJECT(RETURNING jsonb)
+;
+SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': stable_one() RETURNING text) FORMAT JSON)
+;
+SELECT JSON_OBJECT(1: 1, '1': NULL ABSENT ON NULL WITH UNIQUE)
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select * from search_graph
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': stable_one() RETURNING text) FORMAT JSON)
+;
+SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+SELECT p.id, p.code, child.child_id
+FROM split_cov.parent_table p
+LEFT JOIN LATERAL (
+    SELECT c.id AS child_id
+    FROM split_cov.child_table c
+    WHERE c.parent_id = p.id
+    ORDER BY c.id
+    FETCH FIRST 1 ROW WITH TIES
+) child ON true
+WHERE EXISTS (SELECT 1 FROM split_cov.parent_table p2 WHERE p2.id = p.id)
+;
+SELECT 1_000.5e0_1
+;
+-- indent non singly-rooted xml
+SELECT xmlserialize(DOCUMENT '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union distinct
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+select * from search_graph order by seq
+;
+SELECT NULL IS NOT JSON
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.c2 FROM ft1 t1 WHERE t1.c1 > 960 ORDER BY t1.c2 FETCH FIRST 2 ROWS WITH TIES
+;
+------------------------------------------------------------------------------------------
+[SELECT] WITH uuidts AS (
+    SELECT y, ts as ts, lag(ts) OVER (ORDER BY y) AS prev_ts
+    FROM (SELECT y, uuid_extract_timestamp(uuidv7((y || ' years')::interval)) AS ts
+        FROM generate_series(1970 - extract(year from now())::int, 10888 - extract(year from now())::int) y)
+)
+SELECT y, ts, prev_ts FROM uuidts WHERE ts < prev_ts
+;
+----------
+[SELECT] SELECT
+	JSON_OBJECTAGG(i: i),
+--	JSON_OBJECTAGG(i VALUE i),
+--	JSON_OBJECTAGG(KEY i VALUE i),
+	JSON_OBJECTAGG(i: i RETURNING jsonb)
+FROM
+	generate_series(1, 5) i
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING bytea FORMAT JSON)
+;
+----------
+[SELECT] -- JSON_OBJECTAGG()
+SELECT	JSON_OBJECTAGG('key': 1) IS NULL,
+		JSON_OBJECTAGG('key': 1 RETURNING jsonb) IS NULL
+WHERE FALSE
+;
+----------
+[SELECT] SELECT JSON_ARRAY(NULL, NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING text)
+;
+----------
+[SELECT] -- Null inputs should return NULL
+SELECT SUBSTRING('abcdefg' SIMILAR '%' ESCAPE NULL) IS NULL AS "True"
+;
+----------
+[SELECT] SELECT 0x12345678::int4::bytea AS "\x12345678", (-0x12345678)::int4::bytea AS "\xedcba988"
+;
+----------
+[SELECT] SELECT 0x7FFFFFFF
+;
+----------
+[SELECT] with test1 as (select * from table1) select * from (with test2 as (select * from table2) select * from test2)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' RETURNING text))
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': 2::text)
+;
+----------
+[SELECT] -- error
+
+-- Subselects without aliases
+
+SELECT count FROM (SELECT COUNT(DISTINCT name) FROM road)
+;
+----------
+[SELECT] SELECT NULL::json IS JSON
+;
+----------
+[SELECT] SELECT 0b_10_0101
+;
+----------
+[SELECT] SELECT -0x80000001
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a' || 2: 1)
+;
+----------
+[SELECT] select x, lag(x, 1) over (order by x), lead(x, 3) over (order by x)
+from (select x::numeric as x from generate_series(1,10) x)
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+  cycle f, t set is_cycle using path
+select * from search_graph
+;
+----------
+[SELECT] -- "group by distinct" behavior...
+select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by distinct rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(JSON_ARRAY(i, i + 1 RETURNING text) FORMAT JSON NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (2)) AS t(i)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(NULL: 1 RETURNING jsonb)
+;
+----------
+[SELECT] SELECT -0b10000000000000000000000000000001
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR 'a#"(b_d)#"%' ESCAPE '#') AS "bcd"
+;
+----------
+[SELECT] explain (analyze,buffers off,costs off) select sum(n) over(partition by m) from (SELECT n < 3 as m, n from generate_series(1,2500) a(n))
+;
+----------
+[SELECT] -- Reading page not in buffer with read-only
+SELECT test_slru_page_readonly(0x1234500000001)
+;
+----------
+[SELECT] SELECT NULL::text IS JSON
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+----------
+[SELECT] SELECT 0o2_73
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT '<foo><bar></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] SELECT pair.id, pair.code, l.left_val, r.right_val
+FROM (VALUES (1, 'x', 'left')) AS l(id, code, left_val)
+LEFT JOIN (VALUES (1, 'x', 'right'), (1, 'y', 'other')) AS r(id, code, right_val)
+USING (id, code) AS pair
+WHERE pair.code = 'x'
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] SELECT js IS JSON ARRAY WITH UNIQUE KEYS AS array_unique,
+       js IS JSON ARRAY WITHOUT UNIQUE KEYS AS array_without_unique,
+       js IS NOT JSON OBJECT AS not_object
+FROM (VALUES ('[{"a":"1"}, {"b":"2","b":"3"}]')) AS foo(js)
+;
+----------
+[SELECT] -- cases near int4 overflow
+SELECT 0b1111111111111111111111111111111
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(i ORDER BY i DESC RETURNING jsonb) FROM (VALUES (1), (2), (NULL), (3)) AS t(i)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT i FROM (VALUES (3), (1), (NULL), (2)) foo(i) ORDER BY i)
+;
+----------
+[SELECT] SELECT -0o20000000000
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF) MERGE INTO stats_track_tab USING (SELECT id FROM generate_series(1, 10) id) ON x = id
+  WHEN MATCHED THEN UPDATE SET x = id
+  WHEN NOT MATCHED THEN INSERT (x) VALUES (id)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': stable_one() RETURNING text) FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1: 1, '1': NULL ABSENT ON NULL WITH UNIQUE)
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select * from search_graph
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': stable_one() RETURNING text) FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+----------
+[SELECT] SELECT p.id, p.code, child.child_id
+FROM split_cov.parent_table p
+LEFT JOIN LATERAL (
+    SELECT c.id AS child_id
+    FROM split_cov.child_table c
+    WHERE c.parent_id = p.id
+    ORDER BY c.id
+    FETCH FIRST 1 ROW WITH TIES
+) child ON true
+WHERE EXISTS (SELECT 1 FROM split_cov.parent_table p2 WHERE p2.id = p.id)
+;
+----------
+[SELECT] SELECT 1_000.5e0_1
+;
+----------
+[SELECT] -- indent non singly-rooted xml
+SELECT xmlserialize(DOCUMENT '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union distinct
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+select * from search_graph order by seq
+;
+----------
+[SELECT] SELECT NULL IS NOT JSON
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT t1.c2 FROM ft1 t1 WHERE t1.c1 > 960 ORDER BY t1.c2 FETCH FIRST 2 ROWS WITH TIES
+;

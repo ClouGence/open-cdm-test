@@ -1,0 +1,1827 @@
+[doris_official_website_create_view_001__create_view__0001]
+sql:
+CREATE MATERIALIZED VIEW partition_mv
+BUILD IMMEDIATE
+REFRESH AUTO
+ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00'
+PARTITION BY (DATE_TRUNC(o_orderdate, 'MONTH'))
+DISTRIBUTED BY HASH (l_orderkey) BUCKETS 2
+PROPERTIES
+("replication_num" = "3")
+AS
+SELECT
+o_orderdate,
+l_orderkey,
+l_partkey
+FROM
+orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey
+LEFT JOIN partsupp ON ps_partkey = l_partkey
+and l_suppkey = ps_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:37) /test/1/catalog1/schema1/partition_mv/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(15:0~15:6) /test/1/catalog1/schema1/orders/",
+        "Table(16:10~16:18) /test/1/catalog1/schema1/lineitem/",
+        "Table(17:10~17:18) /test/1/catalog1/schema1/partsupp/"
+      ]
+    },
+    {
+      "subject": "Function(5:14~5:24) /test/1/catalog1/schema1/DATE_TRUNC/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0002]
+sql:
+CREATE MATERIALIZED VIEW partition_mv_2
+BUILD IMMEDIATE
+REFRESH AUTO
+ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00'
+PARTITION BY (DATE_TRUNC(min_orderdate, 'MONTH'))
+DISTRIBUTED BY HASH (l_orderkey) BUCKETS 2
+PROPERTIES
+("replication_num" = "3")
+AS
+SELECT
+min(o_orderdate) AS min_orderdate,
+l_orderkey,
+l_partkey
+FROM
+orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey
+LEFT JOIN partsupp ON ps_partkey = l_partkey
+and l_suppkey = ps_suppkey
+GROUP BY
+o_orderdate,
+l_orderkey,
+l_partkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:39) /test/1/catalog1/schema1/partition_mv_2/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(15:0~15:6) /test/1/catalog1/schema1/orders/",
+        "Table(16:10~16:18) /test/1/catalog1/schema1/lineitem/",
+        "Table(17:10~17:18) /test/1/catalog1/schema1/partsupp/"
+      ]
+    },
+    {
+      "subject": "Function(5:14~5:24) /test/1/catalog1/schema1/DATE_TRUNC/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:0~11:3) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0003]
+sql:
+CREATE MATERIALIZED VIEW sync_agg_mv AS
+SELECT 
+  l_shipdate as shipdate,
+  l_partkey as partkey,
+  count(*),
+  sum(l_discount)
+FROM
+  lineitem
+GROUP BY
+  l_shipdate,
+  l_partkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:36) /test/1/catalog1/schema1/sync_agg_mv/",
+      "action" : "CREATE",
+      "target" : "Table(8:2~8:10) /test/1/catalog1/schema1/lineitem/"
+    },
+    {
+      "subject": "Function(5:2~5:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:2~6:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0004]
+sql:
+CREATE VIEW example_db.example_view (k1, k2, k3, v1)
+    AS
+    SELECT c1 as k1, k2, k3, SUM(v1) FROM example_table
+    WHERE k1 = 20160112 GROUP BY k1,k2,k3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "View(1:12~1:35) /test/1/catalog1/example_db/example_view/",
+      "action" : "CREATE",
+      "target" : "Table(3:42~3:55) /test/1/catalog1/schema1/example_table/"
+    },
+    {
+      "subject": "Function(3:29~3:32) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0005]
+sql:
+CREATE VIEW example_db.example_view
+    (
+        k1 COMMENT "first key",
+        k2 COMMENT "second key",
+        k3 COMMENT "third key",
+        v1 COMMENT "first value"
+    )
+    COMMENT "my first view"
+    AS
+    SELECT c1 as k1, k2, k3, SUM(v1) FROM example_table
+    WHERE k1 = 20160112 GROUP BY k1,k2,k3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "View(1:12~1:35) /test/1/catalog1/example_db/example_view/",
+      "action" : "CREATE",
+      "target" : "Table(10:42~10:55) /test/1/catalog1/schema1/example_table/"
+    },
+    {
+      "subject": "Function(10:29~10:32) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0006]
+sql:
+create materialized view mv1 as 
+    select 
+        abs(k1)+k2+1,        
+        sum(abs(k2+2)+k3+3) 
+    from 
+        d_table 
+    group by 
+        abs(k1)+k2+1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:28) /test/1/catalog1/schema1/mv1/",
+      "action" : "CREATE",
+      "target" : "Table(6:8~6:15) /test/1/catalog1/schema1/d_table/"
+    },
+    {
+      "subject": "Function(3:8~3:11) /test/1/catalog1/schema1/abs/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:8~4:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:12~4:15) /test/1/catalog1/schema1/abs/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:8~8:11) /test/1/catalog1/schema1/abs/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0007]
+sql:
+create materialized view mv2 as 
+    select 
+        year(k4),
+        month(k4) 
+    from 
+        d_table 
+    where 
+        year(k4) = 2020;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:28) /test/1/catalog1/schema1/mv2/",
+      "action" : "CREATE",
+      "target" : "Table(6:8~6:15) /test/1/catalog1/schema1/d_table/"
+    },
+    {
+      "subject": "Function(3:8~3:12) /test/1/catalog1/schema1/year/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:8~4:13) /test/1/catalog1/schema1/month/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:8~8:12) /test/1/catalog1/schema1/year/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0008]
+sql:
+CREATE MATERIALIZED VIEW complete_mv (
+    orderdate COMMENT '订单日期', 
+    orderkey COMMENT '订单键', 
+    partkey COMMENT '部件键'
+    ) 
+    BUILD IMMEDIATE 
+    REFRESH AUTO 
+    ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00' 
+    DISTRIBUTED BY HASH (orderkey) BUCKETS 2 
+    PROPERTIES 
+    ("replication_num" = "1") 
+    AS 
+    SELECT 
+    o_orderdate, 
+    l_orderkey, 
+    l_partkey 
+    FROM 
+    orders 
+    LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+    LEFT JOIN partsupp ON ps_partkey = l_partkey 
+    and l_suppkey = ps_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:36) /test/1/catalog1/schema1/complete_mv/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(18:4~18:10) /test/1/catalog1/schema1/orders/",
+        "Table(19:14~19:22) /test/1/catalog1/schema1/lineitem/",
+        "Table(20:14~20:22) /test/1/catalog1/schema1/partsupp/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0009]
+sql:
+CREATE MATERIALIZED VIEW partition_mv
+    BUILD IMMEDIATE 
+    REFRESH AUTO 
+    ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00' 
+    PARTITION BY (DATE_TRUNC(o_orderdate, 'MONTH'))
+    DISTRIBUTED BY HASH (l_orderkey) BUCKETS 2 
+    PROPERTIES 
+    ("replication_num" = "3") 
+    AS 
+    SELECT 
+    o_orderdate, 
+    l_orderkey, 
+    l_partkey 
+    FROM 
+    orders 
+    LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+    LEFT JOIN partsupp ON ps_partkey = l_partkey 
+    and l_suppkey = ps_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:37) /test/1/catalog1/schema1/partition_mv/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(15:4~15:10) /test/1/catalog1/schema1/orders/",
+        "Table(16:14~16:22) /test/1/catalog1/schema1/lineitem/",
+        "Table(17:14~17:22) /test/1/catalog1/schema1/partsupp/"
+      ]
+    },
+    {
+      "subject": "Function(5:18~5:28) /test/1/catalog1/schema1/DATE_TRUNC/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0010]
+sql:
+CREATE MATERIALIZED VIEW partition_mv_2
+    BUILD IMMEDIATE 
+    REFRESH AUTO 
+    ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00' 
+    PARTITION BY (DATE_TRUNC(min_orderdate, 'MONTH'))
+    DISTRIBUTED BY HASH (l_orderkey) BUCKETS 2 
+    PROPERTIES 
+    ("replication_num" = "3") 
+    AS
+    SELECT 
+    min(o_orderdate) AS min_orderdate, 
+    l_orderkey, 
+    l_partkey 
+    FROM 
+    orders 
+    LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+    LEFT JOIN partsupp ON ps_partkey = l_partkey 
+    and l_suppkey = ps_suppkey
+    GROUP BY 
+    o_orderdate, 
+    l_orderkey, 
+    l_partkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:39) /test/1/catalog1/schema1/partition_mv_2/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(15:4~15:10) /test/1/catalog1/schema1/orders/",
+        "Table(16:14~16:22) /test/1/catalog1/schema1/lineitem/",
+        "Table(17:14~17:22) /test/1/catalog1/schema1/partsupp/"
+      ]
+    },
+    {
+      "subject": "Function(5:18~5:28) /test/1/catalog1/schema1/DATE_TRUNC/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:4~11:7) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0011]
+sql:
+CREATE MATERIALIZED VIEW mv_1 as SELECT k3, k2, k1 FROM tableA ORDER BY k3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:29) /test/1/catalog1/schema1/mv_1/",
+      "action" : "CREATE",
+      "target" : "Table(1:56~1:62) /test/1/catalog1/schema1/tableA/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0012]
+sql:
+create materialized view k1a2p2ap3ps as select abs(k1)+k2+1,sum(abs(k2+2)+k3+3) from d_table group by abs(k1)+k2+1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:36) /test/1/catalog1/schema1/k1a2p2ap3ps/",
+      "action" : "CREATE",
+      "target" : "Table(1:85~1:92) /test/1/catalog1/schema1/d_table/"
+    },
+    {
+      "subject": "Function(1:47~1:50) /test/1/catalog1/schema1/abs/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:60~1:63) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:64~1:67) /test/1/catalog1/schema1/abs/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:102~1:105) /test/1/catalog1/schema1/abs/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0013]
+sql:
+create materialized view kymd as select year(k4),month(k4),day(k4) from d_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:29) /test/1/catalog1/schema1/kymd/",
+      "action" : "CREATE",
+      "target" : "Table(1:72~1:79) /test/1/catalog1/schema1/d_table/"
+    },
+    {
+      "subject": "Function(1:40~1:44) /test/1/catalog1/schema1/year/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:49~1:54) /test/1/catalog1/schema1/month/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:59~1:62) /test/1/catalog1/schema1/day/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0014]
+sql:
+create materialized view k1_k2 as
+   select k2, k1 from duplicate_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:30) /test/1/catalog1/schema1/k1_k2/",
+      "action" : "CREATE",
+      "target" : "Table(2:22~2:37) /test/1/catalog1/schema1/duplicate_table/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0015]
+sql:
+create materialized view k2_order as
+   select k2, k1 from duplicate_table order by k2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:33) /test/1/catalog1/schema1/k2_order/",
+      "action" : "CREATE",
+      "target" : "Table(2:22~2:37) /test/1/catalog1/schema1/duplicate_table/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0016]
+sql:
+create materialized view k1_k2_sumk3 as
+   select k1, k2, sum(k3) from duplicate_table group by k1, k2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:36) /test/1/catalog1/schema1/k1_k2_sumk3/",
+      "action" : "CREATE",
+      "target" : "Table(2:31~2:46) /test/1/catalog1/schema1/duplicate_table/"
+    },
+    {
+      "subject": "Function(2:18~2:21) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0017]
+sql:
+create materialized view deduplicate as
+   select k1, k2, k3, k4 from duplicate_table group by k1, k2, k3, k4;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:36) /test/1/catalog1/schema1/deduplicate/",
+      "action" : "CREATE",
+      "target" : "Table(2:30~2:45) /test/1/catalog1/schema1/duplicate_table/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0018]
+sql:
+create materialized view mv_1 as
+   select k3, k4, k5, k6, k7 from all_type_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:29) /test/1/catalog1/schema1/mv_1/",
+      "action" : "CREATE",
+      "target" : "Table(2:34~2:48) /test/1/catalog1/schema1/all_type_table/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0019]
+sql:
+create materialized view id_col1 as select id,col1 from table3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:32) /test/1/catalog1/schema1/id_col1/",
+      "action" : "CREATE",
+      "target" : "Table(1:56~1:62) /test/1/catalog1/schema1/table3/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0020]
+sql:
+CREATE MATERIALIZED VIEW mv_6
+REFRESH COMPLETE ON SCHEDULE EVERY 10 hour
+DISTRIBUTED BY RANDOM BUCKETS 2   
+AS
+SELECT * FROM lineitem;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:29) /test/1/catalog1/schema1/mv_6/",
+      "action" : "CREATE",
+      "target" : "Table(5:14~5:22) /test/1/catalog1/schema1/lineitem/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0021]
+sql:
+CREATE MATERIALIZED VIEW mv_7
+REFRESH AUTO ON SCHEDULE EVERY 10 hour
+PARTITION by(l_shipdate)
+DISTRIBUTED BY RANDOM BUCKETS 2    
+AS
+SELECT * FROM lineitem;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:29) /test/1/catalog1/schema1/mv_7/",
+      "action" : "CREATE",
+      "target" : "Table(6:14~6:22) /test/1/catalog1/schema1/lineitem/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0022]
+sql:
+CREATE MATERIALIZED VIEW mv_8
+REFRESH AUTO ON COMMIT
+PARTITION by(l_shipdate)
+DISTRIBUTED BY RANDOM BUCKETS 2   
+AS
+SELECT * FROM lineitem;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:29) /test/1/catalog1/schema1/mv_8/",
+      "action" : "CREATE",
+      "target" : "Table(6:14~6:22) /test/1/catalog1/schema1/lineitem/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0023]
+sql:
+CREATE MATERIALIZED VIEW mv_1_0
+BUILD IMMEDIATE 
+REFRESH AUTO
+ON MANUAL    
+DISTRIBUTED BY RANDOM BUCKETS 2   
+AS   
+SELECT   
+  l_linestatus,   
+  to_date(o_orderdate) as date_alias,   
+  o_shippriority   
+FROM   
+  orders   
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:31) /test/1/catalog1/schema1/mv_1_0/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(12:2~12:8) /test/1/catalog1/schema1/orders/",
+        "Table(13:12~13:20) /test/1/catalog1/schema1/lineitem/"
+      ]
+    },
+    {
+      "subject": "Function(9:2~9:9) /test/1/catalog1/schema1/to_date/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0024]
+sql:
+CREATE MATERIALIZED VIEW mv_1_1
+BUILD DEFERRED
+REFRESH COMPLETE
+ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00'  
+DISTRIBUTED BY RANDOM BUCKETS 2          
+PROPERTIES ('replication_num' = '1')   
+AS   
+SELECT   
+l_linestatus,   
+to_date(o_orderdate) as date_alias,   
+o_shippriority   
+FROM   
+orders   
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:31) /test/1/catalog1/schema1/mv_1_1/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(13:0~13:6) /test/1/catalog1/schema1/orders/",
+        "Table(14:10~14:18) /test/1/catalog1/schema1/lineitem/"
+      ]
+    },
+    {
+      "subject": "Function(10:0~10:7) /test/1/catalog1/schema1/to_date/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0025]
+sql:
+CREATE MATERIALIZED VIEW mv_1_1
+BUILD IMMEDIATE
+REFRESH COMPLETE
+ON COMMIT
+DISTRIBUTED BY RANDOM BUCKETS 2          
+PROPERTIES ('replication_num' = '1')   
+AS   
+SELECT   
+l_linestatus,   
+to_date(o_orderdate) as date_alias,   
+o_shippriority   
+FROM   
+orders   
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:31) /test/1/catalog1/schema1/mv_1_1/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(13:0~13:6) /test/1/catalog1/schema1/orders/",
+        "Table(14:10~14:18) /test/1/catalog1/schema1/lineitem/"
+      ]
+    },
+    {
+      "subject": "Function(10:0~10:7) /test/1/catalog1/schema1/to_date/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0026]
+sql:
+CREATE MATERIALIZED VIEW mv_2_0 
+BUILD IMMEDIATE
+REFRESH AUTO
+ON MANUAL   
+PARTITION BY (order_date_month)   
+DISTRIBUTED BY RANDOM BUCKETS 2   
+AS   
+SELECT   
+  l_linestatus,
+  date_trunc(o_orderdate, 'month') as order_date_month,   
+  o_shippriority   
+FROM   
+  orders   
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:31) /test/1/catalog1/schema1/mv_2_0/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(13:2~13:8) /test/1/catalog1/schema1/orders/",
+        "Table(14:10~14:18) /test/1/catalog1/schema1/lineitem/"
+      ]
+    },
+    {
+      "subject": "Function(10:2~10:12) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0027]
+sql:
+CREATE MATERIALIZED VIEW mv_2_1 BUILD IMMEDIATE REFRESH AUTO ON MANUAL   
+PARTITION BY (order_date_month)   
+DISTRIBUTED BY RANDOM BUCKETS 2   
+AS   
+SELECT   
+  l_linestatus,
+  date_trunc(date_add(o_orderdate, INTERVAL 2 DAY), 'month') as order_date_month,   
+  o_shippriority   
+FROM   
+  orders   
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:31) /test/1/catalog1/schema1/mv_2_1/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(10:2~10:8) /test/1/catalog1/schema1/orders/",
+        "Table(11:10~11:18) /test/1/catalog1/schema1/lineitem/"
+      ]
+    },
+    {
+      "subject": "Function(7:2~7:12) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:13~7:21) /test/1/catalog1/schema1/date_add/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0028]
+sql:
+CREATE MATERIALIZED VIEW mv_hive
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+partition by(`year`)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT k1,year,region FROM hive1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:32) /test/1/catalog1/schema1/mv_hive/",
+      "action" : "CREATE",
+      "target" : "Table(6:27~6:32) /test/1/catalog1/schema1/hive1/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0029]
+sql:
+CREATE MATERIALIZED VIEW mv_hive2
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+partition by(`region`)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT k1,year,region FROM hive1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:33) /test/1/catalog1/schema1/mv_hive2/",
+      "action" : "CREATE",
+      "target" : "Table(6:27~6:32) /test/1/catalog1/schema1/hive1/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0030]
+sql:
+CREATE MATERIALIZED VIEW mv1
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+partition by(`k2`)
+DISTRIBUTED BY RANDOM BUCKETS 2
+PROPERTIES (
+'partition_sync_limit'='1',
+'partition_sync_time_unit'='DAY'
+)
+AS
+SELECT * FROM t1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:28) /test/1/catalog1/schema1/mv1/",
+      "action" : "CREATE",
+      "target" : "Table(10:14~10:16) /test/1/catalog1/schema1/t1/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0031]
+sql:
+CREATE MATERIALIZED VIEW mv_3
+    BUILD DEFERRED REFRESH AUTO ON MANUAL
+    partition by (date_trunc(`k2`,'month'))
+    DISTRIBUTED BY RANDOM BUCKETS 2
+    AS
+    SELECT * FROM t1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:29) /test/1/catalog1/schema1/mv_3/",
+      "action" : "CREATE",
+      "target" : "Table(6:18~6:20) /test/1/catalog1/schema1/t1/"
+    },
+    {
+      "subject": "Function(3:18~3:28) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0032]
+sql:
+CREATE MATERIALIZED VIEW mv_4
+    BUILD DEFERRED REFRESH AUTO ON MANUAL
+    partition by (date_trunc(`k2`,'year'))
+    DISTRIBUTED BY RANDOM BUCKETS 2
+    AS
+    SELECT * FROM t1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:29) /test/1/catalog1/schema1/mv_4/",
+      "action" : "CREATE",
+      "target" : "Table(6:18~6:20) /test/1/catalog1/schema1/t1/"
+    },
+    {
+      "subject": "Function(3:18~3:28) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0033]
+sql:
+CREATE MATERIALIZED VIEW mv1
+      BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+      DISTRIBUTED BY RANDOM BUCKETS 3
+      AS
+      SELECT t1.l_linenumber,
+             o_custkey,
+             o_orderdate
+      FROM (SELECT * FROM lineitem WHERE l_linenumber > 1) t1
+      LEFT OUTER JOIN orders
+      ON l_orderkey = o_orderkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:28) /test/1/catalog1/schema1/mv1/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(8:26~8:34) /test/1/catalog1/schema1/lineitem/",
+        "Table(9:22~9:28) /test/1/catalog1/schema1/orders/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0034]
+sql:
+CREATE MATERIALIZED VIEW mv3
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT
+    l_shipdate, l_suppkey, o_orderdate,
+    sum(o_totalprice) AS sum_total,
+    max(o_totalprice) AS max_total,
+    min(o_totalprice) AS min_total,
+    count(*) AS count_all,
+    count(distinct CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END) AS bitmap_union_basic
+FROM lineitem
+LEFT OUTER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+l_shipdate,
+l_suppkey,
+o_orderdate;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:28) /test/1/catalog1/schema1/mv3/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(12:5~12:13) /test/1/catalog1/schema1/lineitem/",
+        "Table(13:16~13:22) /test/1/catalog1/schema1/orders/"
+      ]
+    },
+    {
+      "subject": "Function(7:4~7:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:4~8:7) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:4~9:7) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:4~10:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:4~11:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0035]
+sql:
+CREATE MATERIALIZED VIEW mv4
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT
+    o_shippriority, o_comment,
+    count(distinct CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END) AS cnt_1,
+    count(distinct CASE WHEN O_SHIPPRIORITY > 2 AND o_orderkey IN (2) THEN o_custkey ELSE null END) AS cnt_2,
+    sum(o_totalprice),
+    max(o_totalprice),
+    min(o_totalprice),
+    count(*)
+FROM orders
+GROUP BY
+o_shippriority,
+o_comment;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:28) /test/1/catalog1/schema1/mv4/",
+      "action" : "CREATE",
+      "target" : "Table(13:5~13:11) /test/1/catalog1/schema1/orders/"
+    },
+    {
+      "subject": "Function(7:4~7:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:4~8:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:4~9:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:4~10:7) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:4~11:7) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:4~12:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0036]
+sql:
+CREATE MATERIALIZED VIEW mv5
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT
+    l_shipdate, o_orderdate, l_partkey, l_suppkey,
+    sum(o_totalprice) AS sum_total,
+    max(o_totalprice) AS max_total,
+    min(o_totalprice) AS min_total,
+    count(*) AS count_all,
+    bitmap_union(to_bitmap(CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END)) AS bitmap_union_basic
+FROM lineitem
+LEFT OUTER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+l_shipdate,
+o_orderdate,
+l_partkey,
+l_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:28) /test/1/catalog1/schema1/mv5/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(12:5~12:13) /test/1/catalog1/schema1/lineitem/",
+        "Table(13:16~13:22) /test/1/catalog1/schema1/orders/"
+      ]
+    },
+    {
+      "subject": "Function(7:4~7:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:4~8:7) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:4~9:7) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:4~10:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:4~11:16) /test/1/catalog1/schema1/bitmap_union/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:17~11:26) /test/1/catalog1/schema1/to_bitmap/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0037]
+sql:
+CREATE MATERIALIZED VIEW mv5_1
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+select o_orderstatus, o_orderdate, o_orderpriority,
+       sum(o_totalprice) as sum_total,
+       max(o_totalprice) as max_total,
+       min(o_totalprice) as min_total,
+       count(*) as count_all
+from orders
+group by
+o_orderstatus, o_orderdate, o_orderpriority;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:30) /test/1/catalog1/schema1/mv5_1/",
+      "action" : "CREATE",
+      "target" : "Table(10:5~10:11) /test/1/catalog1/schema1/orders/"
+    },
+    {
+      "subject": "Function(6:7~6:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:7~7:10) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:7~8:10) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:7~9:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0038]
+sql:
+CREATE MATERIALIZED VIEW mv7
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+partition by(l_shipdate)
+DISTRIBUTED BY RANDOM BUCKETS 2
+as
+select l_shipdate, o_orderdate, l_partkey,
+       l_suppkey, sum(o_totalprice) as sum_total
+from lineitem
+left join orders on lineitem.l_orderkey = orders.o_orderkey and l_shipdate = o_orderdate
+group by
+    l_shipdate,
+    o_orderdate,
+    l_partkey,
+    l_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:28) /test/1/catalog1/schema1/mv7/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(8:5~8:13) /test/1/catalog1/schema1/lineitem/",
+        "Table(9:10~9:16) /test/1/catalog1/schema1/orders/"
+      ]
+    },
+    {
+      "subject": "Function(7:18~7:21) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0039]
+sql:
+CREATE MATERIALIZED VIEW mv8_0_inner_mv
+BUILD IMMEDIATE REFRESH COMPLETE ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+select
+l_linenumber,
+o_custkey,
+o_orderkey,
+o_orderstatus,
+l_partkey,
+l_suppkey,
+l_orderkey
+from lineitem
+inner join orders on lineitem.l_orderkey = orders.o_orderkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:39) /test/1/catalog1/schema1/mv8_0_inner_mv/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(13:5~13:13) /test/1/catalog1/schema1/lineitem/",
+        "Table(14:11~14:17) /test/1/catalog1/schema1/orders/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0040]
+sql:
+CREATE MATERIALIZED VIEW mv8_0
+BUILD IMMEDIATE REFRESH COMPLETE ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+select
+l_linenumber,
+o_custkey,
+o_orderkey,
+o_orderstatus,
+l_partkey,
+l_suppkey,
+l_orderkey,
+ps_availqty
+from mv8_0_inner_mv
+inner join partsupp on l_partkey = ps_partkey AND l_suppkey = ps_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:30) /test/1/catalog1/schema1/mv8_0/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(14:5~14:19) /test/1/catalog1/schema1/mv8_0_inner_mv/",
+        "Table(15:11~15:19) /test/1/catalog1/schema1/partsupp/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0041]
+sql:
+CREATE MATERIALIZED VIEW mv10_0
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+as
+select l_shipdate, o_orderdate, l_partkey,
+       l_suppkey, o_totalprice
+from lineitem
+left join orders on lineitem.l_orderkey = orders.o_orderkey and l_shipdate = o_orderdate;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:31) /test/1/catalog1/schema1/mv10_0/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(7:5~7:13) /test/1/catalog1/schema1/lineitem/",
+        "Table(8:10~8:16) /test/1/catalog1/schema1/orders/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0042]
+sql:
+CREATE MATERIALIZED VIEW mv9_0
+BUILD IMMEDIATE REFRESH COMPLETE ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+PROPERTIES ('replication_num' = '1') 
+AS
+select
+  l_linenumber,
+  o_custkey,
+  o_orderkey,
+  o_orderstatus,
+  l_partkey,
+  l_suppkey,
+  l_orderkey
+from lineitem
+inner join orders on lineitem.l_orderkey = orders.o_orderkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:30) /test/1/catalog1/schema1/mv9_0/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(14:5~14:13) /test/1/catalog1/schema1/lineitem/",
+        "Table(15:11~15:17) /test/1/catalog1/schema1/orders/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0043]
+sql:
+CREATE MATERIALIZED VIEW rollup_partition_mv 
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL 
+partition by(order_date) 
+DISTRIBUTED BY RANDOM BUCKETS 2 
+AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day') as order_date 
+FROM 
+  lineitem 
+  LEFT JOIN partsupp ON l_partkey = ps_partkey 
+  and l_suppkey = ps_suppkey 
+GROUP BY 
+  l_linestatus, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:44) /test/1/catalog1/schema1/rollup_partition_mv/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(14:2~14:10) /test/1/catalog1/schema1/lineitem/",
+        "Table(15:12~15:20) /test/1/catalog1/schema1/partsupp/"
+      ]
+    },
+    {
+      "subject": "Function(8:2~8:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:2~12:12) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(20:2~20:12) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0044]
+sql:
+CREATE MATERIALIZED VIEW union_sub_mv1
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL 
+partition by(order_date) 
+DISTRIBUTED BY RANDOM BUCKETS 2 
+AS
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day') as order_date 
+FROM 
+  lineitem 
+  LEFT JOIN partsupp ON l_partkey = ps_partkey 
+  and l_suppkey = ps_suppkey 
+GROUP BY 
+  l_linestatus, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:38) /test/1/catalog1/schema1/union_sub_mv1/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(14:2~14:10) /test/1/catalog1/schema1/lineitem/",
+        "Table(15:12~15:20) /test/1/catalog1/schema1/partsupp/"
+      ]
+    },
+    {
+      "subject": "Function(8:2~8:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:2~12:12) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(20:2~20:12) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0045]
+sql:
+CREATE MATERIALIZED VIEW union_sub_mv2
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL 
+partition by(order_date) 
+DISTRIBUTED BY RANDOM BUCKETS 2 
+       
+AS
+SELECT
+  l_linestatus, 
+  l_extendedprice, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day') as order_date 
+FROM 
+  lineitem 
+  LEFT JOIN partsupp ON l_partkey = ps_partkey 
+  and l_suppkey = ps_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:38) /test/1/catalog1/schema1/union_sub_mv2/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(13:2~13:10) /test/1/catalog1/schema1/lineitem/",
+        "Table(14:12~14:20) /test/1/catalog1/schema1/partsupp/"
+      ]
+    },
+    {
+      "subject": "Function(11:2~11:12) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0046]
+sql:
+CREATE VIEW union_all_view
+AS
+SELECT * 
+FROM
+union_sub_mv1
+UNION ALL
+SELECT * 
+FROM
+union_sub_mv2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "View(1:12~1:26) /test/1/catalog1/schema1/union_all_view/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(5:0~5:13) /test/1/catalog1/schema1/union_sub_mv1/",
+        "Table(9:0~9:13) /test/1/catalog1/schema1/union_sub_mv2/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0047]
+sql:
+CREATE MATERIALIZED VIEW latest_partition_mv 
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL 
+partition by(order_date) 
+DISTRIBUTED BY RANDOM BUCKETS 2 
+PROPERTIES (
+  "partition_sync_limit" = "3", 
+  "partition_sync_time_unit" = "DAY", 
+  "partition_date_format" = "yyyy-MM-dd"
+)       
+AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day') as order_date 
+FROM 
+  lineitem 
+  LEFT JOIN partsupp ON l_partkey = ps_partkey 
+  and l_suppkey = ps_suppkey 
+GROUP BY 
+  l_linestatus, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:44) /test/1/catalog1/schema1/latest_partition_mv/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(19:2~19:10) /test/1/catalog1/schema1/lineitem/",
+        "Table(20:12~20:20) /test/1/catalog1/schema1/partsupp/"
+      ]
+    },
+    {
+      "subject": "Function(13:2~13:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(17:2~17:12) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(25:2~25:12) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0048]
+sql:
+CREATE MATERIALIZED VIEW common_agg_mv
+    BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+    DISTRIBUTED BY RANDOM BUCKETS 2
+    AS 
+    SELECT 
+      l_linestatus, 
+      sum(
+        l_extendedprice * (1 - l_discount)
+      ) AS revenue, 
+      o_shippriority,
+      l_suppkey,
+      l_partkey,
+      o_orderdate
+    FROM 
+      orders 
+      LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+    GROUP BY 
+      l_linestatus, 
+      o_shippriority,
+      l_suppkey,
+      l_partkey,
+      o_orderdate;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:38) /test/1/catalog1/schema1/common_agg_mv/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(15:6~15:12) /test/1/catalog1/schema1/orders/",
+        "Table(16:16~16:24) /test/1/catalog1/schema1/lineitem/"
+      ]
+    },
+    {
+      "subject": "Function(7:6~7:9) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0049]
+sql:
+CREATE MATERIALIZED VIEW sync_mv
+    AS
+    SELECT 
+      decision,
+      code, 
+      app_name, 
+      event_id, 
+      event_type, 
+      date_trunc(time, 'minute'), 
+      DATE_FORMAT(
+        `time`, '%Y-%m-%d'
+      ), 
+      cast(FLOOR(MINUTE(time) / 15) as decimal(9, 0)),
+      count(id) as cnt
+    from 
+      test 
+    group by 
+      code, 
+      app_name, 
+      event_id, 
+      event_type, 
+      date_trunc(time, 'minute'), 
+      decision, 
+      DATE_FORMAT(time, '%Y-%m-%d'), 
+      cast(FLOOR(MINUTE(`time`) / 15) as decimal(9, 0));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:32) /test/1/catalog1/schema1/sync_mv/",
+      "action" : "CREATE",
+      "target" : "Table(16:6~16:10) /test/1/catalog1/schema1/test/"
+    },
+    {
+      "subject": "Function(9:6~9:16) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:6~10:17) /test/1/catalog1/schema1/DATE_FORMAT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(13:11~13:16) /test/1/catalog1/schema1/FLOOR/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(13:17~13:23) /test/1/catalog1/schema1/MINUTE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(14:6~14:11) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(22:6~22:16) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(24:6~24:17) /test/1/catalog1/schema1/DATE_FORMAT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(25:11~25:16) /test/1/catalog1/schema1/FLOOR/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(25:17~25:23) /test/1/catalog1/schema1/MINUTE/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0050]
+sql:
+CREATE MATERIALIZED VIEW dwd_order_detail
+BUILD IMMEDIATE REFRESH AUTO ON COMMIT
+DISTRIBUTED BY RANDOM BUCKETS 16
+AS
+select
+o.o_orderkey,
+o.o_custkey,
+o.o_orderstatus,
+o.o_totalprice,
+o.o_orderdate,
+c.c_name,
+c.c_nationkey,
+n.n_name as nation_name,
+r.r_name as region_name,
+l.l_partkey,
+l.l_quantity,
+l.l_extendedprice,
+l.l_discount,
+l.l_tax
+from orders o
+join customer c on o.o_custkey = c.c_custkey
+join nation n on c.c_nationkey = n.n_nationkey
+join region r on n.n_regionkey = r.r_regionkey
+join lineitem l on o.o_orderkey = l.l_orderkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:41) /test/1/catalog1/schema1/dwd_order_detail/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(20:5~20:11) /test/1/catalog1/schema1/orders/",
+        "Table(21:5~21:13) /test/1/catalog1/schema1/customer/",
+        "Table(22:5~22:11) /test/1/catalog1/schema1/nation/",
+        "Table(23:5~23:11) /test/1/catalog1/schema1/region/",
+        "Table(24:5~24:13) /test/1/catalog1/schema1/lineitem/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0051]
+sql:
+CREATE MATERIALIZED VIEW dws_daily_sales
+BUILD IMMEDIATE REFRESH AUTO ON COMMIT
+DISTRIBUTED BY RANDOM BUCKETS 16
+AS
+select
+date_trunc(o_orderdate, 'month') as month,
+nation_name,
+region_name,
+bitmap_union(to_bitmap(o_orderkey)) as order_count,
+sum(l_extendedprice * (1 - l_discount)) as net_revenue
+from dwd_order_detail
+group by
+date_trunc(o_orderdate, 'month'),
+nation_name,
+region_name;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:40) /test/1/catalog1/schema1/dws_daily_sales/",
+      "action" : "CREATE",
+      "target" : "Table(11:5~11:21) /test/1/catalog1/schema1/dwd_order_detail/"
+    },
+    {
+      "subject": "Function(6:0~6:10) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:0~9:12) /test/1/catalog1/schema1/bitmap_union/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:13~9:22) /test/1/catalog1/schema1/to_bitmap/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:0~10:3) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(13:0~13:10) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_view_001__create_view__0052]
+sql:
+create materialized view store_amt as 
+select store_id, sum(sale_amt) from sales_records group by store_id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:34) /test/1/catalog1/schema1/store_amt/",
+      "action" : "CREATE",
+      "target" : "Table(2:36~2:49) /test/1/catalog1/schema1/sales_records/"
+    },
+    {
+      "subject": "Function(2:17~2:20) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}

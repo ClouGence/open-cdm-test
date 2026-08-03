@@ -1,0 +1,310 @@
+ALTER TABLE amazon_reviews ADD INDEX review_body_ngram_idx(review_body) USING NGRAM_BF PROPERTIES("gram_size"="10", "bf_size"="10240");
+-- Add a column. Result will be returned in milliseconds.
+ALTER TABLE lineitem ADD COLUMN l_new_column INT;
+ALTER TABLE enable_binlog SET ("binlog.enable" = "true");
+ALTER TABLE customer SET ("file_cache_ttl_seconds" = "3000");
+-- Dimension table: small data volume, infrequent changes; set a 1-year TTL to keep it resident in the cache
+ALTER TABLE dimension_table SET ("file_cache_ttl_seconds" = "31536000");
+
+-- Fact table: full load ingested daily; set a 1-day TTL aligned with the ingestion cycle
+ALTER TABLE fact_table SET ("file_cache_ttl_seconds" = "86400");
+-- Range partition: LESS THAN form
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01");
+
+-- Range partition: fixed-interval form
+ALTER TABLE tbl2 ADD TEMPORARY PARTITION tp1 VALUES [("2020-01-01"), ("2020-02-01"));
+
+-- Range partition: custom replica count and bucketing
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+
+-- List partition: single-column enumeration
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai");
+
+-- List partition: multi-column enumeration
+ALTER TABLE tbl4 ADD TEMPORARY PARTITION tp1 VALUES IN ((1, "Beijing"), (1, "Shanghai"));
+
+-- List partition: custom replica count and bucketing
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+-- Equal-count replacement
+ALTER TABLE tbl1 REPLACE PARTITION (p1) WITH TEMPORARY PARTITION (tp1);
+
+-- Many-to-many replacement
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2, tp3);
+
+-- Replace with explicit parameters
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2)
+PROPERTIES (
+    "strict_range" = "false",
+    "use_temp_partition_name" = "true"
+);
+ALTER TABLE tbl1 REPLACE PARTITION (p1) WITH TEMPORARY PARTITION (tp1);
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1);
+ALTER TABLE tbl1 DROP TEMPORARY PARTITION tp1;
+ALTER TABLE example_table
+SET ( 'min_load_replica_num' = '2' );
+ALTER TABLE db1.tbl1 ENABLE FEATURE "UPDATE_FLEXIBLE_COLUMNS";
+ALTER TABLE tbl SET ("colocate_with" = "group2");
+ALTER TABLE tbl SET ("colocate_with" = "");
+ALTER TABLE products ORDER BY (product_id, total_value, price, quantity);
+ALTER TABLE products RENAME COLUMN total_value new_name;
+ALTER TABLE products DROP COLUMN total_value;
+ALTER TABLE example_db.my_table
+  ADD COLUMN new_col INT KEY DEFAULT "0" AFTER key_1;
+ALTER TABLE example_db.my_table
+  ADD COLUMN new_col INT DEFAULT "0" AFTER value_1;
+ALTER TABLE example_db.my_table   
+  ADD COLUMN new_col INT SUM DEFAULT "0" AFTER value_1;
+ALTER TABLE example_db.my_table
+  ADD COLUMN new_col INT KEY DEFAULT "0" FIRST;
+ALTER TABLE example_db.my_table
+  ADD COLUMN (new_col1 INT SUM DEFAULT "0" ,new_col2 INT SUM DEFAULT "0");
+ALTER TABLE example_db.my_table
+  ADD COLUMN (new_col1 INT key DEFAULT "0" , new_col2 INT DEFAULT "0");
+ALTER TABLE example_db.my_table DROP COLUMN col1;
+ALTER TABLE example_db.my_table 
+  MODIFY COLUMN col1 BIGINT KEY DEFAULT "1" AFTER col2;
+ALTER TABLE example_db.my_table 
+  MODIFY COLUMN val1 VARCHAR(64) REPLACE DEFAULT "abc";
+ALTER TABLE example_db.my_table 
+  MODIFY COLUMN k3 VARCHAR(50) KEY NULL COMMENT 'to 50';
+ALTER TABLE table1 MODIFY COMMENT "table1_comment";
+ALTER TABLE table1 MODIFY COLUMN col1 COMMENT "table1_col1_comment";
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+ALTER TABLE example_db.my_table ADD PARTITION p3 VALUES LESS THAN ('30');
+-- p3 will have 10 buckets; existing partitions remain unchanged
+;
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 3;
+ALTER TABLE example_db.my_list_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 8;
+ALTER TABLE example_db.my_random_table MODIFY DISTRIBUTION DISTRIBUTED BY RANDOM BUCKETS 12;
+ALTER TABLE example_db.my_random_table MODIFY DISTRIBUTION DISTRIBUTED BY RANDOM BUCKETS AUTO;
+-- Table originally created with BUCKETS AUTO
+ALTER TABLE example_db.my_auto_auto_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 5;
+-- New partitions will use 5 buckets
+
+ALTER TABLE example_db.my_auto_auto_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+-- New partitions will return to system-determined bucket count
+;
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 4;
+ALTER TABLE example_db.my_table ADD PARTITION p2 VALUES LESS THAN ('20');
+-- p2 has 4 buckets
+
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+ALTER TABLE example_db.my_table ADD PARTITION p3 VALUES LESS THAN ('30');
+-- p3 has system-determined bucket count
+
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 6;
+ALTER TABLE example_db.my_table ADD PARTITION p4 VALUES LESS THAN ('40');
+-- p4 has 6 buckets
+;
+-- This will fail with: "Cannot change default bucket number of colocate table"
+ALTER TABLE example_db.my_colocate_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+-- This will fail with: "Only support change partitioned table's distribution"
+ALTER TABLE example_db.my_unpartitioned_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+-- Original table uses HASH distribution; changing to RANDOM will fail
+-- Error: "Cannot change distribution type"
+ALTER TABLE example_db.my_hash_table MODIFY DISTRIBUTION DISTRIBUTED BY RANDOM BUCKETS 10;
+-- Original table uses HASH(k1); changing to HASH(k2) will fail
+-- Error: "Cannot assign hash distribution with different distribution cols"
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k2) BUCKETS 10;
+ALTER TABLE example_db.my_table
+ADD PARTITION p1 VALUES LESS THAN ("2014-01-01");
+ALTER TABLE example_db.my_table
+ADD PARTITION p1 VALUES LESS THAN ("2015-01-01")
+DISTRIBUTED BY HASH(k1) BUCKETS 20;
+ALTER TABLE example_db.my_table
+ADD PARTITION p1 VALUES LESS THAN ("2015-01-01")
+("replication_num"="1");
+ALTER TABLE example_db.my_table
+MODIFY PARTITION p1 SET("replication_num"="1");
+ALTER TABLE example_db.my_table
+MODIFY PARTITION (p1, p2, p4) SET("replication_num"="1");
+ALTER TABLE example_db.my_table
+MODIFY PARTITION (*) SET("storage_medium"="HDD");
+ALTER TABLE example_db.my_table
+DROP PARTITION p1;
+ALTER TABLE example_db.my_table
+DROP PARTITION p1,
+DROP PARTITION p2,
+DROP PARTITION p3;
+------------------------------------------------------------------------------------------
+[ALTER_TABLE|ADD_INDEX] ALTER TABLE amazon_reviews ADD INDEX review_body_ngram_idx(review_body) USING NGRAM_BF PROPERTIES("gram_size"="10", "bf_size"="10240");
+----------
+[ALTER_TABLE|ADD_COLUMN] -- Add a column. Result will be returned in milliseconds.
+ALTER TABLE lineitem ADD COLUMN l_new_column INT;
+----------
+[ALTER_TABLE] ALTER TABLE enable_binlog SET ("binlog.enable" = "true");
+----------
+[ALTER_TABLE] ALTER TABLE customer SET ("file_cache_ttl_seconds" = "3000");
+----------
+[ALTER_TABLE] -- Dimension table: small data volume, infrequent changes; set a 1-year TTL to keep it resident in the cache
+ALTER TABLE dimension_table SET ("file_cache_ttl_seconds" = "31536000");
+----------
+[ALTER_TABLE] -- Fact table: full load ingested daily; set a 1-day TTL aligned with the ingestion cycle
+ALTER TABLE fact_table SET ("file_cache_ttl_seconds" = "86400");
+----------
+[ALTER_TABLE|ADD_PARTITION] -- Range partition: LESS THAN form
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01");
+----------
+[ALTER_TABLE|ADD_PARTITION] -- Range partition: fixed-interval form
+ALTER TABLE tbl2 ADD TEMPORARY PARTITION tp1 VALUES [("2020-01-01"), ("2020-02-01"));
+----------
+[ALTER_TABLE|ADD_PARTITION] -- Range partition: custom replica count and bucketing
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+----------
+[ALTER_TABLE|ADD_PARTITION] -- List partition: single-column enumeration
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai");
+----------
+[ALTER_TABLE|ADD_PARTITION] -- List partition: multi-column enumeration
+ALTER TABLE tbl4 ADD TEMPORARY PARTITION tp1 VALUES IN ((1, "Beijing"), (1, "Shanghai"));
+----------
+[ALTER_TABLE|ADD_PARTITION] -- List partition: custom replica count and bucketing
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- Equal-count replacement
+ALTER TABLE tbl1 REPLACE PARTITION (p1) WITH TEMPORARY PARTITION (tp1);
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- Many-to-many replacement
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2, tp3);
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- Replace with explicit parameters
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2)
+PROPERTIES (
+    "strict_range" = "false",
+    "use_temp_partition_name" = "true"
+);
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE tbl1 REPLACE PARTITION (p1) WITH TEMPORARY PARTITION (tp1);
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1);
+----------
+[ALTER_TABLE|DROP_PARTITION] ALTER TABLE tbl1 DROP TEMPORARY PARTITION tp1;
+----------
+[ALTER_TABLE] ALTER TABLE example_table
+SET ( 'min_load_replica_num' = '2' );
+----------
+[ALTER_TABLE] ALTER TABLE db1.tbl1 ENABLE FEATURE "UPDATE_FLEXIBLE_COLUMNS";
+----------
+[ALTER_TABLE] ALTER TABLE tbl SET ("colocate_with" = "group2");
+----------
+[ALTER_TABLE] ALTER TABLE tbl SET ("colocate_with" = "");
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE products ORDER BY (product_id, total_value, price, quantity);
+----------
+[ALTER_TABLE|RENAME_COLUMN] ALTER TABLE products RENAME COLUMN total_value new_name;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE products DROP COLUMN total_value;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE example_db.my_table
+  ADD COLUMN new_col INT KEY DEFAULT "0" AFTER key_1;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE example_db.my_table
+  ADD COLUMN new_col INT DEFAULT "0" AFTER value_1;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE example_db.my_table   
+  ADD COLUMN new_col INT SUM DEFAULT "0" AFTER value_1;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE example_db.my_table
+  ADD COLUMN new_col INT KEY DEFAULT "0" FIRST;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE example_db.my_table
+  ADD COLUMN (new_col1 INT SUM DEFAULT "0" ,new_col2 INT SUM DEFAULT "0");
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE example_db.my_table
+  ADD COLUMN (new_col1 INT key DEFAULT "0" , new_col2 INT DEFAULT "0");
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE example_db.my_table DROP COLUMN col1;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE example_db.my_table 
+  MODIFY COLUMN col1 BIGINT KEY DEFAULT "1" AFTER col2;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE example_db.my_table 
+  MODIFY COLUMN val1 VARCHAR(64) REPLACE DEFAULT "abc";
+----------
+[ALTER_TABLE|ALTER_COLUMN|COMMENT_COLUMN] ALTER TABLE example_db.my_table 
+  MODIFY COLUMN k3 VARCHAR(50) KEY NULL COMMENT 'to 50';
+----------
+[ALTER_TABLE|COMMENT_TABLE] ALTER TABLE table1 MODIFY COMMENT "table1_comment";
+----------
+[ALTER_TABLE|COMMENT_COLUMN] ALTER TABLE table1 MODIFY COLUMN col1 COMMENT "table1_col1_comment";
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITION p3 VALUES LESS THAN ('30');
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 3;
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_list_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 8;
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_random_table MODIFY DISTRIBUTION DISTRIBUTED BY RANDOM BUCKETS 12;
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_random_table MODIFY DISTRIBUTION DISTRIBUTED BY RANDOM BUCKETS AUTO;
+----------
+[ALTER_TABLE] -- Table originally created with BUCKETS AUTO
+ALTER TABLE example_db.my_auto_auto_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 5;
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_auto_auto_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 4;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITION p2 VALUES LESS THAN ('20');
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITION p3 VALUES LESS THAN ('30');
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 6;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITION p4 VALUES LESS THAN ('40');
+----------
+[ALTER_TABLE] -- This will fail with: "Cannot change default bucket number of colocate table"
+ALTER TABLE example_db.my_colocate_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+----------
+[ALTER_TABLE] -- This will fail with: "Only support change partitioned table's distribution"
+ALTER TABLE example_db.my_unpartitioned_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+----------
+[ALTER_TABLE] -- Original table uses HASH distribution; changing to RANDOM will fail
+-- Error: "Cannot change distribution type"
+ALTER TABLE example_db.my_hash_table MODIFY DISTRIBUTION DISTRIBUTED BY RANDOM BUCKETS 10;
+----------
+[ALTER_TABLE] -- Original table uses HASH(k1); changing to HASH(k2) will fail
+-- Error: "Cannot assign hash distribution with different distribution cols"
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k2) BUCKETS 10;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table
+ADD PARTITION p1 VALUES LESS THAN ("2014-01-01");
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table
+ADD PARTITION p1 VALUES LESS THAN ("2015-01-01")
+DISTRIBUTED BY HASH(k1) BUCKETS 20;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table
+ADD PARTITION p1 VALUES LESS THAN ("2015-01-01")
+("replication_num"="1");
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE example_db.my_table
+MODIFY PARTITION p1 SET("replication_num"="1");
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE example_db.my_table
+MODIFY PARTITION (p1, p2, p4) SET("replication_num"="1");
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE example_db.my_table
+MODIFY PARTITION (*) SET("storage_medium"="HDD");
+----------
+[ALTER_TABLE|DROP_PARTITION] ALTER TABLE example_db.my_table
+DROP PARTITION p1;
+----------
+[ALTER_TABLE|DROP_PARTITION] ALTER TABLE example_db.my_table
+DROP PARTITION p1,
+DROP PARTITION p2,
+DROP PARTITION p3;

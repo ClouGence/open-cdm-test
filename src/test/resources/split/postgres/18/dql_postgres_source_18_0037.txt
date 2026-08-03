@@ -1,0 +1,456 @@
+SELECT JSON_QUERY(jsonb 'null', '$Xyz' PASSING 1 AS Xyz)
+;
+SELECT TIMESTAMP '2001-02-16 20:38:40' AT LOCAL AS timestamp_at_local,
+       TIMESTAMP WITH TIME ZONE '2001-02-16 20:38:40-05' AT LOCAL AS timestamptz_at_local,
+       TIME WITH TIME ZONE '20:38:40-05' AT LOCAL AS timetz_at_local
+;
+-- TABLE-level ERROR ON ERROR is not propagated to columns
+SELECT *
+FROM
+	(VALUES ('1'), ('"err"')) vals(js)
+		LEFT OUTER JOIN
+	JSON_TABLE(vals.js::jsonb, '$' COLUMNS (a int PATH '$' ERROR ON ERROR)) jt
+		ON true
+;
+SELECT JSON('{"a": 1, "a": 2}' WITHOUT UNIQUE KEYS)
+;
+SELECT JSON_QUERY(jsonb '{}', '$.missing' EMPTY ARRAY ON EMPTY) AS empty_array_on_empty
+;
+SELECT 0x7FFFFFFF
+;
+with test1 as (select * from table1) select * from (with test2 as (select * from table2) select * from test2)
+;
+SELECT JSON_VALUE(jsonb '{"a": 123}', '$' || '.' || 'b' DEFAULT 'foo' ON EMPTY)
+;
+SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' RETURNING text))
+;
+SELECT JSON_OBJECT('a': 2::text)
+;
+-- error
+
+-- Subselects without aliases
+
+SELECT count FROM (SELECT COUNT(DISTINCT name) FROM road)
+;
+SELECT
+	JSON_QUERY(js, '$') AS "unspec",
+	JSON_QUERY(js, '$' WITHOUT WRAPPER) AS "without",
+	JSON_QUERY(js, '$' WITH CONDITIONAL WRAPPER) AS "with cond",
+	JSON_QUERY(js, '$' WITH UNCONDITIONAL ARRAY WRAPPER) AS "with uncond",
+	JSON_QUERY(js, '$' WITH ARRAY WRAPPER) AS "with"
+FROM
+	(VALUES
+		(jsonb 'null'),
+		('12.3'),
+		('true'),
+		('"aaa"'),
+		('[1, null, "2"]'),
+		('{"a": 1, "b": [2]}')
+	) foo(js)
+;
+SELECT NULL::json IS JSON
+;
+SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2 DEFAULT 1 ON ERROR)
+;
+SELECT 0b_10_0101
+;
+-- RETURNING tries to return its own output
+WITH RECURSIVE t(action, a) AS (
+	MERGE INTO y USING (VALUES (11)) v(a) ON y.a = v.a
+		WHEN NOT MATCHED THEN INSERT VALUES (v.a)
+		RETURNING merge_action(), (SELECT a FROM t)
+)
+SELECT * FROM t
+;
+SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+SELECT JSON_VALUE(jsonb '[" "]', '$[*]' RETURNING int ERROR ON ERROR)
+;
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::text COLLATE "C" ON ERROR)
+;
+SELECT -0x80000001
+;
+SELECT JSON_OBJECT('a' || 2: 1)
+;
+select x, lag(x, 1) over (order by x), lead(x, 3) over (order by x)
+from (select x::numeric as x from generate_series(1,10) x)
+;
+SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$'
+	COLUMNS (
+		NESTED PATH '$' AS a
+		COLUMNS (
+			b int
+		),
+		NESTED PATH '$'
+		COLUMNS (
+			NESTED PATH '$' AS a
+			COLUMNS (
+				c int
+			)
+		)
+	)
+) jt
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+  cycle f, t set is_cycle using path
+select * from search_graph
+;
+-- "group by distinct" behavior...
+select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by distinct rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+SELECT JSON_ARRAYAGG(JSON_ARRAY(i, i + 1 RETURNING text) FORMAT JSON NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (2)) AS t(i)
+;
+SELECT JSON_OBJECTAGG(NULL: 1 RETURNING jsonb)
+;
+SELECT * FROM JSON_TABLE(
+  jsonb '{"favorites":[{"kind":"comedy","films":[{"title":"Bananas","director":"Woody Allen"},{"title":"The Dinner Game","director":"Francis Veber"}]},{"kind":"horror","films":[{"title":"Psycho","director":"Alfred Hitchcock"}]}]}',
+  '$.favorites[*]'
+  COLUMNS (
+    id FOR ORDINALITY,
+    kind text PATH '$.kind',
+    title jsonb PATH '$.films[*].title' WITH WRAPPER,
+    director jsonb PATH '$.films[*].director' WITH WRAPPER
+  )
+) AS jt
+;
+-- But KEEP QUOTES (the default) is fine
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text FORMAT JSON PATH '$' WITH WRAPPER KEEP QUOTES))
+;
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int omit quotes true on error))
+;
+SELECT -0b10000000000000000000000000000001
+;
+SELECT JSON_VALUE(jsonb '"1.23"', '$' RETURNING numeric)
+;
+SELECT SUBSTRING('abcdefg' SIMILAR 'a#"(b_d)#"%' ESCAPE '#') AS "bcd"
+;
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+-- Other miscellaneous checks
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			aaa int, -- "aaa" has implicit path '$."aaa"'
+			aaa1 int PATH '$.aaa',
+			js2 json PATH '$',
+			jsb2w jsonb PATH '$' WITH WRAPPER,
+			jsb2q jsonb PATH '$' OMIT QUOTES,
+			ia int[] PATH '$',
+			ta text[] PATH '$',
+			jba jsonb[] PATH '$'
+		)
+	) jt
+	ON true
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$.a' RETURNING char(2) OMIT QUOTES DEFAULT '"bb"'::jsonb ON EMPTY)
+;
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int2 omit quotes error on error)
+;
+-- Test ON ERROR / EMPTY value validity for the function; all fail.
+SELECT JSON_EXISTS(jsonb '1', '$' DEFAULT 1 ON ERROR)
+;
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' WITHOUT WRAPPER OMIT QUOTES))
+;
+explain (analyze,buffers off,costs off) select sum(n) over(partition by m) from (SELECT n < 3 as m, n from generate_series(1,2500) a(n))
+;
+SELECT JSON_VALUE(jsonb 'null', '$a' PASSING point ' (1, 2 )' AS a RETURNING point ERROR ON ERROR)
+;
+-- Reading page not in buffer with read-only
+SELECT test_slru_page_readonly(0x1234500000001)
+;
+SELECT NULL::text IS JSON
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING jsonb)
+;
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			exists1 bool EXISTS PATH '$.aaa',
+			exists2 int EXISTS PATH '$.aaa',
+			exists3 int EXISTS PATH 'strict $.aaa' UNKNOWN ON ERROR,
+			exists4 text EXISTS PATH 'strict $.aaa' FALSE ON ERROR
+		)
+	) jt
+	ON true
+;
+SELECT JSON_VALUE(jsonb '"aaa"', '$' RETURNING json ERROR ON ERROR)
+;
+SELECT JSON('   1   '::json WITH UNIQUE KEYS)
+;
+SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+SELECT 0o2_73
+;
+SELECT JSON_VALUE(jsonb '"111"', '$.a'  RETURNING bit(3) DEFAULT '1111' ON EMPTY)
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$Xyz' PASSING 1 AS Xyz)
+;
+----------
+[SELECT] SELECT TIMESTAMP '2001-02-16 20:38:40' AT LOCAL AS timestamp_at_local,
+       TIMESTAMP WITH TIME ZONE '2001-02-16 20:38:40-05' AT LOCAL AS timestamptz_at_local,
+       TIME WITH TIME ZONE '20:38:40-05' AT LOCAL AS timetz_at_local
+;
+----------
+[SELECT] -- TABLE-level ERROR ON ERROR is not propagated to columns
+SELECT *
+FROM
+	(VALUES ('1'), ('"err"')) vals(js)
+		LEFT OUTER JOIN
+	JSON_TABLE(vals.js::jsonb, '$' COLUMNS (a int PATH '$' ERROR ON ERROR)) jt
+		ON true
+;
+----------
+[SELECT] SELECT JSON('{"a": 1, "a": 2}' WITHOUT UNIQUE KEYS)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '{}', '$.missing' EMPTY ARRAY ON EMPTY) AS empty_array_on_empty
+;
+----------
+[SELECT] SELECT 0x7FFFFFFF
+;
+----------
+[SELECT] with test1 as (select * from table1) select * from (with test2 as (select * from table2) select * from test2)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '{"a": 123}', '$' || '.' || 'b' DEFAULT 'foo' ON EMPTY)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' RETURNING text))
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': 2::text)
+;
+----------
+[SELECT] -- error
+
+-- Subselects without aliases
+
+SELECT count FROM (SELECT COUNT(DISTINCT name) FROM road)
+;
+----------
+[SELECT] SELECT
+	JSON_QUERY(js, '$') AS "unspec",
+	JSON_QUERY(js, '$' WITHOUT WRAPPER) AS "without",
+	JSON_QUERY(js, '$' WITH CONDITIONAL WRAPPER) AS "with cond",
+	JSON_QUERY(js, '$' WITH UNCONDITIONAL ARRAY WRAPPER) AS "with uncond",
+	JSON_QUERY(js, '$' WITH ARRAY WRAPPER) AS "with"
+FROM
+	(VALUES
+		(jsonb 'null'),
+		('12.3'),
+		('true'),
+		('"aaa"'),
+		('[1, null, "2"]'),
+		('{"a": 1, "b": [2]}')
+	) foo(js)
+;
+----------
+[SELECT] SELECT NULL::json IS JSON
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2 DEFAULT 1 ON ERROR)
+;
+----------
+[SELECT] SELECT 0b_10_0101
+;
+----------
+[SELECT|MERGE] -- RETURNING tries to return its own output
+WITH RECURSIVE t(action, a) AS (
+	MERGE INTO y USING (VALUES (11)) v(a) ON y.a = v.a
+		WHEN NOT MATCHED THEN INSERT VALUES (v.a)
+		RETURNING merge_action(), (SELECT a FROM t)
+)
+SELECT * FROM t
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '[" "]', '$[*]' RETURNING int ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::text COLLATE "C" ON ERROR)
+;
+----------
+[SELECT] SELECT -0x80000001
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a' || 2: 1)
+;
+----------
+[SELECT] select x, lag(x, 1) over (order by x), lead(x, 3) over (order by x)
+from (select x::numeric as x from generate_series(1,10) x)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$'
+	COLUMNS (
+		NESTED PATH '$' AS a
+		COLUMNS (
+			b int
+		),
+		NESTED PATH '$'
+		COLUMNS (
+			NESTED PATH '$' AS a
+			COLUMNS (
+				c int
+			)
+		)
+	)
+) jt
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+  cycle f, t set is_cycle using path
+select * from search_graph
+;
+----------
+[SELECT] -- "group by distinct" behavior...
+select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by distinct rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(JSON_ARRAY(i, i + 1 RETURNING text) FORMAT JSON NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (2)) AS t(i)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(NULL: 1 RETURNING jsonb)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+  jsonb '{"favorites":[{"kind":"comedy","films":[{"title":"Bananas","director":"Woody Allen"},{"title":"The Dinner Game","director":"Francis Veber"}]},{"kind":"horror","films":[{"title":"Psycho","director":"Alfred Hitchcock"}]}]}',
+  '$.favorites[*]'
+  COLUMNS (
+    id FOR ORDINALITY,
+    kind text PATH '$.kind',
+    title jsonb PATH '$.films[*].title' WITH WRAPPER,
+    director jsonb PATH '$.films[*].director' WITH WRAPPER
+  )
+) AS jt
+;
+----------
+[SELECT] -- But KEEP QUOTES (the default) is fine
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text FORMAT JSON PATH '$' WITH WRAPPER KEEP QUOTES))
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int omit quotes true on error))
+;
+----------
+[SELECT] SELECT -0b10000000000000000000000000000001
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"1.23"', '$' RETURNING numeric)
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR 'a#"(b_d)#"%' ESCAPE '#') AS "bcd"
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+----------
+[SELECT] -- Other miscellaneous checks
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			aaa int, -- "aaa" has implicit path '$."aaa"'
+			aaa1 int PATH '$.aaa',
+			js2 json PATH '$',
+			jsb2w jsonb PATH '$' WITH WRAPPER,
+			jsb2q jsonb PATH '$' OMIT QUOTES,
+			ia int[] PATH '$',
+			ta text[] PATH '$',
+			jba jsonb[] PATH '$'
+		)
+	) jt
+	ON true
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$.a' RETURNING char(2) OMIT QUOTES DEFAULT '"bb"'::jsonb ON EMPTY)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int2 omit quotes error on error)
+;
+----------
+[SELECT] -- Test ON ERROR / EMPTY value validity for the function; all fail.
+SELECT JSON_EXISTS(jsonb '1', '$' DEFAULT 1 ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' WITHOUT WRAPPER OMIT QUOTES))
+;
+----------
+[SELECT] explain (analyze,buffers off,costs off) select sum(n) over(partition by m) from (SELECT n < 3 as m, n from generate_series(1,2500) a(n))
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$a' PASSING point ' (1, 2 )' AS a RETURNING point ERROR ON ERROR)
+;
+----------
+[SELECT] -- Reading page not in buffer with read-only
+SELECT test_slru_page_readonly(0x1234500000001)
+;
+----------
+[SELECT] SELECT NULL::text IS JSON
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING jsonb)
+;
+----------
+[SELECT] SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			exists1 bool EXISTS PATH '$.aaa',
+			exists2 int EXISTS PATH '$.aaa',
+			exists3 int EXISTS PATH 'strict $.aaa' UNKNOWN ON ERROR,
+			exists4 text EXISTS PATH 'strict $.aaa' FALSE ON ERROR
+		)
+	) jt
+	ON true
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"aaa"', '$' RETURNING json ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON('   1   '::json WITH UNIQUE KEYS)
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+----------
+[SELECT] SELECT 0o2_73
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"111"', '$.a'  RETURNING bit(3) DEFAULT '1111' ON EMPTY)
+;

@@ -1,0 +1,540 @@
+SELECT pubname
+     , NULL
+     , NULL
+FROM pg_catalog.pg_publication p
+     JOIN pg_catalog.pg_publication_namespace pn ON p.oid = pn.pnpubid
+     JOIN pg_catalog.pg_class pc ON pc.relnamespace = pn.pnnspid
+WHERE pc.oid ='18993' and pg_catalog.pg_relation_is_publishable('18993')
+UNION
+SELECT pubname
+     , pg_get_expr(pr.prqual, c.oid)
+     , (CASE WHEN pr.prattrs IS NOT NULL THEN
+         (SELECT string_agg(attname, ', ')
+           FROM pg_catalog.generate_series(0, pg_catalog.array_upper(pr.prattrs::pg_catalog.int2[], 1)) s,
+                pg_catalog.pg_attribute
+          WHERE attrelid = pr.prrelid AND attnum = prattrs[s])
+        ELSE NULL END) FROM pg_catalog.pg_publication p
+     JOIN pg_catalog.pg_publication_rel pr ON p.oid = pr.prpubid
+     JOIN pg_catalog.pg_class c ON c.oid = pr.prrelid
+WHERE pr.prrelid = '18993'
+UNION
+SELECT pubname
+     , NULL
+     , NULL
+FROM pg_catalog.pg_publication p
+WHERE p.puballtables AND pg_catalog.pg_relation_is_publishable('18993')
+ORDER BY 1
+;
+SELECT conname, conrelid::pg_catalog.regclass AS ontable,
+       pg_catalog.pg_get_constraintdef(oid, true) AS condef
+  FROM pg_catalog.pg_constraint c
+ WHERE confrelid IN (SELECT pg_catalog.pg_partition_ancestors('19224')
+                     UNION ALL VALUES ('19224'::pg_catalog.regclass))
+       AND contype = 'f' AND conparentid = 0
+ORDER BY conname
+;
+SELECT pol.polname, pol.polpermissive,
+  CASE WHEN pol.polroles = '{0}' THEN NULL ELSE pg_catalog.array_to_string(array(select rolname from pg_catalog.pg_roles where oid = any (pol.polroles) order by 1),',') END,
+  pg_catalog.pg_get_expr(pol.polqual, pol.polrelid),
+  pg_catalog.pg_get_expr(pol.polwithcheck, pol.polrelid),
+  CASE pol.polcmd
+    WHEN 'r' THEN 'SELECT'
+    WHEN 'a' THEN 'INSERT'
+    WHEN 'w' THEN 'UPDATE'
+    WHEN 'd' THEN 'DELETE'
+    END AS cmd
+FROM pg_catalog.pg_policy pol
+WHERE pol.polrelid = '19029' ORDER BY 1
+;
+SELECT pg_get_indexdef(i.indexrelid)
+FROM pg_index i JOIN pg_class c ON i.indexrelid = c.oid
+WHERE i.indrelid = 'tbl_gist'::regclass ORDER BY c.relname
+;
+SELECT tableoid, oid, adnum, pg_catalog.pg_get_expr(adbin, adrelid) AS adsrc FROM pg_catalog.pg_attrdef WHERE adrelid = '27084'::pg_catalog.oid
+;
+SELECT c.oid::pg_catalog.regclass, c.relkind, inhdetachpending, pg_catalog.pg_get_expr(c.relpartbound, c.oid)
+FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i
+WHERE c.oid = i.inhrelid AND i.inhparent = '16963'
+ORDER BY pg_catalog.pg_get_expr(c.relpartbound, c.oid) = 'DEFAULT', c.oid::pg_catalog.regclass::pg_catalog.text
+;
+SELECT pg_catalog.format_type('39848'::pg_catalog.oid, NULL)
+;
+SELECT typarray FROM pg_catalog.pg_type WHERE oid = '17988'::pg_catalog.oid
+;
+SELECT timestamp '-infinity infinity'
+;
+SELECT * FROM pg_get_multixact_members((SELECT xmax FROM split_xact.t_multixact WHERE id = 1))
+;
+-- For binary upgrade, must preserve pg_type array oid
+SELECT pg_catalog.binary_upgrade_set_next_array_pg_type_oid('30121'::pg_catalog.oid)
+;
+SELECT c.oid::pg_catalog.regclass
+FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i
+WHERE c.oid = i.inhparent AND i.inhrelid = '35184'
+  AND c.relkind != 'p' AND c.relkind != 'I'
+ORDER BY inhseqno
+;
+SELECT * FROM verify_heapam('test_index',
+							startblock := NULL,
+							endblock := NULL)
+;
+SELECT pg_catalog.binary_upgrade_set_next_heap_relfilenode('32583'::pg_catalog.oid)
+;
+SELECT pg_catalog.setval('"public"."sequence_test6"', 1, false)
+;
+SELECT c.oid::pg_catalog.regclass, c.relkind, inhdetachpending, pg_catalog.pg_get_expr(c.relpartbound, c.oid)
+FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i
+WHERE c.oid = i.inhrelid AND i.inhparent = '21346'
+ORDER BY pg_catalog.pg_get_expr(c.relpartbound, c.oid) = 'DEFAULT', c.oid::pg_catalog.regclass::pg_catalog.text
+;
+SELECT c.conname, a.attname, c.connoinherit,
+  c.conislocal, c.coninhcount <> 0,
+  c.convalidated
+FROM pg_catalog.pg_constraint c JOIN
+  pg_catalog.pg_attribute a ON
+    (a.attrelid = c.conrelid AND a.attnum = c.conkey[1])
+WHERE c.contype = 'n' AND
+  c.conrelid = '23671'::pg_catalog.regclass
+ORDER BY a.attnum
+;
+SELECT
+a.attnum,
+a.attname,
+a.atttypmod,
+a.attstattarget,
+a.attstorage,
+t.typstorage,
+a.attnotnull,
+a.atthasdef,
+a.attisdropped,
+a.attlen,
+a.attalign,
+a.attislocal,
+pg_catalog.format_type(t.oid, a.atttypmod) AS atttypname,
+array_to_string(a.attoptions, ', ') AS attoptions,
+CASE WHEN a.attcollation <> t.typcollation THEN a.attcollation ELSE 0 END AS attcollation,
+a.attcompression AS attcompression,
+pg_catalog.array_to_string(ARRAY(SELECT pg_catalog.quote_ident(option_name) || ' ' || pg_catalog.quote_literal(option_value) FROM pg_catalog.pg_options_to_table(attfdwoptions) ORDER BY option_name), E',
+    ') AS attfdwoptions,
+a.attidentity,
+CASE WHEN a.atthasmissing AND NOT a.attisdropped THEN a.attmissingval ELSE null END AS attmissingval,
+a.attgenerated
+FROM pg_catalog.pg_attribute a LEFT JOIN pg_catalog.pg_type t ON a.atttypid = t.oid
+WHERE a.attrelid = '20130'::pg_catalog.oid AND a.attnum > 0::pg_catalog.int2
+ORDER BY a.attnum
+;
+SELECT regexp_instr('1234567890', '(123)(4(56)(78))', 1, 1, 0, 'i', 0)
+;
+EXPLAIN (ANALYZE, TIMING OFF, COSTS OFF, SUMMARY OFF, BUFFERS OFF)
+SELECT * FROM brin_interval_test WHERE a = '-30 years'::interval
+;
+SELECT c.reltype AS crel, t.reltype AS trel FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_class t ON   (c.reltoastrelid = t.oid AND c.relkind <> 'p') WHERE c.oid = '1260'::pg_catalog.oid
+;
+-- For binary upgrade, must preserve pg_class oids and relfilenodes
+SELECT pg_catalog.binary_upgrade_set_next_heap_pg_class_oid('32710'::pg_catalog.oid)
+;
+SELECT pg_catalog.binary_upgrade_set_next_toast_pg_class_oid('18965'::pg_catalog.oid)
+;
+-- NULL
+SELECT EXTRACT(HOUR          FROM DATE 'infinity')
+;
+SELECT pg_catalog.binary_upgrade_set_next_index_relfilenode('26045'::pg_catalog.oid)
+;
+SELECT * FROM check_estimated_rows('SELECT * FROM table_fillfactor')
+;
+SELECT pubname
+     , NULL
+     , NULL
+FROM pg_catalog.pg_publication p
+     JOIN pg_catalog.pg_publication_namespace pn ON p.oid = pn.pnpubid
+     JOIN pg_catalog.pg_class pc ON pc.relnamespace = pn.pnnspid
+WHERE pc.oid ='27580' and pg_catalog.pg_relation_is_publishable('27580')
+UNION
+SELECT pubname
+     , pg_get_expr(pr.prqual, c.oid)
+     , (CASE WHEN pr.prattrs IS NOT NULL THEN
+         (SELECT string_agg(attname, ', ')
+           FROM pg_catalog.generate_series(0, pg_catalog.array_upper(pr.prattrs::pg_catalog.int2[], 1)) s,
+                pg_catalog.pg_attribute
+          WHERE attrelid = pr.prrelid AND attnum = prattrs[s])
+        ELSE NULL END) FROM pg_catalog.pg_publication p
+     JOIN pg_catalog.pg_publication_rel pr ON p.oid = pr.prpubid
+     JOIN pg_catalog.pg_class c ON c.oid = pr.prrelid
+WHERE pr.prrelid = '27580'
+UNION
+SELECT pubname
+     , NULL
+     , NULL
+FROM pg_catalog.pg_publication p
+WHERE p.puballtables AND pg_catalog.pg_relation_is_publishable('27580')
+ORDER BY 1
+;
+SELECT "public".bt_index_check(index := c.oid, heapallindexed := false )
+FROM pg_catalog.pg_class c, pg_catalog.pg_index i WHERE c.oid = 6239 AND c.oid = i.indexrelid AND c.relpersistence != 't' AND i.indisready AND i.indisvalid AND i.indislive
+;
+SELECT v.blkno, v.offnum, v.attnum, v.msg FROM pg_catalog.pg_class c, "public".verify_heapam(
+relation := c.oid, on_error_stop := false, check_toast := true, skip := 'none'
+) v WHERE c.oid = 2612 AND c.relpersistence != 't'
+;
+SELECT count(*) FROM test_tablesample TABLESAMPLE system_rows (1)
+;
+SELECT c.relkind, c.relfilenode, c.reltoastrelid, ct.relfilenode AS toast_relfilenode, i.indexrelid, cti.relfilenode AS toast_index_relfilenode FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_index i ON (c.reltoastrelid = i.indrelid AND i.indisvalid) LEFT JOIN pg_catalog.pg_class ct ON (c.reltoastrelid = ct.oid) LEFT JOIN pg_catalog.pg_class AS cti ON (i.indexrelid = cti.oid) WHERE c.oid = '24074'::pg_catalog.oid
+;
+SELECT c2.relname, i.indisprimary, i.indisunique, i.indisclustered, i.indisvalid, pg_catalog.pg_get_indexdef(i.indexrelid, 0, true),
+  pg_catalog.pg_get_constraintdef(con.oid, true), contype, condeferrable, condeferred, i.indisreplident, c2.reltablespace
+FROM pg_catalog.pg_class c, pg_catalog.pg_class c2, pg_catalog.pg_index i
+  LEFT JOIN pg_catalog.pg_constraint con ON (conrelid = i.indrelid AND conindid = i.indexrelid AND contype IN ('p','u','x'))
+WHERE c.oid = '28201' AND c.oid = i.indrelid AND i.indexrelid = c2.oid
+ORDER BY i.indisprimary DESC, c2.relname
+;
+SELECT conname, conrelid::pg_catalog.regclass AS ontable,
+       pg_catalog.pg_get_constraintdef(oid, true) AS condef
+  FROM pg_catalog.pg_constraint c
+ WHERE confrelid IN (SELECT pg_catalog.pg_partition_ancestors('29455')
+                     UNION ALL VALUES ('29455'::pg_catalog.regclass))
+       AND contype = 'f' AND conparentid = 0
+ORDER BY conname
+;
+SELECT stats_reset = 'Wed Jul 29 22:55:37.855743 2026 PDT'::timestamptz FROM pg_stat_wal
+;
+SELECT t.tgname, t.tgfoid::pg_catalog.regproc AS tgfname, pg_catalog.pg_get_triggerdef(t.oid, false) AS tgdef, t.tgenabled, t.tableoid, t.oid, t.tgisinternal FROM pg_catalog.pg_trigger t LEFT JOIN pg_catalog.pg_trigger u ON u.oid = t.tgparentid WHERE t.tgrelid = '26556'::pg_catalog.oid AND (NOT t.tgisinternal OR t.tgenabled != u.tgenabled)
+;
+-- For binary upgrade, must preserve pg_type toast oid
+SELECT pg_catalog.binary_upgrade_set_next_toast_pg_type_oid('36581'::pg_catalog.oid)
+;
+SELECT typarray FROM pg_catalog.pg_type WHERE oid = '28234'::pg_catalog.oid
+;
+SELECT m <= '$122.99' FROM money_data
+;
+SELECT t.tableoid, t.oid, t.relname AS indexname, inh.inhparent AS parentidx, pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, i.indnkeyatts AS indnkeyatts, i.indnatts AS indnatts, i.indkey, i.indisclustered, i.indisreplident, c.contype, c.conname, c.condeferrable, c.condeferred, c.tableoid AS contableoid, c.oid AS conoid, pg_catalog.pg_get_constraintdef(c.oid, false) AS condef, (SELECT spcname FROM pg_catalog.pg_tablespace s WHERE s.oid = t.reltablespace) AS tablespace, t.reloptions AS indreloptions, (SELECT pg_catalog.array_agg(attnum ORDER BY attnum)   FROM pg_catalog.pg_attribute   WHERE attrelid = i.indexrelid AND     attstattarget >= 0) AS indstatcols,(SELECT pg_catalog.array_agg(attstattarget ORDER BY attnum)   FROM pg_catalog.pg_attribute   WHERE attrelid = i.indexrelid AND     attstattarget >= 0) AS indstatvals FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class t ON (t.oid = i.indexrelid) JOIN pg_catalog.pg_class t2 ON (t2.oid = i.indrelid) LEFT JOIN pg_catalog.pg_constraint c ON (i.indrelid = c.conrelid AND i.indexrelid = c.conindid AND c.contype IN ('p','u','x')) LEFT JOIN pg_catalog.pg_inherits inh ON (inh.inhrelid = indexrelid) WHERE i.indrelid = '31123'::pg_catalog.oid AND (i.indisvalid OR t2.relkind = 'p') AND i.indisready ORDER BY indexname
+;
+SELECT to_regrole('"Nonexistent"')
+;
+SELECT pubname
+FROM pg_catalog.pg_publication p
+JOIN pg_catalog.pg_publication_rel pr ON p.oid = pr.prpubid
+WHERE pr.prrelid = '19106'
+UNION ALL
+SELECT pubname
+FROM pg_catalog.pg_publication p
+WHERE p.puballtables AND pg_catalog.pg_relation_is_publishable('19106')
+ORDER BY 1
+;
+SELECT proretset, prosrc, probin, pg_catalog.pg_get_function_arguments(oid) AS funcargs, pg_catalog.pg_get_function_identity_arguments(oid) AS funciargs, pg_catalog.pg_get_function_result(oid) AS funcresult, array_to_string(protrftypes, ' ') AS protrftypes, prokind, provolatile, proisstrict, prosecdef, proleakproof, proconfig, procost, prorows, prosupport, proparallel, (SELECT lanname FROM pg_catalog.pg_language WHERE oid = prolang) AS lanname FROM pg_catalog.pg_proc WHERE oid = '21610'::pg_catalog.oid
+;
+SELECT c.oid::pg_catalog.regclass, c.relkind, inhdetachpending, pg_catalog.pg_get_expr(c.relpartbound, c.oid)
+FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i
+WHERE c.oid = i.inhrelid AND i.inhparent = '33885'
+ORDER BY pg_catalog.pg_get_expr(c.relpartbound, c.oid) = 'DEFAULT', c.oid::pg_catalog.regclass::pg_catalog.text
+;
+-- retrieving the inserted data
+SELECT guid_field FROM guid1
+;
+SELECT typarray FROM pg_catalog.pg_type WHERE oid = '40515'::pg_catalog.oid
+;
+select '[{"b": "c"}, {"b": "cc"}]'::json #>> array['z','b']
+;
+SELECT c.relkind, c.relfilenode, c.reltoastrelid, ct.relfilenode AS toast_relfilenode, i.indexrelid, cti.relfilenode AS toast_index_relfilenode FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_index i ON (c.reltoastrelid = i.indrelid AND i.indisvalid) LEFT JOIN pg_catalog.pg_class ct ON (c.reltoastrelid = ct.oid) LEFT JOIN pg_catalog.pg_class AS cti ON (i.indexrelid = cti.oid) WHERE c.oid = '27340'::pg_catalog.oid
+;
+SELECT r.srsubstate, s.subname, n.nspname, c.relname FROM pg_catalog.pg_subscription_rel r LEFT JOIN pg_catalog.pg_subscription s   ON r.srsubid = s.oid LEFT JOIN pg_catalog.pg_class c   ON r.srrelid = c.oid LEFT JOIN pg_catalog.pg_namespace n   ON c.relnamespace = n.oid WHERE r.srsubstate NOT IN ('i', 'r') ORDER BY s.subname
+;
+SELECT dblink_exec('myconn', 'SET datestyle = GERMAN, DMY;')
+;
+-- For binary upgrade, must preserve pg_type array oid
+SELECT pg_catalog.binary_upgrade_set_next_array_pg_type_oid('32885'::pg_catalog.oid)
+;
+------------------------------------------------------------------------------------------
+[METADATA] SELECT pubname
+     , NULL
+     , NULL
+FROM pg_catalog.pg_publication p
+     JOIN pg_catalog.pg_publication_namespace pn ON p.oid = pn.pnpubid
+     JOIN pg_catalog.pg_class pc ON pc.relnamespace = pn.pnnspid
+WHERE pc.oid ='18993' and pg_catalog.pg_relation_is_publishable('18993')
+UNION
+SELECT pubname
+     , pg_get_expr(pr.prqual, c.oid)
+     , (CASE WHEN pr.prattrs IS NOT NULL THEN
+         (SELECT string_agg(attname, ', ')
+           FROM pg_catalog.generate_series(0, pg_catalog.array_upper(pr.prattrs::pg_catalog.int2[], 1)) s,
+                pg_catalog.pg_attribute
+          WHERE attrelid = pr.prrelid AND attnum = prattrs[s])
+        ELSE NULL END) FROM pg_catalog.pg_publication p
+     JOIN pg_catalog.pg_publication_rel pr ON p.oid = pr.prpubid
+     JOIN pg_catalog.pg_class c ON c.oid = pr.prrelid
+WHERE pr.prrelid = '18993'
+UNION
+SELECT pubname
+     , NULL
+     , NULL
+FROM pg_catalog.pg_publication p
+WHERE p.puballtables AND pg_catalog.pg_relation_is_publishable('18993')
+ORDER BY 1
+;
+----------
+[METADATA] SELECT conname, conrelid::pg_catalog.regclass AS ontable,
+       pg_catalog.pg_get_constraintdef(oid, true) AS condef
+  FROM pg_catalog.pg_constraint c
+ WHERE confrelid IN (SELECT pg_catalog.pg_partition_ancestors('19224')
+                     UNION ALL VALUES ('19224'::pg_catalog.regclass))
+       AND contype = 'f' AND conparentid = 0
+ORDER BY conname
+;
+----------
+[METADATA] SELECT pol.polname, pol.polpermissive,
+  CASE WHEN pol.polroles = '{0}' THEN NULL ELSE pg_catalog.array_to_string(array(select rolname from pg_catalog.pg_roles where oid = any (pol.polroles) order by 1),',') END,
+  pg_catalog.pg_get_expr(pol.polqual, pol.polrelid),
+  pg_catalog.pg_get_expr(pol.polwithcheck, pol.polrelid),
+  CASE pol.polcmd
+    WHEN 'r' THEN 'SELECT'
+    WHEN 'a' THEN 'INSERT'
+    WHEN 'w' THEN 'UPDATE'
+    WHEN 'd' THEN 'DELETE'
+    END AS cmd
+FROM pg_catalog.pg_policy pol
+WHERE pol.polrelid = '19029' ORDER BY 1
+;
+----------
+[SELECT|METADATA] SELECT pg_get_indexdef(i.indexrelid)
+FROM pg_index i JOIN pg_class c ON i.indexrelid = c.oid
+WHERE i.indrelid = 'tbl_gist'::regclass ORDER BY c.relname
+;
+----------
+[METADATA] SELECT tableoid, oid, adnum, pg_catalog.pg_get_expr(adbin, adrelid) AS adsrc FROM pg_catalog.pg_attrdef WHERE adrelid = '27084'::pg_catalog.oid
+;
+----------
+[METADATA] SELECT c.oid::pg_catalog.regclass, c.relkind, inhdetachpending, pg_catalog.pg_get_expr(c.relpartbound, c.oid)
+FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i
+WHERE c.oid = i.inhrelid AND i.inhparent = '16963'
+ORDER BY pg_catalog.pg_get_expr(c.relpartbound, c.oid) = 'DEFAULT', c.oid::pg_catalog.regclass::pg_catalog.text
+;
+----------
+[METADATA] SELECT pg_catalog.format_type('39848'::pg_catalog.oid, NULL)
+;
+----------
+[METADATA] SELECT typarray FROM pg_catalog.pg_type WHERE oid = '17988'::pg_catalog.oid
+;
+----------
+[SELECT] SELECT timestamp '-infinity infinity'
+;
+----------
+[SELECT] SELECT * FROM pg_get_multixact_members((SELECT xmax FROM split_xact.t_multixact WHERE id = 1))
+;
+----------
+[SELECT] -- For binary upgrade, must preserve pg_type array oid
+SELECT pg_catalog.binary_upgrade_set_next_array_pg_type_oid('30121'::pg_catalog.oid)
+;
+----------
+[METADATA] SELECT c.oid::pg_catalog.regclass
+FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i
+WHERE c.oid = i.inhparent AND i.inhrelid = '35184'
+  AND c.relkind != 'p' AND c.relkind != 'I'
+ORDER BY inhseqno
+;
+----------
+[SELECT] SELECT * FROM verify_heapam('test_index',
+							startblock := NULL,
+							endblock := NULL)
+;
+----------
+[SELECT] SELECT pg_catalog.binary_upgrade_set_next_heap_relfilenode('32583'::pg_catalog.oid)
+;
+----------
+[SELECT] SELECT pg_catalog.setval('"public"."sequence_test6"', 1, false)
+;
+----------
+[METADATA] SELECT c.oid::pg_catalog.regclass, c.relkind, inhdetachpending, pg_catalog.pg_get_expr(c.relpartbound, c.oid)
+FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i
+WHERE c.oid = i.inhrelid AND i.inhparent = '21346'
+ORDER BY pg_catalog.pg_get_expr(c.relpartbound, c.oid) = 'DEFAULT', c.oid::pg_catalog.regclass::pg_catalog.text
+;
+----------
+[METADATA] SELECT c.conname, a.attname, c.connoinherit,
+  c.conislocal, c.coninhcount <> 0,
+  c.convalidated
+FROM pg_catalog.pg_constraint c JOIN
+  pg_catalog.pg_attribute a ON
+    (a.attrelid = c.conrelid AND a.attnum = c.conkey[1])
+WHERE c.contype = 'n' AND
+  c.conrelid = '23671'::pg_catalog.regclass
+ORDER BY a.attnum
+;
+----------
+[METADATA] SELECT
+a.attnum,
+a.attname,
+a.atttypmod,
+a.attstattarget,
+a.attstorage,
+t.typstorage,
+a.attnotnull,
+a.atthasdef,
+a.attisdropped,
+a.attlen,
+a.attalign,
+a.attislocal,
+pg_catalog.format_type(t.oid, a.atttypmod) AS atttypname,
+array_to_string(a.attoptions, ', ') AS attoptions,
+CASE WHEN a.attcollation <> t.typcollation THEN a.attcollation ELSE 0 END AS attcollation,
+a.attcompression AS attcompression,
+pg_catalog.array_to_string(ARRAY(SELECT pg_catalog.quote_ident(option_name) || ' ' || pg_catalog.quote_literal(option_value) FROM pg_catalog.pg_options_to_table(attfdwoptions) ORDER BY option_name), E',
+    ') AS attfdwoptions,
+a.attidentity,
+CASE WHEN a.atthasmissing AND NOT a.attisdropped THEN a.attmissingval ELSE null END AS attmissingval,
+a.attgenerated
+FROM pg_catalog.pg_attribute a LEFT JOIN pg_catalog.pg_type t ON a.atttypid = t.oid
+WHERE a.attrelid = '20130'::pg_catalog.oid AND a.attnum > 0::pg_catalog.int2
+ORDER BY a.attnum
+;
+----------
+[SELECT] SELECT regexp_instr('1234567890', '(123)(4(56)(78))', 1, 1, 0, 'i', 0)
+;
+----------
+[SELECT] EXPLAIN (ANALYZE, TIMING OFF, COSTS OFF, SUMMARY OFF, BUFFERS OFF)
+SELECT * FROM brin_interval_test WHERE a = '-30 years'::interval
+;
+----------
+[METADATA] SELECT c.reltype AS crel, t.reltype AS trel FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_class t ON   (c.reltoastrelid = t.oid AND c.relkind <> 'p') WHERE c.oid = '1260'::pg_catalog.oid
+;
+----------
+[SELECT] -- For binary upgrade, must preserve pg_class oids and relfilenodes
+SELECT pg_catalog.binary_upgrade_set_next_heap_pg_class_oid('32710'::pg_catalog.oid)
+;
+----------
+[SELECT] SELECT pg_catalog.binary_upgrade_set_next_toast_pg_class_oid('18965'::pg_catalog.oid)
+;
+----------
+[SELECT] -- NULL
+SELECT EXTRACT(HOUR          FROM DATE 'infinity')
+;
+----------
+[SELECT] SELECT pg_catalog.binary_upgrade_set_next_index_relfilenode('26045'::pg_catalog.oid)
+;
+----------
+[SELECT] SELECT * FROM check_estimated_rows('SELECT * FROM table_fillfactor')
+;
+----------
+[METADATA] SELECT pubname
+     , NULL
+     , NULL
+FROM pg_catalog.pg_publication p
+     JOIN pg_catalog.pg_publication_namespace pn ON p.oid = pn.pnpubid
+     JOIN pg_catalog.pg_class pc ON pc.relnamespace = pn.pnnspid
+WHERE pc.oid ='27580' and pg_catalog.pg_relation_is_publishable('27580')
+UNION
+SELECT pubname
+     , pg_get_expr(pr.prqual, c.oid)
+     , (CASE WHEN pr.prattrs IS NOT NULL THEN
+         (SELECT string_agg(attname, ', ')
+           FROM pg_catalog.generate_series(0, pg_catalog.array_upper(pr.prattrs::pg_catalog.int2[], 1)) s,
+                pg_catalog.pg_attribute
+          WHERE attrelid = pr.prrelid AND attnum = prattrs[s])
+        ELSE NULL END) FROM pg_catalog.pg_publication p
+     JOIN pg_catalog.pg_publication_rel pr ON p.oid = pr.prpubid
+     JOIN pg_catalog.pg_class c ON c.oid = pr.prrelid
+WHERE pr.prrelid = '27580'
+UNION
+SELECT pubname
+     , NULL
+     , NULL
+FROM pg_catalog.pg_publication p
+WHERE p.puballtables AND pg_catalog.pg_relation_is_publishable('27580')
+ORDER BY 1
+;
+----------
+[METADATA] SELECT "public".bt_index_check(index := c.oid, heapallindexed := false )
+FROM pg_catalog.pg_class c, pg_catalog.pg_index i WHERE c.oid = 6239 AND c.oid = i.indexrelid AND c.relpersistence != 't' AND i.indisready AND i.indisvalid AND i.indislive
+;
+----------
+[METADATA] SELECT v.blkno, v.offnum, v.attnum, v.msg FROM pg_catalog.pg_class c, "public".verify_heapam(
+relation := c.oid, on_error_stop := false, check_toast := true, skip := 'none'
+) v WHERE c.oid = 2612 AND c.relpersistence != 't'
+;
+----------
+[SELECT] SELECT count(*) FROM test_tablesample TABLESAMPLE system_rows (1)
+;
+----------
+[METADATA] SELECT c.relkind, c.relfilenode, c.reltoastrelid, ct.relfilenode AS toast_relfilenode, i.indexrelid, cti.relfilenode AS toast_index_relfilenode FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_index i ON (c.reltoastrelid = i.indrelid AND i.indisvalid) LEFT JOIN pg_catalog.pg_class ct ON (c.reltoastrelid = ct.oid) LEFT JOIN pg_catalog.pg_class AS cti ON (i.indexrelid = cti.oid) WHERE c.oid = '24074'::pg_catalog.oid
+;
+----------
+[METADATA] SELECT c2.relname, i.indisprimary, i.indisunique, i.indisclustered, i.indisvalid, pg_catalog.pg_get_indexdef(i.indexrelid, 0, true),
+  pg_catalog.pg_get_constraintdef(con.oid, true), contype, condeferrable, condeferred, i.indisreplident, c2.reltablespace
+FROM pg_catalog.pg_class c, pg_catalog.pg_class c2, pg_catalog.pg_index i
+  LEFT JOIN pg_catalog.pg_constraint con ON (conrelid = i.indrelid AND conindid = i.indexrelid AND contype IN ('p','u','x'))
+WHERE c.oid = '28201' AND c.oid = i.indrelid AND i.indexrelid = c2.oid
+ORDER BY i.indisprimary DESC, c2.relname
+;
+----------
+[METADATA] SELECT conname, conrelid::pg_catalog.regclass AS ontable,
+       pg_catalog.pg_get_constraintdef(oid, true) AS condef
+  FROM pg_catalog.pg_constraint c
+ WHERE confrelid IN (SELECT pg_catalog.pg_partition_ancestors('29455')
+                     UNION ALL VALUES ('29455'::pg_catalog.regclass))
+       AND contype = 'f' AND conparentid = 0
+ORDER BY conname
+;
+----------
+[SELECT] SELECT stats_reset = 'Wed Jul 29 22:55:37.855743 2026 PDT'::timestamptz FROM pg_stat_wal
+;
+----------
+[METADATA] SELECT t.tgname, t.tgfoid::pg_catalog.regproc AS tgfname, pg_catalog.pg_get_triggerdef(t.oid, false) AS tgdef, t.tgenabled, t.tableoid, t.oid, t.tgisinternal FROM pg_catalog.pg_trigger t LEFT JOIN pg_catalog.pg_trigger u ON u.oid = t.tgparentid WHERE t.tgrelid = '26556'::pg_catalog.oid AND (NOT t.tgisinternal OR t.tgenabled != u.tgenabled)
+;
+----------
+[SELECT] -- For binary upgrade, must preserve pg_type toast oid
+SELECT pg_catalog.binary_upgrade_set_next_toast_pg_type_oid('36581'::pg_catalog.oid)
+;
+----------
+[METADATA] SELECT typarray FROM pg_catalog.pg_type WHERE oid = '28234'::pg_catalog.oid
+;
+----------
+[SELECT] SELECT m <= '$122.99' FROM money_data
+;
+----------
+[METADATA] SELECT t.tableoid, t.oid, t.relname AS indexname, inh.inhparent AS parentidx, pg_catalog.pg_get_indexdef(i.indexrelid) AS indexdef, i.indnkeyatts AS indnkeyatts, i.indnatts AS indnatts, i.indkey, i.indisclustered, i.indisreplident, c.contype, c.conname, c.condeferrable, c.condeferred, c.tableoid AS contableoid, c.oid AS conoid, pg_catalog.pg_get_constraintdef(c.oid, false) AS condef, (SELECT spcname FROM pg_catalog.pg_tablespace s WHERE s.oid = t.reltablespace) AS tablespace, t.reloptions AS indreloptions, (SELECT pg_catalog.array_agg(attnum ORDER BY attnum)   FROM pg_catalog.pg_attribute   WHERE attrelid = i.indexrelid AND     attstattarget >= 0) AS indstatcols,(SELECT pg_catalog.array_agg(attstattarget ORDER BY attnum)   FROM pg_catalog.pg_attribute   WHERE attrelid = i.indexrelid AND     attstattarget >= 0) AS indstatvals FROM pg_catalog.pg_index i JOIN pg_catalog.pg_class t ON (t.oid = i.indexrelid) JOIN pg_catalog.pg_class t2 ON (t2.oid = i.indrelid) LEFT JOIN pg_catalog.pg_constraint c ON (i.indrelid = c.conrelid AND i.indexrelid = c.conindid AND c.contype IN ('p','u','x')) LEFT JOIN pg_catalog.pg_inherits inh ON (inh.inhrelid = indexrelid) WHERE i.indrelid = '31123'::pg_catalog.oid AND (i.indisvalid OR t2.relkind = 'p') AND i.indisready ORDER BY indexname
+;
+----------
+[METADATA] SELECT to_regrole('"Nonexistent"')
+;
+----------
+[METADATA] SELECT pubname
+FROM pg_catalog.pg_publication p
+JOIN pg_catalog.pg_publication_rel pr ON p.oid = pr.prpubid
+WHERE pr.prrelid = '19106'
+UNION ALL
+SELECT pubname
+FROM pg_catalog.pg_publication p
+WHERE p.puballtables AND pg_catalog.pg_relation_is_publishable('19106')
+ORDER BY 1
+;
+----------
+[METADATA] SELECT proretset, prosrc, probin, pg_catalog.pg_get_function_arguments(oid) AS funcargs, pg_catalog.pg_get_function_identity_arguments(oid) AS funciargs, pg_catalog.pg_get_function_result(oid) AS funcresult, array_to_string(protrftypes, ' ') AS protrftypes, prokind, provolatile, proisstrict, prosecdef, proleakproof, proconfig, procost, prorows, prosupport, proparallel, (SELECT lanname FROM pg_catalog.pg_language WHERE oid = prolang) AS lanname FROM pg_catalog.pg_proc WHERE oid = '21610'::pg_catalog.oid
+;
+----------
+[METADATA] SELECT c.oid::pg_catalog.regclass, c.relkind, inhdetachpending, pg_catalog.pg_get_expr(c.relpartbound, c.oid)
+FROM pg_catalog.pg_class c, pg_catalog.pg_inherits i
+WHERE c.oid = i.inhrelid AND i.inhparent = '33885'
+ORDER BY pg_catalog.pg_get_expr(c.relpartbound, c.oid) = 'DEFAULT', c.oid::pg_catalog.regclass::pg_catalog.text
+;
+----------
+[SELECT] -- retrieving the inserted data
+SELECT guid_field FROM guid1
+;
+----------
+[METADATA] SELECT typarray FROM pg_catalog.pg_type WHERE oid = '40515'::pg_catalog.oid
+;
+----------
+[SELECT] select '[{"b": "c"}, {"b": "cc"}]'::json #>> array['z','b']
+;
+----------
+[METADATA] SELECT c.relkind, c.relfilenode, c.reltoastrelid, ct.relfilenode AS toast_relfilenode, i.indexrelid, cti.relfilenode AS toast_index_relfilenode FROM pg_catalog.pg_class c LEFT JOIN pg_catalog.pg_index i ON (c.reltoastrelid = i.indrelid AND i.indisvalid) LEFT JOIN pg_catalog.pg_class ct ON (c.reltoastrelid = ct.oid) LEFT JOIN pg_catalog.pg_class AS cti ON (i.indexrelid = cti.oid) WHERE c.oid = '27340'::pg_catalog.oid
+;
+----------
+[METADATA] SELECT r.srsubstate, s.subname, n.nspname, c.relname FROM pg_catalog.pg_subscription_rel r LEFT JOIN pg_catalog.pg_subscription s   ON r.srsubid = s.oid LEFT JOIN pg_catalog.pg_class c   ON r.srrelid = c.oid LEFT JOIN pg_catalog.pg_namespace n   ON c.relnamespace = n.oid WHERE r.srsubstate NOT IN ('i', 'r') ORDER BY s.subname
+;
+----------
+[SELECT] SELECT dblink_exec('myconn', 'SET datestyle = GERMAN, DMY;')
+;
+----------
+[SELECT] -- For binary upgrade, must preserve pg_type array oid
+SELECT pg_catalog.binary_upgrade_set_next_array_pg_type_oid('32885'::pg_catalog.oid)
+;

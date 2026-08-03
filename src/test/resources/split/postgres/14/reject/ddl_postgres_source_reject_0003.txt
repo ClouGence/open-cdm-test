@@ -1,0 +1,360 @@
+CREATE PUBLICATION testpub_dups FOR TABLE testpub_rf_tbl1 WHERE (a = 1), testpub_rf_tbl1 WITH (publish = 'insert')
+;
+-- build indexes on filled table
+CREATE UNIQUE INDEX unique_idx3 ON unique_tbl (i) NULLS DISTINCT
+;
+CREATE PUBLICATION testpub_dups FOR TABLE testpub_rf_tbl1, testpub_rf_tbl1 WHERE (a = 2) WITH (publish = 'insert')
+;
+CREATE PUBLICATION tap_pub_2 FOR TABLE tab_rowfilter_2 WHERE (c % 3 = 0)
+;
+-- error: duplicates not allowed in column list
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, a)
+;
+CREATE PUBLICATION pub6 FOR TABLE test_part_a (b, a) WITH (publish_via_partition_root = true)
+;
+CREATE PUBLICATION pub_check_oldtuple FOR TABLE test_oldtuple_col (a, b)
+;
+ALTER PUBLICATION pub8 ADD TABLE test_part_c_1 (a,c)
+;
+-- cleanup pub_test1 schema for invalidation tests
+ALTER PUBLICATION testpub2_forschema DROP TABLES IN SCHEMA pub_test1
+;
+ALTER PUBLICATION testpub6 SET TABLES IN SCHEMA testpub_rf_schema2, TABLE testpub_rf_schema2.testpub_rf_tbl6 WHERE (i < 99)
+;
+-- ok - can use column list for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk (b)
+;
+ALTER PUBLICATION tap_pub_1 SET TABLE tab_rowfilter_1 WHERE (a > 1000 AND b <> 'filtered'), tab_rowfilter_2 WHERE (c % 2 = 0), tab_rowfilter_3
+;
+ALTER MATERIALIZED VIEW heapmv SET ACCESS METHOD heap, SET ACCESS METHOD heap2
+;
+ALTER PUBLICATION pub_mix_1 SET TABLE test_mix_1 (a, b)
+;
+-- drop schema that is not present in the publication
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test2
+;
+-- fail - can't set schema to 'FOR ALL TABLES' publication
+ALTER PUBLICATION testpub_foralltables SET TABLES IN SCHEMA pub_test
+;
+ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl7 (a, b)
+;
+CREATE PUBLICATION testpub_rf_yes FOR TABLE testpub_rf_tbl1 WHERE (a > 1) WITH (publish = 'insert')
+;
+CREATE PUBLICATION tap_pub_not_used FOR TABLE tab_rowfilter_1 WHERE (a < 0)
+;
+-- failure - specify a schema when there is already a column list in the
+-- publication
+ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public
+;
+alter database abc refresh collation version
+;
+CREATE PUBLICATION tap_pub_allinschema FOR TABLES IN SCHEMA schema_rf_x, TABLE schema_rf_x.tab_rf_x WHERE (x > 10)
+;
+CREATE PUBLICATION testpub6 FOR TABLE testpub_rf_tbl3 WHERE (e =#> 27)
+;
+ALTER TABLE am_partitioned SET ACCESS METHOD heap2
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk WHERE (d > 99)
+;
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA non_existent_schema
+;
+CREATE FUNCTION merge_sf_test()
+ RETURNS void
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN MATCHED
+   AND (s.a + t.id) = 42
+   THEN UPDATE SET data = repeat(t.data, s.a) || s.b, id = length(s.b)
+WHEN NOT MATCHED
+   AND (s.b IS NOT NULL)
+   THEN INSERT (data, id)
+   VALUES (s.b, s.a)
+WHEN MATCHED
+   AND length(s.b || t.data) > 10
+   THEN UPDATE SET data = s.b
+WHEN MATCHED
+   AND s.a > 200
+   THEN UPDATE SET filling[s.a] = t.id
+WHEN MATCHED
+   AND s.a > 100
+   THEN DELETE
+WHEN MATCHED
+   THEN DO NOTHING
+WHEN NOT MATCHED
+   AND s.a > 200
+   THEN INSERT DEFAULT VALUES
+WHEN NOT MATCHED
+   AND s.a > 100
+   THEN INSERT (id, data) OVERRIDING USER VALUE
+   VALUES (s.a, DEFAULT)
+WHEN NOT MATCHED
+   AND s.a > 0
+   THEN INSERT
+   VALUES (s.a, s.b, DEFAULT)
+WHEN NOT MATCHED
+   THEN INSERT (filling[1], id)
+   VALUES (s.a, s.a);
+END
+;
+ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+ALTER PUBLICATION testpub_fortable ADD TABLES IN SCHEMA pub_test
+;
+CREATE UNIQUE INDEX cwi_a_nnd ON cwi_test (a) NULLS NOT DISTINCT
+;
+CREATE PUBLICATION testpub5 FOR TABLE testpub_rf_tbl1, testpub_rf_tbl2 WHERE (c <> 'test' AND d < 5) WITH (publish = 'insert')
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 (b)
+;
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test2
+;
+ALTER PUBLICATION "dump_pub_all" ADD TABLE ONLY "pubme"."t1" WHERE (("c" < 0))
+;
+CREATE PUBLICATION split_pub18_schema FOR TABLES IN SCHEMA split_pub18_b, CURRENT_SCHEMA WITH (publish = 'insert')
+;
+CREATE PUBLICATION split_pub_cols FOR TABLE split_fdw_repl.accounts (id, owner_name) WHERE (amount > 0) WITH (publish = 'insert, update', publish_via_partition_root = true)
+;
+-- should be able to create publication with schema and table of the same
+-- schema
+CREATE PUBLICATION testpub_for_tbl_schema FOR TABLES IN SCHEMA pub_test, TABLE pub_test.testpub_nopk
+;
+-- fail - publication WHERE clause must be boolean
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (1234)
+;
+CREATE PUBLICATION testpub6 FOR TABLE rf_tbl_abcd_pk WHERE (a > 99)
+;
+CREATE PUBLICATION tap_pub_schema FOR TABLES IN SCHEMA sch1
+;
+ALTER PUBLICATION "dump_pub_nsp_2ct" ADD TABLES IN SCHEMA "pubme2"
+;
+CREATE PUBLICATION testpub1_forschema FOR TABLES IN SCHEMA pub_test1
+;
+-- error: replica identity "a" not included in the column list
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (b, c)
+;
+-- 1b. REPLICA IDENTITY is DEFAULT and table has no PK
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_nopk WHERE (a > 99)
+;
+-- add non existent schema
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA non_existent_schema
+;
+ALTER PUBLICATION testpub_both_filters ADD TABLE testpub_tbl_both_filters (a,c) WHERE (c != 1)
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl4 WHERE (length(g) < 6)
+;
+CREATE PUBLICATION pub1
+	   FOR TABLE tab1 (a, "B"), tab3 ("a'", "c'"), test_part (a, b), tab4 (a, b, d)
+	  WITH (publish_via_partition_root = 'true')
+;
+CREATE PUBLICATION pub_mix_7 FOR TABLE test_mix_4 (a, b)
+;
+CREATE PUBLICATION pub_mix_5 FOR TABLE test_mix_3 (a, b, c)
+;
+------------------------------------------------------------------------------------------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_dups FOR TABLE testpub_rf_tbl1 WHERE (a = 1), testpub_rf_tbl1 WITH (publish = 'insert')
+;
+----------
+[ADD_INDEX] -- build indexes on filled table
+CREATE UNIQUE INDEX unique_idx3 ON unique_tbl (i) NULLS DISTINCT
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_dups FOR TABLE testpub_rf_tbl1, testpub_rf_tbl1 WHERE (a = 2) WITH (publish = 'insert')
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_2 FOR TABLE tab_rowfilter_2 WHERE (c % 3 = 0)
+;
+----------
+[ALTER_PUB_SUB] -- error: duplicates not allowed in column list
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, a)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub6 FOR TABLE test_part_a (b, a) WITH (publish_via_partition_root = true)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_check_oldtuple FOR TABLE test_oldtuple_col (a, b)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub8 ADD TABLE test_part_c_1 (a,c)
+;
+----------
+[ALTER_PUB_SUB] -- cleanup pub_test1 schema for invalidation tests
+ALTER PUBLICATION testpub2_forschema DROP TABLES IN SCHEMA pub_test1
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLES IN SCHEMA testpub_rf_schema2, TABLE testpub_rf_schema2.testpub_rf_tbl6 WHERE (i < 99)
+;
+----------
+[ALTER_PUB_SUB] -- ok - can use column list for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk (b)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION tap_pub_1 SET TABLE tab_rowfilter_1 WHERE (a > 1000 AND b <> 'filtered'), tab_rowfilter_2 WHERE (c % 2 = 0), tab_rowfilter_3
+;
+----------
+[ALTER_VIEW] ALTER MATERIALIZED VIEW heapmv SET ACCESS METHOD heap, SET ACCESS METHOD heap2
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub_mix_1 SET TABLE test_mix_1 (a, b)
+;
+----------
+[ALTER_PUB_SUB] -- drop schema that is not present in the publication
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test2
+;
+----------
+[ALTER_PUB_SUB] -- fail - can't set schema to 'FOR ALL TABLES' publication
+ALTER PUBLICATION testpub_foralltables SET TABLES IN SCHEMA pub_test
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl7 (a, b)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_rf_yes FOR TABLE testpub_rf_tbl1 WHERE (a > 1) WITH (publish = 'insert')
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_not_used FOR TABLE tab_rowfilter_1 WHERE (a < 0)
+;
+----------
+[ALTER_PUB_SUB] -- failure - specify a schema when there is already a column list in the
+-- publication
+ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public
+;
+----------
+[ALTER_CATALOG] alter database abc refresh collation version
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_allinschema FOR TABLES IN SCHEMA schema_rf_x, TABLE schema_rf_x.tab_rf_x WHERE (x > 10)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub6 FOR TABLE testpub_rf_tbl3 WHERE (e =#> 27)
+;
+----------
+[ALTER_TABLE] ALTER TABLE am_partitioned SET ACCESS METHOD heap2
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk WHERE (d > 99)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA non_existent_schema
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION merge_sf_test()
+ RETURNS void
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN MATCHED
+   AND (s.a + t.id) = 42
+   THEN UPDATE SET data = repeat(t.data, s.a) || s.b, id = length(s.b)
+WHEN NOT MATCHED
+   AND (s.b IS NOT NULL)
+   THEN INSERT (data, id)
+   VALUES (s.b, s.a)
+WHEN MATCHED
+   AND length(s.b || t.data) > 10
+   THEN UPDATE SET data = s.b
+WHEN MATCHED
+   AND s.a > 200
+   THEN UPDATE SET filling[s.a] = t.id
+WHEN MATCHED
+   AND s.a > 100
+   THEN DELETE
+WHEN MATCHED
+   THEN DO NOTHING
+WHEN NOT MATCHED
+   AND s.a > 200
+   THEN INSERT DEFAULT VALUES
+WHEN NOT MATCHED
+   AND s.a > 100
+   THEN INSERT (id, data) OVERRIDING USER VALUE
+   VALUES (s.a, DEFAULT)
+WHEN NOT MATCHED
+   AND s.a > 0
+   THEN INSERT
+   VALUES (s.a, s.b, DEFAULT)
+WHEN NOT MATCHED
+   THEN INSERT (filling[1], id)
+   VALUES (s.a, s.a);
+END
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLES IN SCHEMA pub_test
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX cwi_a_nnd ON cwi_test (a) NULLS NOT DISTINCT
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub5 FOR TABLE testpub_rf_tbl1, testpub_rf_tbl2 WHERE (c <> 'test' AND d < 5) WITH (publish = 'insert')
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 (b)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test2
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_all" ADD TABLE ONLY "pubme"."t1" WHERE (("c" < 0))
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION split_pub18_schema FOR TABLES IN SCHEMA split_pub18_b, CURRENT_SCHEMA WITH (publish = 'insert')
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION split_pub_cols FOR TABLE split_fdw_repl.accounts (id, owner_name) WHERE (amount > 0) WITH (publish = 'insert, update', publish_via_partition_root = true)
+;
+----------
+[CREATE_PUB_SUB] -- should be able to create publication with schema and table of the same
+-- schema
+CREATE PUBLICATION testpub_for_tbl_schema FOR TABLES IN SCHEMA pub_test, TABLE pub_test.testpub_nopk
+;
+----------
+[ALTER_PUB_SUB] -- fail - publication WHERE clause must be boolean
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (1234)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub6 FOR TABLE rf_tbl_abcd_pk WHERE (a > 99)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_schema FOR TABLES IN SCHEMA sch1
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_nsp_2ct" ADD TABLES IN SCHEMA "pubme2"
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub1_forschema FOR TABLES IN SCHEMA pub_test1
+;
+----------
+[ALTER_PUB_SUB] -- error: replica identity "a" not included in the column list
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (b, c)
+;
+----------
+[ALTER_PUB_SUB] -- 1b. REPLICA IDENTITY is DEFAULT and table has no PK
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_nopk WHERE (a > 99)
+;
+----------
+[ALTER_PUB_SUB] -- add non existent schema
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA non_existent_schema
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_both_filters ADD TABLE testpub_tbl_both_filters (a,c) WHERE (c != 1)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl4 WHERE (length(g) < 6)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub1
+	   FOR TABLE tab1 (a, "B"), tab3 ("a'", "c'"), test_part (a, b), tab4 (a, b, d)
+	  WITH (publish_via_partition_root = 'true')
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_mix_7 FOR TABLE test_mix_4 (a, b)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_mix_5 FOR TABLE test_mix_3 (a, b, c)
+;

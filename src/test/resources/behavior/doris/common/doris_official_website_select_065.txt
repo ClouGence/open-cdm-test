@@ -1,0 +1,1321 @@
+[doris_official_website_select_065__select__0001]
+sql:
+WITH example_data AS (
+    SELECT 1 as column1, 66 as column2, 'A' as group_name
+    UNION ALL
+    SELECT 1, 10, 'A'
+    UNION ALL
+    SELECT 1, 66, 'A'
+    UNION ALL
+    SELECT 1, 20, 'A'
+    UNION ALL
+    SELECT 2, 66, 'B'
+    UNION ALL
+    SELECT 2, 30, 'B'
+    UNION ALL
+    SELECT 2, 40, 'B'
+)
+SELECT 
+    group_name,
+    column1,
+    column2,
+    NTH_VALUE(column2, 2) OVER (
+        PARTITION BY column1 
+        ORDER BY column2
+        ROWS BETWEEN 1 preceding and 1 following
+    ) as nth
+FROM example_data
+ORDER BY column1, column2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(20:4~20:13) /test/1/catalog1/schema1/NTH_VALUE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(25:5~25:17) /test/1/catalog1/schema1/example_data/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0002]
+sql:
+-- TERM + PHRASE + NOT 
+SELECT request_id, error_msg, latency_ms
+FROM inference_logs
+WHERE search('
+  level:ERROR 
+  AND error_msg:"CUDA out of memory" 
+  AND NOT module:healthcheck 
+  AND model_name:gpt*
+')
+  AND log_time > NOW() - INTERVAL 1 HOUR
+ORDER BY latency_ms DESC LIMIT 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:19) /test/1/catalog1/schema1/inference_logs/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/search/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:17~10:20) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0003]
+sql:
+-- BM25 
+SELECT request_id, error_msg, score() AS relevance
+FROM inference_logs
+WHERE search('error_msg:"memory allocation failed" OR error_msg:"CUDA error"')
+ORDER BY relevance DESC LIMIT 20;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:30~2:35) /test/1/catalog1/schema1/score/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:19) /test/1/catalog1/schema1/inference_logs/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/search/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0004]
+sql:
+-- Search in VARIANT
+SELECT * FROM agent_logs
+WHERE search('NESTED(steps, status:error AND tool:code_exec)');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:24) /test/1/catalog1/schema1/agent_logs/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(3:6~3:12) /test/1/catalog1/schema1/search/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0005]
+sql:
+-- search + aggregation
+SELECT model_name, COUNT(*) AS error_count,
+       PERCENTILE_APPROX(latency_ms, 0.99) AS p99_latency
+FROM inference_logs
+WHERE search('level:ERROR AND error_msg:"CUDA out of memory"')
+  AND log_time > NOW() - INTERVAL 1 HOUR
+GROUP BY model_name ORDER BY error_count DESC;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:19~2:24) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:7~3:24) /test/1/catalog1/schema1/PERCENTILE_APPROX/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:5~4:19) /test/1/catalog1/schema1/inference_logs/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(5:6~5:12) /test/1/catalog1/schema1/search/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:17~6:20) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0006]
+sql:
+SELECT CONCAT('a', 'b');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:13) /test/1/catalog1/schema1/CONCAT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0007]
+sql:
+SELECT * FROM test WHERE K4 < 1000 AND K5 = 80 AND K6 = 10000;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:18) /test/1/catalog1/schema1/test/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0008]
+sql:
+SELECT * FROM test WHERE k4 < 1000 AND k5 = 80 OR k6 >= 10000;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:18) /test/1/catalog1/schema1/test/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0009]
+sql:
+-- running difference(x)
+SELECT running_difference(x) FROM t ORDER BY k;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:25) /test/1/catalog1/schema1/running_difference/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:34~2:35) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0010]
+sql:
+-- window function
+SELECT x - lag(x, 1, 0) OVER (ORDER BY k) FROM t;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:11~2:14) /test/1/catalog1/schema1/lag/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:47~2:48) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0011]
+sql:
+SELECT * FROM tbl
+   INTO OUTFILE "hdfs://path/to/result_"
+   FORMAT AS CSV
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.hadoop.security.authentication" = "kerberos",
+       "broker.kerberos_principal" = "doris@YOUR.COM",
+       "broker.kerberos_keytab" = "/home/doris/my.keytab",
+       "column_separator" = ",",
+       "line_delimiter" = "\n",
+       "max_file_size" = "100MB"
+   );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0012]
+sql:
+SELECT c1, c2, c3 FROM tbl
+   INTO OUTFILE "hdfs://path/to/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.hadoop.security.authentication" = "kerberos",
+       "broker.kerberos_principal" = "doris@YOUR.COM",
+       "broker.kerberos_keytab" = "/home/doris/my.keytab",
+       "schema"="required,int32,c1;required,byte_array,c2;required,byte_array,c2"
+   );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:23~1:26) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0013]
+sql:
+SELECT k1 FROM tbl1 UNION SELECT k2 FROM tbl1
+   INTO OUTFILE "bos://bucket/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.bos_endpoint" = "http://bj.bcebos.com",
+       "broker.bos_accesskey" = "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
+       "broker.bos_secret_accesskey" = "yyyyyyyyyyyyyyyyyyyyyyyyy",
+       "schema"="required,int32,k1;required,byte_array,k2"
+   );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:15~1:19) /test/1/catalog1/schema1/tbl1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:41~1:45) /test/1/catalog1/schema1/tbl1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0014]
+sql:
+select k1,k2,v1 from tbl1 limit 100000
+   into outfile "s3a://my_bucket/export/my_file_"
+   FORMAT AS CSV
+   PROPERTIES
+   (
+       "broker.name" = "hdfs_broker",
+       "broker.fs.s3a.access.key" = "xxx",
+       "broker.fs.s3a.secret.key" = "xxxx",
+       "broker.fs.s3a.endpoint" = "https://cos.xxxxxx.myqcloud.com/",
+       "column_separator" = ",",
+       "line_delimiter" = "\n",
+       "max_file_size" = "1024MB",
+       "success_file_name" = "SUCCESS"
+   )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:21~1:25) /test/1/catalog1/schema1/tbl1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0015]
+sql:
+SELECT * FROM tbl
+   INTO OUTFILE "hdfs://${host}:${fileSystem_port}/path/to/result_"
+   FORMAT AS CSV
+   PROPERTIES
+   (
+       "fs.defaultFS" = "hdfs://ip:port",
+       "hadoop.username" = "work"
+   );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0016]
+sql:
+select * from query("catalog" = "jdbc_catalog", "query" = "select * from db_name.table_name where condition");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_065__select__0017]
+sql:
+SELECT c1, c2, c3 FROM tbl
+   INTO OUTFILE "hdfs://path/to/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.hadoop.security.authentication" = "kerberos",
+       "broker.kerberos_principal" = "doris@YOUR.COM",
+       "broker.kerberos_keytab" = "/home/doris/my.keytab"
+   );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:23~1:26) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0018]
+sql:
+SELECT k1 FROM tbl1 UNION SELECT k2 FROM tbl1
+   INTO OUTFILE "bos://bucket/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.bos_endpoint" = "http://bj.bcebos.com",
+       "broker.bos_accesskey" = "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
+       "broker.bos_secret_accesskey" = "yyyyyyyyyyyyyyyyyyyyyyyyy"
+   );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:15~1:19) /test/1/catalog1/schema1/tbl1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:41~1:45) /test/1/catalog1/schema1/tbl1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0019]
+sql:
+-- 2.1 Rows in the content column containing both keyword1 and keyword2, where keyword2 must immediately follow keyword1
+-- 'keyword1 keyword2', 'wordx keyword1 keyword2', 'wordx keyword1 keyword2 wordy' all match because they contain 'keyword1 keyword2' with keyword2 immediately following keyword1
+-- 'keyword1 wordx keyword2' does not match because there is a word between keyword1 and keyword2
+-- 'keyword2 keyword1' does not match because the order is reversed
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(5:14~5:24) /test/1/catalog1/schema1/table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0020]
+sql:
+-- 2.2 Rows in the content column containing both keyword1 and keyword2, with a slop (maximum word distance) of 3
+-- 'keyword1 keyword2', 'keyword1 a keyword2', 'keyword1 a b c keyword2' all match because the slop is 0, 1, and 3 respectively, all within 3
+-- 'keyword1 a b c d keyword2' does not match because the slop is 4, exceeding 3
+-- 'keyword2 keyword1', 'keyword2 a keyword1', 'keyword2 a b c keyword1' also match because when slop > 0, the order of keyword1 and keyword2 is not required. To enforce the order, Doris provides a + sign after slop
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(5:14~5:24) /test/1/catalog1/schema1/table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0021]
+sql:
+-- To enforce order, use a positive sign with slop; 'keyword1 a b c keyword2' matches, while 'keyword2 a b c keyword1' does not
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3+';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:24) /test/1/catalog1/schema1/table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0022]
+sql:
+-- 2.3 Prefix matching the last word keyword2, with a default limit of 50 prefixes (controlled by session variable inverted_index_max_expansions)
+-- It is necessary to ensure that keyword1 and keyword2 remain adjacent in the original text after tokenization, with no other words in between.
+-- 'keyword1 keyword2abc' matches because keyword1 is identical and keyword2abc is a prefix of keyword2
+-- 'keyword1 keyword2' also matches because keyword2 is a prefix of keyword2
+-- 'keyword1 keyword3' does not match because keyword3 is not a prefix of keyword2
+-- 'keyword1 keyword3abc' does not match because keyword3abc is not a prefix of keyword2
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1 keyword2';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(7:14~7:24) /test/1/catalog1/schema1/table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0023]
+sql:
+-- 2.4 If only one word is provided, it defaults to a prefix query with a limit of 50 prefixes (controlled by session variable inverted_index_max_expansions)
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:24) /test/1/catalog1/schema1/table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0024]
+sql:
+-- 2.5 Regular expression matching on tokenized words, with a default limit of 50 matches (controlled by session variable inverted_index_max_expansions)
+-- Similar to MATCH_PHRASE_PREFIX but with regex instead of prefix
+SELECT * FROM table_name WHERE content MATCH_REGEXP 'key.*';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:14~3:24) /test/1/catalog1/schema1/table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0025]
+sql:
+-- 3. Normal equality, range, IN, and NOT IN queries using standard SQL syntax, for example:
+SELECT * FROM table_name WHERE id = 123;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:24) /test/1/catalog1/schema1/table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0026]
+sql:
+SELECT * FROM table_name WHERE ts > '2023-01-01 00:00:00';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:24) /test/1/catalog1/schema1/table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0027]
+sql:
+SELECT * FROM table_name WHERE op_type IN ('add', 'delete');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:24) /test/1/catalog1/schema1/table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0028]
+sql:
+SELECT
+    product_id,
+    any_value(product_title),
+    AVG(star_rating) AS rating,
+    COUNT(*) AS count
+FROM
+    amazon_reviews
+WHERE
+    review_body LIKE '%is super awesome%'
+GROUP BY
+    product_id
+ORDER BY
+    count DESC,
+    rating DESC,
+    product_id
+LIMIT 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:13) /test/1/catalog1/schema1/any_value/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:7) /test/1/catalog1/schema1/AVG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:9) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:4~7:18) /test/1/catalog1/schema1/amazon_reviews/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0029]
+sql:
+SELECT * FROM S3 (
+      "uri" = "s3://your_bucket/path/to/tvf_test/test.parquet",
+      "format" = "parquet",
+      "s3.endpoint" = "https://s3.us-east-1.amazonaws.com",
+      "s3.region" = "us-east-1",
+      "s3.role_arn" = "<your-bucket-role-arn>",
+      "s3.external_id" = "<your-external-id>"      -- option parameter
+  )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_065__select__0030]
+sql:
+-- Full row retrieval
+SELECT * FROM tbl WHERE k1 = 1 AND k2 = 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0031]
+sql:
+-- Partial column retrieval
+SELECT v1, v2 FROM tbl WHERE k1 = 1 AND k2 = 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:19~2:22) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0032]
+sql:
+SELECT 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_065__select__0033]
+sql:
+-- Purpose: verify that the data was loaded successfully
+-- Expected: 4 rows are returned
+select * from demo.mytable;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:14~3:26) /test/1/catalog1/demo/mytable/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0034]
+sql:
+EXPLAIN
+SELECT o.o_orderpriority, COUNT(*) AS orders, SUM(l.l_extendedprice) AS revenue
+FROM   orders o
+JOIN   lineitem l ON o.o_orderkey = l.l_orderkey
+WHERE  o.o_orderdate >= '2026-01-01'
+GROUP BY o.o_orderpriority
+ORDER BY revenue DESC
+LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:26~2:31) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:46~2:49) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:7~3:13) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:7~4:15) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0035]
+sql:
+SELECT region, count(*) AS orders, sum(amount) AS revenue
+FROM s3(
+  "uri"    = "s3://demo-bucket/orders/year=2026/*.parquet",
+  "format" = "parquet",
+  "s3.endpoint"   = "https://s3.us-east-1.amazonaws.com",
+  "s3.access_key" = "AK...",
+  "s3.secret_key" = "SK..."
+)
+WHERE order_date >= '2026-04-01' AND status = 'PAID'
+GROUP BY region;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:15~1:20) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:35~1:38) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0036]
+sql:
+WITH bm25 AS (
+  SELECT id, ROW_NUMBER() OVER (ORDER BY score() DESC) AS r
+  FROM docs WHERE body MATCH_ANY 'music' ORDER BY score() DESC LIMIT 100
+),
+ann AS (
+  SELECT id, ROW_NUMBER() OVER (ORDER BY l2_distance_approximate(
+           embedding, [0.1,0.1,0.2,0.2,0.3,0.3,0.4,0.4]) ASC) AS r
+  FROM docs ORDER BY l2_distance_approximate(
+           embedding, [0.1,0.1,0.2,0.2,0.3,0.3,0.4,0.4]) ASC LIMIT 100
+)
+SELECT COALESCE(b.id, a.id) AS id,
+       COALESCE(1.0/(60+b.r), 0) + COALESCE(1.0/(60+a.r), 0) AS rrf
+FROM bm25 b FULL OUTER JOIN ann a ON b.id = a.id
+ORDER BY rrf DESC LIMIT 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:13~2:23) /test/1/catalog1/schema1/ROW_NUMBER/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:41~2:46) /test/1/catalog1/schema1/score/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:7~3:11) /test/1/catalog1/schema1/docs/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(3:50~3:55) /test/1/catalog1/schema1/score/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:13~6:23) /test/1/catalog1/schema1/ROW_NUMBER/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:41~6:64) /test/1/catalog1/schema1/l2_distance_approximate/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:7~8:11) /test/1/catalog1/schema1/docs/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(8:21~8:44) /test/1/catalog1/schema1/l2_distance_approximate/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:7~11:15) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:7~12:15) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:35~12:43) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:5~13:9) /test/1/catalog1/schema1/bm25/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:28~13:31) /test/1/catalog1/schema1/ann/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0037]
+sql:
+SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'hive_ctl' AND engine_name = 'hive'
+ORDER BY entry_name;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(4:5~4:53) /test/1/catalog1/information_schema/catalog_meta_cache_statistics/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0038]
+sql:
+SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'iceberg_ctl' AND engine_name = 'iceberg'
+ORDER BY entry_name;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(4:5~4:53) /test/1/catalog1/information_schema/catalog_meta_cache_statistics/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0039]
+sql:
+SELECT id, _row_id, _last_updated_sequence_number FROM iceberg_tbl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:55~1:66) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0040]
+sql:
+SELECT * FROM iceberg_table$all_manifests;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:41) /test/1/catalog1/schema1/iceberg_table$all_manifests/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0041]
+sql:
+SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'paimon_ctl' AND engine_name = 'paimon'
+ORDER BY entry_name;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(4:5~4:53) /test/1/catalog1/information_schema/catalog_meta_cache_statistics/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0042]
+sql:
+-- between snapshots [0, 5)
+SELECT * FROM paimon_table@incr('startSnapshotId'='0', 'endSnapshotId'='5');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:26) /test/1/catalog1/schema1/paimon_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0043]
+sql:
+-- between snapshots [0, 5) with specified scan mode
+SELECT * FROM paimon_table@incr('startSnapshotId'='0', 'endSnapshotId'='5', 'incrementalBetweenScanMode'='diff');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:26) /test/1/catalog1/schema1/paimon_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0044]
+sql:
+-- read from start timestamp
+SELECT * FROM paimon_table@incr('startTimestamp'='1750844949000');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:26) /test/1/catalog1/schema1/paimon_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0045]
+sql:
+-- read between timestamp
+SELECT * FROM paimon_table@incr('startTimestamp'='1750844949000', 'endTimestamp'='1750944949000');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:26) /test/1/catalog1/schema1/paimon_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0046]
+sql:
+SELECT `bucket`, COUNT(*) as file_count, SUM(file_size_in_bytes)/1024/1024 as total_size_mb FROM paimon_s3.tpcds.catalog_sales$files GROUP BY `bucket` ORDER BY total_size_mb;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:17~1:22) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:41~1:44) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:97~1:132) /test/1/paimon_s3/tpcds/catalog_sales$files/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0047]
+sql:
+-- 目的：验证数据导入成功
+-- 期望：看到 4 行数据
+select * from demo.mytable;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:14~3:26) /test/1/catalog1/demo/mytable/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0048]
+sql:
+SELECT * FROM iceberg_tbl FOR TIME AS OF "2022-10-07 17:20:37";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0049]
+sql:
+SELECT * FROM iceberg_tbl FOR VERSION AS OF 868895038966572;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0050]
+sql:
+-- 查询当前快照的数据文件
+SELECT * FROM iceberg_table$data_files;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:38) /test/1/catalog1/schema1/iceberg_table$data_files/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0051]
+sql:
+-- 查询当前快照的删除文件
+SELECT * FROM iceberg_table$delete_files;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:40) /test/1/catalog1/schema1/iceberg_table$delete_files/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0052]
+sql:
+-- 查询所有快照的所有文件（包括数据和删除文件）
+SELECT * FROM iceberg_table$all_files;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:37) /test/1/catalog1/schema1/iceberg_table$all_files/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0053]
+sql:
+-- 查询所有快照的数据文件
+SELECT * FROM iceberg_table$all_data_files;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:42) /test/1/catalog1/schema1/iceberg_table$all_data_files/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0054]
+sql:
+-- 查询所有快照的删除文件
+SELECT * FROM iceberg_table$all_delete_files;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:44) /test/1/catalog1/schema1/iceberg_table$all_delete_files/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_065__select__0055]
+sql:
+-- Search for "Kafka streaming" with embedding [0.7, 0.3, 0.2, 0.4, 0.2]
+WITH vector_results AS (
+    -- Similarity search: find conceptually similar documents
+    SELECT
+        id, content,
+        1 - cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) AS vector_score,
+        ROW_NUMBER() OVER (ORDER BY cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) ASC) AS vector_rank
+    FROM rag_documents
+    ORDER BY cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) ASC
+    LIMIT 10
+),
+text_results AS (
+    -- Full-text search: find exact term matches
+    SELECT
+        id, content,
+        1.0 AS text_score,
+        ROW_NUMBER() OVER (ORDER BY id) AS text_rank
+    FROM rag_documents
+    WHERE content MATCH 'Kafka streaming'
+    LIMIT 10
+),
+combined AS (
+    -- Combine results from both methods
+    SELECT
+        COALESCE(v.id, t.id) AS id,
+        COALESCE(v.content, t.content) AS content,
+        COALESCE(v.vector_score, 0) AS vector_score,
+        COALESCE(t.text_score, 0) AS text_score,
+        COALESCE(v.vector_rank, 999) AS vector_rank,
+        COALESCE(t.text_rank, 999) AS text_rank
+    FROM vector_results v
+    FULL OUTER JOIN text_results t ON v.id = t.id
+)
+-- RRF fusion: combine rankings with 1/(k + rank) formula
+SELECT
+    id, content, vector_score, text_score,
+    (0.5 / (60 + vector_rank) + 0.5 / (60 + text_rank)) AS hybrid_score
+FROM combined
+ORDER BY hybrid_score DESC
+LIMIT 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(6:12~6:27) /test/1/catalog1/schema1/cosine_distance/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:8~7:18) /test/1/catalog1/schema1/ROW_NUMBER/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:36~7:51) /test/1/catalog1/schema1/cosine_distance/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:9~8:22) /test/1/catalog1/schema1/rag_documents/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(9:13~9:28) /test/1/catalog1/schema1/cosine_distance/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(17:8~17:18) /test/1/catalog1/schema1/ROW_NUMBER/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(18:9~18:22) /test/1/catalog1/schema1/rag_documents/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(25:8~25:16) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(26:8~26:16) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(27:8~27:16) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(28:8~28:16) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(29:8~29:16) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(30:8~30:16) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(31:9~31:23) /test/1/catalog1/schema1/vector_results/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(32:20~32:32) /test/1/catalog1/schema1/text_results/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(38:5~38:13) /test/1/catalog1/schema1/combined/",
+      "action" : "READ"
+    }
+  ]
+}

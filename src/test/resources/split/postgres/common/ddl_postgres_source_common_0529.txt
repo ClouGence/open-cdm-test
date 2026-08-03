@@ -1,0 +1,546 @@
+CREATE TABLE concur_reindex_part_10 PARTITION OF concur_reindex_part
+  FOR VALUES FROM (10) TO (20) PARTITION BY list (c2)
+;
+ALTER INDEX pg_toast.pg_toast_28549_index RENAME TO reind_con_toast_idx
+;
+CALL transaction_test10a(10)
+;
+VACUUM (PARALLEL 2) pg_catalog.pg_authid
+;
+ALTER TABLE rf_tbl_abcd_nopk REPLICA IDENTITY NOTHING
+;
+CREATE INDEX ON brin_date_test USING brin (a date_minmax_multi_ops) WITH (pages_per_range=1)
+;
+ALTER INDEX pg_toast.pg_toast_28499_index RENAME TO reind_con_toast_idx
+;
+VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_tablespace
+;
+-- stable because depends on pg_trgm.word_similarity_threshold
+
+CREATE FUNCTION word_similarity_commutator_op(text,text)
+RETURNS bool
+AS '$libdir/pg_trgm'
+LANGUAGE C STRICT STABLE PARALLEL SAFE
+;
+CREATE FUNCTION gbt_ts_distance(internal,timestamp,int2,oid,internal)
+RETURNS float8
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+CREATE TABLE part_bogus_expr_fail PARTITION OF range_parted
+  FOR VALUES FROM ((select 1)) TO ('2019-01-01')
+;
+alter table defcheck_def add check (b <= 0 and b is not null)
+;
+VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_tablespace
+;
+CREATE TEMP TABLE arrtest_f (f0 int, f1 text, f2 float8)
+;
+VACUUM (SKIP_DATABASE_STATS, PARALLEL 0) pg_catalog.pg_statistic_ext_data
+;
+DROP TABLE b
+;
+DROP FUNCTION trigfunc
+;
+CREATE TABLE vac_horizon_floor_table(col1 int) with (autovacuum_enabled=false)
+;
+CREATE COLLATION "public"."regress_pg_unicode_fast" (provider = builtin, locale = 'PG_UNICODE_FAST', version = '1')
+;
+-- setup of malicious function
+CREATE OR REPLACE FUNCTION f_leak(text) RETURNS bool
+    COST 0.0000001 LANGUAGE plpgsql
+    AS 'BEGIN RAISE NOTICE ''f_leak => %'', $1; RETURN true; END'
+;
+CREATE TABLE "public"."rtest_system" (
+    "sysname" "text",
+    "sysdesc" "text"
+)
+;
+ALTER INDEX ptif_test_index ATTACH PARTITION ptif_test1_index
+;
+CREATE VIEW pg_tables AS
+    SELECT
+        N.nspname AS schemaname,
+        C.relname AS tablename,
+        pg_get_userbyid(C.relowner) AS tableowner,
+        T.spcname AS tablespace,
+        C.relhasindex AS hasindexes,
+        C.relhasrules AS hasrules,
+        C.relhastriggers AS hastriggers,
+        C.relrowsecurity AS rowsecurity
+    FROM pg_class C LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+         LEFT JOIN pg_tablespace T ON (T.oid = C.reltablespace)
+    WHERE C.relkind IN ('r', 'p')
+;
+-- fail - can't drop a table from the schema publication which isn't in the
+-- publication
+ALTER PUBLICATION testpub_forschema DROP TABLE pub_test.testpub_nopk
+;
+CREATE FUNCTION seg_lt(seg, seg)
+RETURNS bool
+AS '$libdir/seg'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+ANALYZE pg_temp_3.pg_temp_27503
+;
+-- leave these tables around for pg_upgrade testing
+
+-- It's possible to remove a constraint from parents without affecting children
+CREATE TABLE notnull_tbl5 (a int CONSTRAINT ann NOT NULL,
+	b int CONSTRAINT bnn NOT NULL)
+;
+DROP TABLE pg_temp_10.pg_temp_26350_2, pg_temp_10.pg_temp_26350
+;
+DROP SUBSCRIPTION tap_sub_A_B_2
+;
+CREATE TABLE tab4_1 (a int PRIMARY KEY)
+;
+CREATE TABLE "public"."prt1_m_p1" (
+    "a" integer,
+    "b" integer,
+    "c" integer
+)
+;
+DROP TABLE pg_temp_11.pg_temp_26345_2, pg_temp_11.pg_temp_26345
+;
+/*
+ * 5.6
+ * TIME_STAMP domain
+ */
+
+CREATE DOMAIN time_stamp AS timestamp(2) with time zone
+    DEFAULT current_timestamp(2)
+;
+/*
+ * 6.82
+ * VIEWS view
+ */
+
+CREATE VIEW views AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+
+           CAST(
+             CASE WHEN pg_has_role(c.relowner, 'USAGE')
+                  THEN pg_get_viewdef(c.oid)
+                  ELSE null END
+             AS character_data) AS view_definition,
+
+           CAST(
+             CASE WHEN 'check_option=cascaded' = ANY (c.reloptions)
+                  THEN 'CASCADED'
+                  WHEN 'check_option=local' = ANY (c.reloptions)
+                  THEN 'LOCAL'
+                  ELSE 'NONE' END
+             AS character_data) AS check_option,
+
+           CAST(
+             -- (1 << CMD_UPDATE) + (1 << CMD_DELETE)
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 20 = 20
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_updatable,
+
+           CAST(
+             -- 1 << CMD_INSERT
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 8 = 8
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_insertable_into,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_UPDATE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 81 = 81)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_updatable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_DELETE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 73 = 73)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_deletable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_INSERT
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 69 = 69)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_insertable_into
+
+    FROM pg_namespace nc, pg_class c
+
+    WHERE c.relnamespace = nc.oid
+          AND c.relkind = 'v'
+          AND (NOT pg_is_other_temp_schema(nc.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES') )
+;
+CREATE TABLE t3 (s int, t text)
+;
+CREATE OR REPLACE FUNCTION test_slru_page_writeall() RETURNS VOID
+  AS 'MODULE_PATHNAME', 'test_slru_page_writeall' LANGUAGE C
+;
+ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf3
+;
+/*
+ * 5.15
+ * COLLATIONS view
+ */
+
+CREATE VIEW collations AS
+    SELECT CAST(current_database() AS sql_identifier) AS collation_catalog,
+           CAST(nc.nspname AS sql_identifier) AS collation_schema,
+           CAST(c.collname AS sql_identifier) AS collation_name,
+           CAST('NO PAD' AS character_data) AS pad_attribute
+    FROM pg_collation c, pg_namespace nc
+    WHERE c.collnamespace = nc.oid
+          AND collencoding IN (-1, (SELECT encoding FROM pg_database WHERE datname = current_database()))
+;
+CREATE MATERIALIZED VIEW mat_view_heap_psql USING heap_psql AS SELECT f1 from tbl_heap_psql
+;
+alter table mytable drop column f2
+;
+ALTER TABLE test_gist ADD COLUMN i int DEFAULT NULL
+;
+VACUUM (SKIP_DATABASE_STATS) pg_catalog.pg_amproc
+;
+CREATE TABLE pa_source (sid integer)
+;
+create table part_10_20_cd partition of part_10_20 for values in ('cd')
+;
+ALTER EXTENSION test_pg_dump ADD ACCESS METHOD gist2
+;
+alter table atacc1 drop a
+;
+alter table p2 add constraint cc check (f2>0)
+;
+CREATE FUNCTION cash_dist(money, money)
+RETURNS money
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+DO $$
+DECLARE
+  exists boolean;
+BEGIN
+  SELECT EXISTS (SELECT * FROM first_client_table) INTO STRICT exists;
+  IF exists THEN
+	-- We are the second client or the client with the deadlock error
+
+	-- The first client will take care by itself of this lock (see below)
+	PERFORM pg_advisory_unlock(0);
+
+	PERFORM pg_advisory_lock(3);
+
+	-- The second client can get a deadlock here
+	PERFORM pg_advisory_lock(2);
+  ELSE
+	-- We are the first client
+
+	-- This code should not be used in a new transaction after an error
+	INSERT INTO first_client_table VALUES (1);
+
+	PERFORM pg_advisory_lock(2);
+  END IF;
+END$$
+;
+-- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."d" INHERIT "public"."b"
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] CREATE TABLE concur_reindex_part_10 PARTITION OF concur_reindex_part
+  FOR VALUES FROM (10) TO (20) PARTITION BY list (c2)
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_28549_index RENAME TO reind_con_toast_idx
+;
+----------
+[CALL_PROG_OBJ] CALL transaction_test10a(10)
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 2) pg_catalog.pg_authid
+;
+----------
+[ALTER_TABLE] ALTER TABLE rf_tbl_abcd_nopk REPLICA IDENTITY NOTHING
+;
+----------
+[ADD_INDEX] CREATE INDEX ON brin_date_test USING brin (a date_minmax_multi_ops) WITH (pages_per_range=1)
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_28499_index RENAME TO reind_con_toast_idx
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_tablespace
+;
+----------
+[CREATE_PROG_OBJ] -- stable because depends on pg_trgm.word_similarity_threshold
+
+CREATE FUNCTION word_similarity_commutator_op(text,text)
+RETURNS bool
+AS '$libdir/pg_trgm'
+LANGUAGE C STRICT STABLE PARALLEL SAFE
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_ts_distance(internal,timestamp,int2,oid,internal)
+RETURNS float8
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[CREATE_TABLE] CREATE TABLE part_bogus_expr_fail PARTITION OF range_parted
+  FOR VALUES FROM ((select 1)) TO ('2019-01-01')
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table defcheck_def add check (b <= 0 and b is not null)
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_tablespace
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE arrtest_f (f0 int, f1 text, f2 float8)
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, PARALLEL 0) pg_catalog.pg_statistic_ext_data
+;
+----------
+[DROP_TABLE] DROP TABLE b
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION trigfunc
+;
+----------
+[CREATE_TABLE] CREATE TABLE vac_horizon_floor_table(col1 int) with (autovacuum_enabled=false)
+;
+----------
+[CREATE_POLICY] CREATE COLLATION "public"."regress_pg_unicode_fast" (provider = builtin, locale = 'PG_UNICODE_FAST', version = '1')
+;
+----------
+[CREATE_PROG_OBJ] -- setup of malicious function
+CREATE OR REPLACE FUNCTION f_leak(text) RETURNS bool
+    COST 0.0000001 LANGUAGE plpgsql
+    AS 'BEGIN RAISE NOTICE ''f_leak => %'', $1; RETURN true; END'
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."rtest_system" (
+    "sysname" "text",
+    "sysdesc" "text"
+)
+;
+----------
+[ALTER_INDEX] ALTER INDEX ptif_test_index ATTACH PARTITION ptif_test1_index
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW pg_tables AS
+    SELECT
+        N.nspname AS schemaname,
+        C.relname AS tablename,
+        pg_get_userbyid(C.relowner) AS tableowner,
+        T.spcname AS tablespace,
+        C.relhasindex AS hasindexes,
+        C.relhasrules AS hasrules,
+        C.relhastriggers AS hastriggers,
+        C.relrowsecurity AS rowsecurity
+    FROM pg_class C LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+         LEFT JOIN pg_tablespace T ON (T.oid = C.reltablespace)
+    WHERE C.relkind IN ('r', 'p')
+;
+----------
+[ALTER_PUB_SUB] -- fail - can't drop a table from the schema publication which isn't in the
+-- publication
+ALTER PUBLICATION testpub_forschema DROP TABLE pub_test.testpub_nopk
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION seg_lt(seg, seg)
+RETURNS bool
+AS '$libdir/seg'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_3.pg_temp_27503
+;
+----------
+[CREATE_TABLE] -- leave these tables around for pg_upgrade testing
+
+-- It's possible to remove a constraint from parents without affecting children
+CREATE TABLE notnull_tbl5 (a int CONSTRAINT ann NOT NULL,
+	b int CONSTRAINT bnn NOT NULL)
+;
+----------
+[DROP_TABLE] DROP TABLE pg_temp_10.pg_temp_26350_2, pg_temp_10.pg_temp_26350
+;
+----------
+[DROP_PUB_SUB] DROP SUBSCRIPTION tap_sub_A_B_2
+;
+----------
+[CREATE_TABLE] CREATE TABLE tab4_1 (a int PRIMARY KEY)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."prt1_m_p1" (
+    "a" integer,
+    "b" integer,
+    "c" integer
+)
+;
+----------
+[DROP_TABLE] DROP TABLE pg_temp_11.pg_temp_26345_2, pg_temp_11.pg_temp_26345
+;
+----------
+[CREATE_TYPE] /*
+ * 5.6
+ * TIME_STAMP domain
+ */
+
+CREATE DOMAIN time_stamp AS timestamp(2) with time zone
+    DEFAULT current_timestamp(2)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 6.82
+ * VIEWS view
+ */
+
+CREATE VIEW views AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+
+           CAST(
+             CASE WHEN pg_has_role(c.relowner, 'USAGE')
+                  THEN pg_get_viewdef(c.oid)
+                  ELSE null END
+             AS character_data) AS view_definition,
+
+           CAST(
+             CASE WHEN 'check_option=cascaded' = ANY (c.reloptions)
+                  THEN 'CASCADED'
+                  WHEN 'check_option=local' = ANY (c.reloptions)
+                  THEN 'LOCAL'
+                  ELSE 'NONE' END
+             AS character_data) AS check_option,
+
+           CAST(
+             -- (1 << CMD_UPDATE) + (1 << CMD_DELETE)
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 20 = 20
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_updatable,
+
+           CAST(
+             -- 1 << CMD_INSERT
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 8 = 8
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_insertable_into,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_UPDATE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 81 = 81)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_updatable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_DELETE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 73 = 73)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_deletable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_INSERT
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 69 = 69)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_insertable_into
+
+    FROM pg_namespace nc, pg_class c
+
+    WHERE c.relnamespace = nc.oid
+          AND c.relkind = 'v'
+          AND (NOT pg_is_other_temp_schema(nc.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES') )
+;
+----------
+[CREATE_TABLE] CREATE TABLE t3 (s int, t text)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION test_slru_page_writeall() RETURNS VOID
+  AS 'MODULE_PATHNAME', 'test_slru_page_writeall' LANGUAGE C
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY alt_opf1 USING hash RENAME TO alt_opf3
+;
+----------
+[CREATE_VIEW(SELECT)] /*
+ * 5.15
+ * COLLATIONS view
+ */
+
+CREATE VIEW collations AS
+    SELECT CAST(current_database() AS sql_identifier) AS collation_catalog,
+           CAST(nc.nspname AS sql_identifier) AS collation_schema,
+           CAST(c.collname AS sql_identifier) AS collation_name,
+           CAST('NO PAD' AS character_data) AS pad_attribute
+    FROM pg_collation c, pg_namespace nc
+    WHERE c.collnamespace = nc.oid
+          AND collencoding IN (-1, (SELECT encoding FROM pg_database WHERE datname = current_database()))
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mat_view_heap_psql USING heap_psql AS SELECT f1 from tbl_heap_psql
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] alter table mytable drop column f2
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE test_gist ADD COLUMN i int DEFAULT NULL
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS) pg_catalog.pg_amproc
+;
+----------
+[CREATE_TABLE] CREATE TABLE pa_source (sid integer)
+;
+----------
+[CREATE_TABLE] create table part_10_20_cd partition of part_10_20 for values in ('cd')
+;
+----------
+[ALTER_LIBRARY] ALTER EXTENSION test_pg_dump ADD ACCESS METHOD gist2
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] alter table atacc1 drop a
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table p2 add constraint cc check (f2>0)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION cash_dist(money, money)
+RETURNS money
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[BLOCK] DO $$
+DECLARE
+  exists boolean;
+BEGIN
+  SELECT EXISTS (SELECT * FROM first_client_table) INTO STRICT exists;
+  IF exists THEN
+	-- We are the second client or the client with the deadlock error
+
+	-- The first client will take care by itself of this lock (see below)
+	PERFORM pg_advisory_unlock(0);
+
+	PERFORM pg_advisory_lock(3);
+
+	-- The second client can get a deadlock here
+	PERFORM pg_advisory_lock(2);
+  ELSE
+	-- We are the first client
+
+	-- This code should not be used in a new transaction after an error
+	INSERT INTO first_client_table VALUES (1);
+
+	PERFORM pg_advisory_lock(2);
+  END IF;
+END$$
+;
+----------
+[ALTER_TABLE] -- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."d" INHERIT "public"."b"
+;

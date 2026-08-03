@@ -1,0 +1,648 @@
+--EXPLAIN (ANALYZE ON, COSTS OFF, SUMMARY OFF, TIMING OFF)
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED AND t.balance > s.delta THEN
+	UPDATE SET balance = t.balance - s.delta
+WHEN MATCHED THEN
+	DELETE
+WHEN NOT MATCHED THEN
+	INSERT VALUES (s.sid, s.delta)
+;
+MERGE INTO rw_view2 t USING (VALUES (-5)) AS v(a) ON t.a = v.a
+  WHEN NOT MATCHED THEN INSERT VALUES (v.a)
+;
+MERGE INTO rw_view14  AS t
+  USING (VALUES (2, 'Merged row 2'), (3, 'Merged row 3')) AS v(a,b) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET b = v.b  -- should be OK, except...
+  WHEN NOT MATCHED THEN INSERT VALUES (null, v.a, v.b)
+;
+MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid AND t.tid = 1
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid + 1, balance = balance + delta, val = val || ' updated by merge'
+  RETURNING merge_action(), t.*
+;
+-- ok
+MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED THEN UPDATE SET cc = cc
+;
+MERGE INTO pgss_dml_tab USING pgss_dml_tab st ON (st.a = pgss_dml_tab.a AND st.a >= 4)
+ WHEN MATCHED THEN DELETE
+;
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT VALUES (4, NULL)
+;
+MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid + 1, balance = balance + delta, val = val || ' updated by merge'
+  WHEN NOT MATCHED THEN
+    INSERT VALUES (sid, delta, 'inserted by merge')
+  WHEN NOT MATCHED BY SOURCE THEN
+    UPDATE SET val = val || ' not matched by source'
+;
+INSERT INTO split_returning18.items AS t (id, code, qty)
+VALUES (1, 'a', 12), (2, 'b', 5)
+ON CONFLICT (id) DO UPDATE SET qty = excluded.qty
+RETURNING WITH (OLD AS o, NEW AS n) o.qty AS old_qty, n.qty AS new_qty, n.code
+;
+-- MERGE source comes from CTE:
+WITH merge_source_cte AS MATERIALIZED (SELECT 15 a, 'merge_source_cte val' b)
+MERGE INTO m USING (select * from merge_source_cte) o ON m.k=o.a
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || merge_source_cte.*::text || ' merge update' FROM merge_source_cte WHERE a = 15)
+WHEN NOT MATCHED THEN INSERT VALUES(o.a, o.b || (SELECT merge_source_cte.*::text || ' merge insert' FROM merge_source_cte))
+;
+MERGE INTO split_merge18.inventory * AS t
+USING (VALUES ('skip', 0, 'zero')) AS s(sku, delta, note)
+ON t.sku = s.sku
+WHEN NOT MATCHED AND s.delta = 0 THEN DO NOTHING
+RETURNING merge_action(), t.*
+;
+MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid
+  WHEN MATCHED THEN
+    UPDATE SET balance = balance + delta, val = val || ' updated by merge'
+  WHEN NOT MATCHED THEN
+    INSERT VALUES (sid, delta, 'inserted by merge')
+;
+-- same as above
+MERGE INTO test USING test st ON (st.a = test.a)
+ WHEN NOT MATCHED THEN INSERT (b, a) VALUES (NULL, 0)
+;
+explain (analyze, timing off, summary off, costs off, buffers off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN MATCHED AND t.a < 10 THEN
+	UPDATE SET b = t.b + 1
+;
+-- not allowed
+MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+  WHEN MATCHED THEN UPDATE SET ccc = ccc
+;
+-- conditions in NOT MATCHED BY SOURCE clause can only refer to target columns
+MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN NOT MATCHED BY SOURCE AND s.balance = 100 THEN
+	DELETE
+;
+MERGE INTO sq_target t
+USING v
+ON tid = sid AND (SELECT count(*) > 0 FROM sq_target)
+WHEN MATCHED THEN
+    UPDATE SET balance = 42
+;
+MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED THEN
+	UPDATE SET b = s.b
+;
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED BY SOURCE THEN
+	DELETE
+WHEN NOT MATCHED BY TARGET THEN
+	INSERT VALUES (s.sid, s.delta)
+RETURNING merge_action(), old, new, t.*
+;
+MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED THEN
+	UPDATE SET b = 'ok'
+WHEN NOT MATCHED THEN
+	INSERT VALUES (a, NULL)
+;
+merge into uv_ptv t
+  using (values (1,2), (1,3)) as v(a,b) on t.a = v.a and t.b = v.b
+  when matched then update set b = t.b + 1
+  when not matched then insert values (v.a, v.b + 1)
+;
+MERGE INTO document d
+USING (SELECT 3 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge '
+;
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED THEN
+	DELETE
+;
+MERGE INTO target t USING (SELECT 1 as key, 'merge2' as val) s ON s.key = t.key WHEN NOT MATCHED THEN INSERT VALUES (s.key, s.val) WHEN MATCHED THEN UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED AND t.balance > s.delta THEN
+    UPDATE SET balance = t.balance - s.delta
+WHEN MATCHED THEN
+	UPDATE SET balance = 0
+WHEN NOT MATCHED THEN
+    INSERT VALUES (s.sid, s.delta)
+WHEN NOT MATCHED BY SOURCE AND tid = 1 THEN
+	UPDATE SET balance = 0
+WHEN NOT MATCHED BY SOURCE THEN
+	DELETE
+RETURNING merge_action(), t.*
+;
+MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED THEN
+	UPDATE SET b = s.b
+WHEN NOT MATCHED THEN
+	INSERT VALUES (a, b)
+;
+MERGE INTO testpub_merge_no_ri USING testpub_merge_pk s ON s.a >= 1
+ WHEN MATCHED THEN DELETE
+;
+MERGE INTO gtestm t USING gtestm AS s ON 2 * t.a = s.b WHEN MATCHED THEN DELETE RETURNING *
+;
+explain (analyze, timing off, summary off, costs off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN MATCHED THEN
+	UPDATE SET b = t.b + 1
+;
+MERGE INTO sq_target t
+    USING sq_source s
+    ON tid = sid
+    WHEN MATCHED AND tid >= 2 THEN
+        UPDATE SET balance = t.balance + delta
+    WHEN NOT MATCHED THEN
+        INSERT (balance, tid) VALUES (balance + delta, sid)
+    WHEN MATCHED AND tid < 2 THEN
+        DELETE
+    RETURNING merge_action(), t.*
+;
+WITH RECURSIVE cte_basic AS (SELECT 1 a, 'cte_basic val' b)
+MERGE INTO m USING (select 0 k, 'merge source SubPlan' v) o ON m.k=o.k
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || ' merge update' FROM cte_basic WHERE cte_basic.a = m.k LIMIT 1)
+WHEN NOT MATCHED THEN INSERT VALUES(o.k, o.v)
+;
+-- fail (s.b used in the WHEN quals)
+MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED AND s.b = 'x' THEN
+	UPDATE SET b = 'x'
+WHEN NOT MATCHED THEN
+	INSERT VALUES (a, NULL)
+;
+-- should fail
+
+MERGE INTO measurement m
+ USING (VALUES (1, '01-17-2007'::date)) nm(city_id, logdate) ON
+      (m.city_id = nm.city_id and m.logdate=nm.logdate)
+WHEN NOT MATCHED THEN INSERT
+     (city_id, logdate, peaktemp, unitsales)
+   VALUES (city_id - 1, logdate, 25, 100)
+;
+MERGE INTO measurement m
+ USING (VALUES (1, '01-17-2007'::date)) nm(city_id, logdate) ON
+      (m.city_id = nm.city_id and m.logdate=nm.logdate)
+WHEN NOT MATCHED THEN INSERT
+     (city_id, logdate, peaktemp, unitsales)
+   VALUES (city_id - 1, logdate, NULL, 100)
+;
+MERGE INTO testpub_merge_no_ri USING testpub_merge_pk s ON s.a >= 1
+ WHEN MATCHED THEN DO NOTHING
+ WHEN NOT MATCHED THEN INSERT (a, b) VALUES (0, 0)
+;
+-- check if AND works
+MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN MATCHED AND t.balance = 99 AND s.balance > 100 THEN
+	UPDATE SET balance = t.balance + s.balance
+;
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+  INSERT VALUES (s.sid, s.delta)
+;
+MERGE INTO pg_class c
+USING pg_namespace n
+ON n.oid = c.relnamespace
+WHEN MATCHED AND c.oid = 'pg_depend'::regclass THEN
+	UPDATE SET reltuples = reltuples - 1
+;
+MERGE INTO tgt USING src ON tgt.a IS NOT DISTINCT FROM src.a
+  WHEN MATCHED THEN UPDATE SET a = src.a, b = src.b
+  WHEN NOT MATCHED BY SOURCE THEN DELETE
+  RETURNING merge_action(), src.*, tgt.*
+;
+merge into uv_ptv t
+  using (values (1,2), (1,4)) as v(a,b) on t.a = v.a and t.b = v.b
+  when matched then update set b = t.b + 1
+  when not matched then insert values (v.a, v.b + 1)
+;
+merge into parent p using (values (1)) as v(id) on p.aid = v.id
+  when matched then update set val1 = 'b'
+;
+-- Should produce -99 and 21
+MERGE INTO rw_view2 t USING (VALUES (-40), (3)) AS v(a) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET a = t.a+1
+;
+MERGE INTO test USING test st ON (st.a = test.a)
+ WHEN NOT MATCHED THEN INSERT VALUES (0, NULL)
+;
+MERGE INTO document d
+USING (SELECT 1 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge7 ',
+			   cid = (SELECT cid from category WHERE cname = 'novel')
+;
+MERGE INTO target_tg t
+  USING (SELECT 1 as key) s
+  ON s.key = t.key
+  WHEN MATCHED AND balance < 100 THEN
+	UPDATE SET balance = balance * 2, val = t.val || ' when1'
+  WHEN MATCHED AND balance < 200 THEN
+    DELETE
+;
+MERGE INTO split_cov.parent_table p
+USING (VALUES (1, 'aa'), (3, 'c')) AS s(id, code)
+ON p.id = s.id
+WHEN MATCHED THEN UPDATE SET code = s.code
+WHEN NOT MATCHED THEN INSERT (id, code) VALUES (s.id, s.code)
+;
+-- some simple expressions in INSERT targetlist
+MERGE INTO cj_target t
+USING cj_source2 s2
+	INNER JOIN cj_source1 s1 ON sid1 = sid2
+ON t.tid = sid1
+WHEN NOT MATCHED THEN
+	INSERT VALUES (sid2, delta + scat, sval)
+WHEN MATCHED THEN
+	UPDATE SET val = val || ' updated by merge'
+;
+-- check if we can access system columns in the conditions
+MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN MATCHED AND t.xmin = t.xmax THEN
+	UPDATE SET balance = t.balance + s.balance
+;
+MERGE INTO target t
+  USING (SELECT 1 as key) s
+  ON s.key = t.key
+  WHEN MATCHED AND balance < 100 THEN
+	UPDATE SET balance = balance * 2, val = t.val || ' when1'
+  WHEN MATCHED AND balance < 200 THEN
+    DELETE
+;
+MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN MATCHED AND t.balance = 99 AND s.balance > 100 THEN
+	UPDATE SET balance = t.balance + s.balance
+;
+------------------------------------------------------------------------------------------
+[MERGE] --EXPLAIN (ANALYZE ON, COSTS OFF, SUMMARY OFF, TIMING OFF)
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED AND t.balance > s.delta THEN
+	UPDATE SET balance = t.balance - s.delta
+WHEN MATCHED THEN
+	DELETE
+WHEN NOT MATCHED THEN
+	INSERT VALUES (s.sid, s.delta)
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t USING (VALUES (-5)) AS v(a) ON t.a = v.a
+  WHEN NOT MATCHED THEN INSERT VALUES (v.a)
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view14  AS t
+  USING (VALUES (2, 'Merged row 2'), (3, 'Merged row 3')) AS v(a,b) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET b = v.b  -- should be OK, except...
+  WHEN NOT MATCHED THEN INSERT VALUES (null, v.a, v.b)
+;
+----------
+[MERGE] MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid AND t.tid = 1
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid + 1, balance = balance + delta, val = val || ' updated by merge'
+  RETURNING merge_action(), t.*
+;
+----------
+[MERGE|SELECT] -- ok
+MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED THEN UPDATE SET cc = cc
+;
+----------
+[MERGE] MERGE INTO pgss_dml_tab USING pgss_dml_tab st ON (st.a = pgss_dml_tab.a AND st.a >= 4)
+ WHEN MATCHED THEN DELETE
+;
+----------
+[MERGE] MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT VALUES (4, NULL)
+;
+----------
+[MERGE] MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid + 1, balance = balance + delta, val = val || ' updated by merge'
+  WHEN NOT MATCHED THEN
+    INSERT VALUES (sid, delta, 'inserted by merge')
+  WHEN NOT MATCHED BY SOURCE THEN
+    UPDATE SET val = val || ' not matched by source'
+;
+----------
+[MERGE|SELECT] INSERT INTO split_returning18.items AS t (id, code, qty)
+VALUES (1, 'a', 12), (2, 'b', 5)
+ON CONFLICT (id) DO UPDATE SET qty = excluded.qty
+RETURNING WITH (OLD AS o, NEW AS n) o.qty AS old_qty, n.qty AS new_qty, n.code
+;
+----------
+[MERGE|SELECT] -- MERGE source comes from CTE:
+WITH merge_source_cte AS MATERIALIZED (SELECT 15 a, 'merge_source_cte val' b)
+MERGE INTO m USING (select * from merge_source_cte) o ON m.k=o.a
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || merge_source_cte.*::text || ' merge update' FROM merge_source_cte WHERE a = 15)
+WHEN NOT MATCHED THEN INSERT VALUES(o.a, o.b || (SELECT merge_source_cte.*::text || ' merge insert' FROM merge_source_cte))
+;
+----------
+[MERGE|SELECT] MERGE INTO split_merge18.inventory * AS t
+USING (VALUES ('skip', 0, 'zero')) AS s(sku, delta, note)
+ON t.sku = s.sku
+WHEN NOT MATCHED AND s.delta = 0 THEN DO NOTHING
+RETURNING merge_action(), t.*
+;
+----------
+[MERGE] MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid
+  WHEN MATCHED THEN
+    UPDATE SET balance = balance + delta, val = val || ' updated by merge'
+  WHEN NOT MATCHED THEN
+    INSERT VALUES (sid, delta, 'inserted by merge')
+;
+----------
+[MERGE] -- same as above
+MERGE INTO test USING test st ON (st.a = test.a)
+ WHEN NOT MATCHED THEN INSERT (b, a) VALUES (NULL, 0)
+;
+----------
+[MERGE] explain (analyze, timing off, summary off, costs off, buffers off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN MATCHED AND t.a < 10 THEN
+	UPDATE SET b = t.b + 1
+;
+----------
+[MERGE|SELECT] -- not allowed
+MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+  WHEN MATCHED THEN UPDATE SET ccc = ccc
+;
+----------
+[MERGE] -- conditions in NOT MATCHED BY SOURCE clause can only refer to target columns
+MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN NOT MATCHED BY SOURCE AND s.balance = 100 THEN
+	DELETE
+;
+----------
+[MERGE|SELECT] MERGE INTO sq_target t
+USING v
+ON tid = sid AND (SELECT count(*) > 0 FROM sq_target)
+WHEN MATCHED THEN
+    UPDATE SET balance = 42
+;
+----------
+[MERGE] MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED THEN
+	UPDATE SET b = s.b
+;
+----------
+[MERGE] MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED BY SOURCE THEN
+	DELETE
+WHEN NOT MATCHED BY TARGET THEN
+	INSERT VALUES (s.sid, s.delta)
+RETURNING merge_action(), old, new, t.*
+;
+----------
+[MERGE] MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED THEN
+	UPDATE SET b = 'ok'
+WHEN NOT MATCHED THEN
+	INSERT VALUES (a, NULL)
+;
+----------
+[MERGE|SELECT] merge into uv_ptv t
+  using (values (1,2), (1,3)) as v(a,b) on t.a = v.a and t.b = v.b
+  when matched then update set b = t.b + 1
+  when not matched then insert values (v.a, v.b + 1)
+;
+----------
+[MERGE|SELECT] MERGE INTO document d
+USING (SELECT 3 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge '
+;
+----------
+[MERGE] MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED THEN
+	DELETE
+;
+----------
+[MERGE|SELECT] MERGE INTO target t USING (SELECT 1 as key, 'merge2' as val) s ON s.key = t.key WHEN NOT MATCHED THEN INSERT VALUES (s.key, s.val) WHEN MATCHED THEN UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+----------
+[MERGE] MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED AND t.balance > s.delta THEN
+    UPDATE SET balance = t.balance - s.delta
+WHEN MATCHED THEN
+	UPDATE SET balance = 0
+WHEN NOT MATCHED THEN
+    INSERT VALUES (s.sid, s.delta)
+WHEN NOT MATCHED BY SOURCE AND tid = 1 THEN
+	UPDATE SET balance = 0
+WHEN NOT MATCHED BY SOURCE THEN
+	DELETE
+RETURNING merge_action(), t.*
+;
+----------
+[MERGE] MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED THEN
+	UPDATE SET b = s.b
+WHEN NOT MATCHED THEN
+	INSERT VALUES (a, b)
+;
+----------
+[MERGE] MERGE INTO testpub_merge_no_ri USING testpub_merge_pk s ON s.a >= 1
+ WHEN MATCHED THEN DELETE
+;
+----------
+[MERGE] MERGE INTO gtestm t USING gtestm AS s ON 2 * t.a = s.b WHEN MATCHED THEN DELETE RETURNING *
+;
+----------
+[MERGE] explain (analyze, timing off, summary off, costs off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN MATCHED THEN
+	UPDATE SET b = t.b + 1
+;
+----------
+[MERGE] MERGE INTO sq_target t
+    USING sq_source s
+    ON tid = sid
+    WHEN MATCHED AND tid >= 2 THEN
+        UPDATE SET balance = t.balance + delta
+    WHEN NOT MATCHED THEN
+        INSERT (balance, tid) VALUES (balance + delta, sid)
+    WHEN MATCHED AND tid < 2 THEN
+        DELETE
+    RETURNING merge_action(), t.*
+;
+----------
+[MERGE|SELECT] WITH RECURSIVE cte_basic AS (SELECT 1 a, 'cte_basic val' b)
+MERGE INTO m USING (select 0 k, 'merge source SubPlan' v) o ON m.k=o.k
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || ' merge update' FROM cte_basic WHERE cte_basic.a = m.k LIMIT 1)
+WHEN NOT MATCHED THEN INSERT VALUES(o.k, o.v)
+;
+----------
+[MERGE] -- fail (s.b used in the WHEN quals)
+MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED AND s.b = 'x' THEN
+	UPDATE SET b = 'x'
+WHEN NOT MATCHED THEN
+	INSERT VALUES (a, NULL)
+;
+----------
+[MERGE|SELECT] -- should fail
+
+MERGE INTO measurement m
+ USING (VALUES (1, '01-17-2007'::date)) nm(city_id, logdate) ON
+      (m.city_id = nm.city_id and m.logdate=nm.logdate)
+WHEN NOT MATCHED THEN INSERT
+     (city_id, logdate, peaktemp, unitsales)
+   VALUES (city_id - 1, logdate, 25, 100)
+;
+----------
+[MERGE|SELECT] MERGE INTO measurement m
+ USING (VALUES (1, '01-17-2007'::date)) nm(city_id, logdate) ON
+      (m.city_id = nm.city_id and m.logdate=nm.logdate)
+WHEN NOT MATCHED THEN INSERT
+     (city_id, logdate, peaktemp, unitsales)
+   VALUES (city_id - 1, logdate, NULL, 100)
+;
+----------
+[MERGE] MERGE INTO testpub_merge_no_ri USING testpub_merge_pk s ON s.a >= 1
+ WHEN MATCHED THEN DO NOTHING
+ WHEN NOT MATCHED THEN INSERT (a, b) VALUES (0, 0)
+;
+----------
+[MERGE] -- check if AND works
+MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN MATCHED AND t.balance = 99 AND s.balance > 100 THEN
+	UPDATE SET balance = t.balance + s.balance
+;
+----------
+[MERGE] MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+  INSERT VALUES (s.sid, s.delta)
+;
+----------
+[MERGE] MERGE INTO pg_class c
+USING pg_namespace n
+ON n.oid = c.relnamespace
+WHEN MATCHED AND c.oid = 'pg_depend'::regclass THEN
+	UPDATE SET reltuples = reltuples - 1
+;
+----------
+[MERGE] MERGE INTO tgt USING src ON tgt.a IS NOT DISTINCT FROM src.a
+  WHEN MATCHED THEN UPDATE SET a = src.a, b = src.b
+  WHEN NOT MATCHED BY SOURCE THEN DELETE
+  RETURNING merge_action(), src.*, tgt.*
+;
+----------
+[MERGE|SELECT] merge into uv_ptv t
+  using (values (1,2), (1,4)) as v(a,b) on t.a = v.a and t.b = v.b
+  when matched then update set b = t.b + 1
+  when not matched then insert values (v.a, v.b + 1)
+;
+----------
+[MERGE|SELECT] merge into parent p using (values (1)) as v(id) on p.aid = v.id
+  when matched then update set val1 = 'b'
+;
+----------
+[MERGE|SELECT] -- Should produce -99 and 21
+MERGE INTO rw_view2 t USING (VALUES (-40), (3)) AS v(a) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET a = t.a+1
+;
+----------
+[MERGE] MERGE INTO test USING test st ON (st.a = test.a)
+ WHEN NOT MATCHED THEN INSERT VALUES (0, NULL)
+;
+----------
+[MERGE|SELECT] MERGE INTO document d
+USING (SELECT 1 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge7 ',
+			   cid = (SELECT cid from category WHERE cname = 'novel')
+;
+----------
+[MERGE|SELECT] MERGE INTO target_tg t
+  USING (SELECT 1 as key) s
+  ON s.key = t.key
+  WHEN MATCHED AND balance < 100 THEN
+	UPDATE SET balance = balance * 2, val = t.val || ' when1'
+  WHEN MATCHED AND balance < 200 THEN
+    DELETE
+;
+----------
+[MERGE|SELECT] MERGE INTO split_cov.parent_table p
+USING (VALUES (1, 'aa'), (3, 'c')) AS s(id, code)
+ON p.id = s.id
+WHEN MATCHED THEN UPDATE SET code = s.code
+WHEN NOT MATCHED THEN INSERT (id, code) VALUES (s.id, s.code)
+;
+----------
+[MERGE] -- some simple expressions in INSERT targetlist
+MERGE INTO cj_target t
+USING cj_source2 s2
+	INNER JOIN cj_source1 s1 ON sid1 = sid2
+ON t.tid = sid1
+WHEN NOT MATCHED THEN
+	INSERT VALUES (sid2, delta + scat, sval)
+WHEN MATCHED THEN
+	UPDATE SET val = val || ' updated by merge'
+;
+----------
+[MERGE] -- check if we can access system columns in the conditions
+MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN MATCHED AND t.xmin = t.xmax THEN
+	UPDATE SET balance = t.balance + s.balance
+;
+----------
+[MERGE|SELECT] MERGE INTO target t
+  USING (SELECT 1 as key) s
+  ON s.key = t.key
+  WHEN MATCHED AND balance < 100 THEN
+	UPDATE SET balance = balance * 2, val = t.val || ' when1'
+  WHEN MATCHED AND balance < 200 THEN
+    DELETE
+;
+----------
+[MERGE] MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN MATCHED AND t.balance = 99 AND s.balance > 100 THEN
+	UPDATE SET balance = t.balance + s.balance
+;

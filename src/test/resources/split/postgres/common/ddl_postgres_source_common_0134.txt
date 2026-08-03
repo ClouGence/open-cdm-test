@@ -1,0 +1,572 @@
+create foreign table remp (a int check (a in (1)), b text) server loopback options (table_name 'loct')
+;
+ANALYZE public.pagg_tab_para_p1
+;
+CREATE FUNCTION nlevel(ltree)
+RETURNS int4
+AS '$libdir/ltree'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+CREATE TYPE myvarchar (
+    input = myvarcharin,
+    output = myvarcharout,
+    alignment = integer,
+    storage = main
+)
+;
+ANALYZE pg_temp_14.pg_temp_25613
+;
+-- fail
+
+DROP COLLATION ext_cine_coll
+;
+CREATE FUNCTION g_int_same(_int4, _int4, internal)
+RETURNS internal
+AS '$libdir/_int'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+/* contrib/pg_buffercache/pg_buffercache--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+-- Register the function.
+CREATE FUNCTION pg_buffercache_pages()
+RETURNS SETOF RECORD
+AS '$libdir/pg_buffercache', 'pg_buffercache_pages'
+LANGUAGE C PARALLEL SAFE
+;
+ANALYZE fkpart3.pk4
+;
+-- propagation of collation in SQL functions (inlined and non-inlined cases)
+-- and plpgsql functions too
+
+CREATE FUNCTION mylt (text, text) RETURNS boolean LANGUAGE sql
+    AS $$ select $1 < $2 $$
+;
+VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_publication_rel
+;
+CREATE TABLE test_partition partition OF test_partitioned FOR VALUES IN (1)
+;
+CREATE POLICY p0 ON x1 FOR ALL USING (c = current_user)
+;
+-- Test a backwards Append scan
+create table list_part (a int) partition by list (a)
+;
+-- ERROR
+ALTER FOREIGN TABLE ft2 ADD CONSTRAINT fd_pt1chk2 CHECK (c2 <> '')
+;
+ALTER TABLE tt7 OF tt_t1
+;
+CREATE TABLE stats_import.part_child_1
+  PARTITION OF stats_import.part_parent
+  FOR VALUES FROM (0) TO (10)
+  WITH (autovacuum_enabled = false)
+;
+drop function pg_temp.twophase_func()
+;
+CREATE TABLE "public"."functional_dependencies" (
+    "filler1" "text",
+    "filler2" numeric,
+    "a" integer,
+    "b" "text",
+    "filler3" "date",
+    "c" numeric,
+    "d" "text"
+)
+;
+ALTER SEQUENCE IF EXISTS public.seq_renamed SET SCHEMA split_sequence_next
+;
+-- cleanup
+
+DROP PROCEDURE ptest1
+;
+ALTER TABLE pagg_tab_para_p2 SET (parallel_workers = 0)
+;
+alter index idxpart_a_b_idx attach partition idxpart1_tst1
+;
+ALTER TABLE ONLY "public"."credit_card"
+    ADD CONSTRAINT "credit_card_cid_fkey" FOREIGN KEY ("cid") REFERENCES "public"."customer"("cid")
+;
+-- fail
+create or replace function parted_trigfunc() returns trigger language plpgsql as $$
+begin
+  new.c = new.c || ' did '|| TG_OP;
+  return new;
+end;
+$$
+;
+ALTER INDEX pg_toast.pg_toast_30564_index RENAME TO reind_con_toast_idx
+;
+CREATE FUNCTION btean13cmp(ean13, issn)
+	RETURNS int4
+	AS 'btint8cmp'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+CREATE TABLE more__int AS SELECT
+   -- Leave alone NULLs, empty arrays and the one row that we use to test
+   -- equality; also skip INT_MAX
+   CASE WHEN a IS NULL OR a = '{}' OR a = '{73,23,20}' THEN a ELSE
+     (select array_agg(u) || array_agg(u + 1000) || array_agg(u + 2000)
+      from unnest(a) u where u < 2000000000)
+   END AS a, a as b
+   FROM test__int
+;
+ALTER TABLE tab_full2 REPLICA IDENTITY FULL
+;
+CREATE FUNCTION gbt_int8_same(gbtreekey16, gbtreekey16, internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+CREATE SCHEMA split_alter_table
+;
+VACUUM (DISABLE_PAGE_SKIPPING) information_schema.sql_features
+;
+VACUUM (SKIP_DATABASE_STATS, PARALLEL 2) pg_catalog.pg_extension
+;
+DROP TABLE IF EXISTS split_table_idx.typed_table
+;
+CREATE FUNCTION "public"."equipment_named_ambiguous_1a"("hobby" "public"."hobbies_r") RETURNS SETOF "public"."equipment_r"
+    LANGUAGE "sql"
+    AS $$select * from equipment_r where hobby = equipment_named_ambiguous_1a.hobby.name$$
+;
+create function wait_for_stats() returns void as $$
+declare
+  start_time timestamptz := clock_timestamp();
+  updated1 bool;
+  updated2 bool;
+  updated3 bool;
+  updated4 bool;
+begin
+  -- we don't want to wait forever; loop will exit after 30 seconds
+  for i in 1 .. 300 loop
+
+    -- With parallel query, the seqscan and indexscan on tenk2 might be done
+    -- in parallel worker processes, which will send their stats counters
+    -- asynchronously to what our own session does.  So we must check for
+    -- those counts to be registered separately from the update counts.
+
+    -- check to see if seqscan has been sensed
+    SELECT (st.seq_scan >= pr.seq_scan + 1) INTO updated1
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if indexscan has been sensed
+    SELECT (st.idx_scan >= pr.idx_scan + 1) INTO updated2
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if all updates have been sensed
+    SELECT (n_tup_ins > 0) INTO updated3
+      FROM pg_stat_user_tables WHERE relname='trunc_stats_test4';
+
+    -- We must also check explicitly that pg_stat_get_snapshot_timestamp has
+    -- advanced, because that comes from the global stats file which might
+    -- be older than the per-DB stats file we got the other values from.
+    SELECT (pr.snap_ts < pg_stat_get_snapshot_timestamp()) INTO updated4
+      FROM prevstats AS pr;
+
+    exit when updated1 and updated2 and updated3 and updated4;
+
+    -- wait a little
+    perform pg_sleep_for('100 milliseconds');
+
+    -- reset stats snapshot so we can test again
+    perform pg_stat_clear_snapshot();
+
+  end loop;
+
+  -- report time waited in postmaster log (where it won't change test output)
+  raise log 'wait_for_stats delayed % seconds',
+    extract(epoch from clock_timestamp() - start_time);
+end
+$$ language plpgsql
+;
+DROP DOMAIN IF EXISTS split_domain_type_next.email_domain CASCADE
+;
+-- No rows match the index predicate, make sure the index has the right number
+-- of ranges (same as number of page ranges).
+CREATE INDEX ON test2 USING brin (a) WITH (pages_per_range=1) WHERE (a IS NULL)
+;
+/*
+ * 5.12
+ * CHARACTER_SETS view
+ */
+
+CREATE VIEW character_sets AS
+    SELECT CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(getdatabaseencoding() AS sql_identifier) AS character_set_name,
+           CAST(CASE WHEN getdatabaseencoding() = 'UTF8' THEN 'UCS' ELSE getdatabaseencoding() END AS sql_identifier) AS character_repertoire,
+           CAST(getdatabaseencoding() AS sql_identifier) AS form_of_use,
+           CAST(current_database() AS sql_identifier) AS default_collate_catalog,
+           CAST(nc.nspname AS sql_identifier) AS default_collate_schema,
+           CAST(c.collname AS sql_identifier) AS default_collate_name
+    FROM pg_database d
+         LEFT JOIN (pg_collation c JOIN pg_namespace nc ON (c.collnamespace = nc.oid))
+             ON (datcollate = collcollate AND datctype = collctype)
+    WHERE d.datname = current_database()
+    ORDER BY char_length(c.collname) DESC, c.collname ASC -- prefer full/canonical name
+    LIMIT 1
+;
+CREATE TABLE "public"."test_io_bulkwrite_strategy" (
+    "i" integer
+)
+;
+ALTER OPERATOR ? (_lquery, _ltree)
+  SET (RESTRICT = matchingsel, JOIN = matchingjoinsel)
+;
+-- should fail
+-- ... but not UNIQUE.
+CREATE TEMP TABLE z2 (b TEXT, UNIQUE(aa, b)) inherits (a)
+;
+CREATE OPERATOR && (
+	LEFTARG = cube, RIGHTARG = cube, PROCEDURE = cube_overlap,
+	COMMUTATOR = '&&',
+	RESTRICT = areasel, JOIN = areajoinsel
+)
+;
+CREATE INDEX t1c_ab_idx on t1c ((a || b))
+;
+CREATE FUNCTION "public"."explain_analyze_without_memory"("query" "text") RETURNS TABLE("out_line" "text")
+    LANGUAGE "plpgsql"
+    AS $$
+declare
+  line text;
+begin
+  for line in
+    execute 'explain (analyze, costs off, summary off, timing off) ' || query
+  loop
+    out_line := regexp_replace(line, '\d+kB', 'NNkB', 'g');
+    return next;
+  end loop;
+end;
+$$
+;
+ALTER TABLE "generated_virtual_tests"."gtest20b"
+    ADD CONSTRAINT "chk" CHECK (("b" < 50)) NOT VALID
+;
+VACUUM (INDEX_CLEANUP FALSE) pg_catalog.pg_parameter_acl
+;
+CREATE DOMAIN uint2 AS int2 CHECK (VALUE >= 0)
+;
+ALTER TEXT SEARCH DICTIONARY split_ts_probe.simple_dict (Accept = false)
+;
+-- Test partitioned tables with no partitions, which should be handled the
+-- same as the non-inheritance case when expanding its RTE.
+create table list_parted_tbl (a int,b int) partition by list (a)
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] create foreign table remp (a int check (a in (1)), b text) server loopback options (table_name 'loct')
+;
+----------
+[ADMIN_TABLE] ANALYZE public.pagg_tab_para_p1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION nlevel(ltree)
+RETURNS int4
+AS '$libdir/ltree'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[CREATE_TYPE] CREATE TYPE myvarchar (
+    input = myvarcharin,
+    output = myvarcharout,
+    alignment = integer,
+    storage = main
+)
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_14.pg_temp_25613
+;
+----------
+[DROP_POLICY] -- fail
+
+DROP COLLATION ext_cine_coll
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION g_int_same(_int4, _int4, internal)
+RETURNS internal
+AS '$libdir/_int'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[CREATE_PROG_OBJ] /* contrib/pg_buffercache/pg_buffercache--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+-- Register the function.
+CREATE FUNCTION pg_buffercache_pages()
+RETURNS SETOF RECORD
+AS '$libdir/pg_buffercache', 'pg_buffercache_pages'
+LANGUAGE C PARALLEL SAFE
+;
+----------
+[ADMIN_TABLE] ANALYZE fkpart3.pk4
+;
+----------
+[CREATE_PROG_OBJ] -- propagation of collation in SQL functions (inlined and non-inlined cases)
+-- and plpgsql functions too
+
+CREATE FUNCTION mylt (text, text) RETURNS boolean LANGUAGE sql
+    AS $$ select $1 < $2 $$
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_publication_rel
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_partition partition OF test_partitioned FOR VALUES IN (1)
+;
+----------
+[CREATE_POLICY] CREATE POLICY p0 ON x1 FOR ALL USING (c = current_user)
+;
+----------
+[CREATE_TABLE] -- Test a backwards Append scan
+create table list_part (a int) partition by list (a)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] -- ERROR
+ALTER FOREIGN TABLE ft2 ADD CONSTRAINT fd_pt1chk2 CHECK (c2 <> '')
+;
+----------
+[ALTER_TABLE] ALTER TABLE tt7 OF tt_t1
+;
+----------
+[CREATE_TABLE] CREATE TABLE stats_import.part_child_1
+  PARTITION OF stats_import.part_parent
+  FOR VALUES FROM (0) TO (10)
+  WITH (autovacuum_enabled = false)
+;
+----------
+[DROP_PROG_OBJ] drop function pg_temp.twophase_func()
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."functional_dependencies" (
+    "filler1" "text",
+    "filler2" numeric,
+    "a" integer,
+    "b" "text",
+    "filler3" "date",
+    "c" numeric,
+    "d" "text"
+)
+;
+----------
+[ALTER_SEQUENCE] ALTER SEQUENCE IF EXISTS public.seq_renamed SET SCHEMA split_sequence_next
+;
+----------
+[DROP_PROG_OBJ] -- cleanup
+
+DROP PROCEDURE ptest1
+;
+----------
+[ALTER_TABLE] ALTER TABLE pagg_tab_para_p2 SET (parallel_workers = 0)
+;
+----------
+[ALTER_INDEX] alter index idxpart_a_b_idx attach partition idxpart1_tst1
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "public"."credit_card"
+    ADD CONSTRAINT "credit_card_cid_fkey" FOREIGN KEY ("cid") REFERENCES "public"."customer"("cid")
+;
+----------
+[CREATE_PROG_OBJ] -- fail
+create or replace function parted_trigfunc() returns trigger language plpgsql as $$
+begin
+  new.c = new.c || ' did '|| TG_OP;
+  return new;
+end;
+$$
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_30564_index RENAME TO reind_con_toast_idx
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION btean13cmp(ean13, issn)
+	RETURNS int4
+	AS 'btint8cmp'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE more__int AS SELECT
+   -- Leave alone NULLs, empty arrays and the one row that we use to test
+   -- equality; also skip INT_MAX
+   CASE WHEN a IS NULL OR a = '{}' OR a = '{73,23,20}' THEN a ELSE
+     (select array_agg(u) || array_agg(u + 1000) || array_agg(u + 2000)
+      from unnest(a) u where u < 2000000000)
+   END AS a, a as b
+   FROM test__int
+;
+----------
+[ALTER_TABLE] ALTER TABLE tab_full2 REPLICA IDENTITY FULL
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_int8_same(gbtreekey16, gbtreekey16, internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA split_alter_table
+;
+----------
+[ADMIN_TABLE] VACUUM (DISABLE_PAGE_SKIPPING) information_schema.sql_features
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, PARALLEL 2) pg_catalog.pg_extension
+;
+----------
+[DROP_TABLE] DROP TABLE IF EXISTS split_table_idx.typed_table
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."equipment_named_ambiguous_1a"("hobby" "public"."hobbies_r") RETURNS SETOF "public"."equipment_r"
+    LANGUAGE "sql"
+    AS $$select * from equipment_r where hobby = equipment_named_ambiguous_1a.hobby.name$$
+;
+----------
+[CREATE_PROG_OBJ] create function wait_for_stats() returns void as $$
+declare
+  start_time timestamptz := clock_timestamp();
+  updated1 bool;
+  updated2 bool;
+  updated3 bool;
+  updated4 bool;
+begin
+  -- we don't want to wait forever; loop will exit after 30 seconds
+  for i in 1 .. 300 loop
+
+    -- With parallel query, the seqscan and indexscan on tenk2 might be done
+    -- in parallel worker processes, which will send their stats counters
+    -- asynchronously to what our own session does.  So we must check for
+    -- those counts to be registered separately from the update counts.
+
+    -- check to see if seqscan has been sensed
+    SELECT (st.seq_scan >= pr.seq_scan + 1) INTO updated1
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if indexscan has been sensed
+    SELECT (st.idx_scan >= pr.idx_scan + 1) INTO updated2
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if all updates have been sensed
+    SELECT (n_tup_ins > 0) INTO updated3
+      FROM pg_stat_user_tables WHERE relname='trunc_stats_test4';
+
+    -- We must also check explicitly that pg_stat_get_snapshot_timestamp has
+    -- advanced, because that comes from the global stats file which might
+    -- be older than the per-DB stats file we got the other values from.
+    SELECT (pr.snap_ts < pg_stat_get_snapshot_timestamp()) INTO updated4
+      FROM prevstats AS pr;
+
+    exit when updated1 and updated2 and updated3 and updated4;
+
+    -- wait a little
+    perform pg_sleep_for('100 milliseconds');
+
+    -- reset stats snapshot so we can test again
+    perform pg_stat_clear_snapshot();
+
+  end loop;
+
+  -- report time waited in postmaster log (where it won't change test output)
+  raise log 'wait_for_stats delayed % seconds',
+    extract(epoch from clock_timestamp() - start_time);
+end
+$$ language plpgsql
+;
+----------
+[DROP_TYPE] DROP DOMAIN IF EXISTS split_domain_type_next.email_domain CASCADE
+;
+----------
+[ADD_INDEX] -- No rows match the index predicate, make sure the index has the right number
+-- of ranges (same as number of page ranges).
+CREATE INDEX ON test2 USING brin (a) WITH (pages_per_range=1) WHERE (a IS NULL)
+;
+----------
+[CREATE_VIEW(SELECT)] /*
+ * 5.12
+ * CHARACTER_SETS view
+ */
+
+CREATE VIEW character_sets AS
+    SELECT CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(getdatabaseencoding() AS sql_identifier) AS character_set_name,
+           CAST(CASE WHEN getdatabaseencoding() = 'UTF8' THEN 'UCS' ELSE getdatabaseencoding() END AS sql_identifier) AS character_repertoire,
+           CAST(getdatabaseencoding() AS sql_identifier) AS form_of_use,
+           CAST(current_database() AS sql_identifier) AS default_collate_catalog,
+           CAST(nc.nspname AS sql_identifier) AS default_collate_schema,
+           CAST(c.collname AS sql_identifier) AS default_collate_name
+    FROM pg_database d
+         LEFT JOIN (pg_collation c JOIN pg_namespace nc ON (c.collnamespace = nc.oid))
+             ON (datcollate = collcollate AND datctype = collctype)
+    WHERE d.datname = current_database()
+    ORDER BY char_length(c.collname) DESC, c.collname ASC -- prefer full/canonical name
+    LIMIT 1
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."test_io_bulkwrite_strategy" (
+    "i" integer
+)
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR ? (_lquery, _ltree)
+  SET (RESTRICT = matchingsel, JOIN = matchingjoinsel)
+;
+----------
+[CREATE_TABLE] -- should fail
+-- ... but not UNIQUE.
+CREATE TEMP TABLE z2 (b TEXT, UNIQUE(aa, b)) inherits (a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR && (
+	LEFTARG = cube, RIGHTARG = cube, PROCEDURE = cube_overlap,
+	COMMUTATOR = '&&',
+	RESTRICT = areasel, JOIN = areajoinsel
+)
+;
+----------
+[ADD_INDEX] CREATE INDEX t1c_ab_idx on t1c ((a || b))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."explain_analyze_without_memory"("query" "text") RETURNS TABLE("out_line" "text")
+    LANGUAGE "plpgsql"
+    AS $$
+declare
+  line text;
+begin
+  for line in
+    execute 'explain (analyze, costs off, summary off, timing off) ' || query
+  loop
+    out_line := regexp_replace(line, '\d+kB', 'NNkB', 'g');
+    return next;
+  end loop;
+end;
+$$
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE "generated_virtual_tests"."gtest20b"
+    ADD CONSTRAINT "chk" CHECK (("b" < 50)) NOT VALID
+;
+----------
+[ADMIN_TABLE] VACUUM (INDEX_CLEANUP FALSE) pg_catalog.pg_parameter_acl
+;
+----------
+[CREATE_TYPE] CREATE DOMAIN uint2 AS int2 CHECK (VALUE >= 0)
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH DICTIONARY split_ts_probe.simple_dict (Accept = false)
+;
+----------
+[CREATE_TABLE] -- Test partitioned tables with no partitions, which should be handled the
+-- same as the non-inheritance case when expanding its RTE.
+create table list_parted_tbl (a int,b int) partition by list (a)
+;

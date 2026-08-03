@@ -1,0 +1,1402 @@
+-- Common properties: field_pattern (target path), analyzer, parser, support_phrase, etc.
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"),
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content")
+);
+
+-- v.content has both tokenized and non-tokenized inverted indexes
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+SELECT * FROM tbl WHERE v['content'] = 'Doris';
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'pattern_*' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "pattern_*"),
+    INDEX idx_v(v) USING INVERTED -- global non-tokenized inverted index
+);
+
+SELECT * FROM tbl WHERE v['pattern_1'] MATCH 'Doris';
+SELECT * FROM tbl WHERE v['pattern_1'] = 'Doris';
+CREATE DATABASE db1;
+CREATE USER jack@'192.%' IDENTIFIED BY 'jack_pwd';
+CREATE USER jack@'%' IDENTIFIED BY 'jack_pwd';
+CREATE ROLE role1;
+CREATE ROLE role2;
+CREATE ROLE my_role;
+CREATE WORKLOAD GROUP g1 PROPERTIES("max_cpu_percent"="10");
+
+GRANT SELECT_PRIV ON db1.* TO 'jack'@'192.%';
+GRANT USAGE_PRIV ON RESOURCE 'spark_resource' TO 'jack'@'192.%';
+GRANT 'role1','role2' TO 'jack'@'192.%';
+GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO 'jack'@'%';
+GRANT USAGE_PRIV ON WORKLOAD GROUP '%' TO 'jack'@'%';
+GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO 'jack'@'%';
+GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO ROLE 'my_role';
+GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO 'jack'@'%';
+GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO ROLE 'my_role';
+GRANT USAGE_PRIV ON STORAGE VAULT '%' TO 'jack'@'%';
+-- 1. Create tokenizers with different tokenization strategies
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+
+-- 2. Create multiple indexes on the same column
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- Standard tokenizer for tokenized search
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- Keyword tokenizer for exact matching
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- edge n-gram tokenizer for auto-completion
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_phone_number_tokenizer
+PROPERTIES
+(
+    "type" = "edge_ngram",
+    "min_gram" = "3",
+    "max_gram" = "10",
+    "token_chars" = "digit"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS edge_ngram_phone_number
+PROPERTIES
+(
+    "tokenizer" = "edge_ngram_phone_number_tokenizer"
+);
+
+CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "edge_ngram_phone_number")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+
+SELECT tokenize('13891972631', '"analyzer"="edge_ngram_phone_number"');
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS word_splitter
+PROPERTIES
+(
+    "type" = "word_delimiter",
+    "split_on_numerics" = "false",
+    "split_on_case_change" = "false"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS lowercase_delimited
+PROPERTIES
+(
+    "tokenizer" = "standard",
+    "token_filter" = "asciifolding, word_splitter, lowercase"
+);
+
+CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "lowercase_delimited")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+
+SELECT tokenize('The server at IP 192.168.1.15 sent a confirmation to user_123@example.com, requiring a quickResponse before the deadline.', '"analyzer"="lowercase_delimited"');
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES
+(
+    "tokenizer" = "keyword",
+    "token_filter" = "asciifolding, lowercase"
+);
+
+CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "keyword_lowercase")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+
+SELECT tokenize('hÉllo World', '"analyzer"="keyword_lowercase"');
+-- Example: Define a custom analyzer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "asciifolding, lowercase"
+);
+
+-- Use the custom analyzer when creating a table
+CREATE TABLE docs (
+    id BIGINT,
+    content TEXT,
+    INDEX idx_content (content) USING INVERTED PROPERTIES(
+        "analyzer" = "keyword_lowercase",
+        "support_phrase" = "true"
+    )
+);
+-- A VARIANT column with an inverted index
+CREATE TABLE test_variant_search_subcolumn (
+    id BIGINT,
+    properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+    INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+        "parser" = "unicode",
+        "lower_case" = "true",
+        "support_phrase" = "true"
+    )
+);
+
+-- Single-term query
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+
+-- AND / ALL queries
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+
+-- OR query across different subcolumns
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+-- View the index list
+SHOW INDEX FROM document_vectors;
+
+-- View data scale
+SHOW DATA ALL FROM document_vectors;
+
+-- Drop the index
+ALTER TABLE document_vectors DROP INDEX idx_embedding;
+-- 常用属性：field_pattern（目标子路径）、analyzer、parser、support_phrase 等
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"),
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content")
+);
+
+-- v.content 同时具备分词与不分词的倒排索引
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+SELECT * FROM tbl WHERE v['content'] = 'Doris';
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'pattern_*' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "pattern_*"),
+    INDEX idx_v(v) USING INVERTED -- 全局指定非分词索引
+);
+
+SELECT * FROM tbl WHERE v['pattern_1'] MATCH 'Doris';
+SELECT * FROM tbl WHERE v['pattern_1'] = 'Doris';
+CREATE DATABASE db1;
+CREATE USER jack@'192.%' IDENTIFIED BY 'jack_pwd';
+CREATE USER jack@'%' IDENTIFIED BY 'jack_pwd';
+CREATE ROLE role1;
+CREATE ROLE role2;
+CREATE ROLE my_role;
+CREATE ROLE test_role;
+CREATE WORKLOAD GROUP g1 PROPERTIES("max_cpu_percent"="10");
+
+GRANT SELECT_PRIV ON db1.* TO 'jack'@'192.%';
+GRANT USAGE_PRIV ON RESOURCE 'spark_resource' TO 'jack'@'192.%';
+GRANT 'role1','role2' TO 'jack'@'192.%';
+GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO 'jack'@'%';
+GRANT USAGE_PRIV ON WORKLOAD GROUP '%' TO 'jack'@'%';
+GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO ROLE 'test_role';
+GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO 'jack'@'%';
+GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO ROLE 'my_role';
+GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO 'jack'@'%';
+GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO ROLE 'my_role';
+GRANT USAGE_PRIV ON STORAGE VAULT '%' TO 'jack'@'%';
+-- 1. 创建不同分词策略的分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+
+-- 2. 在同一列上创建多个索引
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- 标准分词器用于分词搜索
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- 关键词分词器用于精确匹配
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- edge n-gram 分词器用于自动补全
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+-- 示例：定义自定义分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "asciifolding, lowercase"
+);
+
+-- 在建表时使用自定义分词器
+CREATE TABLE docs (
+    id BIGINT,
+    content TEXT,
+    INDEX idx_content (content) USING INVERTED PROPERTIES(
+        "analyzer" = "keyword_lowercase",
+        "support_phrase" = "true"
+    )
+);
+-- 带 VARIANT 列与倒排索引
+CREATE TABLE test_variant_search_subcolumn (
+    id BIGINT,
+    properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+    INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+        "parser" = "unicode",
+        "lower_case" = "true",
+        "support_phrase" = "true"
+    )
+);
+
+-- 单词查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+
+-- AND / ALL 查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+
+-- 不同子列 OR 查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+-- 查看索引列表
+SHOW INDEX FROM document_vectors;
+
+-- 查看数据规模
+SHOW DATA ALL FROM document_vectors;
+
+-- 删除索引
+ALTER TABLE document_vectors DROP INDEX idx_embedding;
+-- Common properties: field_pattern (target subpath), analyzer, parser, support_phrase, etc.
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>, -- specify concrete type for subcolumn 'content'
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"), -- tokenized inverted index for 'content' with english parser
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content") -- non-tokenized inverted index for 'content'
+);
+
+-- v.content will have both a tokenized (english) inverted index and a non-tokenized inverted index
+
+-- Use tokenized index
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+
+-- Use non-tokenized index
+SELECT * FROM tbl WHERE v['content'] = 'Doris';
+-- 创建分支
+ALTER TABLE iceberg_tbl CREATE BRANCH b1;
+-- 写入数据到指定分支
+INSERT INTO iceberg_tbl@branch(b1) values(1, 2);
+-- 查询指定分支
+SELECT * FROM iceberg_tbl@branch(b1);
+-- 创建用于多值列分割的 char group tokenizer
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS multi_value_tokenizer
+PROPERTIES
+(
+    "type" = "char_group",
+    "tokenize_on_chars" = "[|]",
+    "max_token_length" = "255"
+);
+-- 创建多值列分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS multi_value_analyzer
+PROPERTIES
+(
+    "tokenizer" = "multi_value_tokenizer",
+    "token_filter" = "lowercase, asciifolding"
+);
+
+SELECT tokenize('alice|123456|company', '"analyzer"="multi_value_analyzer"');
+-- 结果为[alice]、[123456]、[company]
+
+-- MATCH_ANY(‘alice’)或者MATCH_ANY(‘123456’)都可以命中
+;
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_phone_number_tokenizer
+PROPERTIES
+(
+    "type" = "edge_ngram",
+    "min_gram" = "3",
+    "max_gram" = "10",
+    "token_chars" = "digit"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS edge_ngram_phone_number
+PROPERTIES
+(
+    "tokenizer" = "edge_ngram_phone_number_tokenizer"
+);
+
+CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "edge_ngram_phone_number")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+"replication_allocation" = "tag.location.default: 1"
+);
+-- Create pinyin tokenizer with multiple output formats
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS pinyin_tokenizer
+PROPERTIES (
+    "type" = "pinyin",
+    "keep_first_letter" = "true",
+    "keep_full_pinyin" = "true",
+    "keep_joined_full_pinyin" = "true",
+    "keep_original" = "true",
+    "keep_none_chinese" = "true",
+    "lowercase" = "true",
+    "remove_duplicated_term" = "true"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS pinyin_analyzer
+PROPERTIES (
+    "tokenizer" = "pinyin_tokenizer"
+);
+
+CREATE TABLE contacts (
+    id BIGINT NOT NULL AUTO_INCREMENT(1),
+    name TEXT NULL,
+    INDEX idx_name (name) USING INVERTED PROPERTIES("analyzer" = "pinyin_analyzer", "support_phrase" = "true")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+
+INSERT INTO contacts VALUES (1, "刘德华"), (2, "张学友"), (3, "郭富城");
+
+SELECT * FROM contacts WHERE name MATCH '刘德华';
+SELECT * FROM contacts WHERE name MATCH 'liudehua';
+SELECT * FROM contacts WHERE name MATCH 'liu';
+SELECT * FROM contacts WHERE name MATCH 'ldh';
+-- Create pinyin filter to apply after keyword tokenizer
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS pinyin_filter
+PROPERTIES (
+    "type" = "pinyin",
+    "keep_first_letter" = "true",
+    "keep_full_pinyin" = "true",
+    "keep_original" = "true",
+    "lowercase" = "true"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_pinyin
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "pinyin_filter"
+);
+
+CREATE TABLE stars (
+    id BIGINT NOT NULL AUTO_INCREMENT(1),
+    name TEXT NULL,
+    INDEX idx_name (name) USING INVERTED PROPERTIES("analyzer" = "keyword_pinyin")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+
+INSERT INTO stars VALUES (1, "刘德华"), (2, "张学友"), (3, "刘德华ABC");
+
+-- Supports multiple search modes:
+SELECT * FROM stars WHERE name MATCH '刘德华';
+SELECT * FROM stars WHERE name MATCH 'liu';
+SELECT * FROM stars WHERE name MATCH 'ldh';
+SELECT * FROM stars WHERE name MATCH 'zxy';
+-- Create analyzers with different tokenization strategies
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+
+-- Create table with multiple indexes on same column
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- Standard analyzer for tokenized search
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- Keyword analyzer for exact match
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- Edge n-gram analyzer for autocomplete
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+-- Define a custom analyzer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+  "tokenizer" = "keyword",
+  "token_filter" = "asciifolding, lowercase"
+);
+
+-- Use the analyzer in table creation
+CREATE TABLE docs (
+  id BIGINT,
+  content TEXT,
+  INDEX idx_content (content) USING INVERTED PROPERTIES (
+    "analyzer" = "keyword_lowercase",
+    "support_phrase" = "true"
+  )
+);
+-- Table with both tokenized and untokenized indexes
+CREATE TABLE t (
+  id INT,
+  content STRING,
+  INDEX idx_untokenized(content) USING INVERTED,
+  INDEX idx_tokenized(content)  USING INVERTED PROPERTIES("parser" = "standard")
+);
+
+-- Exact string match (uses untokenized index)
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning)')
+ORDER BY id;
+
+-- No match for partial token with EXACT
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine)')
+ORDER BY id;
+
+-- ANY/ALL use tokenized index
+SELECT id, content FROM t WHERE SEARCH('content:ANY(machine learning)') ORDER BY id;
+SELECT id, content FROM t WHERE SEARCH('content:ALL(machine learning)') ORDER BY id;
+
+-- Compare EXACT vs ANY
+SELECT id, content FROM t WHERE SEARCH('content:EXACT(deep learning)') ORDER BY id;
+SELECT id, content FROM t WHERE SEARCH('content:ANY(deep learning)') ORDER BY id;
+
+-- Mixed conditions
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning) OR content:ANY(intelligence)')
+ORDER BY id;
+
+-- Simplified syntax with default field/operator
+SELECT id, tags
+FROM tag_dataset
+WHERE SEARCH('deep learning', 'tags', 'and'); -- expands to tags:ALL(deep learning)
+
+-- Phrase and wildcard queries in one DSL
+SELECT id, content FROM t
+WHERE SEARCH('content:"deep learning" OR content:AI*')
+ORDER BY id;
+
+-- VARIANT column with inverted index
+CREATE TABLE test_variant_search_subcolumn (
+  id BIGINT,
+  properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+  INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+    "parser" = "unicode",
+    "lower_case" = "true",
+    "support_phrase" = "true"
+  )
+);
+
+-- Single term
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+
+-- AND / ALL
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+
+-- OR across different subcolumns
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+SHOW INDEX FROM document_vectors;
+SHOW DATA ALL FROM document_vectors;
+ALTER TABLE document_vectors DROP INDEX idx_embedding;
+-- Create branches
+ALTER TABLE iceberg_tbl CREATE BRANCH b1;
+-- Write data to a specific branch
+INSERT INTO iceberg_tbl@branch(b1) values(1, 2);
+-- Query data from a specific branch
+SELECT * FROM iceberg_tbl@branch(b1);
+-- 1. Create a custom token filter
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS complex_word_splitter
+PROPERTIES
+(
+    "type" = "word_delimiter",
+    "type_table" = "[. => SUBWORD_DELIM], [_ => SUBWORD_DELIM]");
+
+-- 2. Create a custom tokenizer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS complex_identifier_analyzer
+PROPERTIES
+(
+    "tokenizer" = "standard",
+    "token_filter" = "complex_word_splitter, lowercase"
+);
+
+SELECT TOKENIZE('apy217.39_202501260000026_526', '”analyzer“=” complex_identifier_analyzer“');
+-- Result:[apy]，[217]，[39]，[202501260000026]，[526]
+
+-- MATCH('apy217') or MATCH('202501260000026') can both work
+;
+-- Create a char group tokenizer for multi-valued column splitting
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS multi_value_tokenizer
+PROPERTIES
+(
+    "type" = "char_group",
+    "tokenize_on_chars" = "[|]",
+    "max_token_length" = "255"
+);
+-- Create a tokenizer for multi-valued columns
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS multi_value_analyzer
+PROPERTIES
+(
+    "tokenizer" = "multi_value_tokenizer",
+    "token_filter" = "lowercase, asciifolding"
+);
+
+SELECT tokenize('alice|123456|company', '"analyzer"="multi_value_analyzer"');
+-- Result: [alice]、[123456]、[company]
+
+-- Both MATCH_ANY('alice') and MATCH_ANY('123456') can successfully match
+;
+INSERT INTO iceberg_table@branch(b1) SELECT * FROM other_table;
+INSERT OVERWRITE TABLE iceberg_table@branch(b1) SELECT * FROM other_table;
+-- Add stateless BEs into two compute groups
+ALTER SYSTEM ADD BACKEND 'be1:9050' PROPERTIES ("tag.compute_group_name" = "etl");
+ALTER SYSTEM ADD BACKEND 'be2:9050' PROPERTIES ("tag.compute_group_name" = "bi");
+ALTER SYSTEM ADD BACKEND 'be3:9050' PROPERTIES ("tag.compute_group_name" = "bi");
+
+-- Grant access
+GRANT USAGE_PRIV ON COMPUTE GROUP etl TO 'etl_user';
+GRANT USAGE_PRIV ON COMPUTE GROUP bi  TO 'bi_user';
+
+-- Set defaults (the user has to reconnect for new defaults to apply)
+SET PROPERTY FOR 'etl_user' 'default_compute_group' = 'etl';
+SET PROPERTY FOR 'bi_user'  'default_compute_group' = 'bi';
+
+-- One-off switch for the current session
+USE my_db@bi;
+SELECT region, SUM(amount) FROM orders WHERE dt = CURRENT_DATE() GROUP BY region;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Common properties: field_pattern (target path), analyzer, parser, support_phrase, etc.
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"),
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content")
+);
+----------
+[SELECT] -- v.content has both tokenized and non-tokenized inverted indexes
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+----------
+[SELECT] SELECT * FROM tbl WHERE v['content'] = 'Doris';
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'pattern_*' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "pattern_*"),
+    INDEX idx_v(v) USING INVERTED -- global non-tokenized inverted index
+);
+----------
+[SELECT] SELECT * FROM tbl WHERE v['pattern_1'] MATCH 'Doris';
+----------
+[SELECT] SELECT * FROM tbl WHERE v['pattern_1'] = 'Doris';
+----------
+[CREATE_SCHEMA] CREATE DATABASE db1;
+----------
+[CREATE_USER] CREATE USER jack@'192.%' IDENTIFIED BY 'jack_pwd';
+----------
+[CREATE_USER] CREATE USER jack@'%' IDENTIFIED BY 'jack_pwd';
+----------
+[CREATE_ROLE] CREATE ROLE role1;
+----------
+[CREATE_ROLE] CREATE ROLE role2;
+----------
+[CREATE_ROLE] CREATE ROLE my_role;
+----------
+[CREATE_RESOURCE_GROUP] CREATE WORKLOAD GROUP g1 PROPERTIES("max_cpu_percent"="10");
+----------
+[GRANT] GRANT SELECT_PRIV ON db1.* TO 'jack'@'192.%';
+----------
+[GRANT] GRANT USAGE_PRIV ON RESOURCE 'spark_resource' TO 'jack'@'192.%';
+----------
+[GRANT] GRANT 'role1','role2' TO 'jack'@'192.%';
+----------
+[GRANT] GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON WORKLOAD GROUP '%' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO ROLE 'my_role';
+----------
+[GRANT] GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO ROLE 'my_role';
+----------
+[GRANT] GRANT USAGE_PRIV ON STORAGE VAULT '%' TO 'jack'@'%';
+----------
+[SYSTEM_SETTING_WRITE] -- 1. Create tokenizers with different tokenization strategies
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- 2. Create multiple indexes on the same column
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- Standard tokenizer for tokenized search
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- Keyword tokenizer for exact matching
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- edge n-gram tokenizer for auto-completion
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_phone_number_tokenizer
+PROPERTIES
+(
+    "type" = "edge_ngram",
+    "min_gram" = "3",
+    "max_gram" = "10",
+    "token_chars" = "digit"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS edge_ngram_phone_number
+PROPERTIES
+(
+    "tokenizer" = "edge_ngram_phone_number_tokenizer"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "edge_ngram_phone_number")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+----------
+[SELECT] SELECT tokenize('13891972631', '"analyzer"="edge_ngram_phone_number"');
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS word_splitter
+PROPERTIES
+(
+    "type" = "word_delimiter",
+    "split_on_numerics" = "false",
+    "split_on_case_change" = "false"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS lowercase_delimited
+PROPERTIES
+(
+    "tokenizer" = "standard",
+    "token_filter" = "asciifolding, word_splitter, lowercase"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "lowercase_delimited")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+----------
+[SELECT] SELECT tokenize('The server at IP 192.168.1.15 sent a confirmation to user_123@example.com, requiring a quickResponse before the deadline.', '"analyzer"="lowercase_delimited"');
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES
+(
+    "tokenizer" = "keyword",
+    "token_filter" = "asciifolding, lowercase"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "keyword_lowercase")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+----------
+[SELECT] SELECT tokenize('hÉllo World', '"analyzer"="keyword_lowercase"');
+----------
+[SYSTEM_SETTING_WRITE] -- Example: Define a custom analyzer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "asciifolding, lowercase"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Use the custom analyzer when creating a table
+CREATE TABLE docs (
+    id BIGINT,
+    content TEXT,
+    INDEX idx_content (content) USING INVERTED PROPERTIES(
+        "analyzer" = "keyword_lowercase",
+        "support_phrase" = "true"
+    )
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- A VARIANT column with an inverted index
+CREATE TABLE test_variant_search_subcolumn (
+    id BIGINT,
+    properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+    INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+        "parser" = "unicode",
+        "lower_case" = "true",
+        "support_phrase" = "true"
+    )
+);
+----------
+[SELECT] -- Single-term query
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+----------
+[SELECT] -- AND / ALL queries
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+----------
+[SELECT] SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+----------
+[SELECT] -- OR query across different subcolumns
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+----------
+[METADATA] -- View the index list
+SHOW INDEX FROM document_vectors;
+----------
+[METADATA] -- View data scale
+SHOW DATA ALL FROM document_vectors;
+----------
+[ALTER_TABLE|DROP_INDEX] -- Drop the index
+ALTER TABLE document_vectors DROP INDEX idx_embedding;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- 常用属性：field_pattern（目标子路径）、analyzer、parser、support_phrase 等
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"),
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content")
+);
+----------
+[SELECT] -- v.content 同时具备分词与不分词的倒排索引
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+----------
+[SELECT] SELECT * FROM tbl WHERE v['content'] = 'Doris';
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'pattern_*' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "pattern_*"),
+    INDEX idx_v(v) USING INVERTED -- 全局指定非分词索引
+);
+----------
+[SELECT] SELECT * FROM tbl WHERE v['pattern_1'] MATCH 'Doris';
+----------
+[SELECT] SELECT * FROM tbl WHERE v['pattern_1'] = 'Doris';
+----------
+[CREATE_SCHEMA] CREATE DATABASE db1;
+----------
+[CREATE_USER] CREATE USER jack@'192.%' IDENTIFIED BY 'jack_pwd';
+----------
+[CREATE_USER] CREATE USER jack@'%' IDENTIFIED BY 'jack_pwd';
+----------
+[CREATE_ROLE] CREATE ROLE role1;
+----------
+[CREATE_ROLE] CREATE ROLE role2;
+----------
+[CREATE_ROLE] CREATE ROLE my_role;
+----------
+[CREATE_ROLE] CREATE ROLE test_role;
+----------
+[CREATE_RESOURCE_GROUP] CREATE WORKLOAD GROUP g1 PROPERTIES("max_cpu_percent"="10");
+----------
+[GRANT] GRANT SELECT_PRIV ON db1.* TO 'jack'@'192.%';
+----------
+[GRANT] GRANT USAGE_PRIV ON RESOURCE 'spark_resource' TO 'jack'@'192.%';
+----------
+[GRANT] GRANT 'role1','role2' TO 'jack'@'192.%';
+----------
+[GRANT] GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON WORKLOAD GROUP '%' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO ROLE 'test_role';
+----------
+[GRANT] GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO ROLE 'my_role';
+----------
+[GRANT] GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO ROLE 'my_role';
+----------
+[GRANT] GRANT USAGE_PRIV ON STORAGE VAULT '%' TO 'jack'@'%';
+----------
+[SYSTEM_SETTING_WRITE] -- 1. 创建不同分词策略的分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- 2. 在同一列上创建多个索引
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- 标准分词器用于分词搜索
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- 关键词分词器用于精确匹配
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- edge n-gram 分词器用于自动补全
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+----------
+[SYSTEM_SETTING_WRITE] -- 示例：定义自定义分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "asciifolding, lowercase"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- 在建表时使用自定义分词器
+CREATE TABLE docs (
+    id BIGINT,
+    content TEXT,
+    INDEX idx_content (content) USING INVERTED PROPERTIES(
+        "analyzer" = "keyword_lowercase",
+        "support_phrase" = "true"
+    )
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- 带 VARIANT 列与倒排索引
+CREATE TABLE test_variant_search_subcolumn (
+    id BIGINT,
+    properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+    INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+        "parser" = "unicode",
+        "lower_case" = "true",
+        "support_phrase" = "true"
+    )
+);
+----------
+[SELECT] -- 单词查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+----------
+[SELECT] -- AND / ALL 查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+----------
+[SELECT] SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+----------
+[SELECT] -- 不同子列 OR 查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+----------
+[METADATA] -- 查看索引列表
+SHOW INDEX FROM document_vectors;
+----------
+[METADATA] -- 查看数据规模
+SHOW DATA ALL FROM document_vectors;
+----------
+[ALTER_TABLE|DROP_INDEX] -- 删除索引
+ALTER TABLE document_vectors DROP INDEX idx_embedding;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Common properties: field_pattern (target subpath), analyzer, parser, support_phrase, etc.
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>, -- specify concrete type for subcolumn 'content'
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"), -- tokenized inverted index for 'content' with english parser
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content") -- non-tokenized inverted index for 'content'
+);
+----------
+[SELECT] -- Use tokenized index
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+----------
+[SELECT] -- Use non-tokenized index
+SELECT * FROM tbl WHERE v['content'] = 'Doris';
+----------
+[ALTER_TABLE] -- 创建分支
+ALTER TABLE iceberg_tbl CREATE BRANCH b1;
+----------
+[INSERT] -- 写入数据到指定分支
+INSERT INTO iceberg_tbl@branch(b1) values(1, 2);
+----------
+[SELECT] -- 查询指定分支
+SELECT * FROM iceberg_tbl@branch(b1);
+----------
+[SYSTEM_SETTING_WRITE] -- 创建用于多值列分割的 char group tokenizer
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS multi_value_tokenizer
+PROPERTIES
+(
+    "type" = "char_group",
+    "tokenize_on_chars" = "[|]",
+    "max_token_length" = "255"
+);
+----------
+[SYSTEM_SETTING_WRITE] -- 创建多值列分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS multi_value_analyzer
+PROPERTIES
+(
+    "tokenizer" = "multi_value_tokenizer",
+    "token_filter" = "lowercase, asciifolding"
+);
+----------
+[SELECT] SELECT tokenize('alice|123456|company', '"analyzer"="multi_value_analyzer"');
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_phone_number_tokenizer
+PROPERTIES
+(
+    "type" = "edge_ngram",
+    "min_gram" = "3",
+    "max_gram" = "10",
+    "token_chars" = "digit"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS edge_ngram_phone_number
+PROPERTIES
+(
+    "tokenizer" = "edge_ngram_phone_number_tokenizer"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "edge_ngram_phone_number")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+"replication_allocation" = "tag.location.default: 1"
+);
+----------
+[SYSTEM_SETTING_WRITE] -- Create pinyin tokenizer with multiple output formats
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS pinyin_tokenizer
+PROPERTIES (
+    "type" = "pinyin",
+    "keep_first_letter" = "true",
+    "keep_full_pinyin" = "true",
+    "keep_joined_full_pinyin" = "true",
+    "keep_original" = "true",
+    "keep_none_chinese" = "true",
+    "lowercase" = "true",
+    "remove_duplicated_term" = "true"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS pinyin_analyzer
+PROPERTIES (
+    "tokenizer" = "pinyin_tokenizer"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE contacts (
+    id BIGINT NOT NULL AUTO_INCREMENT(1),
+    name TEXT NULL,
+    INDEX idx_name (name) USING INVERTED PROPERTIES("analyzer" = "pinyin_analyzer", "support_phrase" = "true")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+----------
+[INSERT] INSERT INTO contacts VALUES (1, "刘德华"), (2, "张学友"), (3, "郭富城");
+----------
+[SELECT] SELECT * FROM contacts WHERE name MATCH '刘德华';
+----------
+[SELECT] SELECT * FROM contacts WHERE name MATCH 'liudehua';
+----------
+[SELECT] SELECT * FROM contacts WHERE name MATCH 'liu';
+----------
+[SELECT] SELECT * FROM contacts WHERE name MATCH 'ldh';
+----------
+[SYSTEM_SETTING_WRITE] -- Create pinyin filter to apply after keyword tokenizer
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS pinyin_filter
+PROPERTIES (
+    "type" = "pinyin",
+    "keep_first_letter" = "true",
+    "keep_full_pinyin" = "true",
+    "keep_original" = "true",
+    "lowercase" = "true"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_pinyin
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "pinyin_filter"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE stars (
+    id BIGINT NOT NULL AUTO_INCREMENT(1),
+    name TEXT NULL,
+    INDEX idx_name (name) USING INVERTED PROPERTIES("analyzer" = "keyword_pinyin")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+----------
+[INSERT] INSERT INTO stars VALUES (1, "刘德华"), (2, "张学友"), (3, "刘德华ABC");
+----------
+[SELECT] -- Supports multiple search modes:
+SELECT * FROM stars WHERE name MATCH '刘德华';
+----------
+[SELECT] SELECT * FROM stars WHERE name MATCH 'liu';
+----------
+[SELECT] SELECT * FROM stars WHERE name MATCH 'ldh';
+----------
+[SELECT] SELECT * FROM stars WHERE name MATCH 'zxy';
+----------
+[SYSTEM_SETTING_WRITE] -- Create analyzers with different tokenization strategies
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Create table with multiple indexes on same column
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- Standard analyzer for tokenized search
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- Keyword analyzer for exact match
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- Edge n-gram analyzer for autocomplete
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+----------
+[SYSTEM_SETTING_WRITE] -- Define a custom analyzer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+  "tokenizer" = "keyword",
+  "token_filter" = "asciifolding, lowercase"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Use the analyzer in table creation
+CREATE TABLE docs (
+  id BIGINT,
+  content TEXT,
+  INDEX idx_content (content) USING INVERTED PROPERTIES (
+    "analyzer" = "keyword_lowercase",
+    "support_phrase" = "true"
+  )
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Table with both tokenized and untokenized indexes
+CREATE TABLE t (
+  id INT,
+  content STRING,
+  INDEX idx_untokenized(content) USING INVERTED,
+  INDEX idx_tokenized(content)  USING INVERTED PROPERTIES("parser" = "standard")
+);
+----------
+[SELECT] -- Exact string match (uses untokenized index)
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning)')
+ORDER BY id;
+----------
+[SELECT] -- No match for partial token with EXACT
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine)')
+ORDER BY id;
+----------
+[SELECT] -- ANY/ALL use tokenized index
+SELECT id, content FROM t WHERE SEARCH('content:ANY(machine learning)') ORDER BY id;
+----------
+[SELECT] SELECT id, content FROM t WHERE SEARCH('content:ALL(machine learning)') ORDER BY id;
+----------
+[SELECT] -- Compare EXACT vs ANY
+SELECT id, content FROM t WHERE SEARCH('content:EXACT(deep learning)') ORDER BY id;
+----------
+[SELECT] SELECT id, content FROM t WHERE SEARCH('content:ANY(deep learning)') ORDER BY id;
+----------
+[SELECT] -- Mixed conditions
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning) OR content:ANY(intelligence)')
+ORDER BY id;
+----------
+[SELECT] -- Simplified syntax with default field/operator
+SELECT id, tags
+FROM tag_dataset
+WHERE SEARCH('deep learning', 'tags', 'and');
+----------
+[SELECT] -- Phrase and wildcard queries in one DSL
+SELECT id, content FROM t
+WHERE SEARCH('content:"deep learning" OR content:AI*')
+ORDER BY id;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- VARIANT column with inverted index
+CREATE TABLE test_variant_search_subcolumn (
+  id BIGINT,
+  properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+  INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+    "parser" = "unicode",
+    "lower_case" = "true",
+    "support_phrase" = "true"
+  )
+);
+----------
+[SELECT] -- Single term
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+----------
+[SELECT] -- AND / ALL
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+----------
+[SELECT] SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+----------
+[SELECT] -- OR across different subcolumns
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+----------
+[METADATA] SHOW INDEX FROM document_vectors;
+----------
+[METADATA] SHOW DATA ALL FROM document_vectors;
+----------
+[ALTER_TABLE|DROP_INDEX] ALTER TABLE document_vectors DROP INDEX idx_embedding;
+----------
+[ALTER_TABLE] -- Create branches
+ALTER TABLE iceberg_tbl CREATE BRANCH b1;
+----------
+[INSERT] -- Write data to a specific branch
+INSERT INTO iceberg_tbl@branch(b1) values(1, 2);
+----------
+[SELECT] -- Query data from a specific branch
+SELECT * FROM iceberg_tbl@branch(b1);
+----------
+[SYSTEM_SETTING_WRITE] -- 1. Create a custom token filter
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS complex_word_splitter
+PROPERTIES
+(
+    "type" = "word_delimiter",
+    "type_table" = "[. => SUBWORD_DELIM], [_ => SUBWORD_DELIM]");
+----------
+[SYSTEM_SETTING_WRITE] -- 2. Create a custom tokenizer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS complex_identifier_analyzer
+PROPERTIES
+(
+    "tokenizer" = "standard",
+    "token_filter" = "complex_word_splitter, lowercase"
+);
+----------
+[SELECT] SELECT TOKENIZE('apy217.39_202501260000026_526', '”analyzer“=” complex_identifier_analyzer“');
+----------
+[SYSTEM_SETTING_WRITE] -- Create a char group tokenizer for multi-valued column splitting
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS multi_value_tokenizer
+PROPERTIES
+(
+    "type" = "char_group",
+    "tokenize_on_chars" = "[|]",
+    "max_token_length" = "255"
+);
+----------
+[SYSTEM_SETTING_WRITE] -- Create a tokenizer for multi-valued columns
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS multi_value_analyzer
+PROPERTIES
+(
+    "tokenizer" = "multi_value_tokenizer",
+    "token_filter" = "lowercase, asciifolding"
+);
+----------
+[SELECT] SELECT tokenize('alice|123456|company', '"analyzer"="multi_value_analyzer"');
+----------
+[INSERT|SELECT] INSERT INTO iceberg_table@branch(b1) SELECT * FROM other_table;
+----------
+[MERGE|SELECT] INSERT OVERWRITE TABLE iceberg_table@branch(b1) SELECT * FROM other_table;
+----------
+[ADMIN] -- Add stateless BEs into two compute groups
+ALTER SYSTEM ADD BACKEND 'be1:9050' PROPERTIES ("tag.compute_group_name" = "etl");
+----------
+[ADMIN] ALTER SYSTEM ADD BACKEND 'be2:9050' PROPERTIES ("tag.compute_group_name" = "bi");
+----------
+[ADMIN] ALTER SYSTEM ADD BACKEND 'be3:9050' PROPERTIES ("tag.compute_group_name" = "bi");
+----------
+[GRANT] -- Grant access
+GRANT USAGE_PRIV ON COMPUTE GROUP etl TO 'etl_user';
+----------
+[GRANT] GRANT USAGE_PRIV ON COMPUTE GROUP bi  TO 'bi_user';
+----------
+[ALTER_USER] -- Set defaults (the user has to reconnect for new defaults to apply)
+SET PROPERTY FOR 'etl_user' 'default_compute_group' = 'etl';
+----------
+[ALTER_USER] SET PROPERTY FOR 'bi_user'  'default_compute_group' = 'bi';
+----------
+[ADMIN_RESOURCE_GROUP] -- One-off switch for the current session
+USE my_db@bi;
+----------
+[SELECT] SELECT region, SUM(amount) FROM orders WHERE dt = CURRENT_DATE() GROUP BY region;

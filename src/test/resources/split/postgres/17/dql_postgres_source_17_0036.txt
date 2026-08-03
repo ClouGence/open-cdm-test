@@ -1,0 +1,342 @@
+-- Postgres extension: with 0 or 1 separator, assume parts 1 and 3 are empty
+SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%g' ESCAPE '#') AS "bcdefg"
+;
+SELECT JSON_OBJECT(RETURNING text FORMAT JSON)
+;
+SELECT JSON_VALUE(jsonb '"123.45"', '$' RETURNING float) AS value_float
+;
+SELECT JSON_OBJECT((1::text) VALUE 2)
+;
+SELECT * FROM JSON_TABLE('{"a": [{"b": "1"}, {"b": "2"}]}', '$' COLUMNS (b json path '$.a[*].b' ERROR ON ERROR))
+;
+SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' FORMAT JSON RETURNING text))
+;
+SELECT *
+FROM limitoption
+WHERE val < 2
+ORDER BY val
+FETCH FIRST 2 ROWS WITH TIES
+;
+SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING json)
+;
+SELECT JSON_OBJECT('code' VALUE 'P123', 'title': 'Jaws' RETURNING jsonb)
+;
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING numeric error on error)
+;
+EXPLAIN (COSTS OFF)
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED THEN
+	DELETE
+;
+SELECT JSON_VALUE(jsonb '"03:04 2015-02-01"', '$.datetime("HH24:MI YYYY-MM-DD")' RETURNING date) AS value_date
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int PATH 'lax $.a' DEFAULT 1 ON EMPTY DEFAULT 2 ON ERROR)) jt
+;
+SELECT JSON_ARRAY(RETURNING bytea)
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' EMPTY OBJECT ON EMPTY)
+;
+EXPLAIN (costs off)
+MERGE INTO rw_view2 t
+  USING (VALUES ('Tom'), ('Dick'), ('Harry')) AS v(person) ON t.person = v.person
+  WHEN MATCHED AND snoop(t.person) THEN UPDATE SET person = v.person
+;
+-- Only allow EMPTY and ERROR for ON ERROR
+SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') DEFAULT 1 ON ERROR)
+;
+VALUES (TIMESTAMP '1978-07-07 19:38' AT LOCAL)
+;
+SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v ABSENT ON NULL)
+OVER (ORDER BY k)
+FROM (VALUES (1,1), (1,null), (2,2)) a(k,v)
+;
+SELECT JSON_QUERY(jsonb 'null', '$Xyz' PASSING 1 AS "Xyz")
+;
+SELECT JSON_OBJECT(
+	'a': '123',
+	1.23: 123,
+	'c': json '[ 1,true,{ } ]',
+	'd': jsonb '{ "x" : 123.45 }'
+)
+;
+SELECT JSON_ARRAY(SELECT i, i FROM (VALUES (1)) foo(i))
+;
+SELECT test_slru_page_exists(0x1234500000000)
+;
+-- Test timestamptz passing and output
+SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+SELECT JSON_QUERY(jsonb 'null', '$"Xyz"' PASSING 1 AS "Xyz")
+;
+SELECT xmlserialize(CONTENT  '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+SELECT JSON_VALUE(jsonb '"\"aaa\""', '$' RETURNING jsonb)
+;
+-- ArrayCoerceExpr
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::oid[]::int[] ON ERROR)
+;
+select json_serialize ( '{ "a" : 1 } ' returning jsonb )
+;
+SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%|ab#"g' ESCAPE '#') AS "bcdef"
+;
+--SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i) NULL ON NULL);
+--SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i) NULL ON NULL RETURNING jsonb);
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (3), (1), (NULL), (2)) foo(i) ORDER BY i)
+;
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING timestamptz)
+;
+WITH uuidts AS (
+    SELECT y, ts as ts, lag(ts) OVER (ORDER BY y) AS prev_ts
+    FROM (SELECT y, uuid_extract_timestamp(uuidv7((y || ' years')::interval)) AS ts
+        FROM generate_series(1970 - extract(year from now())::int, 10888 - extract(year from now())::int) y)
+)
+SELECT y, ts, prev_ts FROM uuidts WHERE ts < prev_ts
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int8 EXISTS PATH '$.a'))
+;
+-- Test PASSING and RETURNING date/time types
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+SELECT * FROM unnest((JSON_QUERY(jsonb '{"jsa":  [{"a": 1, "b": ["foo"]}, {"a": 2, "c": {}}, 123]}', '$' RETURNING sqljsonb_rec)).jsa)
+;
+SELECT
+	JSON_OBJECTAGG(i: i),
+--	JSON_OBJECTAGG(i VALUE i),
+--	JSON_OBJECTAGG(KEY i VALUE i),
+	JSON_OBJECTAGG(i: i RETURNING jsonb)
+FROM
+	generate_series(1, 5) i
+;
+SELECT JSON_OBJECT(RETURNING bytea FORMAT JSON)
+;
+SELECT JSON_VALUE(jsonb 'true', '$' RETURNING bool)
+;
+-- JSON_OBJECTAGG()
+SELECT	JSON_OBJECTAGG('key': 1) IS NULL,
+		JSON_OBJECTAGG('key': 1 RETURNING jsonb) IS NULL
+WHERE FALSE
+;
+-- test QUOTES behavior.
+SELECT JSON_QUERY(jsonb'{"rec": "{1,2,3}"}', '$.rec' returning int[] omit quotes)
+;
+-- RETURNING FORMAT not allowed
+
+-- RETUGNING pseudo-types not allowed
+SELECT JSON_VALUE(jsonb '["1"]', '$[*]' RETURNING record)
+;
+SELECT JSON_ARRAY(NULL, NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+SELECT JSON_OBJECT(RETURNING text)
+;
+SELECT JSON_QUERY(js, '$'  RETURNING int DEFAULT b + 1 ON ERROR) FROM test_jsonb_mutability
+;
+-- Null inputs should return NULL
+SELECT SUBSTRING('abcdefg' SIMILAR '%' ESCAPE NULL) IS NULL AS "True"
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON EMPTY NULL ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1', 'lax $.a' NULL ON EMPTY DEFAULT '2' ON ERROR)
+;
+SELECT 0x12345678::int4::bytea AS "\x12345678", (-0x12345678)::int4::bytea AS "\xedcba988"
+;
+------------------------------------------------------------------------------------------
+[SELECT] -- Postgres extension: with 0 or 1 separator, assume parts 1 and 3 are empty
+SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%g' ESCAPE '#') AS "bcdefg"
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING text FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"123.45"', '$' RETURNING float) AS value_float
+;
+----------
+[SELECT] SELECT JSON_OBJECT((1::text) VALUE 2)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE('{"a": [{"b": "1"}, {"b": "2"}]}', '$' COLUMNS (b json path '$.a[*].b' ERROR ON ERROR))
+;
+----------
+[SELECT] SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' FORMAT JSON RETURNING text))
+;
+----------
+[SELECT] SELECT *
+FROM limitoption
+WHERE val < 2
+ORDER BY val
+FETCH FIRST 2 ROWS WITH TIES
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING json)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('code' VALUE 'P123', 'title': 'Jaws' RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING numeric error on error)
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF)
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED THEN
+	DELETE
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"03:04 2015-02-01"', '$.datetime("HH24:MI YYYY-MM-DD")' RETURNING date) AS value_date
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int PATH 'lax $.a' DEFAULT 1 ON EMPTY DEFAULT 2 ON ERROR)) jt
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING bytea)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' EMPTY OBJECT ON EMPTY)
+;
+----------
+[PERFORMANCE] EXPLAIN (costs off)
+MERGE INTO rw_view2 t
+  USING (VALUES ('Tom'), ('Dick'), ('Harry')) AS v(person) ON t.person = v.person
+  WHEN MATCHED AND snoop(t.person) THEN UPDATE SET person = v.person
+;
+----------
+[SELECT] -- Only allow EMPTY and ERROR for ON ERROR
+SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') DEFAULT 1 ON ERROR)
+;
+----------
+[SELECT] VALUES (TIMESTAMP '1978-07-07 19:38' AT LOCAL)
+;
+----------
+[SELECT] SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v ABSENT ON NULL)
+OVER (ORDER BY k)
+FROM (VALUES (1,1), (1,null), (2,2)) a(k,v)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$Xyz' PASSING 1 AS "Xyz")
+;
+----------
+[SELECT] SELECT JSON_OBJECT(
+	'a': '123',
+	1.23: 123,
+	'c': json '[ 1,true,{ } ]',
+	'd': jsonb '{ "x" : 123.45 }'
+)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT i, i FROM (VALUES (1)) foo(i))
+;
+----------
+[SELECT] SELECT test_slru_page_exists(0x1234500000000)
+;
+----------
+[SELECT] -- Test timestamptz passing and output
+SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$"Xyz"' PASSING 1 AS "Xyz")
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"\"aaa\""', '$' RETURNING jsonb)
+;
+----------
+[SELECT] -- ArrayCoerceExpr
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::oid[]::int[] ON ERROR)
+;
+----------
+[SELECT] select json_serialize ( '{ "a" : 1 } ' returning jsonb )
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%|ab#"g' ESCAPE '#') AS "bcdef"
+;
+----------
+[SELECT] --SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i) NULL ON NULL);
+--SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i) NULL ON NULL RETURNING jsonb);
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (3), (1), (NULL), (2)) foo(i) ORDER BY i)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING timestamptz)
+;
+----------
+[SELECT] WITH uuidts AS (
+    SELECT y, ts as ts, lag(ts) OVER (ORDER BY y) AS prev_ts
+    FROM (SELECT y, uuid_extract_timestamp(uuidv7((y || ' years')::interval)) AS ts
+        FROM generate_series(1970 - extract(year from now())::int, 10888 - extract(year from now())::int) y)
+)
+SELECT y, ts, prev_ts FROM uuidts WHERE ts < prev_ts
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int8 EXISTS PATH '$.a'))
+;
+----------
+[SELECT] -- Test PASSING and RETURNING date/time types
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+----------
+[SELECT] SELECT * FROM unnest((JSON_QUERY(jsonb '{"jsa":  [{"a": 1, "b": ["foo"]}, {"a": 2, "c": {}}, 123]}', '$' RETURNING sqljsonb_rec)).jsa)
+;
+----------
+[SELECT] SELECT
+	JSON_OBJECTAGG(i: i),
+--	JSON_OBJECTAGG(i VALUE i),
+--	JSON_OBJECTAGG(KEY i VALUE i),
+	JSON_OBJECTAGG(i: i RETURNING jsonb)
+FROM
+	generate_series(1, 5) i
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING bytea FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'true', '$' RETURNING bool)
+;
+----------
+[SELECT] -- JSON_OBJECTAGG()
+SELECT	JSON_OBJECTAGG('key': 1) IS NULL,
+		JSON_OBJECTAGG('key': 1 RETURNING jsonb) IS NULL
+WHERE FALSE
+;
+----------
+[SELECT] -- test QUOTES behavior.
+SELECT JSON_QUERY(jsonb'{"rec": "{1,2,3}"}', '$.rec' returning int[] omit quotes)
+;
+----------
+[SELECT] -- RETURNING FORMAT not allowed
+
+-- RETUGNING pseudo-types not allowed
+SELECT JSON_VALUE(jsonb '["1"]', '$[*]' RETURNING record)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(NULL, NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING text)
+;
+----------
+[SELECT] SELECT JSON_QUERY(js, '$'  RETURNING int DEFAULT b + 1 ON ERROR) FROM test_jsonb_mutability
+;
+----------
+[SELECT] -- Null inputs should return NULL
+SELECT SUBSTRING('abcdefg' SIMILAR '%' ESCAPE NULL) IS NULL AS "True"
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON EMPTY NULL ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'lax $.a' NULL ON EMPTY DEFAULT '2' ON ERROR)
+;
+----------
+[SELECT] SELECT 0x12345678::int4::bytea AS "\x12345678", (-0x12345678)::int4::bytea AS "\xedcba988"
+;

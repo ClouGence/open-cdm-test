@@ -1,0 +1,365 @@
+DROP SPATIAL REFERENCE SYSTEM IF EXISTS 70000001;
+DROP SPATIAL REFERENCE SYSTEM IF EXISTS 70000002;
+CREATE SPATIAL REFERENCE SYSTEM 70000001
+  NAME 'split_srs_a'
+  DEFINITION 'GEOGCS["split_srs_a",DATUM["split_datum_a",SPHEROID["split_spheroid_a",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.017453292519943278],AXIS["Lat",NORTH],AXIS["Lon",EAST]]';
+CREATE OR REPLACE SPATIAL REFERENCE SYSTEM 70000001
+  ORGANIZATION 'SPLIT' IDENTIFIED BY 70000001
+  DESCRIPTION 'split replacement'
+  NAME 'split_srs_a_replace'
+  DEFINITION 'GEOGCS["split_srs_a_replace",DATUM["split_datum_ar",SPHEROID["split_spheroid_ar",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.017453292519943278],AXIS["Lat",NORTH],AXIS["Lon",EAST]]';
+CREATE SPATIAL REFERENCE SYSTEM IF NOT EXISTS 70000002
+  DEFINITION 'GEOGCS["split_srs_b",DATUM["split_datum_b",SPHEROID["split_spheroid_b",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.017453292519943278],AXIS["Lon",EAST],AXIS["Lat",NORTH]]'
+  NAME 'split_srs_b';
+DROP SPATIAL REFERENCE SYSTEM 70000002;
+DROP SPATIAL REFERENCE SYSTEM IF EXISTS 70000001;
+
+
+
+
+CREATE TABLE audit_t (c JSON COLLATE utf8mb4_bin);
+
+
+CREATE TABLE audit_t (c POINT SRID 4326 NULL);
+
+
+
+CREATE TABLE type_expression_defaults (
+ c_float FLOAT DEFAULT (RAND() * RAND()),
+ c_binary BINARY(16) DEFAULT (UUID_TO_BIN(UUID())),
+ c_date DATE DEFAULT (CURRENT_DATE + INTERVAL 1 YEAR),
+ c_point POINT DEFAULT (Point(0,0)),
+ c_json JSON DEFAULT (JSON_ARRAY()),
+ c_blob BLOB DEFAULT ('abc'),
+ c_text TEXT DEFAULT (CONCAT('a','b')),
+ c_base INT DEFAULT 2,
+ c_ref INT DEFAULT (c_base + 1)
+);
+
+CREATE TABLE type_json (c_json JSON);
+
+
+
+
+
+
+CREATE TABLE type_geom_alias (c_collection GEOMCOLLECTION);
+CREATE TABLE type_srid (c_point POINT NOT NULL SRID 4326, SPATIAL INDEX (c_point));
+CREATE TABLE type_spatial_srid_forms (
+ c_geom GEOMETRY SRID 0,
+ c_point POINT SRID 4326 NOT NULL,
+ c_linestring LINESTRING SRID 0,
+ c_polygon POLYGON SRID 0,
+ c_multipoint MULTIPOINT SRID 0,
+ c_multiline MULTILINESTRING SRID 0,
+ c_multipolygon MULTIPOLYGON SRID 0,
+ c_collection GEOMETRYCOLLECTION SRID 0,
+ c_alias GEOMCOLLECTION SRID 0
+);
+
+
+
+
+
+
+
+
+
+
+
+CREATE VIEW codex_year_view(c0) AS (SELECT CAST(2048 AS YEAR));
+CREATE TABLE codex_year_generated(c1 YEAR AS (CAST(1985 AS YEAR)));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CREATE TABLE bit_generated(a INT,b BIT(8) AS (a & 255) STORED,KEY idx_b(b));
+
+
+
+
+
+
+
+CREATE TABLE time_generated(raw_value VARCHAR(32),generated_time TIME(6) GENERATED ALWAYS AS(CAST(raw_value AS TIME(6))) STORED);
+
+
+
+
+
+
+CREATE TABLE temporal_generated(source_value VARCHAR(32),generated_datetime DATETIME(6) GENERATED ALWAYS AS(CAST(source_value AS DATETIME(6))) STORED,generated_timestamp TIMESTAMP(6) GENERATED ALWAYS AS(CAST(source_value AS DATETIME(6))) VIRTUAL,KEY idx_generated_datetime(generated_datetime),KEY idx_generated_timestamp(generated_timestamp));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+CREATE TABLE split_type_enum_set.es_generated (
+      id INT PRIMARY KEY,
+      e ENUM('low','medium','high'),
+      s SET('read','write','admin'),
+      e_index INT GENERATED ALWAYS AS (e+0) STORED,
+      s_mask INT GENERATED ALWAYS AS (s+0) VIRTUAL,
+      INDEX idx_e_index (e_index),
+      INDEX idx_s_mask (s_mask)
+    );
+CREATE TABLE split_type_json.json_core (
+      id INT PRIMARY KEY,
+      doc JSON NOT NULL,
+      payload JSON,
+      doc_name VARCHAR(64)
+        GENERATED ALWAYS AS (JSON_UNQUOTE(doc->'$.name')) STORED,
+      KEY idx_doc_name (doc_name),
+      CHECK (JSON_VALID(doc))
+    );
+CREATE TABLE split_type_json.json_primary_key (doc JSON PRIMARY KEY);
+CREATE TABLE split_type_json.json_unique_key (doc JSON, UNIQUE KEY uq_doc(doc));
+CREATE TABLE split_type_json.json_ordinary_key (doc JSON, KEY idx_doc(doc));
+CREATE TABLE split_type_json.json_default_literal (id INT PRIMARY KEY,doc JSON DEFAULT '{}');
+
+
+
+CREATE TABLE spatial_generated (
+  id INT PRIMARY KEY,
+  p POINT,
+  g GEOMETRY AS (ST_Envelope(p)) STORED
+);
+ALTER TABLE spatial_generated
+ADD COLUMN centroid POINT AS (ST_Centroid(g)) VIRTUAL;
+CREATE TABLE spatial_modern (
+  id INT PRIMARY KEY,
+  p POINT NOT NULL SRID 4326,
+  g GEOMETRY SRID 0,
+  SPATIAL INDEX sx_p (p)
+);
+ALTER TABLE spatial_modern
+ADD COLUMN p0 POINT SRID 0 NULL AFTER p;
+
+
+
+CREATE TABLE integer_generated (
+  id INT PRIMARY KEY,
+  tiny_value TINYINT,
+  small_value SMALLINT,
+  medium_value MEDIUMINT,
+  int_value INTEGER,
+  big_value BIGINT,
+  signed_total BIGINT GENERATED ALWAYS AS (
+    tiny_value+small_value+medium_value+int_value+big_value
+  ) STORED,
+  unsigned_mask BIGINT UNSIGNED GENERATED ALWAYS AS (
+    CAST(int_value AS UNSIGNED)
+  ) VIRTUAL,
+  KEY idx_integer_generated (signed_total,unsigned_mask)
+);
+
+
+
+
+
+
+
+
+CREATE TABLE numeric_generated (
+  id INT PRIMARY KEY,
+  decimal_value DECIMAL(20,6),
+  float_value FLOAT,
+  double_value DOUBLE,
+  exact_total DECIMAL(30,10) GENERATED ALWAYS AS (
+    decimal_value+CAST(float_value AS DECIMAL(20,8))
+  ) STORED,
+  approximate_total DOUBLE GENERATED ALWAYS AS (
+    float_value+double_value
+  ) VIRTUAL,
+  KEY idx_numeric_generated (exact_total,approximate_total)
+);
+CREATE TABLE temporal_generated_pair(dt DATETIME PRIMARY KEY,datetxt VARCHAR(10) GENERATED ALWAYS AS (DATE(dt)) STORED,timetxt VARCHAR(10) GENERATED ALWAYS AS (TIME(dt)) STORED) ENGINE=InnoDB;
+CREATE TABLE generated_coercibility(a VARCHAR(1024),b INT GENERATED ALWAYS AS (COERCIBILITY(a)) VIRTUAL);
+------------------------------------------------------------------------------------------
+[SYSTEM_SETTING_WRITE] DROP SPATIAL REFERENCE SYSTEM IF EXISTS 70000001;
+----------
+[SYSTEM_SETTING_WRITE] DROP SPATIAL REFERENCE SYSTEM IF EXISTS 70000002;
+----------
+[SYSTEM_SETTING_WRITE] CREATE SPATIAL REFERENCE SYSTEM 70000001
+  NAME 'split_srs_a'
+  DEFINITION 'GEOGCS["split_srs_a",DATUM["split_datum_a",SPHEROID["split_spheroid_a",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.017453292519943278],AXIS["Lat",NORTH],AXIS["Lon",EAST]]';
+----------
+[SYSTEM_SETTING_WRITE] CREATE OR REPLACE SPATIAL REFERENCE SYSTEM 70000001
+  ORGANIZATION 'SPLIT' IDENTIFIED BY 70000001
+  DESCRIPTION 'split replacement'
+  NAME 'split_srs_a_replace'
+  DEFINITION 'GEOGCS["split_srs_a_replace",DATUM["split_datum_ar",SPHEROID["split_spheroid_ar",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.017453292519943278],AXIS["Lat",NORTH],AXIS["Lon",EAST]]';
+----------
+[SYSTEM_SETTING_WRITE] CREATE SPATIAL REFERENCE SYSTEM IF NOT EXISTS 70000002
+  DEFINITION 'GEOGCS["split_srs_b",DATUM["split_datum_b",SPHEROID["split_spheroid_b",6378137,298.257223563]],PRIMEM["Greenwich",0],UNIT["degree",0.017453292519943278],AXIS["Lon",EAST],AXIS["Lat",NORTH]]'
+  NAME 'split_srs_b';
+----------
+[SYSTEM_SETTING_WRITE] DROP SPATIAL REFERENCE SYSTEM 70000002;
+----------
+[SYSTEM_SETTING_WRITE] DROP SPATIAL REFERENCE SYSTEM IF EXISTS 70000001;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE audit_t (c JSON COLLATE utf8mb4_bin);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE audit_t (c POINT SRID 4326 NULL);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE type_expression_defaults (
+ c_float FLOAT DEFAULT (RAND() * RAND()),
+ c_binary BINARY(16) DEFAULT (UUID_TO_BIN(UUID())),
+ c_date DATE DEFAULT (CURRENT_DATE + INTERVAL 1 YEAR),
+ c_point POINT DEFAULT (Point(0,0)),
+ c_json JSON DEFAULT (JSON_ARRAY()),
+ c_blob BLOB DEFAULT ('abc'),
+ c_text TEXT DEFAULT (CONCAT('a','b')),
+ c_base INT DEFAULT 2,
+ c_ref INT DEFAULT (c_base + 1)
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE type_json (c_json JSON);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE type_geom_alias (c_collection GEOMCOLLECTION);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE type_srid (c_point POINT NOT NULL SRID 4326, SPATIAL INDEX (c_point));
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE type_spatial_srid_forms (
+ c_geom GEOMETRY SRID 0,
+ c_point POINT SRID 4326 NOT NULL,
+ c_linestring LINESTRING SRID 0,
+ c_polygon POLYGON SRID 0,
+ c_multipoint MULTIPOINT SRID 0,
+ c_multiline MULTILINESTRING SRID 0,
+ c_multipolygon MULTIPOLYGON SRID 0,
+ c_collection GEOMETRYCOLLECTION SRID 0,
+ c_alias GEOMCOLLECTION SRID 0
+);
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW codex_year_view(c0) AS (SELECT CAST(2048 AS YEAR));
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE codex_year_generated(c1 YEAR AS (CAST(1985 AS YEAR)));
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE bit_generated(a INT,b BIT(8) AS (a & 255) STORED,KEY idx_b(b));
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE time_generated(raw_value VARCHAR(32),generated_time TIME(6) GENERATED ALWAYS AS(CAST(raw_value AS TIME(6))) STORED);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE temporal_generated(source_value VARCHAR(32),generated_datetime DATETIME(6) GENERATED ALWAYS AS(CAST(source_value AS DATETIME(6))) STORED,generated_timestamp TIMESTAMP(6) GENERATED ALWAYS AS(CAST(source_value AS DATETIME(6))) VIRTUAL,KEY idx_generated_datetime(generated_datetime),KEY idx_generated_timestamp(generated_timestamp));
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT|ADD_INDEX] CREATE TABLE split_type_enum_set.es_generated (
+      id INT PRIMARY KEY,
+      e ENUM('low','medium','high'),
+      s SET('read','write','admin'),
+      e_index INT GENERATED ALWAYS AS (e+0) STORED,
+      s_mask INT GENERATED ALWAYS AS (s+0) VIRTUAL,
+      INDEX idx_e_index (e_index),
+      INDEX idx_s_mask (s_mask)
+    );
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT|ADD_INDEX] CREATE TABLE split_type_json.json_core (
+      id INT PRIMARY KEY,
+      doc JSON NOT NULL,
+      payload JSON,
+      doc_name VARCHAR(64)
+        GENERATED ALWAYS AS (JSON_UNQUOTE(doc->'$.name')) STORED,
+      KEY idx_doc_name (doc_name),
+      CHECK (JSON_VALID(doc))
+    );
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT] CREATE TABLE split_type_json.json_primary_key (doc JSON PRIMARY KEY);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT] CREATE TABLE split_type_json.json_unique_key (doc JSON, UNIQUE KEY uq_doc(doc));
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE split_type_json.json_ordinary_key (doc JSON, KEY idx_doc(doc));
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT] CREATE TABLE split_type_json.json_default_literal (id INT PRIMARY KEY,doc JSON DEFAULT '{}');
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT] CREATE TABLE spatial_generated (
+  id INT PRIMARY KEY,
+  p POINT,
+  g GEOMETRY AS (ST_Envelope(p)) STORED
+);
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE spatial_generated
+ADD COLUMN centroid POINT AS (ST_Centroid(g)) VIRTUAL;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT|ADD_INDEX] CREATE TABLE spatial_modern (
+  id INT PRIMARY KEY,
+  p POINT NOT NULL SRID 4326,
+  g GEOMETRY SRID 0,
+  SPATIAL INDEX sx_p (p)
+);
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE spatial_modern
+ADD COLUMN p0 POINT SRID 0 NULL AFTER p;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT|ADD_INDEX] CREATE TABLE integer_generated (
+  id INT PRIMARY KEY,
+  tiny_value TINYINT,
+  small_value SMALLINT,
+  medium_value MEDIUMINT,
+  int_value INTEGER,
+  big_value BIGINT,
+  signed_total BIGINT GENERATED ALWAYS AS (
+    tiny_value+small_value+medium_value+int_value+big_value
+  ) STORED,
+  unsigned_mask BIGINT UNSIGNED GENERATED ALWAYS AS (
+    CAST(int_value AS UNSIGNED)
+  ) VIRTUAL,
+  KEY idx_integer_generated (signed_total,unsigned_mask)
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT|ADD_INDEX] CREATE TABLE numeric_generated (
+  id INT PRIMARY KEY,
+  decimal_value DECIMAL(20,6),
+  float_value FLOAT,
+  double_value DOUBLE,
+  exact_total DECIMAL(30,10) GENERATED ALWAYS AS (
+    decimal_value+CAST(float_value AS DECIMAL(20,8))
+  ) STORED,
+  approximate_total DOUBLE GENERATED ALWAYS AS (
+    float_value+double_value
+  ) VIRTUAL,
+  KEY idx_numeric_generated (exact_total,approximate_total)
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT] CREATE TABLE temporal_generated_pair(dt DATETIME PRIMARY KEY,datetxt VARCHAR(10) GENERATED ALWAYS AS (DATE(dt)) STORED,timetxt VARCHAR(10) GENERATED ALWAYS AS (TIME(dt)) STORED) ENGINE=InnoDB;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE generated_coercibility(a VARCHAR(1024),b INT GENERATED ALWAYS AS (COERCIBILITY(a)) VIRTUAL);

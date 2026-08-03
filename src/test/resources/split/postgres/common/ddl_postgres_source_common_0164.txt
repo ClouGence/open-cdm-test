@@ -1,0 +1,674 @@
+CREATE VIEW tid_view_with_ctid AS SELECT ctid, a FROM tid_tab
+;
+ALTER VIEW rw_view1 SET (security_invoker = true)
+;
+drop table part_column_drop
+;
+CREATE SEQUENCE s2.seq1
+;
+CREATE FUNCTION get_raw_page(text, text, int4)
+RETURNS bytea
+AS '$libdir/pageinspect', 'get_raw_page_fork'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+-- no such constraint
+COMMENT ON CONSTRAINT no_constraint ON constraint_comments_tbl IS 'yes, the comment'
+;
+ANALYZE (SKIP_LOCKED) pg_catalog.pg_largeobject
+;
+-- test that returning NULL from the inverse transition functions
+-- restarts the aggregation from scratch. The second aggregate is supposed
+-- to test cases where only some aggregates restart, the third one checks
+-- that one aggregate restarting doesn't cause others to restart.
+
+CREATE FUNCTION sum_int_randrestart_minvfunc(int4, int4) RETURNS int4 AS
+$$ SELECT CASE WHEN random() < 0.2 THEN NULL ELSE $1 - $2 END $$
+LANGUAGE SQL STRICT
+;
+ANALYZE public.pagg_tab_m_p2
+;
+CREATE FUNCTION "public"."trigger_notice"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+  declare
+    arg1 text = TG_ARGV[0];
+    arg2 integer = TG_ARGV[1];
+  begin
+    raise notice 'trigger % on % % % for % args % %',
+		TG_NAME, TG_TABLE_NAME, TG_WHEN, TG_OP, TG_LEVEL, arg1, arg2;
+    return null;
+  end;
+  $$
+;
+CREATE VIEW _pg_foreign_tables AS
+    SELECT
+           CAST(current_database() AS sql_identifier) AS foreign_table_catalog,
+           CAST(n.nspname AS sql_identifier) AS foreign_table_schema,
+           CAST(c.relname AS sql_identifier) AS foreign_table_name,
+           t.ftoptions AS ftoptions,
+           CAST(current_database() AS sql_identifier) AS foreign_server_catalog,
+           CAST(srvname AS sql_identifier) AS foreign_server_name,
+           CAST(u.rolname AS sql_identifier) AS authorization_identifier
+    FROM pg_foreign_table t, pg_foreign_server s, pg_foreign_data_wrapper w,
+         pg_authid u, pg_namespace n, pg_class c
+    WHERE w.oid = s.srvfdw
+          AND u.oid = c.relowner
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))
+          AND n.oid = c.relnamespace
+          AND c.oid = t.ftrelid
+          AND c.relkind = 'f'
+          AND s.oid = t.ftserver
+;
+CREATE FUNCTION sec_to_gc(float8)
+RETURNS float8
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+AS 'SELECT CASE WHEN $1 < 0 THEN 0::float8 WHEN $1/(2*earth()) > 1 THEN pi()*earth() ELSE 2*earth()*asin($1/(2*earth())) END'
+;
+ALTER OPERATOR === (boolean, real) SET (HASHES = false)
+;
+-- ok
+
+drop function dfunc(int, int)
+;
+create table trigpart41 partition of trigpart4 for values from (3000) to (3500)
+;
+-- CREATE MATERIALIZED VIEW does support USING
+CREATE MATERIALIZED VIEW tableam_tblmv_heap2 USING heap2 AS SELECT * FROM tableam_tbl_heap2
+;
+create table basictest
+           ( testint4 domainint4
+           , testtext domaintext
+           , testvarchar domainvarchar
+           , testnumeric domainnumeric
+           )
+;
+drop trigger child2_delete_trig on child2
+;
+CREATE FUNCTION page_header(IN page bytea,
+    OUT lsn pg_lsn,
+    OUT checksum smallint,
+    OUT flags smallint,
+    OUT lower smallint,
+    OUT upper smallint,
+    OUT special smallint,
+    OUT pagesize smallint,
+    OUT version smallint,
+    OUT prune_xid xid)
+AS '$libdir/pageinspect', 'page_header'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+-- ===================================================================
+-- test serial columns (ie, sequence-based defaults)
+-- ===================================================================
+create table loc1 (f1 serial, f2 text)
+;
+CREATE SUBSCRIPTION regress_testsub2 CONNECTION 'dbname=regress_doesnotexist' PUBLICATION foo WITH (connect = false)
+;
+CREATE TABLE "public"."a" (
+    "aa" integer
+)
+;
+DROP TABLE txn0
+;
+CREATE TABLE test31_1 PARTITION OF test31 FOR VALUES FROM ('ABC') TO ('DEF')
+;
+ALTER TABLE idxpart ATTACH PARTITION idxpart1 FOR VALUES FROM (100) TO (200)
+;
+DROP PUBLICATION testpub_rf_yes, testpub_rf_no
+;
+ALTER TABLE test_dropped
+	DROP COLUMN col1,
+	DROP COLUMN col2,
+	ADD COLUMN col3 VARCHAR(10) NOT NULL DEFAULT 'foo',
+	ADD COLUMN col4 INT NOT NULL DEFAULT 42
+;
+/*
+ * 5.81
+ * VIEWS view
+ */
+
+CREATE VIEW views AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+
+           CAST(
+             CASE WHEN pg_has_role(c.relowner, 'USAGE')
+                  THEN pg_get_viewdef(c.oid)
+                  ELSE null END
+             AS character_data) AS view_definition,
+
+           CAST(
+             CASE WHEN 'check_option=cascaded' = ANY (c.reloptions)
+                  THEN 'CASCADED'
+                  WHEN 'check_option=local' = ANY (c.reloptions)
+                  THEN 'LOCAL'
+                  ELSE 'NONE' END
+             AS character_data) AS check_option,
+
+           CAST(
+             -- (1 << CMD_UPDATE) + (1 << CMD_DELETE)
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 20 = 20
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_updatable,
+
+           CAST(
+             -- 1 << CMD_INSERT
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 8 = 8
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_insertable_into,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_UPDATE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 81 = 81)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_updatable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_DELETE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 73 = 73)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_deletable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_INSERT
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 69 = 69)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_insertable_into
+
+    FROM pg_namespace nc, pg_class c
+
+    WHERE c.relnamespace = nc.oid
+          AND c.relkind = 'v'
+          AND (NOT pg_is_other_temp_schema(nc.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES') )
+;
+CREATE SUBSCRIPTION tap_sub CONNECTION 'port=31799 host=/tmp/Cx8DC1CF0C dbname=postgres' PUBLICATION tap_pub
+;
+CREATE TABLE testpub_rf_schema2.testpub_rf_tbl6 (i integer)
+;
+CREATE FUNCTION ltree_gist_options(internal)
+RETURNS void
+AS '$libdir/ltree', 'ltree_gist_options'
+LANGUAGE C IMMUTABLE PARALLEL SAFE
+;
+create table inh_nn_parent(a int)
+;
+ALTER TABLE pg_toast.pg_toast_28341 RENAME TO reind_con_toast
+;
+CREATE OPERATOR |@| (PROCEDURE = unnest, RIGHTARG = ANYARRAY)
+;
+CREATE TEXT SEARCH DICTIONARY yiddish_stem
+	(TEMPLATE = snowball, Language = yiddish )
+;
+ALTER TEXT SEARCH CONFIGURATION norwegian ADD MAPPING
+    FOR word, hword_part, hword
+	WITH norwegian_stem
+;
+-- check clustering an empty table
+DROP TABLE clustertest
+;
+-- Function to assist with verifying EXPLAIN which includes costs.  A series
+-- of bool flags allows control over which portions are masked out
+CREATE FUNCTION explain_mask_costs(query text, do_analyze bool,
+    hide_costs bool, hide_row_est bool, hide_width bool) RETURNS setof text
+LANGUAGE plpgsql AS
+$$
+DECLARE
+    ln text;
+    analyze_str text;
+BEGIN
+    IF do_analyze = true THEN
+        analyze_str := 'on';
+    ELSE
+        analyze_str := 'off';
+    END IF;
+
+    -- avoid jit related output by disabling it
+    SET LOCAL jit = 0;
+
+    FOR ln IN
+        EXECUTE format('explain (analyze %s, costs on, summary off, timing off, buffers off) %s',
+            analyze_str, query)
+    LOOP
+        IF hide_costs = true THEN
+            ln := regexp_replace(ln, 'cost=\d+\.\d\d\.\.\d+\.\d\d', 'cost=N..N');
+        END IF;
+
+        IF hide_row_est = true THEN
+            -- don't use 'g' so that we leave the actual rows intact
+            ln := regexp_replace(ln, 'rows=\d+', 'rows=N');
+        END IF;
+
+        IF hide_width = true THEN
+            ln := regexp_replace(ln, 'width=\d+', 'width=N');
+        END IF;
+
+        RETURN NEXT ln;
+    END LOOP;
+END;
+$$
+;
+ANALYZE public.num_exp_ln
+;
+ALTER TABLE pg_temp_2.pg_temp_28551_2 ADD COLUMN newdata pg_temp_2.pg_temp_28551
+;
+CREATE INDEX clstr_expression_upper_b ON clstr_expression ((upper(b)))
+;
+CREATE TABLE hjtest_1 (a text, b int, id int, c bool)
+;
+CREATE SUBSCRIPTION sub1 CONNECTION 'port=14127 host=/tmp/rx8hUQkqAl dbname=postgres' PUBLICATION pub_mix_1, pub_mix_2
+;
+CREATE OPERATOR < (
+	PROCEDURE = isnlt,
+	LEFTARG = upc,
+	RIGHTARG = ean13,
+	COMMUTATOR = >,
+	NEGATOR = >=,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+/* contrib/tablefunc/tablefunc--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION normal_rand(int4, float8, float8)
+RETURNS setof float8
+AS '$libdir/tablefunc','normal_rand'
+LANGUAGE C VOLATILE STRICT
+;
+ALTER TEXT SEARCH CONFIGURATION "public"."ispell_tst"
+    ADD MAPPING FOR "host" WITH "simple"
+;
+DROP index stats_test_idx1
+;
+-- Test multiple AFTER ROW triggers on a foreign table
+CREATE TRIGGER trig_row_after1
+AFTER INSERT OR UPDATE OR DELETE ON rem1
+FOR EACH ROW EXECUTE PROCEDURE trigger_data(23,'skidoo')
+;
+create or replace function stricttest() returns void as $$
+declare x record;
+begin
+  -- no rows
+  execute 'select * from foo where f1 = $1 or f1::text = $2' using 0, 'foo' into strict x;
+  raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
+end$$ language plpgsql
+;
+-- check error cases
+CREATE OR REPLACE FUNCTION test2() RETURNS hstore
+LANGUAGE plperl
+TRANSFORM FOR TYPE hstore
+AS $$
+return 42;
+$$
+;
+------------------------------------------------------------------------------------------
+[CREATE_VIEW(SELECT)] CREATE VIEW tid_view_with_ctid AS SELECT ctid, a FROM tid_tab
+;
+----------
+[ALTER_VIEW] ALTER VIEW rw_view1 SET (security_invoker = true)
+;
+----------
+[DROP_TABLE] drop table part_column_drop
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE s2.seq1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION get_raw_page(text, text, int4)
+RETURNS bytea
+AS '$libdir/pageinspect', 'get_raw_page_fork'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+----------
+[COMMENT_CONSTRAINT] -- no such constraint
+COMMENT ON CONSTRAINT no_constraint ON constraint_comments_tbl IS 'yes, the comment'
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) pg_catalog.pg_largeobject
+;
+----------
+[CREATE_PROG_OBJ] -- test that returning NULL from the inverse transition functions
+-- restarts the aggregation from scratch. The second aggregate is supposed
+-- to test cases where only some aggregates restart, the third one checks
+-- that one aggregate restarting doesn't cause others to restart.
+
+CREATE FUNCTION sum_int_randrestart_minvfunc(int4, int4) RETURNS int4 AS
+$$ SELECT CASE WHEN random() < 0.2 THEN NULL ELSE $1 - $2 END $$
+LANGUAGE SQL STRICT
+;
+----------
+[ADMIN_TABLE] ANALYZE public.pagg_tab_m_p2
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."trigger_notice"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+  declare
+    arg1 text = TG_ARGV[0];
+    arg2 integer = TG_ARGV[1];
+  begin
+    raise notice 'trigger % on % % % for % args % %',
+		TG_NAME, TG_TABLE_NAME, TG_WHEN, TG_OP, TG_LEVEL, arg1, arg2;
+    return null;
+  end;
+  $$
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW _pg_foreign_tables AS
+    SELECT
+           CAST(current_database() AS sql_identifier) AS foreign_table_catalog,
+           CAST(n.nspname AS sql_identifier) AS foreign_table_schema,
+           CAST(c.relname AS sql_identifier) AS foreign_table_name,
+           t.ftoptions AS ftoptions,
+           CAST(current_database() AS sql_identifier) AS foreign_server_catalog,
+           CAST(srvname AS sql_identifier) AS foreign_server_name,
+           CAST(u.rolname AS sql_identifier) AS authorization_identifier
+    FROM pg_foreign_table t, pg_foreign_server s, pg_foreign_data_wrapper w,
+         pg_authid u, pg_namespace n, pg_class c
+    WHERE w.oid = s.srvfdw
+          AND u.oid = c.relowner
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES'))
+          AND n.oid = c.relnamespace
+          AND c.oid = t.ftrelid
+          AND c.relkind = 'f'
+          AND s.oid = t.ftserver
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION sec_to_gc(float8)
+RETURNS float8
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+AS 'SELECT CASE WHEN $1 < 0 THEN 0::float8 WHEN $1/(2*earth()) > 1 THEN pi()*earth() ELSE 2*earth()*asin($1/(2*earth())) END'
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR === (boolean, real) SET (HASHES = false)
+;
+----------
+[DROP_PROG_OBJ] -- ok
+
+drop function dfunc(int, int)
+;
+----------
+[CREATE_TABLE] create table trigpart41 partition of trigpart4 for values from (3000) to (3500)
+;
+----------
+[CREATE_VIEW(SELECT)] -- CREATE MATERIALIZED VIEW does support USING
+CREATE MATERIALIZED VIEW tableam_tblmv_heap2 USING heap2 AS SELECT * FROM tableam_tbl_heap2
+;
+----------
+[CREATE_TABLE] create table basictest
+           ( testint4 domainint4
+           , testtext domaintext
+           , testvarchar domainvarchar
+           , testnumeric domainnumeric
+           )
+;
+----------
+[DROP_TRIGGER] drop trigger child2_delete_trig on child2
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION page_header(IN page bytea,
+    OUT lsn pg_lsn,
+    OUT checksum smallint,
+    OUT flags smallint,
+    OUT lower smallint,
+    OUT upper smallint,
+    OUT special smallint,
+    OUT pagesize smallint,
+    OUT version smallint,
+    OUT prune_xid xid)
+AS '$libdir/pageinspect', 'page_header'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] -- ===================================================================
+-- test serial columns (ie, sequence-based defaults)
+-- ===================================================================
+create table loc1 (f1 serial, f2 text)
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION regress_testsub2 CONNECTION 'dbname=regress_doesnotexist' PUBLICATION foo WITH (connect = false)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."a" (
+    "aa" integer
+)
+;
+----------
+[DROP_TABLE] DROP TABLE txn0
+;
+----------
+[CREATE_TABLE] CREATE TABLE test31_1 PARTITION OF test31 FOR VALUES FROM ('ABC') TO ('DEF')
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE idxpart ATTACH PARTITION idxpart1 FOR VALUES FROM (100) TO (200)
+;
+----------
+[DROP_PUB_SUB] DROP PUBLICATION testpub_rf_yes, testpub_rf_no
+;
+----------
+[ALTER_TABLE|DROP_COLUMN|ADD_COLUMN] ALTER TABLE test_dropped
+	DROP COLUMN col1,
+	DROP COLUMN col2,
+	ADD COLUMN col3 VARCHAR(10) NOT NULL DEFAULT 'foo',
+	ADD COLUMN col4 INT NOT NULL DEFAULT 42
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 5.81
+ * VIEWS view
+ */
+
+CREATE VIEW views AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+
+           CAST(
+             CASE WHEN pg_has_role(c.relowner, 'USAGE')
+                  THEN pg_get_viewdef(c.oid)
+                  ELSE null END
+             AS character_data) AS view_definition,
+
+           CAST(
+             CASE WHEN 'check_option=cascaded' = ANY (c.reloptions)
+                  THEN 'CASCADED'
+                  WHEN 'check_option=local' = ANY (c.reloptions)
+                  THEN 'LOCAL'
+                  ELSE 'NONE' END
+             AS character_data) AS check_option,
+
+           CAST(
+             -- (1 << CMD_UPDATE) + (1 << CMD_DELETE)
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 20 = 20
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_updatable,
+
+           CAST(
+             -- 1 << CMD_INSERT
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 8 = 8
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_insertable_into,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_UPDATE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 81 = 81)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_updatable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_DELETE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 73 = 73)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_deletable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_INSERT
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 69 = 69)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_insertable_into
+
+    FROM pg_namespace nc, pg_class c
+
+    WHERE c.relnamespace = nc.oid
+          AND c.relkind = 'v'
+          AND (NOT pg_is_other_temp_schema(nc.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES') )
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION tap_sub CONNECTION 'port=31799 host=/tmp/Cx8DC1CF0C dbname=postgres' PUBLICATION tap_pub
+;
+----------
+[CREATE_TABLE] CREATE TABLE testpub_rf_schema2.testpub_rf_tbl6 (i integer)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ltree_gist_options(internal)
+RETURNS void
+AS '$libdir/ltree', 'ltree_gist_options'
+LANGUAGE C IMMUTABLE PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] create table inh_nn_parent(a int)
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_28341 RENAME TO reind_con_toast
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR |@| (PROCEDURE = unnest, RIGHTARG = ANYARRAY)
+;
+----------
+[CREATE_POLICY] CREATE TEXT SEARCH DICTIONARY yiddish_stem
+	(TEMPLATE = snowball, Language = yiddish )
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION norwegian ADD MAPPING
+    FOR word, hword_part, hword
+	WITH norwegian_stem
+;
+----------
+[DROP_TABLE] -- check clustering an empty table
+DROP TABLE clustertest
+;
+----------
+[CREATE_PROG_OBJ] -- Function to assist with verifying EXPLAIN which includes costs.  A series
+-- of bool flags allows control over which portions are masked out
+CREATE FUNCTION explain_mask_costs(query text, do_analyze bool,
+    hide_costs bool, hide_row_est bool, hide_width bool) RETURNS setof text
+LANGUAGE plpgsql AS
+$$
+DECLARE
+    ln text;
+    analyze_str text;
+BEGIN
+    IF do_analyze = true THEN
+        analyze_str := 'on';
+    ELSE
+        analyze_str := 'off';
+    END IF;
+
+    -- avoid jit related output by disabling it
+    SET LOCAL jit = 0;
+
+    FOR ln IN
+        EXECUTE format('explain (analyze %s, costs on, summary off, timing off, buffers off) %s',
+            analyze_str, query)
+    LOOP
+        IF hide_costs = true THEN
+            ln := regexp_replace(ln, 'cost=\d+\.\d\d\.\.\d+\.\d\d', 'cost=N..N');
+        END IF;
+
+        IF hide_row_est = true THEN
+            -- don't use 'g' so that we leave the actual rows intact
+            ln := regexp_replace(ln, 'rows=\d+', 'rows=N');
+        END IF;
+
+        IF hide_width = true THEN
+            ln := regexp_replace(ln, 'width=\d+', 'width=N');
+        END IF;
+
+        RETURN NEXT ln;
+    END LOOP;
+END;
+$$
+;
+----------
+[ADMIN_TABLE] ANALYZE public.num_exp_ln
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE pg_temp_2.pg_temp_28551_2 ADD COLUMN newdata pg_temp_2.pg_temp_28551
+;
+----------
+[ADD_INDEX] CREATE INDEX clstr_expression_upper_b ON clstr_expression ((upper(b)))
+;
+----------
+[CREATE_TABLE] CREATE TABLE hjtest_1 (a text, b int, id int, c bool)
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION sub1 CONNECTION 'port=14127 host=/tmp/rx8hUQkqAl dbname=postgres' PUBLICATION pub_mix_1, pub_mix_2
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR < (
+	PROCEDURE = isnlt,
+	LEFTARG = upc,
+	RIGHTARG = ean13,
+	COMMUTATOR = >,
+	NEGATOR = >=,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+----------
+[CREATE_PROG_OBJ] /* contrib/tablefunc/tablefunc--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION normal_rand(int4, float8, float8)
+RETURNS setof float8
+AS '$libdir/tablefunc','normal_rand'
+LANGUAGE C VOLATILE STRICT
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION "public"."ispell_tst"
+    ADD MAPPING FOR "host" WITH "simple"
+;
+----------
+[DROP_INDEX] DROP index stats_test_idx1
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] -- Test multiple AFTER ROW triggers on a foreign table
+CREATE TRIGGER trig_row_after1
+AFTER INSERT OR UPDATE OR DELETE ON rem1
+FOR EACH ROW EXECUTE PROCEDURE trigger_data(23,'skidoo')
+;
+----------
+[CREATE_PROG_OBJ] create or replace function stricttest() returns void as $$
+declare x record;
+begin
+  -- no rows
+  execute 'select * from foo where f1 = $1 or f1::text = $2' using 0, 'foo' into strict x;
+  raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
+end$$ language plpgsql
+;
+----------
+[CREATE_PROG_OBJ] -- check error cases
+CREATE OR REPLACE FUNCTION test2() RETURNS hstore
+LANGUAGE plperl
+TRANSFORM FOR TYPE hstore
+AS $$
+return 42;
+$$
+;

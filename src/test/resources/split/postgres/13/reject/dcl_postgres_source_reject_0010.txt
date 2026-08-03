@@ -1,0 +1,86 @@
+GRANT SET, ALTER SYSTEM ON PARAMETER
+    autovacuum_work_mem, hash_mem_multiplier, max_stack_depth,
+    shared_buffers, temp_file_limit, work_mem
+TO regress_host_resource_admin
+;
+ALTER SUBSCRIPTION split_sub SKIP (lsn = '0/1')
+;
+-- Grant privileges on parameters to the new non-superuser role
+GRANT SET, ALTER SYSTEM ON PARAMETER
+    autovacuum_work_mem, hash_mem_multiplier, max_stack_depth,
+    shared_buffers, temp_file_limit, work_mem
+TO regress_host_resource_admin
+;
+REVOKE SET ON PARAMETER work_mem FROM regress_host_resource_admin
+;
+-- used in COPY without RETURNING
+COPY (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) TO stdout
+;
+-- And this should remove the entry altogether:
+REVOKE SET ON PARAMETER enable_material FROM PUBLIC
+;
+ALTER SUBSCRIPTION sub SKIP (lsn = '0/1800148')
+;
+-- Check the behavior of the hooks relative to unrecognized parameters
+GRANT ALL ON PARAMETER "none.such" TO PUBLIC
+;
+-- fail
+ALTER SUBSCRIPTION regress_testsub SKIP (lsn = '0/0')
+;
+-- used in COPY
+COPY (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) TO stdout
+;
+------------------------------------------------------------------------------------------
+[GRANT] GRANT SET, ALTER SYSTEM ON PARAMETER
+    autovacuum_work_mem, hash_mem_multiplier, max_stack_depth,
+    shared_buffers, temp_file_limit, work_mem
+TO regress_host_resource_admin
+;
+----------
+[ADMIN_PUB_SUB] ALTER SUBSCRIPTION split_sub SKIP (lsn = '0/1')
+;
+----------
+[GRANT] -- Grant privileges on parameters to the new non-superuser role
+GRANT SET, ALTER SYSTEM ON PARAMETER
+    autovacuum_work_mem, hash_mem_multiplier, max_stack_depth,
+    shared_buffers, temp_file_limit, work_mem
+TO regress_host_resource_admin
+;
+----------
+[REVOKE] REVOKE SET ON PARAMETER work_mem FROM regress_host_resource_admin
+;
+----------
+[DATA_EXPORT|MERGE] -- used in COPY without RETURNING
+COPY (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) TO stdout
+;
+----------
+[REVOKE] -- And this should remove the entry altogether:
+REVOKE SET ON PARAMETER enable_material FROM PUBLIC
+;
+----------
+[ADMIN_PUB_SUB] ALTER SUBSCRIPTION sub SKIP (lsn = '0/1800148')
+;
+----------
+[GRANT] -- Check the behavior of the hooks relative to unrecognized parameters
+GRANT ALL ON PARAMETER "none.such" TO PUBLIC
+;
+----------
+[ADMIN_PUB_SUB] -- fail
+ALTER SUBSCRIPTION regress_testsub SKIP (lsn = '0/0')
+;
+----------
+[DATA_EXPORT|MERGE] -- used in COPY
+COPY (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) TO stdout
+;

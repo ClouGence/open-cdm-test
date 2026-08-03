@@ -1,0 +1,135 @@
+[performance__common_tidb_upstream_explain_partitions_md_0_000]
+sql:
+EXPLAIN SELECT COUNT(*) FROM t1 WHERE d = '2017-06-01';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Function(1:15~1:20) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:29~1:31) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_explain_partitions_md_0_001]
+sql:
+INSERT INTO t1 (d, pad1, pad2, pad3) VALUES
+ ('2016-01-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2016-06-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2016-09-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2017-01-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2017-06-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2017-09-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2018-01-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2018-06-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2018-09-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2019-01-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2019-06-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2019-09-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2020-01-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2020-06-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024)),
+ ('2020-09-01', RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t1/",
+      "action" : "INSERT"
+    },
+    {
+      "subject": "Function(2:16~2:28) /test/1/catalog1/schema1/RANDOM_BYTES/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_explain_partitions_md_0_002]
+sql:
+INSERT INTO t1 SELECT NULL, a.d, RANDOM_BYTES(1024), RANDOM_BYTES(1024), RANDOM_BYTES(1024) FROM t1 a JOIN t1 b JOIN t1 c LIMIT 10000;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t1/",
+      "action" : "INSERT",
+      "target" : "Table(1:97~1:99) /test/1/catalog1/schema1/t1/"
+    },
+    {
+      "subject": "Function(1:33~1:45) /test/1/catalog1/schema1/RANDOM_BYTES/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_explain_partitions_md_0_003]
+sql:
+CREATE TABLE t1 (
+ id BIGINT NOT NULL auto_increment,
+ d date NOT NULL,
+ pad1 BLOB,
+ pad2 BLOB,
+ pad3 BLOB,
+ PRIMARY KEY (id,d)
+) PARTITION BY RANGE (YEAR(d)) (
+ PARTITION p2016 VALUES LESS THAN (2017),
+ PARTITION p2017 VALUES LESS THAN (2018),
+ PARTITION p2018 VALUES LESS THAN (2019),
+ PARTITION p2019 VALUES LESS THAN (2020),
+ PARTITION pmax VALUES LESS THAN MAXVALUE
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t1/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Constraint(7:1~7:19) /test/1/catalog1/schema1/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Function(8:22~8:26) /test/1/catalog1/schema1/YEAR/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_explain_partitions_md_0_004]
+sql:
+EXPLAIN SELECT COUNT(*) FROM t1 WHERE YEAR(d) = 2017;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Function(1:15~1:20) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:29~1:31) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:38~1:42) /test/1/catalog1/schema1/YEAR/",
+      "action" : "CALL"
+    }
+  ]
+}

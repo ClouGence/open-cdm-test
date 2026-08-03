@@ -1,0 +1,554 @@
+CREATE TABLE UNIQUE_NOTEN_TBL(i int UNIQUE NOT ENFORCED)
+;
+alter table inh_nn2 alter constraint inh_nn1_f2_not_null no inherit
+;
+CREATE TABLE gtest_err_6a (a int PRIMARY KEY, b bool GENERATED ALWAYS AS (xmin <> 37) VIRTUAL)
+;
+ALTER TABLE temporal_partitioned_fk_mltrng2mltrng
+  DROP CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk,
+  ADD CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk
+    FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_partitioned_mltrng
+    ON DELETE SET NULL ON UPDATE SET NULL
+;
+-- error
+CREATE TABLE gtestx (x int, b int GENERATED ALWAYS AS (a * 22) VIRTUAL) INHERITS (gtest1)
+;
+CREATE FUNCTION merge_sf_test()
+ RETURNS TABLE(action text, a int, b text,
+               id int, data text, filling int[],
+               old_id int, old_data text, old_filling int[],
+               new_id int, new_data text, new_filling int[])
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN MATCHED
+   AND (s.a + t.id) = 42
+   THEN UPDATE SET data = repeat(t.data, s.a) || s.b, id = length(s.b)
+WHEN NOT MATCHED
+   AND (s.b IS NOT NULL)
+   THEN INSERT (data, id)
+   VALUES (s.b, s.a)
+WHEN MATCHED
+   AND length(s.b || t.data) > 10
+   THEN UPDATE SET data = s.b
+WHEN MATCHED
+   AND s.a > 200
+   THEN UPDATE SET filling[s.a] = t.id
+WHEN MATCHED
+   AND s.a > 100
+   THEN DELETE
+WHEN MATCHED
+   THEN DO NOTHING
+WHEN NOT MATCHED
+   AND s.a > 200
+   THEN INSERT DEFAULT VALUES
+WHEN NOT MATCHED
+   AND s.a > 100
+   THEN INSERT (id, data) OVERRIDING USER VALUE
+   VALUES (s.a, DEFAULT)
+WHEN NOT MATCHED
+   AND s.a > 0
+   THEN INSERT
+   VALUES (s.a, s.b, DEFAULT)
+WHEN NOT MATCHED
+   THEN INSERT (filling[1], id)
+   VALUES (s.a, s.a)
+RETURNING
+   WITH (OLD AS o, NEW AS n)
+   merge_action() AS action, *, o.*, n.*;
+END
+;
+ALTER TABLE public.pitest1 ADD CONSTRAINT pitest1_f3_not_null NOT NULL f3
+;
+create table p1_c1(f1 int constraint p1_a_check check (f1 > 0) not enforced)
+;
+-- NOT NULL NO INHERIT
+CREATE TABLE ATACC1 (a int, NOT NULL a NO INHERIT)
+;
+create table inh_parent (f1 int not null no inherit, f2 int not null no inherit)
+;
+-- Leave these tables around, for pg_upgrade testing
+
+-- test that removing inheritance of NOT NULL NO INHERIT works correctly
+create table inh_parent (f1 int not null no inherit, f2 int not null no inherit)
+;
+CREATE TABLE temporal_mltrng2 (
+  id1 int4range,
+  id2 int4range,
+  valid_at datemultirange,
+  CONSTRAINT temporal_mltrng2_pk PRIMARY KEY (id1, id2, valid_at WITHOUT OVERLAPS)
+)
+;
+-- duplicate generated
+CREATE TABLE gtest_err_1 (a int PRIMARY KEY, b int GENERATED ALWAYS AS (a * 2) VIRTUAL GENERATED ALWAYS AS (a * 3) VIRTUAL)
+;
+ALTER TABLE "public"."atnnparted"
+    ADD CONSTRAINT "dummy_constr" NOT NULL "id" NOT VALID
+;
+ALTER TABLE temporal_fk_mltrng2mltrng
+  ADD CONSTRAINT temporal_fk_mltrng2mltrng_fk
+  FOREIGN KEY (parent_id, PERIOD valid_at)
+  REFERENCES temporal_mltrng (id, PERIOD valid_at)
+  ON UPDATE NO ACTION
+;
+CREATE TABLE temporal_rng3 (
+  id int4range,
+  valid_at TEXT,
+  CONSTRAINT temporal_rng3_uq UNIQUE (id, valid_at WITHOUT OVERLAPS)
+)
+;
+-- specifying an existing constraint is a no-op
+ALTER TABLE notnull_tbl1 ADD CONSTRAINT notnull_tbl1_a_not_null NOT NULL a
+;
+CREATE TABLE temporal_partitioned_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_partitioned_mltrng (id, PERIOD valid_at)
+) PARTITION BY LIST (id)
+;
+-- temporal UNIQUE:
+CREATE TABLE temporal_partitioned (
+  id int4range,
+  valid_at daterange,
+  name text,
+  CONSTRAINT temporal_paritioned_uq UNIQUE (id, valid_at WITHOUT OVERLAPS)
+) PARTITION BY LIST (id)
+;
+-- (parent_id) REFERENCES [implicit]
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id)
+    REFERENCES temporal_mltrng
+)
+;
+ALTER TABLE public.test_replica_identity2 ADD CONSTRAINT test_replica_identity2_id_not_null NOT NULL id
+;
+-- error
+ALTER TABLE notnull_tbl1 ADD CONSTRAINT nn NOT NULL a NOT VALID
+;
+create domain d_fail as int4 not null no inherit
+;
+CREATE TABLE gtest30 (
+    a int,
+    b int GENERATED ALWAYS AS (a * 2) VIRTUAL
+)
+;
+-- (parent_id, valid_at) REFERENCES [implicit]
+-- FOREIGN KEY part should specify PERIOD
+CREATE TABLE temporal_fk_rng2rng (
+  id int4range,
+  valid_at daterange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_rng2rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk FOREIGN KEY (parent_id, valid_at)
+    REFERENCES temporal_rng
+)
+;
+CREATE TABLE gtest21b (a int, b int GENERATED ALWAYS AS (nullif(a, 0)) VIRTUAL)
+;
+alter table p1_c1 add constraint inh_check_constraint9 check (f1 < 10) not valid enforced
+;
+--
+-- test input parser
+--
+
+-- PK with no columns just WITHOUT OVERLAPS:
+
+CREATE TABLE temporal_rng (
+  valid_at daterange,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (valid_at WITHOUT OVERLAPS)
+)
+;
+ALTER TABLE gtest25 ADD COLUMN c int DEFAULT 42,
+  ADD COLUMN x int GENERATED ALWAYS AS (c * 4) VIRTUAL
+;
+create table gtest34p (id int primary key, a int,
+                       c int generated always as (a * 10) virtual)
+    partition by range (id)
+;
+CREATE TABLE split_pg18.temporal_parent (
+    account_id integer NOT NULL,
+    valid_at tstzrange NOT NULL,
+    status text,
+    PRIMARY KEY (account_id, valid_at WITHOUT OVERLAPS)
+)
+;
+alter table inh_nn1 alter constraint inh_nn1_f1_not_null no inherit
+;
+ALTER TABLE "public"."notnull_tbl1_upg"
+    ADD CONSTRAINT "nn" NOT NULL "a" NOT VALID
+;
+CREATE TABLE temporal_rng (
+  valid_at daterange,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (valid_at WITHOUT OVERLAPS)
+)
+;
+-- Can't create a FK with a mismatched multirange type
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at int4multirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk2 PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk2 FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_mltrng (id, PERIOD valid_at)
+)
+;
+CREATE TABLE gtest24nn (a int, b gtestdomainnn GENERATED ALWAYS AS (a * 2) VIRTUAL)
+;
+CREATE TABLE gtest21ax (a int PRIMARY KEY, b int GENERATED ALWAYS AS (nullif(a, 0)) VIRTUAL)
+;
+CREATE TABLE gtestxx_4 (b int GENERATED ALWAYS AS (a * 2) VIRTUAL, a int NOT NULL)
+;
+-- allowed to merge enforced constraint with parent's not enforced constraint
+alter table p1_c1 add constraint inh_check_constraint5 check (f1 < 10) enforced
+;
+CREATE TABLE gtest_err_4 (a int PRIMARY KEY, b double precision GENERATED ALWAYS AS (random()) VIRTUAL)
+;
+CREATE TABLE gtest_normal_child (a int, b int GENERATED ALWAYS AS (a * 2) VIRTUAL)
+;
+ALTER TABLE has_volatile ADD col5 int GENERATED ALWAYS AS (tableoid::int + col2) VIRTUAL
+;
+ALTER TABLE notnull_tbl1 ADD CONSTRAINT foobar NOT NULL a
+;
+alter table p1 add constraint inh_check_constraint3 check (f1 > 0) not enforced
+;
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_mltrng (id, PERIOD valid_at)
+)
+;
+CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange,
+  CONSTRAINT temporal3_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+CREATE TABLE temporal_rng3 (
+  id1 int4range,
+  id2 int4range,
+  valid_at daterange,
+  CONSTRAINT temporal_rng3_uq UNIQUE (id1, id2, valid_at WITHOUT OVERLAPS)
+)
+;
+-- virtual
+create table test9v (a int not null, b int generated always as (a * 2) virtual)
+;
+CREATE TABLE gtesty (x int, b int GENERATED ALWAYS AS (x * 22) VIRTUAL)
+;
+alter table p1_c1 add constraint inh_check_constraint7 check (f1 < 10) not enforced
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] CREATE TABLE UNIQUE_NOTEN_TBL(i int UNIQUE NOT ENFORCED)
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] alter table inh_nn2 alter constraint inh_nn1_f2_not_null no inherit
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_err_6a (a int PRIMARY KEY, b bool GENERATED ALWAYS AS (xmin <> 37) VIRTUAL)
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT|ADD_CONSTRAINT] ALTER TABLE temporal_partitioned_fk_mltrng2mltrng
+  DROP CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk,
+  ADD CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk
+    FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_partitioned_mltrng
+    ON DELETE SET NULL ON UPDATE SET NULL
+;
+----------
+[CREATE_TABLE] -- error
+CREATE TABLE gtestx (x int, b int GENERATED ALWAYS AS (a * 22) VIRTUAL) INHERITS (gtest1)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION merge_sf_test()
+ RETURNS TABLE(action text, a int, b text,
+               id int, data text, filling int[],
+               old_id int, old_data text, old_filling int[],
+               new_id int, new_data text, new_filling int[])
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN MATCHED
+   AND (s.a + t.id) = 42
+   THEN UPDATE SET data = repeat(t.data, s.a) || s.b, id = length(s.b)
+WHEN NOT MATCHED
+   AND (s.b IS NOT NULL)
+   THEN INSERT (data, id)
+   VALUES (s.b, s.a)
+WHEN MATCHED
+   AND length(s.b || t.data) > 10
+   THEN UPDATE SET data = s.b
+WHEN MATCHED
+   AND s.a > 200
+   THEN UPDATE SET filling[s.a] = t.id
+WHEN MATCHED
+   AND s.a > 100
+   THEN DELETE
+WHEN MATCHED
+   THEN DO NOTHING
+WHEN NOT MATCHED
+   AND s.a > 200
+   THEN INSERT DEFAULT VALUES
+WHEN NOT MATCHED
+   AND s.a > 100
+   THEN INSERT (id, data) OVERRIDING USER VALUE
+   VALUES (s.a, DEFAULT)
+WHEN NOT MATCHED
+   AND s.a > 0
+   THEN INSERT
+   VALUES (s.a, s.b, DEFAULT)
+WHEN NOT MATCHED
+   THEN INSERT (filling[1], id)
+   VALUES (s.a, s.a)
+RETURNING
+   WITH (OLD AS o, NEW AS n)
+   merge_action() AS action, *, o.*, n.*;
+END
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE public.pitest1 ADD CONSTRAINT pitest1_f3_not_null NOT NULL f3
+;
+----------
+[CREATE_TABLE] create table p1_c1(f1 int constraint p1_a_check check (f1 > 0) not enforced)
+;
+----------
+[CREATE_TABLE] -- NOT NULL NO INHERIT
+CREATE TABLE ATACC1 (a int, NOT NULL a NO INHERIT)
+;
+----------
+[CREATE_TABLE] create table inh_parent (f1 int not null no inherit, f2 int not null no inherit)
+;
+----------
+[CREATE_TABLE] -- Leave these tables around, for pg_upgrade testing
+
+-- test that removing inheritance of NOT NULL NO INHERIT works correctly
+create table inh_parent (f1 int not null no inherit, f2 int not null no inherit)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_mltrng2 (
+  id1 int4range,
+  id2 int4range,
+  valid_at datemultirange,
+  CONSTRAINT temporal_mltrng2_pk PRIMARY KEY (id1, id2, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[CREATE_TABLE] -- duplicate generated
+CREATE TABLE gtest_err_1 (a int PRIMARY KEY, b int GENERATED ALWAYS AS (a * 2) VIRTUAL GENERATED ALWAYS AS (a * 3) VIRTUAL)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE "public"."atnnparted"
+    ADD CONSTRAINT "dummy_constr" NOT NULL "id" NOT VALID
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE temporal_fk_mltrng2mltrng
+  ADD CONSTRAINT temporal_fk_mltrng2mltrng_fk
+  FOREIGN KEY (parent_id, PERIOD valid_at)
+  REFERENCES temporal_mltrng (id, PERIOD valid_at)
+  ON UPDATE NO ACTION
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_rng3 (
+  id int4range,
+  valid_at TEXT,
+  CONSTRAINT temporal_rng3_uq UNIQUE (id, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] -- specifying an existing constraint is a no-op
+ALTER TABLE notnull_tbl1 ADD CONSTRAINT notnull_tbl1_a_not_null NOT NULL a
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_partitioned_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_partitioned_mltrng (id, PERIOD valid_at)
+) PARTITION BY LIST (id)
+;
+----------
+[CREATE_TABLE] -- temporal UNIQUE:
+CREATE TABLE temporal_partitioned (
+  id int4range,
+  valid_at daterange,
+  name text,
+  CONSTRAINT temporal_paritioned_uq UNIQUE (id, valid_at WITHOUT OVERLAPS)
+) PARTITION BY LIST (id)
+;
+----------
+[CREATE_TABLE] -- (parent_id) REFERENCES [implicit]
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id)
+    REFERENCES temporal_mltrng
+)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE public.test_replica_identity2 ADD CONSTRAINT test_replica_identity2_id_not_null NOT NULL id
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] -- error
+ALTER TABLE notnull_tbl1 ADD CONSTRAINT nn NOT NULL a NOT VALID
+;
+----------
+[CREATE_TYPE] create domain d_fail as int4 not null no inherit
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest30 (
+    a int,
+    b int GENERATED ALWAYS AS (a * 2) VIRTUAL
+)
+;
+----------
+[CREATE_TABLE] -- (parent_id, valid_at) REFERENCES [implicit]
+-- FOREIGN KEY part should specify PERIOD
+CREATE TABLE temporal_fk_rng2rng (
+  id int4range,
+  valid_at daterange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_rng2rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk FOREIGN KEY (parent_id, valid_at)
+    REFERENCES temporal_rng
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest21b (a int, b int GENERATED ALWAYS AS (nullif(a, 0)) VIRTUAL)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table p1_c1 add constraint inh_check_constraint9 check (f1 < 10) not valid enforced
+;
+----------
+[CREATE_TABLE] --
+-- test input parser
+--
+
+-- PK with no columns just WITHOUT OVERLAPS:
+
+CREATE TABLE temporal_rng (
+  valid_at daterange,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE gtest25 ADD COLUMN c int DEFAULT 42,
+  ADD COLUMN x int GENERATED ALWAYS AS (c * 4) VIRTUAL
+;
+----------
+[CREATE_TABLE] create table gtest34p (id int primary key, a int,
+                       c int generated always as (a * 10) virtual)
+    partition by range (id)
+;
+----------
+[CREATE_TABLE] CREATE TABLE split_pg18.temporal_parent (
+    account_id integer NOT NULL,
+    valid_at tstzrange NOT NULL,
+    status text,
+    PRIMARY KEY (account_id, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] alter table inh_nn1 alter constraint inh_nn1_f1_not_null no inherit
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE "public"."notnull_tbl1_upg"
+    ADD CONSTRAINT "nn" NOT NULL "a" NOT VALID
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_rng (
+  valid_at daterange,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[CREATE_TABLE] -- Can't create a FK with a mismatched multirange type
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at int4multirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk2 PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk2 FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_mltrng (id, PERIOD valid_at)
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest24nn (a int, b gtestdomainnn GENERATED ALWAYS AS (a * 2) VIRTUAL)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest21ax (a int PRIMARY KEY, b int GENERATED ALWAYS AS (nullif(a, 0)) VIRTUAL)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtestxx_4 (b int GENERATED ALWAYS AS (a * 2) VIRTUAL, a int NOT NULL)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] -- allowed to merge enforced constraint with parent's not enforced constraint
+alter table p1_c1 add constraint inh_check_constraint5 check (f1 < 10) enforced
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_err_4 (a int PRIMARY KEY, b double precision GENERATED ALWAYS AS (random()) VIRTUAL)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_normal_child (a int, b int GENERATED ALWAYS AS (a * 2) VIRTUAL)
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE has_volatile ADD col5 int GENERATED ALWAYS AS (tableoid::int + col2) VIRTUAL
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE notnull_tbl1 ADD CONSTRAINT foobar NOT NULL a
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table p1 add constraint inh_check_constraint3 check (f1 > 0) not enforced
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_mltrng (id, PERIOD valid_at)
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange,
+  CONSTRAINT temporal3_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_rng3 (
+  id1 int4range,
+  id2 int4range,
+  valid_at daterange,
+  CONSTRAINT temporal_rng3_uq UNIQUE (id1, id2, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[CREATE_TABLE] -- virtual
+create table test9v (a int not null, b int generated always as (a * 2) virtual)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtesty (x int, b int GENERATED ALWAYS AS (x * 22) VIRTUAL)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table p1_c1 add constraint inh_check_constraint7 check (f1 < 10) not enforced
+;

@@ -1,0 +1,182 @@
+CREATE TABLE t1(a INT, b INT, KEY(a));
+-- Does not use SEMI_JOIN_REWRITE() to rewrite the query.
+EXPLAIN SELECT * FROM t WHERE EXISTS (SELECT 1 FROM t1 WHERE t1.a = t.a);
+-- Multiple `LEADING` hints are specified.
+SELECT /*+ LEADING(t1, t2) LEADING(t3) */ * FROM t1, t2, t3 WHERE t1.id = t2.id and t2.id = t3.id;
+SELECT /*+ SET_VAR(MAX_EXECUTION_TIME=1234) */ @@MAX_EXECUTION_TIME;
+CREATE TABLE t1 (k varchar(8), key(k)) COLLATE=utf8mb4_general_ci;
+SELECT * FROM t use index(idx1);
+-- The IndexLookUp operator will not be pushed down.
+SELECT /*+ NO_INDEX_LOOKUP_PUSHDOWN(t) */ * FROM t WHERE a > 1;
+select /*+ READ_FROM_STORAGE(TIFLASH[t1], TIKV[t2]) */ t1.a from t t1, t t2 where t1.a = t2.a;
+CREATE TABLE t(a INT, b INT, key(a), key(b));
+SELECT /*+ BROADCAST_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+select /*+ AGG_TO_COP() */ sum(t1.a) from t t1;
+SELECT /* Comment: The name of the current query block is the default @SEL_1 */ * FROM v2 JOIN (
+        SELECT /* Comment: The name of the current query block is the default @SEL_2 */ * FROM v2) vv;
+SELECT * /*+ use_index(t, a) */ FROM t;
+EXPLAIN SELECT /*+ NO_ORDER_INDEX(t, a) */ a FROM t ORDER BY a LIMIT 10;
+select /*+ MAX_EXECUTION_TIME(1000) */ * from t1 inner join t2 where t1.id = t2.id;
+select /*+ HASH_JOIN(t1, t2) */ * from t1, t2 where t1.id = t2.id;
+CREATE TABLE t2(a INT, KEY(a));
+SHOW WARNINGS;
+SELECT /*+ NO_MERGE_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+SELECT /*+ USE_INDEX(t, idx1) */ * FROM t;
+CREATE TABLE t2 (k varchar(8), key(k)) COLLATE=utf8mb4_bin;
+select /*+ HASH_AGG() */ count(*) from t1, t2 where t1.a > 10 group by t1.id;
+SELECT /*+ FORCE_INDEX(t, idx1) */ * FROM t;
+CREATE VIEW v2 AS
+        SELECT * FROM t JOIN /* Comment: For view v2, the name of the current query block is the default @SEL_1. So, the current query block view list is v2@SEL_1 .@SEL_1 */
+        (
+            SELECT COUNT(*) FROM t1 JOIN v1 /* Comment: For view v2, the name of the current query block is the default @SEL_2. So, the current query block view list is v2@SEL_1 .@SEL_2 */
+        ) tt;
+-- To learn why the `LEADING` hint fails to take effect, execute `show warnings`.
+SHOW WARNINGS;
+EXPLAIN SELECT /*+ INDEX_LOOKUP_PUSHDOWN(t1, a) */ a, b FROM t1;
+SELECT /* Comment: The name of the current query block is the default @SEL_1 */ * FROM v;
+SELECT * FROM (SELECT * FROM t) t1, (SELECT * FROM t) t2;
+CREATE TABLE t2 (id varchar(10) primary key, tname varchar(10));
+EXPLAIN SELECT /*+ ORDER_INDEX(t, a) */ a FROM t ORDER BY a LIMIT 10;
+CREATE TABLE t1(a INT, KEY(a));
+SELECT /*+ QB_NAME(v2_1, v2) merge_join(t@v2_1) */ * FROM v2;
+-- Using NO_DECORRELATE().
+explain select * from t1 where t1.a < (select /*+ NO_DECORRELATE() */ sum(t2.a) from t2 where t2.b = t1.b);
+-- Specifies the global hint
+    SELECT /*+ QB_NAME(v_1, v) USE_INDEX(t@v_1, idx) */ * FROM v;
+EXPLAIN SELECT /*+ INL_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id=t2.id and SUBSTR(t1.tname,1,2)=SUBSTR(t2.tname,1,2);
+SELECT /*+ MPP_2PHASE_AGG() */ COUNT(*) FROM t1, t2 WHERE t1.a > 10 GROUP BY t1.id;
+select /*+ STREAM_AGG() */ count(*) from t1, t2 where t1.a > 10 group by t1.id;
+CREATE TABLE t1 (id varchar(10) primary key, tname varchar(10));
+-- Uses the hint to push down the predicate of the outer query.
+WITH CTE AS (SELECT /*+ MERGE() */ * FROM tc WHERE tc.a < 60) SELECT * FROM CTE WHERE CTE.a < 18;
+CREATE VIEW v1 AS SELECT * FROM t JOIN /* Comment: For view `v1`, the name of the current query block is the default @SEL_1. So, the current query block view list is v2@SEL_1 .@SEL_2 .v1@SEL_1 */
+        (
+            SELECT COUNT(*) FROM t1 JOIN t2 /* Comment: For view `v1`, the name of the current query block is the default @SEL_2. So, the current query block view list is v2@SEL_1 .@SEL_2 .v1@SEL_2 */
+        ) tt;
+SELECT /*+ NO_HASH_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+SELECT /*+ LIMIT_TO_COP() */ * FROM t WHERE a = 1 AND b > 10 ORDER BY c LIMIT 1;
+select /*+ IGNORE_INDEX(t1, idx1, idx2) */ * from t t1;
+select /*+ NO_INDEX_MERGE() */ * from t where t.a > 0 or t.b > 0;
+prepare stmt from 'select  /*+ IGNORE_PLAN_CACHE() */ * from t where t.id = ?';
+SELECT /*+ MPP_1PHASE_AGG() */ COUNT(*) FROM t1, t2 WHERE t1.a > 10 GROUP BY t1.id;
+-- Uses SEMI_JOIN_REWRITE() to rewrite the query.
+EXPLAIN SELECT * FROM t WHERE EXISTS (SELECT /*+ SEMI_JOIN_REWRITE() */ 1 FROM t1 WHERE t1.a = t.a);
+SELECT /*+ HASH_JOIN(@sel_1 t1@sel_1, t3) */ * FROM (SELECT t1.a, t1.b FROM t t1, t t2 WHERE t1.a = t2.a) t1, t t3 WHERE t1.b = t3.b;
+select /*+ MERGE_JOIN(t1, t2) */ * from t1, t2 where t1.id = t2.id;
+SELECT /*+ QB_NAME(v1_2, v2.v1@SEL_2 .@SEL_2) hash_join(t1@v1_2) hash_agg(@v1_2) */ * FROM v2;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE t1(a INT, b INT, KEY(a));
+----------
+[PERFORMANCE] -- Does not use SEMI_JOIN_REWRITE() to rewrite the query.
+EXPLAIN SELECT * FROM t WHERE EXISTS (SELECT 1 FROM t1 WHERE t1.a = t.a);
+----------
+[SELECT] -- Multiple `LEADING` hints are specified.
+SELECT /*+ LEADING(t1, t2) LEADING(t3) */ * FROM t1, t2, t3 WHERE t1.id = t2.id and t2.id = t3.id;
+----------
+[SELECT|SESSION_VARIABLE_RW] SELECT /*+ SET_VAR(MAX_EXECUTION_TIME=1234) */ @@MAX_EXECUTION_TIME;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE t1 (k varchar(8), key(k)) COLLATE=utf8mb4_general_ci;
+----------
+[SELECT] SELECT * FROM t use index(idx1);
+----------
+[SELECT] -- The IndexLookUp operator will not be pushed down.
+SELECT /*+ NO_INDEX_LOOKUP_PUSHDOWN(t) */ * FROM t WHERE a > 1;
+----------
+[SELECT] select /*+ READ_FROM_STORAGE(TIFLASH[t1], TIKV[t2]) */ t1.a from t t1, t t2 where t1.a = t2.a;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE t(a INT, b INT, key(a), key(b));
+----------
+[SELECT] SELECT /*+ BROADCAST_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+----------
+[SELECT] select /*+ AGG_TO_COP() */ sum(t1.a) from t t1;
+----------
+[SELECT] SELECT /* Comment: The name of the current query block is the default @SEL_1 */ * FROM v2 JOIN (
+        SELECT /* Comment: The name of the current query block is the default @SEL_2 */ * FROM v2) vv;
+----------
+[SELECT] SELECT * /*+ use_index(t, a) */ FROM t;
+----------
+[PERFORMANCE] EXPLAIN SELECT /*+ NO_ORDER_INDEX(t, a) */ a FROM t ORDER BY a LIMIT 10;
+----------
+[SELECT] select /*+ MAX_EXECUTION_TIME(1000) */ * from t1 inner join t2 where t1.id = t2.id;
+----------
+[SELECT] select /*+ HASH_JOIN(t1, t2) */ * from t1, t2 where t1.id = t2.id;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE t2(a INT, KEY(a));
+----------
+[PERFORMANCE] SHOW WARNINGS;
+----------
+[SELECT] SELECT /*+ NO_MERGE_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+----------
+[SELECT] SELECT /*+ USE_INDEX(t, idx1) */ * FROM t;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE t2 (k varchar(8), key(k)) COLLATE=utf8mb4_bin;
+----------
+[SELECT] select /*+ HASH_AGG() */ count(*) from t1, t2 where t1.a > 10 group by t1.id;
+----------
+[SELECT] SELECT /*+ FORCE_INDEX(t, idx1) */ * FROM t;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW v2 AS
+        SELECT * FROM t JOIN /* Comment: For view v2, the name of the current query block is the default @SEL_1. So, the current query block view list is v2@SEL_1 .@SEL_1 */
+        (
+            SELECT COUNT(*) FROM t1 JOIN v1 /* Comment: For view v2, the name of the current query block is the default @SEL_2. So, the current query block view list is v2@SEL_1 .@SEL_2 */
+        ) tt;
+----------
+[PERFORMANCE] -- To learn why the `LEADING` hint fails to take effect, execute `show warnings`.
+SHOW WARNINGS;
+----------
+[PERFORMANCE] EXPLAIN SELECT /*+ INDEX_LOOKUP_PUSHDOWN(t1, a) */ a, b FROM t1;
+----------
+[SELECT] SELECT /* Comment: The name of the current query block is the default @SEL_1 */ * FROM v;
+----------
+[SELECT] SELECT * FROM (SELECT * FROM t) t1, (SELECT * FROM t) t2;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT] CREATE TABLE t2 (id varchar(10) primary key, tname varchar(10));
+----------
+[PERFORMANCE] EXPLAIN SELECT /*+ ORDER_INDEX(t, a) */ a FROM t ORDER BY a LIMIT 10;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE t1(a INT, KEY(a));
+----------
+[SELECT] SELECT /*+ QB_NAME(v2_1, v2) merge_join(t@v2_1) */ * FROM v2;
+----------
+[PERFORMANCE] -- Using NO_DECORRELATE().
+explain select * from t1 where t1.a < (select /*+ NO_DECORRELATE() */ sum(t2.a) from t2 where t2.b = t1.b);
+----------
+[SELECT] -- Specifies the global hint
+    SELECT /*+ QB_NAME(v_1, v) USE_INDEX(t@v_1, idx) */ * FROM v;
+----------
+[PERFORMANCE] EXPLAIN SELECT /*+ INL_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id=t2.id and SUBSTR(t1.tname,1,2)=SUBSTR(t2.tname,1,2);
+----------
+[SELECT] SELECT /*+ MPP_2PHASE_AGG() */ COUNT(*) FROM t1, t2 WHERE t1.a > 10 GROUP BY t1.id;
+----------
+[SELECT] select /*+ STREAM_AGG() */ count(*) from t1, t2 where t1.a > 10 group by t1.id;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT] CREATE TABLE t1 (id varchar(10) primary key, tname varchar(10));
+----------
+[SELECT] -- Uses the hint to push down the predicate of the outer query.
+WITH CTE AS (SELECT /*+ MERGE() */ * FROM tc WHERE tc.a < 60) SELECT * FROM CTE WHERE CTE.a < 18;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW v1 AS SELECT * FROM t JOIN /* Comment: For view `v1`, the name of the current query block is the default @SEL_1. So, the current query block view list is v2@SEL_1 .@SEL_2 .v1@SEL_1 */
+        (
+            SELECT COUNT(*) FROM t1 JOIN t2 /* Comment: For view `v1`, the name of the current query block is the default @SEL_2. So, the current query block view list is v2@SEL_1 .@SEL_2 .v1@SEL_2 */
+        ) tt;
+----------
+[SELECT] SELECT /*+ NO_HASH_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+----------
+[SELECT] SELECT /*+ LIMIT_TO_COP() */ * FROM t WHERE a = 1 AND b > 10 ORDER BY c LIMIT 1;
+----------
+[SELECT] select /*+ IGNORE_INDEX(t1, idx1, idx2) */ * from t t1;
+----------
+[SELECT] select /*+ NO_INDEX_MERGE() */ * from t where t.a > 0 or t.b > 0;
+----------
+[UNSAFE] prepare stmt from 'select  /*+ IGNORE_PLAN_CACHE() */ * from t where t.id = ?';
+----------
+[SELECT] SELECT /*+ MPP_1PHASE_AGG() */ COUNT(*) FROM t1, t2 WHERE t1.a > 10 GROUP BY t1.id;
+----------
+[PERFORMANCE] -- Uses SEMI_JOIN_REWRITE() to rewrite the query.
+EXPLAIN SELECT * FROM t WHERE EXISTS (SELECT /*+ SEMI_JOIN_REWRITE() */ 1 FROM t1 WHERE t1.a = t.a);
+----------
+[SELECT] SELECT /*+ HASH_JOIN(@sel_1 t1@sel_1, t3) */ * FROM (SELECT t1.a, t1.b FROM t t1, t t2 WHERE t1.a = t2.a) t1, t t3 WHERE t1.b = t3.b;
+----------
+[SELECT] select /*+ MERGE_JOIN(t1, t2) */ * from t1, t2 where t1.id = t2.id;
+----------
+[SELECT] SELECT /*+ QB_NAME(v1_2, v2.v1@SEL_2 .@SEL_2) hash_join(t1@v1_2) hash_agg(@v1_2) */ * FROM v2;

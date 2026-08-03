@@ -1,0 +1,680 @@
+CREATE TABLE test_mix_4 (a int PRIMARY KEY, b int, c int, d int GENERATED ALWAYS AS (a + 1) STORED, e int GENERATED ALWAYS AS (a + 2) VIRTUAL)
+;
+CREATE OR REPLACE FUNCTION log10(numeric)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN log(10, $1)
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime() < $x' PASSING '12:34'::timetz AS x))
+;
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_mltrng
+)
+;
+CREATE TABLE temporal_fk_rng2rng (
+  id int4range,
+  valid_at daterange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_rng2rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng
+)
+;
+CREATE OR REPLACE FUNCTION date_part(text, date)
+ RETURNS double precision
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN date_part($1, cast($2 as timestamp))
+;
+CREATE OR REPLACE FUNCTION int8pl_inet(bigint, inet)
+ RETURNS inet
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+ALTER TABLE gtest21ax ADD CONSTRAINT cc NOT NULL b
+;
+CREATE PROCEDURE ptestx()
+LANGUAGE SQL
+BEGIN ATOMIC
+  CREATE TABLE x (a int);
+END
+;
+--
+-- partitioned FK referenced updates CASCADE
+--
+
+ALTER TABLE temporal_partitioned_fk_mltrng2mltrng
+  DROP CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk,
+  ADD CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk
+    FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_partitioned_mltrng
+    ON DELETE CASCADE ON UPDATE CASCADE
+;
+ALTER TABLE heaptable SET ACCESS METHOD DEFAULT
+;
+ALTER TABLE gtest24at ADD COLUMN b gtestdomain1 GENERATED ALWAYS AS (a * 2) VIRTUAL
+;
+-- Changing it back to ENFORCED will recreate the necessary triggers.
+ALTER TABLE fk_partitioned_fk ALTER CONSTRAINT fk_partitioned_fk_a_b_fkey ENFORCED
+;
+-- error: virtual generated column "e" can't be in list
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, e)
+;
+ALTER TABLE "public"."identity_dump_unlogged" ALTER COLUMN "a" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."identity_dump_unlogged_a_seq"
+    LOGGED
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+)
+;
+CREATE TABLE gtest_err_1 (a int PRIMARY KEY, b int GENERATED ALWAYS AS (a * 2) VIRTUAL GENERATED ALWAYS AS (a * 3) VIRTUAL)
+;
+ALTER TABLE notnull_tbl1 ADD CONSTRAINT nntbl1_a NOT NULL a NOT VALID
+;
+-- fail - can't drop schema from 'FOR ALL TABLES' publication
+ALTER PUBLICATION testpub_foralltables DROP TABLES IN SCHEMA pub_test
+;
+CREATE VIEW jsonb_table_view5 AS
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			exists1 bool EXISTS PATH '$.aaa',
+			exists2 int EXISTS PATH '$.aaa' TRUE ON ERROR,
+			exists3 text EXISTS PATH 'strict $.aaa' UNKNOWN ON ERROR))
+;
+-- Create a table that holds all the known in-core data types and leave it
+-- around so as pg_upgrade is able to test their binary compatibility.
+CREATE TABLE tab_core_types AS SELECT
+  '(11,12)'::point,
+  '(1,1),(2,2)'::line,
+  '((11,11),(12,12))'::lseg,
+  '((11,11),(13,13))'::box,
+  '((11,12),(13,13),(14,14))'::path AS openedpath,
+  '[(11,12),(13,13),(14,14)]'::path AS closedpath,
+  '((11,12),(13,13),(14,14))'::polygon,
+  '1,1,1'::circle,
+  'today'::date,
+  'now'::time,
+  'now'::timestamp,
+  'now'::timetz,
+  'now'::timestamptz,
+  '12 seconds'::interval,
+  '{"reason":"because"}'::json,
+  '{"when":"now"}'::jsonb,
+  '$.a[*] ? (@ > 2)'::jsonpath,
+  '127.0.0.1'::inet,
+  '127.0.0.0/8'::cidr,
+  '00:01:03:86:1c:ba'::macaddr8,
+  '00:01:03:86:1c:ba'::macaddr,
+  2::int2, 4::int4, 8::int8,
+  4::float4, '8'::float8, pi()::numeric,
+  'foo'::"char",
+  'c'::bpchar,
+  'abc'::varchar,
+  'name'::name,
+  'txt'::text,
+  true::bool,
+  E'\\xDEADBEEF'::bytea,
+  B'10001'::bit,
+  B'10001'::varbit AS varbit,
+  '12.34'::money,
+  'abc'::refcursor,
+  '1 2'::int2vector,
+  '1 2'::oidvector,
+  format('%I=UC/%I', USER, USER)::aclitem AS aclitem,
+  'a fat cat sat on a mat and ate a fat rat'::tsvector,
+  'fat & rat'::tsquery,
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
+  '11'::xid8,
+  'pg_class'::regclass,
+  'regtype'::regtype type,
+  'pg_monitor'::regrole,
+  'pg_class'::regclass::oid,
+  '(1,1)'::tid, '2'::xid, '3'::cid,
+  '10:20:10,14,15'::txid_snapshot,
+  '10:20:10,14,15'::pg_snapshot,
+  '16/B374D848'::pg_lsn,
+  1::information_schema.cardinal_number,
+  'l'::information_schema.character_data,
+  'n'::information_schema.sql_identifier,
+  'now'::information_schema.time_stamp,
+  'YES'::information_schema.yes_or_no,
+  'venus'::planets,
+  'i16'::insenum,
+  '(1,2)'::int4range, '{(1,2)}'::int4multirange,
+  '(3,4)'::int8range, '{(3,4)}'::int8multirange,
+  '(1,2)'::float8range, '{(1,2)}'::float8multirange,
+  '(3,4)'::numrange, '{(3,4)}'::nummultirange,
+  '(a,b)'::textrange, '{(a,b)}'::textmultirange,
+  '(12.34, 56.78)'::cashrange, '{(12.34, 56.78)}'::cashmultirange,
+  '(2020-01-02, 2021-02-03)'::daterange,
+  '{(2020-01-02, 2021-02-03)}'::datemultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tsrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tsmultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tstzrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tstzmultirange,
+  arrayrange(ARRAY[1,2], ARRAY[2,1]),
+  arraymultirange(arrayrange(ARRAY[1,2], ARRAY[2,1]))
+;
+-- (parent_id, valid_at) REFERENCES [implicit]
+-- FOREIGN KEY part should specify PERIOD
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, valid_at)
+    REFERENCES temporal_mltrng
+)
+;
+-- (parent_id, valid_at) REFERENCES (id, valid_at)
+-- both should specify PERIOD:
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, valid_at)
+    REFERENCES temporal_mltrng (id, valid_at)
+)
+;
+CREATE TABLE temporal_rng3 (
+  valid_at daterange,
+  CONSTRAINT temporal_rng3_uq UNIQUE (valid_at WITHOUT OVERLAPS)
+)
+;
+CREATE TABLE testpub_rf_tbl6 (id int PRIMARY KEY, x int, y int GENERATED ALWAYS AS (x * testpub_rf_func2()) VIRTUAL)
+;
+drop database test_database_exists with (force)
+;
+ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION pglz
+;
+ALTER TABLE unique_tbl ALTER CONSTRAINT unique_tbl_i_key ENFORCED
+;
+-- Can't create a FK with a mismatched range type
+CREATE TABLE temporal_fk_rng2rng (
+  id int4range,
+  valid_at int4range,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_rng2rng_pk2 PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk2 FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng (id, PERIOD valid_at)
+)
+;
+ALTER TABLE public.temporal_fk_rng2rng ADD CONSTRAINT temporal_fk_rng2rng_valid_at_not_null NOT NULL valid_at
+;
+-- Test siglen parameter of GiST tsvector_ops
+CREATE INDEX wowidx1 ON test_tsvector USING gist (a tsvector_ops(foo=1))
+;
+alter table p1 add constraint inh_check_constraint4 check (f1 < 10) not enforced
+;
+CREATE VIEW xmlview10 AS SELECT xmlserialize(document '<foo><bar>42</bar></foo>' AS text indent)
+;
+ALTER PUBLICATION "dump_pub_qual_2ct" ADD TABLE ONLY "pubme"."t0" ("c") WHERE (("c" > 0))
+;
+-- enforceability cannot be specified or set for unique constraint
+CREATE TABLE UNIQUE_EN_TBL(i int UNIQUE ENFORCED)
+;
+CREATE VIEW limit_thousand_v_1 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST 5 ROWS WITH TIES OFFSET 10
+;
+create table p1(f1 int constraint p1_a_check check (f1 > 0) enforced)
+;
+-- Schema publication that does not include the schema that has the parent table
+CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch2 WITH (PUBLISH_VIA_PARTITION_ROOT=0)
+;
+CREATE TABLE "generated_virtual_tests"."gtesty" (
+    "x" integer,
+    "b" integer GENERATED ALWAYS AS (("x" * 22))
+)
+;
+CREATE FUNCTION merge_sf_test2()
+ RETURNS void
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN NOT MATCHED
+   THEN INSERT (data, id)
+   VALUES (s.a, s.a)
+WHEN MATCHED
+   THEN UPDATE SET data = s.b
+WHEN NOT MATCHED BY SOURCE
+   THEN DELETE;
+END
+;
+ALTER TABLE "public"."notnull_parent_upg"
+    ADD CONSTRAINT "nn" NOT NULL "a" NOT VALID
+;
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl7 (a, b)
+;
+CREATE OR REPLACE FUNCTION regexp_split_to_table(string citext, pattern citext, flags text) RETURNS SETOF TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_split_to_table( $1::text, $2::text, CASE WHEN pg_catalog.strpos($3, 'c') = 0 THEN  $3 || 'i' ELSE $3 END )
+;
+CREATE TABLE gtest11 (a int PRIMARY KEY, b int, c int GENERATED ALWAYS AS (b * 2) VIRTUAL)
+;
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_mltrng (id, valid_at)
+)
+;
+CREATE OR REPLACE FUNCTION obj_description(oid, name)
+ RETURNS text
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT
+BEGIN ATOMIC
+select description from pg_description
+  where objoid = $1 and
+    classoid = (select oid from pg_class where relname = $2 and
+                relnamespace = 'pg_catalog'::regnamespace) and
+    objsubid = 0;
+END
+;
+CREATE TABLE gtest_child (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS (f2 * 2) VIRTUAL)
+;
+ALTER TRIGGER accounts_check_update_renamed ON split_trigger_probe.accounts NO DEPENDS ON EXTENSION plpgsql
+;
+CREATE TABLE "generated_virtual_tests"."gtest24ata" (
+    "a" integer NOT NULL,
+    "b" integer GENERATED ALWAYS AS (("a" * 2))
+)
+;
+alter table inh_nn1 alter constraint inh_nn1_f1_fkey inherit
+;
+CREATE FUNCTION _pg_numeric_scale(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (21, 23, 20) THEN 0
+       WHEN $1 IN (1700) THEN
+            CASE WHEN $2 = -1
+                 THEN null
+                 ELSE ($2 - 4) & 0xFFFF
+                 END
+       ELSE null
+  END
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] CREATE TABLE test_mix_4 (a int PRIMARY KEY, b int, c int, d int GENERATED ALWAYS AS (a + 1) STORED, e int GENERATED ALWAYS AS (a + 2) VIRTUAL)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION log10(numeric)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN log(10, $1)
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime() < $x' PASSING '12:34'::timetz AS x))
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_mltrng
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_fk_rng2rng (
+  id int4range,
+  valid_at daterange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_rng2rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION date_part(text, date)
+ RETURNS double precision
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN date_part($1, cast($2 as timestamp))
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION int8pl_inet(bigint, inet)
+ RETURNS inet
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE gtest21ax ADD CONSTRAINT cc NOT NULL b
+;
+----------
+[CREATE_PROG_OBJ] CREATE PROCEDURE ptestx()
+LANGUAGE SQL
+BEGIN ATOMIC
+  CREATE TABLE x (a int);
+END
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT|ADD_CONSTRAINT] --
+-- partitioned FK referenced updates CASCADE
+--
+
+ALTER TABLE temporal_partitioned_fk_mltrng2mltrng
+  DROP CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk,
+  ADD CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk
+    FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_partitioned_mltrng
+    ON DELETE CASCADE ON UPDATE CASCADE
+;
+----------
+[ALTER_TABLE] ALTER TABLE heaptable SET ACCESS METHOD DEFAULT
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE gtest24at ADD COLUMN b gtestdomain1 GENERATED ALWAYS AS (a * 2) VIRTUAL
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] -- Changing it back to ENFORCED will recreate the necessary triggers.
+ALTER TABLE fk_partitioned_fk ALTER CONSTRAINT fk_partitioned_fk_a_b_fkey ENFORCED
+;
+----------
+[ALTER_PUB_SUB] -- error: virtual generated column "e" can't be in list
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, e)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE "public"."identity_dump_unlogged" ALTER COLUMN "a" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."identity_dump_unlogged_a_seq"
+    LOGGED
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_err_1 (a int PRIMARY KEY, b int GENERATED ALWAYS AS (a * 2) VIRTUAL GENERATED ALWAYS AS (a * 3) VIRTUAL)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE notnull_tbl1 ADD CONSTRAINT nntbl1_a NOT NULL a NOT VALID
+;
+----------
+[ALTER_PUB_SUB] -- fail - can't drop schema from 'FOR ALL TABLES' publication
+ALTER PUBLICATION testpub_foralltables DROP TABLES IN SCHEMA pub_test
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW jsonb_table_view5 AS
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			exists1 bool EXISTS PATH '$.aaa',
+			exists2 int EXISTS PATH '$.aaa' TRUE ON ERROR,
+			exists3 text EXISTS PATH 'strict $.aaa' UNKNOWN ON ERROR))
+;
+----------
+[CREATE_TABLE|SELECT] -- Create a table that holds all the known in-core data types and leave it
+-- around so as pg_upgrade is able to test their binary compatibility.
+CREATE TABLE tab_core_types AS SELECT
+  '(11,12)'::point,
+  '(1,1),(2,2)'::line,
+  '((11,11),(12,12))'::lseg,
+  '((11,11),(13,13))'::box,
+  '((11,12),(13,13),(14,14))'::path AS openedpath,
+  '[(11,12),(13,13),(14,14)]'::path AS closedpath,
+  '((11,12),(13,13),(14,14))'::polygon,
+  '1,1,1'::circle,
+  'today'::date,
+  'now'::time,
+  'now'::timestamp,
+  'now'::timetz,
+  'now'::timestamptz,
+  '12 seconds'::interval,
+  '{"reason":"because"}'::json,
+  '{"when":"now"}'::jsonb,
+  '$.a[*] ? (@ > 2)'::jsonpath,
+  '127.0.0.1'::inet,
+  '127.0.0.0/8'::cidr,
+  '00:01:03:86:1c:ba'::macaddr8,
+  '00:01:03:86:1c:ba'::macaddr,
+  2::int2, 4::int4, 8::int8,
+  4::float4, '8'::float8, pi()::numeric,
+  'foo'::"char",
+  'c'::bpchar,
+  'abc'::varchar,
+  'name'::name,
+  'txt'::text,
+  true::bool,
+  E'\\xDEADBEEF'::bytea,
+  B'10001'::bit,
+  B'10001'::varbit AS varbit,
+  '12.34'::money,
+  'abc'::refcursor,
+  '1 2'::int2vector,
+  '1 2'::oidvector,
+  format('%I=UC/%I', USER, USER)::aclitem AS aclitem,
+  'a fat cat sat on a mat and ate a fat rat'::tsvector,
+  'fat & rat'::tsquery,
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
+  '11'::xid8,
+  'pg_class'::regclass,
+  'regtype'::regtype type,
+  'pg_monitor'::regrole,
+  'pg_class'::regclass::oid,
+  '(1,1)'::tid, '2'::xid, '3'::cid,
+  '10:20:10,14,15'::txid_snapshot,
+  '10:20:10,14,15'::pg_snapshot,
+  '16/B374D848'::pg_lsn,
+  1::information_schema.cardinal_number,
+  'l'::information_schema.character_data,
+  'n'::information_schema.sql_identifier,
+  'now'::information_schema.time_stamp,
+  'YES'::information_schema.yes_or_no,
+  'venus'::planets,
+  'i16'::insenum,
+  '(1,2)'::int4range, '{(1,2)}'::int4multirange,
+  '(3,4)'::int8range, '{(3,4)}'::int8multirange,
+  '(1,2)'::float8range, '{(1,2)}'::float8multirange,
+  '(3,4)'::numrange, '{(3,4)}'::nummultirange,
+  '(a,b)'::textrange, '{(a,b)}'::textmultirange,
+  '(12.34, 56.78)'::cashrange, '{(12.34, 56.78)}'::cashmultirange,
+  '(2020-01-02, 2021-02-03)'::daterange,
+  '{(2020-01-02, 2021-02-03)}'::datemultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tsrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tsmultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tstzrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tstzmultirange,
+  arrayrange(ARRAY[1,2], ARRAY[2,1]),
+  arraymultirange(arrayrange(ARRAY[1,2], ARRAY[2,1]))
+;
+----------
+[CREATE_TABLE] -- (parent_id, valid_at) REFERENCES [implicit]
+-- FOREIGN KEY part should specify PERIOD
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, valid_at)
+    REFERENCES temporal_mltrng
+)
+;
+----------
+[CREATE_TABLE] -- (parent_id, valid_at) REFERENCES (id, valid_at)
+-- both should specify PERIOD:
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, valid_at)
+    REFERENCES temporal_mltrng (id, valid_at)
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_rng3 (
+  valid_at daterange,
+  CONSTRAINT temporal_rng3_uq UNIQUE (valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE testpub_rf_tbl6 (id int PRIMARY KEY, x int, y int GENERATED ALWAYS AS (x * testpub_rf_func2()) VIRTUAL)
+;
+----------
+[DROP_CATALOG] drop database test_database_exists with (force)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION pglz
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] ALTER TABLE unique_tbl ALTER CONSTRAINT unique_tbl_i_key ENFORCED
+;
+----------
+[CREATE_TABLE] -- Can't create a FK with a mismatched range type
+CREATE TABLE temporal_fk_rng2rng (
+  id int4range,
+  valid_at int4range,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_rng2rng_pk2 PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk2 FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng (id, PERIOD valid_at)
+)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE public.temporal_fk_rng2rng ADD CONSTRAINT temporal_fk_rng2rng_valid_at_not_null NOT NULL valid_at
+;
+----------
+[ADD_INDEX] -- Test siglen parameter of GiST tsvector_ops
+CREATE INDEX wowidx1 ON test_tsvector USING gist (a tsvector_ops(foo=1))
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table p1 add constraint inh_check_constraint4 check (f1 < 10) not enforced
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW xmlview10 AS SELECT xmlserialize(document '<foo><bar>42</bar></foo>' AS text indent)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_qual_2ct" ADD TABLE ONLY "pubme"."t0" ("c") WHERE (("c" > 0))
+;
+----------
+[CREATE_TABLE] -- enforceability cannot be specified or set for unique constraint
+CREATE TABLE UNIQUE_EN_TBL(i int UNIQUE ENFORCED)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW limit_thousand_v_1 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST 5 ROWS WITH TIES OFFSET 10
+;
+----------
+[CREATE_TABLE] create table p1(f1 int constraint p1_a_check check (f1 > 0) enforced)
+;
+----------
+[CREATE_PUB_SUB] -- Schema publication that does not include the schema that has the parent table
+CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch2 WITH (PUBLISH_VIA_PARTITION_ROOT=0)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "generated_virtual_tests"."gtesty" (
+    "x" integer,
+    "b" integer GENERATED ALWAYS AS (("x" * 22))
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION merge_sf_test2()
+ RETURNS void
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN NOT MATCHED
+   THEN INSERT (data, id)
+   VALUES (s.a, s.a)
+WHEN MATCHED
+   THEN UPDATE SET data = s.b
+WHEN NOT MATCHED BY SOURCE
+   THEN DELETE;
+END
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE "public"."notnull_parent_upg"
+    ADD CONSTRAINT "nn" NOT NULL "a" NOT VALID
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl7 (a, b)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_split_to_table(string citext, pattern citext, flags text) RETURNS SETOF TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_split_to_table( $1::text, $2::text, CASE WHEN pg_catalog.strpos($3, 'c') = 0 THEN  $3 || 'i' ELSE $3 END )
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest11 (a int PRIMARY KEY, b int, c int GENERATED ALWAYS AS (b * 2) VIRTUAL)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_mltrng (id, valid_at)
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION obj_description(oid, name)
+ RETURNS text
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT
+BEGIN ATOMIC
+select description from pg_description
+  where objoid = $1 and
+    classoid = (select oid from pg_class where relname = $2 and
+                relnamespace = 'pg_catalog'::regnamespace) and
+    objsubid = 0;
+END
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_child (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS (f2 * 2) VIRTUAL)
+;
+----------
+[ALTER_TRIGGER] ALTER TRIGGER accounts_check_update_renamed ON split_trigger_probe.accounts NO DEPENDS ON EXTENSION plpgsql
+;
+----------
+[CREATE_TABLE] CREATE TABLE "generated_virtual_tests"."gtest24ata" (
+    "a" integer NOT NULL,
+    "b" integer GENERATED ALWAYS AS (("a" * 2))
+)
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] alter table inh_nn1 alter constraint inh_nn1_f1_fkey inherit
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_numeric_scale(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (21, 23, 20) THEN 0
+       WHEN $1 IN (1700) THEN
+            CASE WHEN $2 = -1
+                 THEN null
+                 ELSE ($2 - 4) & 0xFFFF
+                 END
+       ELSE null
+  END
+;

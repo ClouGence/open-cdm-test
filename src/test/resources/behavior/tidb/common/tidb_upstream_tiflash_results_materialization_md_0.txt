@@ -1,0 +1,197 @@
+[insert__common_tidb_upstream_tiflash_results_materialization_md_0_000]
+sql:
+INSERT INTO t2 (name, country)
+SELECT app_name, country FROM t1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t2/",
+      "action" : "INSERT",
+      "target" : "Table(2:30~2:32) /test/1/catalog1/schema1/t1/"
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_tiflash_results_materialization_md_0_001]
+sql:
+INSERT INTO daily_data (rec_date, customer_id, daily_fee)
+SELECT DATE(ts), customer_id, sum(detail_fee) FROM detail_data WHERE DATE(ts) > DATE('2023-1-1 12:2:3') GROUP BY DATE(ts), customer_id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:22) /test/1/catalog1/schema1/daily_data/",
+      "action" : "INSERT",
+      "target" : "Table(2:51~2:62) /test/1/catalog1/schema1/detail_data/"
+    },
+    {
+      "subject": "Function(2:7~2:11) /test/1/catalog1/schema1/DATE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:30~2:33) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_tiflash_results_materialization_md_0_002]
+sql:
+CREATE TABLE detail_data (
+    ts DATETIME,                -- Fee generation time
+    customer_id VARCHAR(20),    -- Customer ID
+    detail_fee DECIMAL(20,2));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:24) /test/1/catalog1/schema1/detail_data/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[alter_table__common_tidb_upstream_tiflash_results_materialization_md_0_003]
+sql:
+-- Amount of fee for per day
+ALTER TABLE detail_data SET TIFLASH REPLICA 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/detail_data/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_tiflash_results_materialization_md_0_004]
+sql:
+-- Amount of fee
+CREATE TABLE daily_data (
+    rec_date DATE,              -- Date when data is collected
+    customer_id VARCHAR(20),    -- Customer ID
+    daily_fee DECIMAL(20,2));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:23) /test/1/catalog1/schema1/daily_data/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_tiflash_results_materialization_md_0_005]
+sql:
+-- ... (detail_data table continues updating)
+INSERT INTO detail_data(ts,customer_id,detail_fee) VALUES
+('2023-1-1 12:2:3', 'cus001', 200.86),
+('2023-1-2 12:2:3', 'cus002', 100.86),
+('2023-1-3 12:2:3', 'cus002', 2200.86),
+('2023-1-4 12:2:3', 'cus003', 2020.86),
+('2023-1-5 12:2:3', 'cus003', 1200.86),
+('2023-1-6 12:2:3', 'cus002', 20.86),
+('2023-1-7 12:2:3', 'cus004', 120.56),
+('2023-1-8 12:2:3', 'cus005', 320.16);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/detail_data/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[alter_table__common_tidb_upstream_tiflash_results_materialization_md_0_006]
+sql:
+ALTER TABLE daily_data SET TIFLASH REPLICA 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:22) /test/1/catalog1/schema1/daily_data/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[session_variable_rw__common_tidb_upstream_tiflash_results_materialization_md_0_007]
+sql:
+SET @@sql_mode='NO_ZERO_IN_DATE,NO_ZERO_DATE,ERROR_FOR_DIVISION_BY_ZERO';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:4~1:14) /test/1/sql_mode/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_tiflash_results_materialization_md_0_008]
+sql:
+-- Execute the following SQL statement 13 times to insert a cumulative total of 65,536 rows into the table.
+INSERT INTO detail_data SELECT * FROM detail_data;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/detail_data/",
+      "action" : "INSERT",
+      "target" : "Table(2:38~2:49) /test/1/catalog1/schema1/detail_data/"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_tiflash_results_materialization_md_0_009]
+sql:
+SELECT MONTH(rec_date), customer_id, sum(daily_fee) FROM daily_data GROUP BY MONTH(rec_date), customer_id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/MONTH/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:37~1:40) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:57~1:67) /test/1/catalog1/schema1/daily_data/",
+      "action" : "READ"
+    }
+  ]
+}

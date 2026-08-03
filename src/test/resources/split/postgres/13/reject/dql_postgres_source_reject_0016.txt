@@ -1,0 +1,265 @@
+SELECT JSON_VALUE(jsonb '1',  '$.a' RETURNING sqljsonb_int_not_null DEFAULT NULL ON EMPTY ERROR ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1234', '$' RETURNING bit(3)  DEFAULT 1::bit(3) ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '"aaa"', '$' RETURNING jsonb)
+;
+SELECT * FROM JSON_TABLE(jsonb '{"d1": "H"}', '$'
+    COLUMNS (js1 jsonb_test_domain PATH '$.a2' DEFAULT '"foo1"'::jsonb::text ON EMPTY))
+;
+SELECT * FROM JSON_TABLE(
+  '{"favorites":{"movies":[{"name":"One","director":"John Doe"}],"books":[{"name":"Mystery","authors":[{"name":"Brown Dan"},{"name":"Ada Blue"}]}]}}'::json,
+  '$.favorites'
+  COLUMNS (
+    user_id FOR ORDINALITY,
+    NESTED '$.movies[*]' COLUMNS (
+      movie_id FOR ORDINALITY,
+      mname text PATH '$.name',
+      director text
+    ),
+    NESTED '$.books[*]' COLUMNS (
+      book_id FOR ORDINALITY,
+      bname text PATH '$.name',
+      NESTED '$.authors[*]' COLUMNS (
+        author_id FOR ORDINALITY,
+        author_name text PATH '$.name'
+      )
+    )
+  )
+) AS jt
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING char(3) ERROR ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '"aaa"', '$' RETURNING char(2))
+;
+SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING jsonb)
+;
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' OMIT QUOTES ON SCALAR STRING))
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int PATH '$'   DEFAULT 1 ON EMPTY DEFAULT 2 ON ERROR)) jt
+;
+SELECT * FROM unnest(JSON_QUERY(jsonb '[{"a": 1, "t": ["foo", []]}, {"a": 2, "jb": [{}, true]}]', '$' RETURNING sqljsonb_rec[]))
+;
+SELECT JSON_QUERY(jsonb '["1"]', '$[*]' WITH CONDITIONAL WRAPPER KEEP QUOTES)
+;
+SELECT JSON_EXISTS(jsonb '{"a":[1,2,3]}', 'strict $.a[5]' UNKNOWN ON ERROR) AS unknown_on_error
+;
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING real error on error)
+;
+-- Error: OMIT QUOTES should not be specified when WITH WRAPPER is present
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' WITH WRAPPER OMIT QUOTES))
+;
+SELECT * FROM JSON_TABLE(jsonb'"1.23"', 'strict $.a' COLUMNS (js2 int PATH '$'))
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON EMPTY EMPTY ARRAY ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$[*]' RETURNING bytea EMPTY OBJECT ON ERROR)
+;
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text FORMAT JSON PATH '$' OMIT QUOTES))
+;
+-- PASSING arguments are passed to nested paths and their columns' paths
+SELECT *
+FROM
+	generate_series(1, 3) x,
+	generate_series(1, 3) y,
+	JSON_TABLE(jsonb
+		'[[1,2,3],[2,3,4,5],[3,4,5,6]]',
+		'strict $[*] ? (@[*] <= $x)'
+		PASSING x AS x, y AS y
+		COLUMNS (
+			y text FORMAT JSON PATH '$',
+			NESTED PATH 'strict $[*] ? (@ == $y)'
+			COLUMNS (
+				z int PATH '$'
+			)
+		)
+	) jt
+;
+SELECT JSON_QUERY(jsonb'{"rec": "(abc,42,01.02.2003)"}', '$.rec' returning comp_abc keep quotes error on error)
+;
+----- test on empty behavior
+SELECT sub.* FROM s,
+	(values(23)) x(x),
+	generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y
+	COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[2]' COLUMNS (NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$')),
+		NESTED PATH '$.a.za[1]' COLUMNS (d json PATH '$ ? (@.z21[*] == ($"x" -1))'),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' as z1 COLUMNS (a int PATH '$')),
+		NESTED PATH '$.a.za[1]' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" +121))' as z21 COLUMNS (b int PATH '$ ? (@ > ($"x" +111))' DEFAULT 0 ON EMPTY))
+	)) sub
+;
+SELECT *
+FROM JSON_TABLE(
+	jsonb '[1,2,3]',
+	'$[*] ? (@ < $x)'
+		PASSING 3 AS x
+		COLUMNS (y text FORMAT JSON PATH '$')
+	) jt
+;
+SELECT JSON_VALUE(jsonb '"\"aaa\""', '$' RETURNING json)
+;
+SELECT JSON_QUERY(jsonb '[1]', '$' WITH CONDITIONAL WRAPPER OMIT QUOTES)
+;
+SELECT JSON_QUERY(jsonb '{"a": 123}', '$' || '.' || 'a' WITH WRAPPER)
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$[*]' DEFAULT '"empty"' ON ERROR)
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int PATH 'strict $.a' DEFAULT 1 ON EMPTY DEFAULT 2 ON ERROR)) jt
+;
+EXPLAIN (verbose, costs off)
+INSERT INTO foo VALUES (4, 'conflict'), (5, 'ok')
+  ON CONFLICT (f1) DO UPDATE SET f2 = excluded.f2||'ed', f3 = -1
+  RETURNING WITH (OLD AS o, NEW AS n)
+            o.tableoid::regclass, o.ctid, o.*,
+            n.tableoid::regclass, n.ctid, n.*, *
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT JSON_VALUE(jsonb '1',  '$.a' RETURNING sqljsonb_int_not_null DEFAULT NULL ON EMPTY ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1234', '$' RETURNING bit(3)  DEFAULT 1::bit(3) ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"aaa"', '$' RETURNING jsonb)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '{"d1": "H"}', '$'
+    COLUMNS (js1 jsonb_test_domain PATH '$.a2' DEFAULT '"foo1"'::jsonb::text ON EMPTY))
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+  '{"favorites":{"movies":[{"name":"One","director":"John Doe"}],"books":[{"name":"Mystery","authors":[{"name":"Brown Dan"},{"name":"Ada Blue"}]}]}}'::json,
+  '$.favorites'
+  COLUMNS (
+    user_id FOR ORDINALITY,
+    NESTED '$.movies[*]' COLUMNS (
+      movie_id FOR ORDINALITY,
+      mname text PATH '$.name',
+      director text
+    ),
+    NESTED '$.books[*]' COLUMNS (
+      book_id FOR ORDINALITY,
+      bname text PATH '$.name',
+      NESTED '$.authors[*]' COLUMNS (
+        author_id FOR ORDINALITY,
+        author_name text PATH '$.name'
+      )
+    )
+  )
+) AS jt
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING char(3) ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"aaa"', '$' RETURNING char(2))
+;
+----------
+[SELECT] SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING jsonb)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' OMIT QUOTES ON SCALAR STRING))
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int PATH '$'   DEFAULT 1 ON EMPTY DEFAULT 2 ON ERROR)) jt
+;
+----------
+[SELECT] SELECT * FROM unnest(JSON_QUERY(jsonb '[{"a": 1, "t": ["foo", []]}, {"a": 2, "jb": [{}, true]}]', '$' RETURNING sqljsonb_rec[]))
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '["1"]', '$[*]' WITH CONDITIONAL WRAPPER KEEP QUOTES)
+;
+----------
+[SELECT] SELECT JSON_EXISTS(jsonb '{"a":[1,2,3]}', 'strict $.a[5]' UNKNOWN ON ERROR) AS unknown_on_error
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING real error on error)
+;
+----------
+[SELECT] -- Error: OMIT QUOTES should not be specified when WITH WRAPPER is present
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' WITH WRAPPER OMIT QUOTES))
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb'"1.23"', 'strict $.a' COLUMNS (js2 int PATH '$'))
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON EMPTY EMPTY ARRAY ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$[*]' RETURNING bytea EMPTY OBJECT ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text FORMAT JSON PATH '$' OMIT QUOTES))
+;
+----------
+[SELECT] -- PASSING arguments are passed to nested paths and their columns' paths
+SELECT *
+FROM
+	generate_series(1, 3) x,
+	generate_series(1, 3) y,
+	JSON_TABLE(jsonb
+		'[[1,2,3],[2,3,4,5],[3,4,5,6]]',
+		'strict $[*] ? (@[*] <= $x)'
+		PASSING x AS x, y AS y
+		COLUMNS (
+			y text FORMAT JSON PATH '$',
+			NESTED PATH 'strict $[*] ? (@ == $y)'
+			COLUMNS (
+				z int PATH '$'
+			)
+		)
+	) jt
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb'{"rec": "(abc,42,01.02.2003)"}', '$.rec' returning comp_abc keep quotes error on error)
+;
+----------
+[SELECT] ----- test on empty behavior
+SELECT sub.* FROM s,
+	(values(23)) x(x),
+	generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y
+	COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[2]' COLUMNS (NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$')),
+		NESTED PATH '$.a.za[1]' COLUMNS (d json PATH '$ ? (@.z21[*] == ($"x" -1))'),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' as z1 COLUMNS (a int PATH '$')),
+		NESTED PATH '$.a.za[1]' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" +121))' as z21 COLUMNS (b int PATH '$ ? (@ > ($"x" +111))' DEFAULT 0 ON EMPTY))
+	)) sub
+;
+----------
+[SELECT] SELECT *
+FROM JSON_TABLE(
+	jsonb '[1,2,3]',
+	'$[*] ? (@ < $x)'
+		PASSING 3 AS x
+		COLUMNS (y text FORMAT JSON PATH '$')
+	) jt
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"\"aaa\""', '$' RETURNING json)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1]', '$' WITH CONDITIONAL WRAPPER OMIT QUOTES)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '{"a": 123}', '$' || '.' || 'a' WITH WRAPPER)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$[*]' DEFAULT '"empty"' ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int PATH 'strict $.a' DEFAULT 1 ON EMPTY DEFAULT 2 ON ERROR)) jt
+;
+----------
+[PERFORMANCE] EXPLAIN (verbose, costs off)
+INSERT INTO foo VALUES (4, 'conflict'), (5, 'ok')
+  ON CONFLICT (f1) DO UPDATE SET f2 = excluded.f2||'ed', f3 = -1
+  RETURNING WITH (OLD AS o, NEW AS n)
+            o.tableoid::regclass, o.ctid, o.*,
+            n.tableoid::regclass, n.ctid, n.*, *
+;

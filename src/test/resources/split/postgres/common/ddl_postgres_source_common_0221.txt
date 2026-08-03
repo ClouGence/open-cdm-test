@@ -1,0 +1,770 @@
+CREATE FUNCTION isngt(isbn13, ean13)
+	RETURNS boolean
+	AS 'int8gt'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+ALTER OPERATOR FAMILY alt_opf4 USING btree DROP
+  -- int4 vs int2
+  OPERATOR 1 (int4, int2) ,
+  OPERATOR 2 (int4, int2) ,
+  OPERATOR 3 (int4, int2) ,
+  OPERATOR 4 (int4, int2) ,
+  OPERATOR 5 (int4, int2) ,
+  FUNCTION 1 (int4, int2)
+;
+drop table join_pt1
+;
+ANALYZE public.renamecolumn
+;
+CREATE TABLE gtest10 (a int PRIMARY KEY, b int, c int GENERATED ALWAYS AS (b * 2) STORED)
+;
+CREATE TABLE ctl_stats4_parent (a int, b int, c int, d int)
+;
+CREATE TABLE test10b (a int[], b priv_testtype1[])
+;
+CREATE INDEX collate_dep_test4i ON collate_dep_test4t (b COLLATE test0)
+;
+CREATE OPERATOR schema_op1.#*# (
+   rightarg = int8,
+   procedure = factorial
+)
+;
+CREATE INDEX "idxpart2_a_idx" ON ONLY "public"."idxpart2" USING "btree" ("a")
+;
+analyze bug_16784
+;
+-- This test isn't that interesting on its own, but the purpose is to leave
+-- behind a table to test pg_upgrade with. The table has a composite type
+-- column in it, and the composite type has a dropped attribute.
+CREATE TYPE test_type3 AS (a int)
+;
+-- OK
+
+CREATE TEXT SEARCH TEMPLATE alt_ts_temp2 (lexize=dsimple_lexize)
+;
+CREATE RULE "_RETURN" AS
+  ON SELECT
+  TO like_datatype_table
+  DO INSTEAD
+    SELECT * FROM datatype_view
+;
+CREATE PROCEDURE ptest9(OUT a int)
+LANGUAGE SQL
+AS $$
+INSERT INTO cp_test VALUES (1, 'a');
+SELECT 1;
+$$
+;
+create table rp_prefix_test2_p2 partition of rp_prefix_test2 for values from (2, 2, 0) to (2, 2, 10)
+;
+DROP TABLE pg_temp_11.pg_temp_41207_2, pg_temp_11.pg_temp_41207
+;
+CREATE EXTENSION hstore_plperl CASCADE
+;
+DROP FUNCTION priv_testfunc6b(b int)
+;
+ALTER TABLE ONLY "public"."beta" ATTACH PARTITION "public"."beta_pos" FOR VALUES FROM ('0') TO ('Infinity')
+;
+ALTER TYPE "public"."rainbow" ADD VALUE 'purple'
+;
+CREATE FUNCTION test_copy_to_callback(pg_catalog.regclass)
+	RETURNS pg_catalog.void
+	AS '$libdir/test_copy_callbacks' LANGUAGE C
+;
+CREATE TABLE tab1_def PARTITION OF tab1 DEFAULT
+;
+CREATE VIEW domain_udt_usage AS
+    SELECT CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nbt.nspname AS sql_identifier) AS udt_schema,
+           CAST(bt.typname AS sql_identifier) AS udt_name,
+           CAST(current_database() AS sql_identifier) AS domain_catalog,
+           CAST(nt.nspname AS sql_identifier) AS domain_schema,
+           CAST(t.typname AS sql_identifier) AS domain_name
+
+    FROM pg_type t, pg_namespace nt,
+         pg_type bt, pg_namespace nbt
+
+    WHERE t.typnamespace = nt.oid
+          AND t.typbasetype = bt.oid
+          AND bt.typnamespace = nbt.oid
+          AND t.typtype = 'd'
+          AND pg_has_role(bt.typowner, 'USAGE')
+;
+CREATE VIEW usage_privileges AS
+
+    /* collations */
+    -- Collations have no real privileges, so we represent all collations with implicit usage privilege here.
+    SELECT CAST(u.rolname AS sql_identifier) AS grantor,
+           CAST('PUBLIC' AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST(n.nspname AS sql_identifier) AS object_schema,
+           CAST(c.collname AS sql_identifier) AS object_name,
+           CAST('COLLATION' AS character_data) AS object_type,
+           CAST('USAGE' AS character_data) AS privilege_type,
+           CAST('NO' AS yes_or_no) AS is_grantable
+
+    FROM pg_authid u,
+         pg_namespace n,
+         pg_collation c
+
+    WHERE u.oid = c.collowner
+          AND c.collnamespace = n.oid
+          AND collencoding IN (-1, (SELECT encoding FROM pg_database WHERE datname = current_database()))
+
+    UNION ALL
+
+    /* domains */
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST(n.nspname AS sql_identifier) AS object_schema,
+           CAST(t.typname AS sql_identifier) AS object_name,
+           CAST('DOMAIN' AS character_data) AS object_type,
+           CAST('USAGE' AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(grantee.oid, t.typowner, 'USAGE')
+                  OR t.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+
+    FROM (
+            SELECT oid, typname, typnamespace, typtype, typowner, (aclexplode(coalesce(typacl, acldefault('T', typowner)))).* FROM pg_type
+         ) AS t (oid, typname, typnamespace, typtype, typowner, grantor, grantee, prtype, grantable),
+         pg_namespace n,
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE t.typnamespace = n.oid
+          AND t.typtype = 'd'
+          AND t.grantee = grantee.oid
+          AND t.grantor = u_grantor.oid
+          AND t.prtype IN ('USAGE')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+
+    UNION ALL
+
+    /* foreign-data wrappers */
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST('' AS sql_identifier) AS object_schema,
+           CAST(fdw.fdwname AS sql_identifier) AS object_name,
+           CAST('FOREIGN DATA WRAPPER' AS character_data) AS object_type,
+           CAST('USAGE' AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(grantee.oid, fdw.fdwowner, 'USAGE')
+                  OR fdw.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+
+    FROM (
+            SELECT fdwname, fdwowner, (aclexplode(coalesce(fdwacl, acldefault('F', fdwowner)))).* FROM pg_foreign_data_wrapper
+         ) AS fdw (fdwname, fdwowner, grantor, grantee, prtype, grantable),
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE u_grantor.oid = fdw.grantor
+          AND grantee.oid = fdw.grantee
+          AND fdw.prtype IN ('USAGE')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+
+    UNION ALL
+
+    /* foreign servers */
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST('' AS sql_identifier) AS object_schema,
+           CAST(srv.srvname AS sql_identifier) AS object_name,
+           CAST('FOREIGN SERVER' AS character_data) AS object_type,
+           CAST('USAGE' AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(grantee.oid, srv.srvowner, 'USAGE')
+                  OR srv.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+
+    FROM (
+            SELECT srvname, srvowner, (aclexplode(coalesce(srvacl, acldefault('S', srvowner)))).* FROM pg_foreign_server
+         ) AS srv (srvname, srvowner, grantor, grantee, prtype, grantable),
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE u_grantor.oid = srv.grantor
+          AND grantee.oid = srv.grantee
+          AND srv.prtype IN ('USAGE')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+
+    UNION ALL
+
+    /* sequences */
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST(n.nspname AS sql_identifier) AS object_schema,
+           CAST(c.relname AS sql_identifier) AS object_name,
+           CAST('SEQUENCE' AS character_data) AS object_type,
+           CAST('USAGE' AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(grantee.oid, c.relowner, 'USAGE')
+                  OR c.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+
+    FROM (
+            SELECT oid, relname, relnamespace, relkind, relowner, (aclexplode(coalesce(relacl, acldefault('r', relowner)))).* FROM pg_class
+         ) AS c (oid, relname, relnamespace, relkind, relowner, grantor, grantee, prtype, grantable),
+         pg_namespace n,
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE c.relnamespace = n.oid
+          AND c.relkind = 'S'
+          AND c.grantee = grantee.oid
+          AND c.grantor = u_grantor.oid
+          AND c.prtype IN ('USAGE')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+;
+ALTER EXTENSION pageinspect UPDATE TO '1.9'
+;
+CREATE TABLE ptif_li_child () INHERITS (ptif_li_parent)
+;
+VACUUM (PROCESS_MAIN FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_ts_config_map
+;
+CREATE INDEX clstr_tst_b ON clstr_tst (b)
+;
+CREATE TABLE prt1_l_p1 PARTITION OF prt1_l FOR VALUES FROM (0) TO (250)
+;
+-- ok:
+alter table atacc1 add constraint foo check (test>0) no inherit
+;
+CREATE TABLE "public"."pagg_tab1_p2" (
+    "x" integer,
+    "y" integer
+)
+;
+CREATE TRIGGER trig_row_before
+BEFORE UPDATE OR DELETE ON bar2
+FOR EACH ROW EXECUTE PROCEDURE trigger_data(23,'skidoo')
+;
+CREATE TABLE t_009_tbl6 (id int, msg text)
+;
+-- REINDEX (TABLESPACE) with partitions
+-- Create a partition tree and check the set of relations reindexed
+-- with their new tablespace.
+CREATE TABLE tbspace_reindex_part (c1 int, c2 int) PARTITION BY RANGE (c1)
+;
+ALTER TABLE ONLY "public"."shighway" INHERIT "public"."road"
+;
+--
+-- misc ALTER commands
+--
+ALTER DATABASE sepgsql_test_regression CONNECTION LIMIT 999
+;
+-- too few columns
+CREATE TABLE tt5 (x int, y numeric(8,2), z int)
+;
+CREATE OPERATOR = (
+	PROCEDURE = isneq,
+	LEFTARG = isbn13,
+	RIGHTARG = ean13,
+	COMMUTATOR = =,
+	NEGATOR = <>,
+	RESTRICT = eqsel,
+	JOIN = eqjoinsel,
+	MERGES,
+	HASHES)
+;
+--
+-- CREATE_TYPE
+--
+
+--
+-- Note: widget_in/out were created in create_function_1, without any
+-- prior shell-type creation.  These commands therefore complete a test
+-- of the "old style" approach of making the functions first.
+--
+CREATE TYPE widget (
+   internallength = 24,
+   input = widget_in,
+   output = widget_out,
+   typmod_in = numerictypmodin,
+   typmod_out = numerictypmodout,
+   alignment = double
+)
+;
+DROP TABLE tblspc1_unlogged
+;
+CREATE TABLE fail_part PARTITION OF range_parted3 FOR VALUES FROM (1, minvalue) TO (1, maxvalue)
+;
+CREATE TABLE "public"."brin_test" (
+    "a" integer,
+    "b" integer
+)
+;
+VACUUM (PARALLEL 0) pg_catalog.pg_enum
+;
+DROP DATABASE nonexistent
+;
+CREATE UNLOGGED TABLE unlogged1(f1 SERIAL PRIMARY KEY, f2 TEXT)
+;
+ALTER PUBLICATION pub_all SET (publish_via_partition_root = true)
+;
+CREATE FUNCTION eatarray(x real[]) RETURNS real[]
+LANGUAGE plpgsql STRICT IMMUTABLE AS $$
+BEGIN
+    x[1] := x[1] + 1;
+    RETURN x;
+END;
+$$
+;
+CREATE INDEX test_index_exists on test_exists(a)
+;
+CREATE FUNCTION public.bt_index_check(index regclass,
+											  heapallindexed boolean default false)
+		RETURNS VOID AS $$
+		BEGIN
+			RAISE EXCEPTION 'Invoked wrong bt_index_check!';
+		END;
+		$$ LANGUAGE plpgsql
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE FUNCTION isngt(isbn13, ean13)
+	RETURNS boolean
+	AS 'int8gt'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY alt_opf4 USING btree DROP
+  -- int4 vs int2
+  OPERATOR 1 (int4, int2) ,
+  OPERATOR 2 (int4, int2) ,
+  OPERATOR 3 (int4, int2) ,
+  OPERATOR 4 (int4, int2) ,
+  OPERATOR 5 (int4, int2) ,
+  FUNCTION 1 (int4, int2)
+;
+----------
+[DROP_TABLE] drop table join_pt1
+;
+----------
+[ADMIN_TABLE] ANALYZE public.renamecolumn
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest10 (a int PRIMARY KEY, b int, c int GENERATED ALWAYS AS (b * 2) STORED)
+;
+----------
+[CREATE_TABLE] CREATE TABLE ctl_stats4_parent (a int, b int, c int, d int)
+;
+----------
+[CREATE_TABLE] CREATE TABLE test10b (a int[], b priv_testtype1[])
+;
+----------
+[ADD_INDEX] CREATE INDEX collate_dep_test4i ON collate_dep_test4t (b COLLATE test0)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR schema_op1.#*# (
+   rightarg = int8,
+   procedure = factorial
+)
+;
+----------
+[ADD_INDEX] CREATE INDEX "idxpart2_a_idx" ON ONLY "public"."idxpart2" USING "btree" ("a")
+;
+----------
+[ADMIN_TABLE] analyze bug_16784
+;
+----------
+[CREATE_TYPE] -- This test isn't that interesting on its own, but the purpose is to leave
+-- behind a table to test pg_upgrade with. The table has a composite type
+-- column in it, and the composite type has a dropped attribute.
+CREATE TYPE test_type3 AS (a int)
+;
+----------
+[CREATE_POLICY] -- OK
+
+CREATE TEXT SEARCH TEMPLATE alt_ts_temp2 (lexize=dsimple_lexize)
+;
+----------
+[CREATE_POLICY] CREATE RULE "_RETURN" AS
+  ON SELECT
+  TO like_datatype_table
+  DO INSTEAD
+    SELECT * FROM datatype_view
+;
+----------
+[CREATE_PROG_OBJ] CREATE PROCEDURE ptest9(OUT a int)
+LANGUAGE SQL
+AS $$
+INSERT INTO cp_test VALUES (1, 'a');
+SELECT 1;
+$$
+;
+----------
+[CREATE_TABLE] create table rp_prefix_test2_p2 partition of rp_prefix_test2 for values from (2, 2, 0) to (2, 2, 10)
+;
+----------
+[DROP_TABLE] DROP TABLE pg_temp_11.pg_temp_41207_2, pg_temp_11.pg_temp_41207
+;
+----------
+[CREATE_LIBRARY] CREATE EXTENSION hstore_plperl CASCADE
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION priv_testfunc6b(b int)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "public"."beta" ATTACH PARTITION "public"."beta_pos" FOR VALUES FROM ('0') TO ('Infinity')
+;
+----------
+[ALTER_TYPE] ALTER TYPE "public"."rainbow" ADD VALUE 'purple'
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION test_copy_to_callback(pg_catalog.regclass)
+	RETURNS pg_catalog.void
+	AS '$libdir/test_copy_callbacks' LANGUAGE C
+;
+----------
+[CREATE_TABLE] CREATE TABLE tab1_def PARTITION OF tab1 DEFAULT
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW domain_udt_usage AS
+    SELECT CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nbt.nspname AS sql_identifier) AS udt_schema,
+           CAST(bt.typname AS sql_identifier) AS udt_name,
+           CAST(current_database() AS sql_identifier) AS domain_catalog,
+           CAST(nt.nspname AS sql_identifier) AS domain_schema,
+           CAST(t.typname AS sql_identifier) AS domain_name
+
+    FROM pg_type t, pg_namespace nt,
+         pg_type bt, pg_namespace nbt
+
+    WHERE t.typnamespace = nt.oid
+          AND t.typbasetype = bt.oid
+          AND bt.typnamespace = nbt.oid
+          AND t.typtype = 'd'
+          AND pg_has_role(bt.typowner, 'USAGE')
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW usage_privileges AS
+
+    /* collations */
+    -- Collations have no real privileges, so we represent all collations with implicit usage privilege here.
+    SELECT CAST(u.rolname AS sql_identifier) AS grantor,
+           CAST('PUBLIC' AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST(n.nspname AS sql_identifier) AS object_schema,
+           CAST(c.collname AS sql_identifier) AS object_name,
+           CAST('COLLATION' AS character_data) AS object_type,
+           CAST('USAGE' AS character_data) AS privilege_type,
+           CAST('NO' AS yes_or_no) AS is_grantable
+
+    FROM pg_authid u,
+         pg_namespace n,
+         pg_collation c
+
+    WHERE u.oid = c.collowner
+          AND c.collnamespace = n.oid
+          AND collencoding IN (-1, (SELECT encoding FROM pg_database WHERE datname = current_database()))
+
+    UNION ALL
+
+    /* domains */
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST(n.nspname AS sql_identifier) AS object_schema,
+           CAST(t.typname AS sql_identifier) AS object_name,
+           CAST('DOMAIN' AS character_data) AS object_type,
+           CAST('USAGE' AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(grantee.oid, t.typowner, 'USAGE')
+                  OR t.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+
+    FROM (
+            SELECT oid, typname, typnamespace, typtype, typowner, (aclexplode(coalesce(typacl, acldefault('T', typowner)))).* FROM pg_type
+         ) AS t (oid, typname, typnamespace, typtype, typowner, grantor, grantee, prtype, grantable),
+         pg_namespace n,
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE t.typnamespace = n.oid
+          AND t.typtype = 'd'
+          AND t.grantee = grantee.oid
+          AND t.grantor = u_grantor.oid
+          AND t.prtype IN ('USAGE')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+
+    UNION ALL
+
+    /* foreign-data wrappers */
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST('' AS sql_identifier) AS object_schema,
+           CAST(fdw.fdwname AS sql_identifier) AS object_name,
+           CAST('FOREIGN DATA WRAPPER' AS character_data) AS object_type,
+           CAST('USAGE' AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(grantee.oid, fdw.fdwowner, 'USAGE')
+                  OR fdw.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+
+    FROM (
+            SELECT fdwname, fdwowner, (aclexplode(coalesce(fdwacl, acldefault('F', fdwowner)))).* FROM pg_foreign_data_wrapper
+         ) AS fdw (fdwname, fdwowner, grantor, grantee, prtype, grantable),
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE u_grantor.oid = fdw.grantor
+          AND grantee.oid = fdw.grantee
+          AND fdw.prtype IN ('USAGE')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+
+    UNION ALL
+
+    /* foreign servers */
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST('' AS sql_identifier) AS object_schema,
+           CAST(srv.srvname AS sql_identifier) AS object_name,
+           CAST('FOREIGN SERVER' AS character_data) AS object_type,
+           CAST('USAGE' AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(grantee.oid, srv.srvowner, 'USAGE')
+                  OR srv.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+
+    FROM (
+            SELECT srvname, srvowner, (aclexplode(coalesce(srvacl, acldefault('S', srvowner)))).* FROM pg_foreign_server
+         ) AS srv (srvname, srvowner, grantor, grantee, prtype, grantable),
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE u_grantor.oid = srv.grantor
+          AND grantee.oid = srv.grantee
+          AND srv.prtype IN ('USAGE')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+
+    UNION ALL
+
+    /* sequences */
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST(n.nspname AS sql_identifier) AS object_schema,
+           CAST(c.relname AS sql_identifier) AS object_name,
+           CAST('SEQUENCE' AS character_data) AS object_type,
+           CAST('USAGE' AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(grantee.oid, c.relowner, 'USAGE')
+                  OR c.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+
+    FROM (
+            SELECT oid, relname, relnamespace, relkind, relowner, (aclexplode(coalesce(relacl, acldefault('r', relowner)))).* FROM pg_class
+         ) AS c (oid, relname, relnamespace, relkind, relowner, grantor, grantee, prtype, grantable),
+         pg_namespace n,
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE c.relnamespace = n.oid
+          AND c.relkind = 'S'
+          AND c.grantee = grantee.oid
+          AND c.grantor = u_grantor.oid
+          AND c.prtype IN ('USAGE')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+;
+----------
+[ALTER_LIBRARY] ALTER EXTENSION pageinspect UPDATE TO '1.9'
+;
+----------
+[CREATE_TABLE] CREATE TABLE ptif_li_child () INHERITS (ptif_li_parent)
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_MAIN FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_ts_config_map
+;
+----------
+[ADD_INDEX] CREATE INDEX clstr_tst_b ON clstr_tst (b)
+;
+----------
+[CREATE_TABLE] CREATE TABLE prt1_l_p1 PARTITION OF prt1_l FOR VALUES FROM (0) TO (250)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] -- ok:
+alter table atacc1 add constraint foo check (test>0) no inherit
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."pagg_tab1_p2" (
+    "x" integer,
+    "y" integer
+)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER trig_row_before
+BEFORE UPDATE OR DELETE ON bar2
+FOR EACH ROW EXECUTE PROCEDURE trigger_data(23,'skidoo')
+;
+----------
+[CREATE_TABLE] CREATE TABLE t_009_tbl6 (id int, msg text)
+;
+----------
+[CREATE_TABLE] -- REINDEX (TABLESPACE) with partitions
+-- Create a partition tree and check the set of relations reindexed
+-- with their new tablespace.
+CREATE TABLE tbspace_reindex_part (c1 int, c2 int) PARTITION BY RANGE (c1)
+;
+----------
+[ALTER_TABLE] ALTER TABLE ONLY "public"."shighway" INHERIT "public"."road"
+;
+----------
+[ALTER_CATALOG] --
+-- misc ALTER commands
+--
+ALTER DATABASE sepgsql_test_regression CONNECTION LIMIT 999
+;
+----------
+[CREATE_TABLE] -- too few columns
+CREATE TABLE tt5 (x int, y numeric(8,2), z int)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR = (
+	PROCEDURE = isneq,
+	LEFTARG = isbn13,
+	RIGHTARG = ean13,
+	COMMUTATOR = =,
+	NEGATOR = <>,
+	RESTRICT = eqsel,
+	JOIN = eqjoinsel,
+	MERGES,
+	HASHES)
+;
+----------
+[CREATE_TYPE] --
+-- CREATE_TYPE
+--
+
+--
+-- Note: widget_in/out were created in create_function_1, without any
+-- prior shell-type creation.  These commands therefore complete a test
+-- of the "old style" approach of making the functions first.
+--
+CREATE TYPE widget (
+   internallength = 24,
+   input = widget_in,
+   output = widget_out,
+   typmod_in = numerictypmodin,
+   typmod_out = numerictypmodout,
+   alignment = double
+)
+;
+----------
+[DROP_TABLE] DROP TABLE tblspc1_unlogged
+;
+----------
+[CREATE_TABLE] CREATE TABLE fail_part PARTITION OF range_parted3 FOR VALUES FROM (1, minvalue) TO (1, maxvalue)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."brin_test" (
+    "a" integer,
+    "b" integer
+)
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 0) pg_catalog.pg_enum
+;
+----------
+[DROP_CATALOG] DROP DATABASE nonexistent
+;
+----------
+[CREATE_TABLE] CREATE UNLOGGED TABLE unlogged1(f1 SERIAL PRIMARY KEY, f2 TEXT)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub_all SET (publish_via_partition_root = true)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION eatarray(x real[]) RETURNS real[]
+LANGUAGE plpgsql STRICT IMMUTABLE AS $$
+BEGIN
+    x[1] := x[1] + 1;
+    RETURN x;
+END;
+$$
+;
+----------
+[ADD_INDEX] CREATE INDEX test_index_exists on test_exists(a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION public.bt_index_check(index regclass,
+											  heapallindexed boolean default false)
+		RETURNS VOID AS $$
+		BEGIN
+			RAISE EXCEPTION 'Invoked wrong bt_index_check!';
+		END;
+		$$ LANGUAGE plpgsql
+;

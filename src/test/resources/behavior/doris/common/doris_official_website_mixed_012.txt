@@ -1,0 +1,2702 @@
+[doris_official_website_mixed_012__create_catalog__0001]
+sql:
+-- Register a Hive catalog
+CREATE CATALOG hive_ctl PROPERTIES (
+  "type" = "hms",
+  "hive.metastore.uris" = "thrift://hms:9083"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(2:15~2:23) /test/1/hive_ctl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_catalog__0002]
+sql:
+-- Register a MySQL catalog for dimension tables
+CREATE CATALOG mysql_ctl PROPERTIES (
+  "type" = "jdbc",
+  "user" = "doris", "password" = "xxx",
+  "jdbc_url" = "jdbc:mysql://mysql:3306/dim",
+  "driver_url" = "mysql-connector-j-8.4.0.jar",
+  "driver_class" = "com.mysql.cj.jdbc.Driver"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(2:15~2:24) /test/1/mysql_ctl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0003]
+sql:
+-- One federated query, three catalogs
+SELECT o.region, SUM(f.amount), d.name
+FROM hive_ctl.sales.orders f
+JOIN internal.curated.region o ON f.region_id = o.id
+JOIN mysql_ctl.dim.product   d ON f.sku       = d.sku
+WHERE f.dt = CURRENT_DATE() GROUP BY 1, 3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:17~2:20) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:26) /test/1/hive_ctl/sales/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:5~4:28) /test/1/internal/curated/region/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:5~5:26) /test/1/mysql_ctl/dim/product/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(6:13~6:25) /test/1/catalog1/schema1/CURRENT_DATE/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0004]
+sql:
+CREATE TABLE orders (
+  order_id   BIGINT,
+  user_id    BIGINT,
+  order_date DATE NOT NULL,
+  amount     DECIMAL(10,2)
+)
+DUPLICATE KEY(order_id, user_id)
+AUTO PARTITION BY RANGE (date_trunc(order_date, 'month')) ()
+DISTRIBUTED BY HASH(user_id) BUCKETS 16;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/orders/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Function(8:25~8:35) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0005]
+sql:
+INSERT INTO orders VALUES
+  (1, 100, '2026-04-15', 99.00),
+  (2, 200, '2026-05-02', 50.00);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:18) /test/1/catalog1/schema1/orders/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0006]
+sql:
+EXPLAIN SELECT SUM(amount) FROM orders
+WHERE order_date >= '2026-05-01' AND user_id = 200;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:15~1:18) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:32~1:38) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__metadata__0007]
+sql:
+-- Inspect the default (0 means "half the CPU cores")
+SHOW VARIABLES LIKE 'parallel_pipeline_task_num';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_012__select__0008]
+sql:
+-- Pin parallelism for one heavy query without touching the session
+SELECT /*+ SET_VAR(parallel_pipeline_task_num=16) */
+       l_orderkey, COUNT(*) AS lines, SUM(l_extendedprice) AS gross
+FROM lineitem
+GROUP BY l_orderkey
+ORDER BY gross DESC
+LIMIT 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:19~3:24) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:38~3:41) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:5~4:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0009]
+sql:
+-- See the resulting plan and Local Exchange placement
+EXPLAIN SELECT /*+ SET_VAR(parallel_pipeline_task_num=16) */
+        l_orderkey, COUNT(*) FROM lineitem GROUP BY l_orderkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:20~3:25) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:34~3:42) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_role__0010]
+sql:
+-- Roles in Doris match LDAP group names; Ranger holds the actual grants
+CREATE ROLE doris_analyst;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_ROLE": [
+    {
+      "subject": "Role(2:12~2:25) /test/1/doris_analyst/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_role__0011]
+sql:
+CREATE ROLE doris_etl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_ROLE": [
+    {
+      "subject": "Role(1:12~1:21) /test/1/doris_etl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_user__0012]
+sql:
+-- Local break-glass account that survives LDAP / Ranger outages
+CREATE USER 'breakglass'@'127.0.0.1' IDENTIFIED BY 'rotate-me';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_USER": [
+    {
+      "subject": "User(2:12~2:62) /test/1/'breakglass'@'127.0.0.1' IDENTIFIED BY 'rotate-me'/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__grant__0013]
+sql:
+GRANT 'admin' TO 'breakglass'@'127.0.0.1';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Role(1:6~1:13) /test/1/'admin'/",
+      "action" : "GRANT",
+      "target" : "User(1:17~1:41) /test/1/'breakglass'@'127.0.0.1'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0014]
+sql:
+CREATE TABLE ad_events (
+  dt DATE,
+  ad_id INT,
+  user_id BIGINT,
+  clicks BIGINT SUM,
+  cost DECIMAL(10,2) SUM
+)
+AGGREGATE KEY(dt, ad_id, user_id)
+DISTRIBUTED BY HASH(ad_id) BUCKETS 4;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:22) /test/1/catalog1/schema1/ad_events/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__alter_table__0015]
+sql:
+ALTER TABLE ad_events ADD ROLLUP rollup_ad (dt, ad_id, clicks, cost);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_mixed_012__select__0016]
+sql:
+SELECT dt, ad_id, SUM(clicks) FROM ad_events
+WHERE dt = '2026-05-01' GROUP BY dt, ad_id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:18~1:21) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:35~1:44) /test/1/catalog1/schema1/ad_events/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_setting_write__0017]
+sql:
+SET enable_query_cache = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:22) /test/1/enable_query_cache/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0018]
+sql:
+-- Run 1: warms the cache for partitions 2024-01-01 .. 2024-01-07
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt >= '2024-01-01' AND dt < '2024-01-08'
+GROUP BY region;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:15~2:18) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:29~2:34) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0019]
+sql:
+-- Run 2: overlapping window, three shared days
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt >= '2024-01-05' AND dt < '2024-01-12'
+GROUP BY region;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:15~2:18) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:29~2:34) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__admin__0020]
+sql:
+-- Tag two BEs into 'online', one into 'offline'
+ALTER SYSTEM MODIFY BACKEND "be1:9050" SET ("tag.location" = "online");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN": []
+}
+
+----------
+[doris_official_website_mixed_012__admin__0021]
+sql:
+ALTER SYSTEM MODIFY BACKEND "be2:9050" SET ("tag.location" = "online");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN": []
+}
+
+----------
+[doris_official_website_mixed_012__admin__0022]
+sql:
+ALTER SYSTEM MODIFY BACKEND "be3:9050" SET ("tag.location" = "offline");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN": []
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0023]
+sql:
+-- Place 2 replicas in 'online', 1 in 'offline'
+CREATE TABLE orders (id BIGINT, region STRING, amount DECIMAL(18,2))
+DISTRIBUTED BY HASH(id) BUCKETS 8
+PROPERTIES ("replication_allocation" = "tag.location.online:2, tag.location.offline:1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:19) /test/1/catalog1/schema1/orders/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__alter_user__0024]
+sql:
+-- Bind users to their pools
+SET PROPERTY FOR 'bi_user'  'resource_tags.location' = 'online';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_USER": []
+}
+
+----------
+[doris_official_website_mixed_012__alter_user__0025]
+sql:
+SET PROPERTY FOR 'etl_user' 'resource_tags.location' = 'offline';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_USER": []
+}
+
+----------
+[doris_official_website_mixed_012__session_setting_write__0026]
+sql:
+-- Enable spill for this session (or set it on a workload group).
+SET enable_spill = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(2:4~2:16) /test/1/enable_spill/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_setting_write__0027]
+sql:
+-- Spill paths do real disk IO, so give the query a longer budget.
+SET query_timeout = 3600;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(2:4~2:17) /test/1/query_timeout/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0028]
+sql:
+-- Run a query that would normally OOM.
+SELECT l_orderkey, SUM(l_quantity)
+FROM lineitem JOIN orders ON l_orderkey = o_orderkey
+WHERE o_orderdate >= '1995-01-01'
+GROUP BY l_orderkey
+ORDER BY 2 DESC LIMIT 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:19~2:22) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:19~3:25) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0029]
+sql:
+-- Check that spill actually happened.
+SELECT query_id, spill_write_bytes_to_local_storage
+FROM information_schema.backend_active_tasks;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:44) /test/1/catalog1/information_schema/backend_active_tasks/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0030]
+sql:
+CREATE TABLE orders (
+  order_id BIGINT,
+  status   VARCHAR(20),
+  amount   DECIMAL(10, 2),
+  updated  DATETIME
+)
+UNIQUE KEY(order_id)
+DISTRIBUTED BY HASH(order_id) BUCKETS 4
+PROPERTIES ("function_column.sequence_col" = "updated");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/orders/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0031]
+sql:
+INSERT INTO orders VALUES
+  (1, 'created', 99.50, '2026-05-08 10:00:00'),
+  (1, 'paid',    99.50, '2026-05-08 10:05:00'),
+  (1, 'created', 99.50, '2026-05-08 09:00:00');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:18) /test/1/catalog1/schema1/orders/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0032]
+sql:
+CREATE TABLE github_events (
+  id          BIGINT,
+  type        VARCHAR(30),
+  payload     VARIANT,
+  created_at  DATETIME,
+  INDEX idx_payload (payload) USING INVERTED PROPERTIES("parser" = "english")
+)
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 4
+PROPERTIES ("storage_format" = "V3");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:26) /test/1/catalog1/schema1/github_events/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0033]
+sql:
+INSERT INTO github_events VALUES
+  (1, 'PushEvent', '{"action":"opened","commits":[{"sha":"abc"}],"size":4}', '2026-05-01'),
+  (2, 'IssueCommentEvent', '{"action":"created","issue":{"number":42}}', '2026-05-01');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:25) /test/1/catalog1/schema1/github_events/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0034]
+sql:
+SELECT CAST(payload['action'] AS STRING) AS action, COUNT(*) AS n
+FROM github_events
+WHERE payload['action'] MATCH 'opened'
+GROUP BY action;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:52~1:57) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:18) /test/1/catalog1/schema1/github_events/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__metadata__0035]
+sql:
+-- Default; safe to leave alone for most workloads
+SHOW VARIABLES LIKE 'batch_size';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_012__session_setting_write__0036]
+sql:
+-- Larger batches: better throughput on big aggregations, more memory per fragment
+SET batch_size = 8192;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(2:4~2:14) /test/1/batch_size/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0037]
+sql:
+SELECT user_id, COUNT(*) AS events, SUM(bytes) AS total_bytes
+FROM access_log
+WHERE ts BETWEEN '2026-05-01' AND '2026-05-08'
+GROUP BY user_id
+ORDER BY total_bytes DESC
+LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:16~1:21) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:36~1:39) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:15) /test/1/catalog1/schema1/access_log/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0038]
+sql:
+CREATE TABLE user_profile (
+  user_id BIGINT,
+  name VARCHAR(64), age INT, country VARCHAR(32), city VARCHAR(64),
+  attr_01 STRING, attr_02 STRING, attr_03 STRING, attr_04 STRING,
+  attr_05 STRING, attr_06 STRING, attr_07 STRING, attr_08 STRING
+)
+DUPLICATE KEY(user_id)
+DISTRIBUTED BY HASH(user_id) BUCKETS 4
+PROPERTIES (
+  "vertical_compaction_num_columns_per_group" = "3"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:25) /test/1/catalog1/schema1/user_profile/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__metadata__0039]
+sql:
+SHOW CREATE TABLE user_profile;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_012__create_resource_group__0040]
+sql:
+-- One group for ETL, one for BI dashboards
+CREATE WORKLOAD GROUP etl PROPERTIES (
+  'min_cpu_percent'='30','max_cpu_percent'='70',
+  'min_memory_percent'='30','max_memory_percent'='70',
+  'max_concurrency'='10');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_RESOURCE_GROUP": []
+}
+
+----------
+[doris_official_website_mixed_012__create_resource_group__0041]
+sql:
+CREATE WORKLOAD GROUP bi PROPERTIES (
+  'min_cpu_percent'='20','max_cpu_percent'='50',
+  'min_memory_percent'='20','max_memory_percent'='50',
+  'max_concurrency'='50','max_queue_size'='100','queue_timeout'='3000');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_RESOURCE_GROUP": []
+}
+
+----------
+[doris_official_website_mixed_012__alter_user__0042]
+sql:
+-- Bind users persistently
+SET PROPERTY FOR 'etl_user' 'default_workload_group'='etl';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_USER": []
+}
+
+----------
+[doris_official_website_mixed_012__alter_user__0043]
+sql:
+SET PROPERTY FOR 'bi_user'  'default_workload_group'='bi';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_USER": []
+}
+
+----------
+[doris_official_website_mixed_012__select__0044]
+sql:
+-- One-off override for a single query
+SELECT /*+ SET_VAR(workload_group='bi') */ region, SUM(revenue)
+FROM orders WHERE dt = CURRENT_DATE() GROUP BY region;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:51~2:54) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(3:23~3:35) /test/1/catalog1/schema1/CURRENT_DATE/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_catalog__0045]
+sql:
+-- 1. switch to catalog, use database and query
+SWITCH doris_ctl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_CATALOG": [
+    {
+      "subject": "Catalog(2:7~2:16) /test/1/doris_ctl/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0046]
+sql:
+USE doris_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:12) /test/1/catalog1/doris_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0047]
+sql:
+SELECT * FROM doris_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:23) /test/1/catalog1/schema1/doris_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0048]
+sql:
+-- 2. use doris database directly
+USE doris_ctl.doris_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(2:14~2:22) /test/1/catalog1/doris_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0049]
+sql:
+SELECT * FROM doris_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:23) /test/1/catalog1/schema1/doris_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0050]
+sql:
+-- 3. use full qualified name to query
+SELECT * FROM doris_ctl.doris_db.doris_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:42) /test/1/doris_ctl/doris_db/doris_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_catalog__0051]
+sql:
+-- 1. switch to catalog, use database and insert
+SWITCH doris_ctl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_CATALOG": [
+    {
+      "subject": "Catalog(2:7~2:16) /test/1/doris_ctl/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0052]
+sql:
+USE doris_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:12) /test/1/catalog1/doris_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0053]
+sql:
+insert into doris_tbl values (1,2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:21) /test/1/catalog1/schema1/doris_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0054]
+sql:
+-- 2. use doris database directly
+USE doris_ctl.doris_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(2:14~2:22) /test/1/catalog1/doris_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0055]
+sql:
+insert into doris_tbl values (1,2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:21) /test/1/catalog1/schema1/doris_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0056]
+sql:
+-- 3. use full qualified name to insert
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:40) /test/1/doris_ctl/doris_db/doris_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0057]
+sql:
+-- 1. insert into values
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:40) /test/1/doris_ctl/doris_db/doris_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0058]
+sql:
+-- 2. insert into select
+insert into doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:40) /test/1/doris_ctl/doris_db/doris_tbl/",
+      "action" : "INSERT",
+      "target" : "Table(2:55~2:73) /test/1/catalog1/doris_db/doris_tbl/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__merge__0059]
+sql:
+-- 3. insert overwrite
+insert overwrite table doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "MERGE": [
+    {
+      "subject": "Table(2:23~2:51) /test/1/doris_ctl/doris_db/doris_tbl/",
+      "action" : "MERGE",
+      "target" : "Table(2:66~2:84) /test/1/catalog1/doris_db/doris_tbl/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_setting_write__0060]
+sql:
+SET show_hidden_columns = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:23) /test/1/show_hidden_columns/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__metadata__0061]
+sql:
+DESC iceberg_tbl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0062]
+sql:
+CREATE TABLE iceberg_table (
+      id INT,
+      name STRING
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:26) /test/1/catalog1/schema1/iceberg_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__alter_table__0063]
+sql:
+ALTER TABLE iceberg_table MODIFY COLUMN id BIGINT NOT NULL DEFAULT 0 COMMENT 'This is a modified id column';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:25) /test/1/catalog1/schema1/iceberg_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0064]
+sql:
+CREATE TABLE iceberg_tbl (
+      id BIGINT,
+      user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT>,
+      dt STRING
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:24) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__alter_table__0065]
+sql:
+ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT, email:STRING>;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:23) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__alter_table__0066]
+sql:
+ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<BIGINT>, age:INT, email:STRING>;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:23) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0067]
+sql:
+SET @min_file_size_bytes = 16 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/min_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0068]
+sql:
+SET @max_file_size_bytes = 768 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/max_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0069]
+sql:
+SELECT 
+        file_path,
+        `partition`,
+        file_size_in_bytes / 1024.0 / 1024.0 AS file_size_mb,
+        record_count,
+        CASE 
+            WHEN file_size_in_bytes < @min_file_size_bytes THEN 'Too small'
+            WHEN file_size_in_bytes > @max_file_size_bytes THEN 'Too large'
+        END AS size_issue
+    FROM iceberg_table$data_files
+    WHERE file_size_in_bytes < @min_file_size_bytes 
+    OR file_size_in_bytes > @max_file_size_bytes
+    ORDER BY `partition`, file_size_in_bytes DESC;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "ConfigKey(7:38~7:58) /test/1/min_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(8:38~8:58) /test/1/max_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:9~10:33) /test/1/catalog1/schema1/iceberg_table$data_files/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(11:31~11:51) /test/1/min_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(12:28~12:48) /test/1/max_file_size_bytes/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0070]
+sql:
+SET @min_file_size_bytes = 16 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/min_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0071]
+sql:
+SET @max_file_size_bytes = 768 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/max_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0072]
+sql:
+WITH file_analysis AS (
+        SELECT 
+            `partition`,
+            file_path,
+            file_size_in_bytes,
+            record_count,
+            (file_size_in_bytes < @min_file_size_bytes OR file_size_in_bytes > @max_file_size_bytes) AS meets_file_level_conditions
+        FROM iceberg_table$data_files
+    )
+    SELECT 
+        'Total files' AS metric, 
+        COUNT(*) AS value
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Files meeting file-level conditions', 
+        SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Total size (GB)', 
+        ROUND(SUM(file_size_in_bytes) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Size meeting file-level conditions (GB)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN file_size_in_bytes ELSE 0 END) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Percentage meeting file-level conditions (%)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+    FROM file_analysis;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "ConfigKey(7:34~7:54) /test/1/min_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(7:79~7:99) /test/1/max_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:13~8:37) /test/1/catalog1/schema1/iceberg_table$data_files/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(12:8~12:13) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:9~13:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(17:8~17:11) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(18:9~18:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(22:8~22:13) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(22:14~22:17) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(23:9~23:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(27:8~27:13) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(27:14~27:17) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(28:9~28:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(32:8~32:13) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(32:14~32:17) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(32:85~32:90) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(33:9~33:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_schema__0073]
+sql:
+-- 目的：创建演示用数据库和表
+create database demo;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_SCHEMA": [
+    {
+      "subject": "Schema(2:16~2:20) /test/1/catalog1/demo/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0074]
+sql:
+use demo;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:8) /test/1/catalog1/demo/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0075]
+sql:
+create table mytable
+(
+    k1 TINYINT,
+    k2 DECIMAL(10, 2) DEFAULT "10.05",
+    k3 CHAR(10) COMMENT "string column",
+    k4 INT NOT NULL DEFAULT "1" COMMENT "int column"
+)
+COMMENT "my first table"
+DISTRIBUTED BY HASH(k1) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:20) /test/1/catalog1/schema1/mytable/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_catalog__0076]
+sql:
+-- 1. switch to catalog, use database and query
+SWITCH doris_ctl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_CATALOG": [
+    {
+      "subject": "Catalog(2:7~2:16) /test/1/doris_ctl/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0077]
+sql:
+USE doris_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:12) /test/1/catalog1/doris_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0078]
+sql:
+insert into doris_tbl values (1,2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:21) /test/1/catalog1/schema1/doris_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0079]
+sql:
+-- 2. use doris database directly
+USE doris_ctl.doris_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(2:14~2:22) /test/1/catalog1/doris_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0080]
+sql:
+insert into doris_tbl values (1,2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:21) /test/1/catalog1/schema1/doris_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0081]
+sql:
+-- 3. use full qualified name to query
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:40) /test/1/doris_ctl/doris_db/doris_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0082]
+sql:
+-- 1.insert into values
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:40) /test/1/doris_ctl/doris_db/doris_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0083]
+sql:
+-- 2.insert into select
+insert into doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:40) /test/1/doris_ctl/doris_db/doris_tbl/",
+      "action" : "INSERT",
+      "target" : "Table(2:55~2:73) /test/1/catalog1/doris_db/doris_tbl/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__merge__0084]
+sql:
+-- 3. insert overwrite
+insert overwrite table doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "MERGE": [
+    {
+      "subject": "Table(2:23~2:51) /test/1/doris_ctl/doris_db/doris_tbl/",
+      "action" : "MERGE",
+      "target" : "Table(2:66~2:84) /test/1/catalog1/doris_db/doris_tbl/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0085]
+sql:
+CREATE TABLE iceberg_table (
+      id INT,
+      name STRING
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:26) /test/1/catalog1/schema1/iceberg_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__alter_table__0086]
+sql:
+ALTER TABLE iceberg_table MODIFY COLUMN id BIGINT NOT NULL DEFAULT 0 COMMENT 'This is a modified id column' FIRST;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:25) /test/1/catalog1/schema1/iceberg_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0087]
+sql:
+CREATE TABLE iceberg_tbl (
+      id BIGINT,
+      user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT>,
+      dt STRING
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:24) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__alter_table__0088]
+sql:
+ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT, email:STRING>;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:23) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__alter_table__0089]
+sql:
+ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<BIGINT>, age:INT, email:STRING>;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:23) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0090]
+sql:
+SET @min_file_size_bytes = 16 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/min_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0091]
+sql:
+SET @max_file_size_bytes = 768 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/max_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0092]
+sql:
+SELECT
+        file_path,
+        `partition`,
+        file_size_in_bytes / 1024.0 / 1024.0 AS file_size_mb,
+        record_count,
+        CASE
+            WHEN file_size_in_bytes < @min_file_size_bytes THEN 'Too small'
+            WHEN file_size_in_bytes > @max_file_size_bytes THEN 'Too large'
+        END AS size_issue
+    FROM iceberg_table$data_files
+    WHERE file_size_in_bytes < @min_file_size_bytes
+    OR file_size_in_bytes > @max_file_size_bytes
+    ORDER BY `partition`, file_size_in_bytes DESC;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "ConfigKey(7:38~7:58) /test/1/min_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(8:38~8:58) /test/1/max_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:9~10:33) /test/1/catalog1/schema1/iceberg_table$data_files/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(11:31~11:51) /test/1/min_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(12:28~12:48) /test/1/max_file_size_bytes/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0093]
+sql:
+SET @min_file_size_bytes = 16 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/min_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0094]
+sql:
+SET @max_file_size_bytes = 768 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/max_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0095]
+sql:
+WITH file_analysis AS (
+        SELECT
+            `partition`,
+            file_path,
+            file_size_in_bytes,
+            record_count,
+            (file_size_in_bytes < @min_file_size_bytes OR file_size_in_bytes > @max_file_size_bytes) AS meets_file_level_conditions
+        FROM iceberg_table$data_files
+    )
+    SELECT
+        'Total files' AS metric,
+        COUNT(*) AS value
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Files meeting file-level conditions',
+        SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END)
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Total size (GB)',
+        ROUND(SUM(file_size_in_bytes) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Size meeting file-level conditions (GB)',
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN file_size_in_bytes ELSE 0 END) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Percentage meeting file-level conditions (%)',
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+    FROM file_analysis;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "ConfigKey(7:34~7:54) /test/1/min_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(7:79~7:99) /test/1/max_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:13~8:37) /test/1/catalog1/schema1/iceberg_table$data_files/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(12:8~12:13) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:9~13:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(17:8~17:11) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(18:9~18:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(22:8~22:13) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(22:14~22:17) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(23:9~23:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(27:8~27:13) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(27:14~27:17) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(28:9~28:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(32:8~32:13) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(32:14~32:17) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(32:85~32:90) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(33:9~33:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_catalog__0096]
+sql:
+-- 1. switch to catalog, use database and query
+SWITCH paimon_ctl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_CATALOG": [
+    {
+      "subject": "Catalog(2:7~2:17) /test/1/paimon_ctl/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0097]
+sql:
+USE paimon_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:13) /test/1/catalog1/paimon_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0098]
+sql:
+SELECT * FROM paimon_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:24) /test/1/catalog1/schema1/paimon_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0099]
+sql:
+-- 2. use paimon database directly
+USE paimon_ctl.paimon_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(2:15~2:24) /test/1/catalog1/paimon_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0100]
+sql:
+SELECT * FROM paimon_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:24) /test/1/catalog1/schema1/paimon_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0101]
+sql:
+-- 3. use full qualified name to query
+SELECT * FROM paimon_ctl.paimon_db.paimon_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:45) /test/1/paimon_ctl/paimon_db/paimon_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_schema__0102]
+sql:
+create database demo;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_SCHEMA": [
+    {
+      "subject": "Schema(1:16~1:20) /test/1/catalog1/demo/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0103]
+sql:
+use demo;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:8) /test/1/catalog1/demo/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0104]
+sql:
+create table mytable
+   (
+       k1 TINYINT,
+       k2 DECIMAL(10, 2) DEFAULT "10.05",    
+       k3 CHAR(10) COMMENT "string column",    
+       k4 INT NOT NULL DEFAULT "1" COMMENT "int column"
+   ) 
+   COMMENT "my first table"
+   DISTRIBUTED BY HASH(k1) BUCKETS 1
+   PROPERTIES (
+    "replication_num" = "1"
+   );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:20) /test/1/catalog1/schema1/mytable/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0105]
+sql:
+SET @min_file_size_bytes = 16 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/min_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0106]
+sql:
+SET @max_file_size_bytes = 768 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/max_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0107]
+sql:
+SELECT 
+        file_path,
+        `partition`,
+        file_size_in_bytes / 1024.0 / 1024.0 AS file_size_mb,
+        record_count,
+        CASE 
+            WHEN file_size_in_bytes < @min_file_size_bytes THEN 'Too small'
+            WHEN file_size_in_bytes > @max_file_size_bytes THEN 'Too large'
+        END AS size_issue
+    FROM iceberg_table$data_files
+    WHERE file_size_in_bytes < @min_file_size_bytes 
+    OR file_size_in_bytes > @max_file_size_bytes
+    ORDER BY `partition`, file_size_in_bytes DESC;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "ConfigKey(7:38~7:58) /test/1/min_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(8:38~8:58) /test/1/max_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:9~10:33) /test/1/catalog1/schema1/iceberg_table$data_files/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(11:31~11:51) /test/1/min_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(12:28~12:48) /test/1/max_file_size_bytes/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0108]
+sql:
+SET @min_file_size_bytes = 16 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/min_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__session_variable_rw__0109]
+sql:
+SET @max_file_size_bytes = 768 * 1024 * 1024;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:24) /test/1/max_file_size_bytes/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0110]
+sql:
+WITH file_analysis AS (
+        SELECT 
+            `partition`,
+            file_path,
+            file_size_in_bytes,
+            record_count,
+            (file_size_in_bytes < @min_file_size_bytes OR file_size_in_bytes > @max_file_size_bytes) AS meets_file_level_conditions
+        FROM iceberg_table$data_files
+    )
+    SELECT 
+        'Total files' AS metric, 
+        COUNT(*) AS value
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Files meeting file-level conditions', 
+        SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Total size (GB)', 
+        ROUND(SUM(file_size_in_bytes) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Size meeting file-level conditions (GB)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN file_size_in_bytes ELSE 0 END) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Percentage meeting file-level conditions (%)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+    FROM file_analysis;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "ConfigKey(7:34~7:54) /test/1/min_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(7:79~7:99) /test/1/max_file_size_bytes/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:13~8:37) /test/1/catalog1/schema1/iceberg_table$data_files/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(12:8~12:13) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:9~13:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(17:8~17:11) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(18:9~18:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(22:8~22:13) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(22:14~22:17) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(23:9~23:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(27:8~27:13) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(27:14~27:17) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(28:9~28:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(32:8~32:13) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(32:14~32:17) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(32:85~32:90) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(33:9~33:22) /test/1/catalog1/schema1/file_analysis/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_catalog__0111]
+sql:
+-- 1. カタログに切り替え、データベースを使用してクエリを実行
+SWITCH hive_ctl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_CATALOG": [
+    {
+      "subject": "Catalog(2:7~2:15) /test/1/hive_ctl/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0112]
+sql:
+USE hive_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:11) /test/1/catalog1/hive_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0113]
+sql:
+SELECT * FROM hive_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:22) /test/1/catalog1/schema1/hive_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0114]
+sql:
+-- 2. hiveデータベースを直接使用
+USE hive_ctl.hive_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(2:13~2:20) /test/1/catalog1/hive_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0115]
+sql:
+SELECT * FROM hive_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:22) /test/1/catalog1/schema1/hive_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0116]
+sql:
+-- 3. 完全修飾名を使用してクエリを実行
+SELECT * FROM hive_ctl.hive_db.hive_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:39) /test/1/hive_ctl/hive_db/hive_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_catalog__0117]
+sql:
+-- 1. カタログに切り替え、データベースを使用してクエリ実行
+SWITCH hive_ctl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_CATALOG": [
+    {
+      "subject": "Catalog(2:7~2:15) /test/1/hive_ctl/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0118]
+sql:
+USE hive_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:11) /test/1/catalog1/hive_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0119]
+sql:
+SELECT * FROM hive_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:22) /test/1/catalog1/schema1/hive_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__switch_schema__0120]
+sql:
+-- 2. hiveデータベースを直接使用
+USE hive_ctl.hive_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(2:13~2:20) /test/1/catalog1/hive_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0121]
+sql:
+SELECT * FROM hive_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:22) /test/1/catalog1/schema1/hive_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0122]
+sql:
+-- 3. 完全修飾名を使用してクエリ実行
+SELECT * FROM hive_ctl.hive_db.hive_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:39) /test/1/hive_ctl/hive_db/hive_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0123]
+sql:
+-- Create table with inverted index for full-text search
+CREATE TABLE documents (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    content TEXT,
+    INDEX idx_content(content) USING INVERTED PROPERTIES("parser"="english")
+) DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:22) /test/1/catalog1/schema1/documents/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0124]
+sql:
+-- Insert sample documents
+INSERT INTO documents (content) VALUES
+('Apache Kafka was first released in 2011 as an open-source distributed event streaming platform.'),
+('Michael Faraday discovered electromagnetic induction in 1831.'),
+('The International Space Station orbits Earth at 400km altitude.');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:21) /test/1/catalog1/schema1/documents/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0125]
+sql:
+-- Full-text search using MATCH
+SELECT id, content
+FROM documents
+WHERE content MATCH 'electromagnetic induction'
+LIMIT 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:14) /test/1/catalog1/schema1/documents/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0126]
+sql:
+-- Create table with vector index for similarity search
+CREATE TABLE documents_with_vectors (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    content TEXT,
+    embedding ARRAY<FLOAT>,
+    INDEX idx_embedding(embedding) USING INVERTED
+) DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:35) /test/1/catalog1/schema1/documents_with_vectors/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0127]
+sql:
+-- Insert documents with embeddings (simplified 5-dim vectors for demo)
+INSERT INTO documents_with_vectors (content, embedding) VALUES
+('Apache Kafka was first released in 2011 as an open-source distributed event streaming platform.', [0.8, 0.2, 0.1, 0.5, 0.3]),
+('Michael Faraday discovered electromagnetic induction in 1831.', [0.1, 0.9, 0.7, 0.2, 0.4]),
+('The International Space Station orbits Earth at 400km altitude.', [0.3, 0.1, 0.2, 0.9, 0.8]);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:34) /test/1/catalog1/schema1/documents_with_vectors/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__select__0128]
+sql:
+-- Similarity search: find documents similar to "streaming data" [0.7, 0.3, 0.2, 0.4, 0.2]
+SELECT id, content,
+       1 - cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) AS similarity
+FROM documents_with_vectors
+ORDER BY cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) ASC
+LIMIT 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:11~3:26) /test/1/catalog1/schema1/cosine_distance/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:5~4:27) /test/1/catalog1/schema1/documents_with_vectors/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(5:9~5:24) /test/1/catalog1/schema1/cosine_distance/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__create_table__0129]
+sql:
+-- Create table with BOTH indexes
+CREATE TABLE rag_documents (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    content TEXT,
+    embedding ARRAY<FLOAT>,
+    -- Vector index for similarity search
+    INDEX idx_embedding(embedding) USING INVERTED,
+    -- Inverted index for full-text search
+    INDEX idx_content(content) USING INVERTED PROPERTIES("parser"="english")
+) DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:26) /test/1/catalog1/schema1/rag_documents/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_012__insert__0130]
+sql:
+-- Insert sample documents with embeddings (simplified 5-dim vectors for demo)
+INSERT INTO rag_documents (content, embedding) VALUES
+('Apache Kafka was first released in 2011 as an open-source distributed event streaming platform.', [0.8, 0.2, 0.1, 0.5, 0.3]),
+('Michael Faraday discovered electromagnetic induction in 1831.', [0.1, 0.9, 0.7, 0.2, 0.4]),
+('The International Space Station orbits Earth at 400km altitude.', [0.3, 0.1, 0.2, 0.9, 0.8]);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:25) /test/1/catalog1/schema1/rag_documents/",
+      "action" : "INSERT"
+    }
+  ]
+}

@@ -1,0 +1,444 @@
+CREATE OR REPLACE FUNCTION regexp_split_to_array(string citext, pattern citext, flags text) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_split_to_array( $1::text, $2::text, CASE WHEN pg_catalog.strpos($3, 'c') = 0 THEN  $3 || 'i' ELSE $3 END )
+;
+CREATE TABLE t (
+        id int,
+        data text STORAGE PLAIN
+    ) WITH (autovacuum_enabled = false)
+;
+CREATE PUBLICATION pub_mix_1 FOR TABLE test_mix_1 (a, b)
+;
+CREATE SCHEMA AUTHORIZATION CURRENT_ROLE
+  CREATE TABLE regress_create_schema_role.tab (id int)
+;
+-- JSON_TABLE: Test backward parsing
+
+CREATE VIEW jsonb_table_view2 AS
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			"int" int PATH '$',
+			"text" text PATH '$',
+			"char(4)" char(4) PATH '$',
+			"bool" bool PATH '$',
+			"numeric" numeric PATH '$',
+			"domain" jsonb_test_domain PATH '$'))
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$[1, 0 to $.a ? (@.datetime() == $x)]' PASSING '12:34'::time AS x))
+;
+ALTER MATERIALIZED VIEW compressmv ALTER COLUMN x SET COMPRESSION lz4
+;
+-- ok - only publish schema
+CREATE PUBLICATION testpub_tbl9 FOR TABLES IN SCHEMA public
+;
+CREATE VIEW "public"."limit_thousand_v_3" AS
+ SELECT "thousand"
+   FROM "public"."onek"
+  WHERE ("thousand" < 995)
+  ORDER BY "thousand"
+ FETCH FIRST ((NULL::integer + 1)) ROWS WITH TIES
+;
+ALTER PUBLICATION "dump_pub_all" ADD TABLES IN SCHEMA "pubme2"
+;
+CREATE PUBLICATION testpub6 FOR TABLE rf_tbl_abcd_pk (a, b)
+;
+-- ok - NULLIF is allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (NULLIF(1,2) = a)
+;
+ALTER TABLE ONLY gtest30 ALTER COLUMN b DROP EXPRESSION
+;
+ALTER PUBLICATION testpub5 ADD TABLE testpub_rf_tbl1 WHERE (a < random())
+;
+-- ok
+CREATE UNIQUE INDEX unique_idx4 ON unique_tbl (i) NULLS NOT DISTINCT
+;
+-- fail - publications already exist
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub1, testpub2 WITH (refresh = false)
+;
+ALTER TABLE ONLY "public"."cminh" ALTER COLUMN "f1" SET COMPRESSION pglz
+;
+CREATE PUBLICATION dump_pub_nsp_2ct FOR
+  TABLES IN SCHEMA pubme,
+  TABLES IN SCHEMA pubme2
+;
+-- alter publication add schema
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test2
+;
+-- ok: stored generated column "d" can be in the list too
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, d)
+;
+-- fail
+ALTER PUBLICATION testpub3 ADD TABLES IN SCHEMA pub_test
+;
+CREATE OR REPLACE FUNCTION gc_to_sec(float8)
+RETURNS float8
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN CASE
+  WHEN $1 < '0'::float8 THEN '0'::float8
+  WHEN $1 / earth() > pi() THEN '2'::float8 * earth()
+  ELSE '2'::float8 * earth() * sin($1 / ('2'::float8 * earth()))
+END
+;
+-- Again, with a schema name and a role specification.
+CREATE SCHEMA regress_schema_1 AUTHORIZATION CURRENT_ROLE
+  CREATE SEQUENCE schema_not_existing.seq
+;
+ALTER TABLE gtest30_1 ALTER COLUMN b DROP EXPRESSION
+;
+-- check STORAGE correctness
+create table test_storage_failed (a text, b int storage extended)
+;
+alter table test_storage alter a set storage default
+;
+CREATE SCHEMA regress_schema_1 AUTHORIZATION CURRENT_ROLE
+  CREATE TABLE schema_not_existing.tab (id int)
+;
+CREATE INDEX concur_appclass_ind on concur_appclass_tab
+  USING gist (i tsvector_ops (siglen='1000'), j tsvector_ops (siglen='500'))
+;
+-- alter publication set it duplicate schemas should set the schemas after
+-- removing the duplicate schemas
+ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA pub_test1, pub_test1
+;
+ALTER TABLE fk_partitioned_fk ADD FOREIGN KEY (a, b)
+  REFERENCES fk_notpartitioned_pk
+  ON DELETE SET DEFAULT (a)
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime("YY-MM-DD") ? (@ == $x)' PASSING '2020-07-14'::date AS x))
+;
+create index _tstidx on _ltreetest using gist (t gist__ltree_ops(siglen=0))
+;
+ALTER PUBLICATION testpub5 ADD TABLE testpub_rf_tbl3 WHERE (e > 1000 AND e < 2000)
+;
+-- fail - publication already exists
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub WITH (refresh = false)
+;
+ALTER TABLE tbl ALTER COLUMN a DROP EXPRESSION
+;
+-- Test JSON_TABLE() column deparsing -- don't emit default ON ERROR / EMPTY
+-- behavior
+CREATE VIEW json_table_view8 AS SELECT * from JSON_TABLE('"a"', '$' COLUMNS (a text PATH '$'))
+;
+-- ok
+CREATE PUBLICATION testpub3 FOR TABLES IN SCHEMA pub_test
+;
+ALTER PUBLICATION testpub5 ADD TABLE testpub_rf_tbl1 WHERE (b < '2' COLLATE user_collation)
+;
+-- should be able to set publication with schema and table of the same schema
+ALTER PUBLICATION testpub6 SET TABLES IN SCHEMA testpub_rf_schema2, TABLE testpub_rf_schema2.testpub_rf_tbl6 WHERE (i < 99)
+;
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, ctid)
+;
+ALTER EXTENSION test_pg_dump ADD DATABASE postgres
+;
+CREATE INDEX concur_appclass_ind_2 on concur_appclass_tab
+  USING gist (k tsvector_ops (siglen='300'), j tsvector_ops)
+;
+ALTER TABLE sts_sch1.tbl ALTER COLUMN c SET EXPRESSION AS (a * 3)
+;
+CREATE FUNCTION merge_sf_test()
+ RETURNS TABLE(action text, a int, b text, id int, data text, filling int[])
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN MATCHED
+   AND (s.a + t.id) = 42
+   THEN UPDATE SET data = repeat(t.data, s.a) || s.b, id = length(s.b)
+WHEN NOT MATCHED
+   AND (s.b IS NOT NULL)
+   THEN INSERT (data, id)
+   VALUES (s.b, s.a)
+WHEN MATCHED
+   AND length(s.b || t.data) > 10
+   THEN UPDATE SET data = s.b
+WHEN MATCHED
+   AND s.a > 200
+   THEN UPDATE SET filling[s.a] = t.id
+WHEN MATCHED
+   AND s.a > 100
+   THEN DELETE
+WHEN MATCHED
+   THEN DO NOTHING
+WHEN NOT MATCHED
+   AND s.a > 200
+   THEN INSERT DEFAULT VALUES
+WHEN NOT MATCHED
+   AND s.a > 100
+   THEN INSERT (id, data) OVERRIDING USER VALUE
+   VALUES (s.a, DEFAULT)
+WHEN NOT MATCHED
+   AND s.a > 0
+   THEN INSERT
+   VALUES (s.a, s.b, DEFAULT)
+WHEN NOT MATCHED
+   THEN INSERT (filling[1], id)
+   VALUES (s.a, s.a)
+RETURNING
+   merge_action() AS action, *;
+END
+;
+ALTER PUBLICATION split_pub18_cols SET TABLE split_pub18_a.accounts (id, amount) WHERE (amount >= 0), TABLE split_pub18_a.accounts_extra
+;
+CREATE INDEX text_idx on test__int using gist (a gist__int_ops(numranges = 253))
+;
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test1
+;
+ALTER TABLE hash_parted2 DETACH PARTITION part_hp CONCURRENTLY
+;
+ALTER TABLE ONLY "public"."cmdata" ALTER COLUMN "f1" SET COMPRESSION pglz
+;
+CREATE PUBLICATION testpub8 FOR TABLE testpub_rf_tbl7 WHERE (y > 100)
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_split_to_array(string citext, pattern citext, flags text) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_split_to_array( $1::text, $2::text, CASE WHEN pg_catalog.strpos($3, 'c') = 0 THEN  $3 || 'i' ELSE $3 END )
+;
+----------
+[CREATE_TABLE] CREATE TABLE t (
+        id int,
+        data text STORAGE PLAIN
+    ) WITH (autovacuum_enabled = false)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_mix_1 FOR TABLE test_mix_1 (a, b)
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA AUTHORIZATION CURRENT_ROLE
+  CREATE TABLE regress_create_schema_role.tab (id int)
+;
+----------
+[CREATE_VIEW(SELECT)] -- JSON_TABLE: Test backward parsing
+
+CREATE VIEW jsonb_table_view2 AS
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			"int" int PATH '$',
+			"text" text PATH '$',
+			"char(4)" char(4) PATH '$',
+			"bool" bool PATH '$',
+			"numeric" numeric PATH '$',
+			"domain" jsonb_test_domain PATH '$'))
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$[1, 0 to $.a ? (@.datetime() == $x)]' PASSING '12:34'::time AS x))
+;
+----------
+[ALTER_VIEW|ALTER_COLUMN] ALTER MATERIALIZED VIEW compressmv ALTER COLUMN x SET COMPRESSION lz4
+;
+----------
+[CREATE_PUB_SUB] -- ok - only publish schema
+CREATE PUBLICATION testpub_tbl9 FOR TABLES IN SCHEMA public
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."limit_thousand_v_3" AS
+ SELECT "thousand"
+   FROM "public"."onek"
+  WHERE ("thousand" < 995)
+  ORDER BY "thousand"
+ FETCH FIRST ((NULL::integer + 1)) ROWS WITH TIES
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_all" ADD TABLES IN SCHEMA "pubme2"
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub6 FOR TABLE rf_tbl_abcd_pk (a, b)
+;
+----------
+[ALTER_PUB_SUB] -- ok - NULLIF is allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (NULLIF(1,2) = a)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE ONLY gtest30 ALTER COLUMN b DROP EXPRESSION
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 ADD TABLE testpub_rf_tbl1 WHERE (a < random())
+;
+----------
+[ADD_INDEX] -- ok
+CREATE UNIQUE INDEX unique_idx4 ON unique_tbl (i) NULLS NOT DISTINCT
+;
+----------
+[ALTER_PUB_SUB] -- fail - publications already exist
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub1, testpub2 WITH (refresh = false)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE ONLY "public"."cminh" ALTER COLUMN "f1" SET COMPRESSION pglz
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION dump_pub_nsp_2ct FOR
+  TABLES IN SCHEMA pubme,
+  TABLES IN SCHEMA pubme2
+;
+----------
+[ALTER_PUB_SUB] -- alter publication add schema
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test2
+;
+----------
+[ALTER_PUB_SUB] -- ok: stored generated column "d" can be in the list too
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, d)
+;
+----------
+[ALTER_PUB_SUB] -- fail
+ALTER PUBLICATION testpub3 ADD TABLES IN SCHEMA pub_test
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION gc_to_sec(float8)
+RETURNS float8
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN CASE
+  WHEN $1 < '0'::float8 THEN '0'::float8
+  WHEN $1 / earth() > pi() THEN '2'::float8 * earth()
+  ELSE '2'::float8 * earth() * sin($1 / ('2'::float8 * earth()))
+END
+;
+----------
+[CREATE_SCHEMA] -- Again, with a schema name and a role specification.
+CREATE SCHEMA regress_schema_1 AUTHORIZATION CURRENT_ROLE
+  CREATE SEQUENCE schema_not_existing.seq
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest30_1 ALTER COLUMN b DROP EXPRESSION
+;
+----------
+[CREATE_TABLE] -- check STORAGE correctness
+create table test_storage_failed (a text, b int storage extended)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table test_storage alter a set storage default
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA regress_schema_1 AUTHORIZATION CURRENT_ROLE
+  CREATE TABLE schema_not_existing.tab (id int)
+;
+----------
+[ADD_INDEX] CREATE INDEX concur_appclass_ind on concur_appclass_tab
+  USING gist (i tsvector_ops (siglen='1000'), j tsvector_ops (siglen='500'))
+;
+----------
+[ALTER_PUB_SUB] -- alter publication set it duplicate schemas should set the schemas after
+-- removing the duplicate schemas
+ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA pub_test1, pub_test1
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE fk_partitioned_fk ADD FOREIGN KEY (a, b)
+  REFERENCES fk_notpartitioned_pk
+  ON DELETE SET DEFAULT (a)
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime("YY-MM-DD") ? (@ == $x)' PASSING '2020-07-14'::date AS x))
+;
+----------
+[ADD_INDEX] create index _tstidx on _ltreetest using gist (t gist__ltree_ops(siglen=0))
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 ADD TABLE testpub_rf_tbl3 WHERE (e > 1000 AND e < 2000)
+;
+----------
+[ALTER_PUB_SUB] -- fail - publication already exists
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub WITH (refresh = false)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE tbl ALTER COLUMN a DROP EXPRESSION
+;
+----------
+[CREATE_VIEW(SELECT)] -- Test JSON_TABLE() column deparsing -- don't emit default ON ERROR / EMPTY
+-- behavior
+CREATE VIEW json_table_view8 AS SELECT * from JSON_TABLE('"a"', '$' COLUMNS (a text PATH '$'))
+;
+----------
+[CREATE_PUB_SUB] -- ok
+CREATE PUBLICATION testpub3 FOR TABLES IN SCHEMA pub_test
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 ADD TABLE testpub_rf_tbl1 WHERE (b < '2' COLLATE user_collation)
+;
+----------
+[ALTER_PUB_SUB] -- should be able to set publication with schema and table of the same schema
+ALTER PUBLICATION testpub6 SET TABLES IN SCHEMA testpub_rf_schema2, TABLE testpub_rf_schema2.testpub_rf_tbl6 WHERE (i < 99)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, ctid)
+;
+----------
+[ALTER_LIBRARY] ALTER EXTENSION test_pg_dump ADD DATABASE postgres
+;
+----------
+[ADD_INDEX] CREATE INDEX concur_appclass_ind_2 on concur_appclass_tab
+  USING gist (k tsvector_ops (siglen='300'), j tsvector_ops)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE sts_sch1.tbl ALTER COLUMN c SET EXPRESSION AS (a * 3)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION merge_sf_test()
+ RETURNS TABLE(action text, a int, b text, id int, data text, filling int[])
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN MATCHED
+   AND (s.a + t.id) = 42
+   THEN UPDATE SET data = repeat(t.data, s.a) || s.b, id = length(s.b)
+WHEN NOT MATCHED
+   AND (s.b IS NOT NULL)
+   THEN INSERT (data, id)
+   VALUES (s.b, s.a)
+WHEN MATCHED
+   AND length(s.b || t.data) > 10
+   THEN UPDATE SET data = s.b
+WHEN MATCHED
+   AND s.a > 200
+   THEN UPDATE SET filling[s.a] = t.id
+WHEN MATCHED
+   AND s.a > 100
+   THEN DELETE
+WHEN MATCHED
+   THEN DO NOTHING
+WHEN NOT MATCHED
+   AND s.a > 200
+   THEN INSERT DEFAULT VALUES
+WHEN NOT MATCHED
+   AND s.a > 100
+   THEN INSERT (id, data) OVERRIDING USER VALUE
+   VALUES (s.a, DEFAULT)
+WHEN NOT MATCHED
+   AND s.a > 0
+   THEN INSERT
+   VALUES (s.a, s.b, DEFAULT)
+WHEN NOT MATCHED
+   THEN INSERT (filling[1], id)
+   VALUES (s.a, s.a)
+RETURNING
+   merge_action() AS action, *;
+END
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION split_pub18_cols SET TABLE split_pub18_a.accounts (id, amount) WHERE (amount >= 0), TABLE split_pub18_a.accounts_extra
+;
+----------
+[ADD_INDEX] CREATE INDEX text_idx on test__int using gist (a gist__int_ops(numranges = 253))
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test1
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE hash_parted2 DETACH PARTITION part_hp CONCURRENTLY
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE ONLY "public"."cmdata" ALTER COLUMN "f1" SET COMPRESSION pglz
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub8 FOR TABLE testpub_rf_tbl7 WHERE (y > 100)
+;

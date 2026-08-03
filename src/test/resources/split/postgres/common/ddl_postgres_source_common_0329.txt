@@ -1,0 +1,774 @@
+CREATE FUNCTION gbt_float4_fetch(internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+-- And with a local child relation of the foreign table parent
+create table foo2child (f3 int) inherits (foo2)
+;
+ALTER TYPE "public"."insenum" ADD VALUE 'i27'
+;
+create rule silly as on delete to dcomptable do instead
+  update dcomptable set d1[1].r = d1[1].r - 1, d1[1].i = d1[1].i + 1
+    where d1[1].i > 0
+;
+create table idxpart21 partition of idxpart2 for values from (10) to (15)
+;
+CREATE TABLE testns.t1 (f1 int)
+;
+ALTER TABLE ONLY "public"."transition_table_base"
+    ADD CONSTRAINT "transition_table_base_pkey" PRIMARY KEY ("id")
+;
+CREATE VIEW pg_stat_slru AS
+    SELECT
+            s.name,
+            s.blks_zeroed,
+            s.blks_hit,
+            s.blks_read,
+            s.blks_written,
+            s.blks_exists,
+            s.flushes,
+            s.truncates,
+            s.stats_reset
+    FROM pg_stat_get_slru() s
+;
+CREATE TEXT SEARCH CONFIGURATION german
+	(PARSER = default)
+;
+-- Create the operator class
+CREATE OPERATOR CLASS gist_numeric_ops
+DEFAULT FOR TYPE numeric USING gist
+AS
+	OPERATOR	1	<  ,
+	OPERATOR	2	<= ,
+	OPERATOR	3	=  ,
+	OPERATOR	4	>= ,
+	OPERATOR	5	>  ,
+	FUNCTION	1	gbt_numeric_consistent (internal, numeric, int2, oid, internal),
+	FUNCTION	2	gbt_numeric_union (internal, internal),
+	FUNCTION	3	gbt_numeric_compress (internal),
+	FUNCTION	4	gbt_var_decompress (internal),
+	FUNCTION	5	gbt_numeric_penalty (internal, internal, internal),
+	FUNCTION	6	gbt_numeric_picksplit (internal, internal),
+	FUNCTION	7	gbt_numeric_same (gbtreekey_var, gbtreekey_var, internal),
+	STORAGE			gbtreekey_var
+;
+ALTER TABLE temporal_fk_mltrng2mltrng
+  DROP CONSTRAINT temporal_fk_mltrng2mltrng_fk
+;
+ALTER TABLE attmp ADD COLUMN c text
+;
+create table parted_conflict_1_1 partition of parted_conflict_1 for values from (0) to (500)
+;
+-- We need a shell type to test some CREATE TYPE failure cases with
+CREATE TYPE bogus_type
+;
+-- Table having triggers
+
+CREATE TABLE base_tbl (a int PRIMARY KEY, b text DEFAULT 'Unspecified')
+;
+-- unrecognized object types
+DO $$
+DECLARE
+    objtype text;
+BEGIN
+    FOR objtype IN VALUES ('toast table'), ('index column'), ('sequence column'),
+        ('toast table column'), ('view column'), ('materialized view column')
+    LOOP
+        BEGIN
+            PERFORM pg_get_object_address(objtype, '{one}', '{}');
+        EXCEPTION WHEN invalid_parameter_value THEN
+            RAISE WARNING 'error for %: %', objtype, sqlerrm;
+        END;
+    END LOOP;
+END;
+$$
+;
+CREATE TABLE "public"."pagg_tab2_p3" (
+    "x" integer,
+    "y" integer
+)
+;
+-- cleanup
+drop table range_parted, list_parted
+;
+ALTER OPERATOR ^? (_lquery, ltree)
+  SET (RESTRICT = matchingsel, JOIN = matchingjoinsel)
+;
+CREATE DATABASE "regression./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ" WITH TEMPLATE = template0 OID = 16385 ENCODING = 'SQL_ASCII' LOCALE_PROVIDER = libc LOCALE = 'C'
+;
+CREATE TABLE update_test (
+    a   INT DEFAULT 10,
+    b   INT,
+    c   TEXT
+)
+;
+-- This is a degenerate case of PHV usage: it is evaluated and needed inside
+-- a baserel scan operation that the SJE removes.  The PHV in this test should
+-- be in the filter of parameterized Index Scan: the replace_nestloop_params()
+-- code will detect if the placeholder list doesn't have a reference to this
+-- parameter.
+--
+-- NOTE:  enable_hashjoin and enable_mergejoin must be disabled.
+CREATE TABLE tbl_phv(x int, y int PRIMARY KEY)
+;
+alter table a_star reset (parallel_workers)
+;
+ALTER TABLE test_replica_identity REPLICA IDENTITY USING INDEX test_replica_identity_unique_nondefer
+;
+create function tg_slotlink_set(bpchar, bpchar)
+returns integer as '
+declare
+    myname	alias for $1;
+    blname	alias for $2;
+    mytype	char(2);
+    link	char(4);
+    rec		record;
+begin
+    mytype := substr(myname, 1, 2);
+    link := mytype || substr(blname, 1, 2);
+    if link = ''PHPH'' then
+        raise exception
+		''slotlink between two phones does not make sense'';
+    end if;
+    if link in (''PHHS'', ''HSPH'') then
+        raise exception
+		''link of phone to hub does not make sense'';
+    end if;
+    if link in (''PHIF'', ''IFPH'') then
+        raise exception
+		''link of phone to hub does not make sense'';
+    end if;
+    if link in (''PSWS'', ''WSPS'') then
+        raise exception
+		''slotlink from patchslot to wallslot not permitted'';
+    end if;
+    if mytype = ''PS'' then
+        select into rec * from PSlot where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.slotlink != blname then
+	    update PSlot set slotlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''WS'' then
+        select into rec * from WSlot where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.slotlink != blname then
+	    update WSlot set slotlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''IF'' then
+        select into rec * from IFace where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.slotlink != blname then
+	    update IFace set slotlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''HS'' then
+        select into rec * from HSlot where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.slotlink != blname then
+	    update HSlot set slotlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''PH'' then
+        select into rec * from PHone where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.slotlink != blname then
+	    update PHone set slotlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    raise exception ''illegal slotlink beginning with %'', mytype;
+end;
+' language plpgsql
+;
+create table rules_base(f1 int, f2 int)
+;
+CREATE TEMP TABLE pg_temp_10.pg_temp_26308_2 (tid pg_catalog.tid)
+;
+CREATE FUNCTION "public"."test_enc_conversion"("bytea", "name", "name", boolean, OUT "validlen" integer, OUT "result" "bytea") RETURNS "record"
+    LANGUAGE "c" STRICT
+    AS '/src/src/test/regress/regress.so', 'test_enc_conversion'
+;
+CREATE SUBSCRIPTION sub CONNECTION 'port=22205 host=/tmp/tNIJG8ZoYI dbname=postgres' PUBLICATION pub WITH (slot_name = 'lsub4_slot', create_slot = false)
+;
+DO LANGUAGE plpgsql $$
+BEGIN
+  EXECUTE 'COPY copy1 FROM stdin';
+END;
+$$
+;
+-- Use hand-rolled hash functions and operator classes to get predictable
+-- result on different machines.  The hash function for int4 simply returns
+-- the sum of the values passed to it and the one for text returns the length
+-- of the non-empty string value passed to it or 0.
+
+create function part_hashint4_noop(value int4, seed int8)
+    returns int8 as $$
+    select value + seed;
+    $$ language sql strict immutable parallel safe
+;
+-- VIEW trigger function
+CREATE OR REPLACE FUNCTION view_trigger() RETURNS trigger
+LANGUAGE plpgsql AS $$
+declare
+    argstr text := '';
+begin
+    for i in 0 .. TG_nargs - 1 loop
+        if i > 0 then
+            argstr := argstr || ', ';
+        end if;
+        argstr := argstr || TG_argv[i];
+    end loop;
+
+    raise notice '% % % % (%)', TG_TABLE_NAME, TG_WHEN, TG_OP, TG_LEVEL, argstr;
+
+    if TG_LEVEL = 'ROW' then
+        if TG_OP = 'INSERT' then
+            raise NOTICE 'NEW: %', NEW;
+            INSERT INTO main_table VALUES (NEW.a, NEW.b);
+            RETURN NEW;
+        end if;
+
+        if TG_OP = 'UPDATE' then
+            raise NOTICE 'OLD: %, NEW: %', OLD, NEW;
+            UPDATE main_table SET a = NEW.a, b = NEW.b WHERE a = OLD.a AND b = OLD.b;
+            if NOT FOUND then RETURN NULL; end if;
+            RETURN NEW;
+        end if;
+
+        if TG_OP = 'DELETE' then
+            raise NOTICE 'OLD: %', OLD;
+            DELETE FROM main_table WHERE a = OLD.a AND b = OLD.b;
+            if NOT FOUND then RETURN NULL; end if;
+            RETURN OLD;
+        end if;
+    end if;
+
+    RETURN NULL;
+end;
+$$
+;
+VACUUM (SKIP_DATABASE_STATS, FULL) pg_catalog.pg_subscription_rel
+;
+CREATE OPERATOR <= (
+  LEFTARG = int_custom,
+  RIGHTARG = int_custom,
+  FUNCTION = int_custom_le,
+  COMMUTATOR = >=,
+  NEGATOR = >,
+  RESTRICT = scalarlesel,
+  JOIN = scalarlejoinsel
+)
+;
+ALTER INDEX pg_toast.pg_toast_28219_index RENAME TO reind_con_toast_idx
+;
+CREATE TABLE gtest_child2 PARTITION OF gtest_parent (
+    f3 WITH OPTIONS GENERATED ALWAYS AS (f2 * 22) STORED  -- overrides gen expr
+) FOR VALUES FROM ('2016-08-01') TO ('2016-09-01')
+;
+create table rule_and_refint_t3 (
+	id3a integer,
+	id3b integer,
+	id3c integer,
+	data text,
+
+	primary key (id3a, id3b, id3c),
+
+	foreign key (id3a, id3b) references rule_and_refint_t1 (id1a, id1b),
+	foreign key (id3a, id3c) references rule_and_refint_t2 (id2a, id2c)
+)
+;
+create or replace function forc01() returns void as $$
+declare
+  c cursor(r1 integer, r2 integer)
+       for select * from generate_series(r1,r2) i;
+  c2 cursor
+       for select * from generate_series(41,43) i;
+begin
+  -- assign portal names to cursors to get stable output
+  c := 'c';
+  c2 := 'c2';
+  for r in c(5,7) loop
+    raise notice '% from %', r.i, c;
+  end loop;
+  -- again, to test if cursor was closed properly
+  for r in c(9,10) loop
+    raise notice '% from %', r.i, c;
+  end loop;
+  -- and test a parameterless cursor
+  for r in c2 loop
+    raise notice '% from %', r.i, c2;
+  end loop;
+  -- and try it with a hand-assigned name
+  raise notice 'after loop, c2 = %', c2;
+  c2 := 'special_name';
+  for r in c2 loop
+    raise notice '% from %', r.i, c2;
+  end loop;
+  raise notice 'after loop, c2 = %', c2;
+  -- and try it with a generated name
+  -- (which we can't show in the output because it's variable)
+  c2 := null;
+  for r in c2 loop
+    raise notice '%', r.i;
+  end loop;
+  raise notice 'after loop, c2 = %', c2;
+  return;
+end;
+$$ language plpgsql
+;
+alter table alter1.t1 set schema alter2
+;
+VACUUM (PARALLEL 0) pg_catalog.pg_publication_namespace
+;
+ALTER TABLE fk_partitioned_pk_2 VALIDATE CONSTRAINT selffk
+;
+ALTER INDEX pg_toast.pg_toast_31078_index RENAME TO reind_con_toast_idx
+;
+-- should work
+
+-- Check inherited UPDATE with first child excluded
+create table some_tab (f1 int, f2 int, f3 int, check (f1 < 10) no inherit)
+;
+CREATE TRIGGER row_before_insupd_trigger BEFORE INSERT OR UPDATE ON base_tbl FOR EACH ROW EXECUTE PROCEDURE row_before_insupd_trigfunc()
+;
+ALTER TYPE split_domain_type_next.address_type ADD ATTRIBUTE country text COLLATE "C" CASCADE
+;
+ANALYZE public.partr_def2
+;
+ALTER TABLE errtst_child_fastdef ADD COLUMN data int NOT NULL DEFAULT 0
+;
+ANALYZE aggtest
+;
+drop function funcB()
+;
+ANALYZE public.bit_defaults
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_float4_fetch(internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[CREATE_TABLE] -- And with a local child relation of the foreign table parent
+create table foo2child (f3 int) inherits (foo2)
+;
+----------
+[ALTER_TYPE] ALTER TYPE "public"."insenum" ADD VALUE 'i27'
+;
+----------
+[CREATE_POLICY] create rule silly as on delete to dcomptable do instead
+  update dcomptable set d1[1].r = d1[1].r - 1, d1[1].i = d1[1].i + 1
+    where d1[1].i > 0
+;
+----------
+[CREATE_TABLE] create table idxpart21 partition of idxpart2 for values from (10) to (15)
+;
+----------
+[CREATE_TABLE] CREATE TABLE testns.t1 (f1 int)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "public"."transition_table_base"
+    ADD CONSTRAINT "transition_table_base_pkey" PRIMARY KEY ("id")
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW pg_stat_slru AS
+    SELECT
+            s.name,
+            s.blks_zeroed,
+            s.blks_hit,
+            s.blks_read,
+            s.blks_written,
+            s.blks_exists,
+            s.flushes,
+            s.truncates,
+            s.stats_reset
+    FROM pg_stat_get_slru() s
+;
+----------
+[CREATE_POLICY] CREATE TEXT SEARCH CONFIGURATION german
+	(PARSER = default)
+;
+----------
+[CREATE_PROG_OBJ] -- Create the operator class
+CREATE OPERATOR CLASS gist_numeric_ops
+DEFAULT FOR TYPE numeric USING gist
+AS
+	OPERATOR	1	<  ,
+	OPERATOR	2	<= ,
+	OPERATOR	3	=  ,
+	OPERATOR	4	>= ,
+	OPERATOR	5	>  ,
+	FUNCTION	1	gbt_numeric_consistent (internal, numeric, int2, oid, internal),
+	FUNCTION	2	gbt_numeric_union (internal, internal),
+	FUNCTION	3	gbt_numeric_compress (internal),
+	FUNCTION	4	gbt_var_decompress (internal),
+	FUNCTION	5	gbt_numeric_penalty (internal, internal, internal),
+	FUNCTION	6	gbt_numeric_picksplit (internal, internal),
+	FUNCTION	7	gbt_numeric_same (gbtreekey_var, gbtreekey_var, internal),
+	STORAGE			gbtreekey_var
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] ALTER TABLE temporal_fk_mltrng2mltrng
+  DROP CONSTRAINT temporal_fk_mltrng2mltrng_fk
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE attmp ADD COLUMN c text
+;
+----------
+[CREATE_TABLE] create table parted_conflict_1_1 partition of parted_conflict_1 for values from (0) to (500)
+;
+----------
+[CREATE_TYPE] -- We need a shell type to test some CREATE TYPE failure cases with
+CREATE TYPE bogus_type
+;
+----------
+[CREATE_TABLE] -- Table having triggers
+
+CREATE TABLE base_tbl (a int PRIMARY KEY, b text DEFAULT 'Unspecified')
+;
+----------
+[BLOCK] -- unrecognized object types
+DO $$
+DECLARE
+    objtype text;
+BEGIN
+    FOR objtype IN VALUES ('toast table'), ('index column'), ('sequence column'),
+        ('toast table column'), ('view column'), ('materialized view column')
+    LOOP
+        BEGIN
+            PERFORM pg_get_object_address(objtype, '{one}', '{}');
+        EXCEPTION WHEN invalid_parameter_value THEN
+            RAISE WARNING 'error for %: %', objtype, sqlerrm;
+        END;
+    END LOOP;
+END;
+$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."pagg_tab2_p3" (
+    "x" integer,
+    "y" integer
+)
+;
+----------
+[DROP_TABLE] -- cleanup
+drop table range_parted, list_parted
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR ^? (_lquery, ltree)
+  SET (RESTRICT = matchingsel, JOIN = matchingjoinsel)
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE "regression./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ" WITH TEMPLATE = template0 OID = 16385 ENCODING = 'SQL_ASCII' LOCALE_PROVIDER = libc LOCALE = 'C'
+;
+----------
+[CREATE_TABLE] CREATE TABLE update_test (
+    a   INT DEFAULT 10,
+    b   INT,
+    c   TEXT
+)
+;
+----------
+[CREATE_TABLE] -- This is a degenerate case of PHV usage: it is evaluated and needed inside
+-- a baserel scan operation that the SJE removes.  The PHV in this test should
+-- be in the filter of parameterized Index Scan: the replace_nestloop_params()
+-- code will detect if the placeholder list doesn't have a reference to this
+-- parameter.
+--
+-- NOTE:  enable_hashjoin and enable_mergejoin must be disabled.
+CREATE TABLE tbl_phv(x int, y int PRIMARY KEY)
+;
+----------
+[ALTER_TABLE] alter table a_star reset (parallel_workers)
+;
+----------
+[ALTER_TABLE] ALTER TABLE test_replica_identity REPLICA IDENTITY USING INDEX test_replica_identity_unique_nondefer
+;
+----------
+[CREATE_PROG_OBJ] create function tg_slotlink_set(bpchar, bpchar)
+returns integer as '
+declare
+    myname	alias for $1;
+    blname	alias for $2;
+    mytype	char(2);
+    link	char(4);
+    rec		record;
+begin
+    mytype := substr(myname, 1, 2);
+    link := mytype || substr(blname, 1, 2);
+    if link = ''PHPH'' then
+        raise exception
+		''slotlink between two phones does not make sense'';
+    end if;
+    if link in (''PHHS'', ''HSPH'') then
+        raise exception
+		''link of phone to hub does not make sense'';
+    end if;
+    if link in (''PHIF'', ''IFPH'') then
+        raise exception
+		''link of phone to hub does not make sense'';
+    end if;
+    if link in (''PSWS'', ''WSPS'') then
+        raise exception
+		''slotlink from patchslot to wallslot not permitted'';
+    end if;
+    if mytype = ''PS'' then
+        select into rec * from PSlot where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.slotlink != blname then
+	    update PSlot set slotlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''WS'' then
+        select into rec * from WSlot where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.slotlink != blname then
+	    update WSlot set slotlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''IF'' then
+        select into rec * from IFace where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.slotlink != blname then
+	    update IFace set slotlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''HS'' then
+        select into rec * from HSlot where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.slotlink != blname then
+	    update HSlot set slotlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''PH'' then
+        select into rec * from PHone where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.slotlink != blname then
+	    update PHone set slotlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    raise exception ''illegal slotlink beginning with %'', mytype;
+end;
+' language plpgsql
+;
+----------
+[CREATE_TABLE] create table rules_base(f1 int, f2 int)
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE pg_temp_10.pg_temp_26308_2 (tid pg_catalog.tid)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."test_enc_conversion"("bytea", "name", "name", boolean, OUT "validlen" integer, OUT "result" "bytea") RETURNS "record"
+    LANGUAGE "c" STRICT
+    AS '/src/src/test/regress/regress.so', 'test_enc_conversion'
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION sub CONNECTION 'port=22205 host=/tmp/tNIJG8ZoYI dbname=postgres' PUBLICATION pub WITH (slot_name = 'lsub4_slot', create_slot = false)
+;
+----------
+[BLOCK] DO LANGUAGE plpgsql $$
+BEGIN
+  EXECUTE 'COPY copy1 FROM stdin';
+END;
+$$
+;
+----------
+[CREATE_PROG_OBJ] -- Use hand-rolled hash functions and operator classes to get predictable
+-- result on different machines.  The hash function for int4 simply returns
+-- the sum of the values passed to it and the one for text returns the length
+-- of the non-empty string value passed to it or 0.
+
+create function part_hashint4_noop(value int4, seed int8)
+    returns int8 as $$
+    select value + seed;
+    $$ language sql strict immutable parallel safe
+;
+----------
+[CREATE_PROG_OBJ] -- VIEW trigger function
+CREATE OR REPLACE FUNCTION view_trigger() RETURNS trigger
+LANGUAGE plpgsql AS $$
+declare
+    argstr text := '';
+begin
+    for i in 0 .. TG_nargs - 1 loop
+        if i > 0 then
+            argstr := argstr || ', ';
+        end if;
+        argstr := argstr || TG_argv[i];
+    end loop;
+
+    raise notice '% % % % (%)', TG_TABLE_NAME, TG_WHEN, TG_OP, TG_LEVEL, argstr;
+
+    if TG_LEVEL = 'ROW' then
+        if TG_OP = 'INSERT' then
+            raise NOTICE 'NEW: %', NEW;
+            INSERT INTO main_table VALUES (NEW.a, NEW.b);
+            RETURN NEW;
+        end if;
+
+        if TG_OP = 'UPDATE' then
+            raise NOTICE 'OLD: %, NEW: %', OLD, NEW;
+            UPDATE main_table SET a = NEW.a, b = NEW.b WHERE a = OLD.a AND b = OLD.b;
+            if NOT FOUND then RETURN NULL; end if;
+            RETURN NEW;
+        end if;
+
+        if TG_OP = 'DELETE' then
+            raise NOTICE 'OLD: %', OLD;
+            DELETE FROM main_table WHERE a = OLD.a AND b = OLD.b;
+            if NOT FOUND then RETURN NULL; end if;
+            RETURN OLD;
+        end if;
+    end if;
+
+    RETURN NULL;
+end;
+$$
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, FULL) pg_catalog.pg_subscription_rel
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR <= (
+  LEFTARG = int_custom,
+  RIGHTARG = int_custom,
+  FUNCTION = int_custom_le,
+  COMMUTATOR = >=,
+  NEGATOR = >,
+  RESTRICT = scalarlesel,
+  JOIN = scalarlejoinsel
+)
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_28219_index RENAME TO reind_con_toast_idx
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_child2 PARTITION OF gtest_parent (
+    f3 WITH OPTIONS GENERATED ALWAYS AS (f2 * 22) STORED  -- overrides gen expr
+) FOR VALUES FROM ('2016-08-01') TO ('2016-09-01')
+;
+----------
+[CREATE_TABLE] create table rule_and_refint_t3 (
+	id3a integer,
+	id3b integer,
+	id3c integer,
+	data text,
+
+	primary key (id3a, id3b, id3c),
+
+	foreign key (id3a, id3b) references rule_and_refint_t1 (id1a, id1b),
+	foreign key (id3a, id3c) references rule_and_refint_t2 (id2a, id2c)
+)
+;
+----------
+[CREATE_PROG_OBJ] create or replace function forc01() returns void as $$
+declare
+  c cursor(r1 integer, r2 integer)
+       for select * from generate_series(r1,r2) i;
+  c2 cursor
+       for select * from generate_series(41,43) i;
+begin
+  -- assign portal names to cursors to get stable output
+  c := 'c';
+  c2 := 'c2';
+  for r in c(5,7) loop
+    raise notice '% from %', r.i, c;
+  end loop;
+  -- again, to test if cursor was closed properly
+  for r in c(9,10) loop
+    raise notice '% from %', r.i, c;
+  end loop;
+  -- and test a parameterless cursor
+  for r in c2 loop
+    raise notice '% from %', r.i, c2;
+  end loop;
+  -- and try it with a hand-assigned name
+  raise notice 'after loop, c2 = %', c2;
+  c2 := 'special_name';
+  for r in c2 loop
+    raise notice '% from %', r.i, c2;
+  end loop;
+  raise notice 'after loop, c2 = %', c2;
+  -- and try it with a generated name
+  -- (which we can't show in the output because it's variable)
+  c2 := null;
+  for r in c2 loop
+    raise notice '%', r.i;
+  end loop;
+  raise notice 'after loop, c2 = %', c2;
+  return;
+end;
+$$ language plpgsql
+;
+----------
+[ALTER_TABLE] alter table alter1.t1 set schema alter2
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 0) pg_catalog.pg_publication_namespace
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] ALTER TABLE fk_partitioned_pk_2 VALIDATE CONSTRAINT selffk
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_31078_index RENAME TO reind_con_toast_idx
+;
+----------
+[CREATE_TABLE] -- should work
+
+-- Check inherited UPDATE with first child excluded
+create table some_tab (f1 int, f2 int, f3 int, check (f1 < 10) no inherit)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER row_before_insupd_trigger BEFORE INSERT OR UPDATE ON base_tbl FOR EACH ROW EXECUTE PROCEDURE row_before_insupd_trigfunc()
+;
+----------
+[ALTER_TYPE] ALTER TYPE split_domain_type_next.address_type ADD ATTRIBUTE country text COLLATE "C" CASCADE
+;
+----------
+[ADMIN_TABLE] ANALYZE public.partr_def2
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE errtst_child_fastdef ADD COLUMN data int NOT NULL DEFAULT 0
+;
+----------
+[ADMIN_TABLE] ANALYZE aggtest
+;
+----------
+[DROP_PROG_OBJ] drop function funcB()
+;
+----------
+[ADMIN_TABLE] ANALYZE public.bit_defaults
+;

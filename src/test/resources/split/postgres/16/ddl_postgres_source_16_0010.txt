@@ -1,0 +1,460 @@
+ALTER PUBLICATION testpub_tbl9 SET TABLE public.testpub_tbl7(a)
+;
+CREATE OR REPLACE FUNCTION regexp_replace(string citext, pattern citext, replacement text, flags text) returns TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_replace( $1::text, $2::text, $3, CASE WHEN pg_catalog.strpos($4, 'c') = 0 THEN  $4 || 'i' ELSE $4 END)
+;
+DROP DATABASE IF EXISTS split_db18_icu WITH (FORCE)
+;
+CREATE PUBLICATION pub3 FOR TABLE t_1 (a), t_2
+	  WITH (PUBLISH_VIA_PARTITION_ROOT)
+;
+CREATE FUNCTION functest_S_1(a text, b date) RETURNS boolean
+    LANGUAGE SQL
+    RETURN a = 'abcd' AND b > '2001-01-01'
+;
+-- failure - add a table with column list when there is already a schema in the
+-- publication
+ALTER PUBLICATION testpub_tbl9 ADD TABLE public.testpub_tbl7(a)
+;
+ALTER TABLE gtest30 ALTER COLUMN b DROP EXPRESSION
+;
+-- failure - cannot SET column list and schema together
+ALTER PUBLICATION testpub_tbl9 SET TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+ALTER SUBSCRIPTION split_sub DROP PUBLICATION split_pub_schema WITH (refresh = false)
+;
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub3 WITH (refresh = false)
+;
+-- ok - delete publications
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub1, testpub2 WITH (refresh = false)
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (1234)
+;
+CREATE PUBLICATION tap_pub_x FOR TABLE schema_rf_x.tab_rf_x WHERE (x > 10)
+;
+ALTER TABLE ONLY "public"."cmmove3" ALTER COLUMN "f1" SET COMPRESSION pglz
+;
+CREATE VIEW limit_thousand_v_3 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST NULL ROWS WITH TIES
+;
+CREATE SCHEMA IF NOT EXISTS newschema3 AUTHORIZATION CURRENT_ROLE
+;
+CREATE OR REPLACE FUNCTION latitude(earth)
+RETURNS float8
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN CASE
+  WHEN public.cube_ll_coord($1, 3) / earth() < '-1'::float8 THEN '-90'::float8
+  WHEN public.cube_ll_coord($1, 3) / earth() > '1'::float8 THEN '90'::float8
+  ELSE degrees(asin(public.cube_ll_coord($1, 3) / earth()))
+END
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (a IN (2, 4, 6))
+;
+-- not allowed
+
+ALTER TYPE myvarchar SET (storage = extended)
+;
+CREATE PUBLICATION pub_test_root FOR TABLE test_root (a) WITH (publish_via_partition_root = true)
+;
+CREATE PUBLICATION addr_pub_schema FOR TABLES IN SCHEMA addr_nsp
+;
+CREATE VIEW json_object_view AS
+SELECT JSON_OBJECT('foo' : '1' FORMAT JSON, 'bar' : 'baz' RETURNING json)
+;
+CREATE UNIQUE INDEX unique_idx2 ON unique_tbl (i) NULLS NOT DISTINCT
+;
+-- test alter compression method for partitioned tables
+ALTER TABLE cmpart1 ALTER COLUMN f1 SET COMPRESSION pglz
+;
+ALTER PUBLICATION testpub_foralltables DROP TABLES IN SCHEMA pub_test
+;
+CREATE PUBLICATION dump_pub_qual_2ct FOR
+  TABLE ONLY pubme.t0 (c) WHERE (c > 0),
+  TABLE ONLY pubme.t1 (c)
+;
+CREATE TABLE not_leftmost (c text STORAGE PLAIN)
+;
+CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch1 WITH (PUBLISH_VIA_PARTITION_ROOT=1)
+;
+ALTER INDEX e NO DEPENDS ON EXTENSION test_ext5
+;
+-- ok - add two publications into subscription
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub1, testpub2 WITH (refresh = false)
+;
+CREATE OR REPLACE FUNCTION integer_pl_date(integer, date)
+ RETURNS date
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+CREATE FUNCTION functest_S_14() RETURNS bigint
+    RETURN (SELECT count(*) FROM functestv3)
+;
+drop database if exists test_database_exists with (force)
+;
+CREATE TABLE cmpart(f1 text COMPRESSION lz4) PARTITION BY HASH(f1)
+;
+CREATE PUBLICATION testpubpart_forschema FOR TABLES IN SCHEMA pub_testpart2
+;
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl6 (a, b, c)
+;
+CREATE FUNCTION functest_IS_7()
+    RETURNS int
+    LANGUAGE SQL
+    RETURN (SELECT count(a) FROM functest2)
+;
+ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl1 (id, ctid)
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (ARRAY[a] <@ ARRAY[2, 4, 6])
+;
+CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch2 WITH (PUBLISH_VIA_PARTITION_ROOT=0)
+;
+CREATE INDEX wowidx1 ON test_tsvector USING gist (a tsvector_ops(siglen=100, siglen = 200))
+;
+CREATE FUNCTION functest_S_13() RETURNS boolean
+    BEGIN ATOMIC
+        SELECT 1;
+        SELECT false;
+    END
+;
+-- Create a table that holds all the known in-core data types and leave it
+-- around so as pg_upgrade is able to test their binary compatibility.
+CREATE TABLE tab_core_types AS SELECT
+  '(11,12)'::point,
+  '(1,1),(2,2)'::line,
+  '((11,11),(12,12))'::lseg,
+  '((11,11),(13,13))'::box,
+  '((11,12),(13,13),(14,14))'::path AS openedpath,
+  '[(11,12),(13,13),(14,14)]'::path AS closedpath,
+  '((11,12),(13,13),(14,14))'::polygon,
+  '1,1,1'::circle,
+  'today'::date,
+  'now'::time,
+  'now'::timestamp,
+  'now'::timetz,
+  'now'::timestamptz,
+  '12 seconds'::interval,
+  '{"reason":"because"}'::json,
+  '{"when":"now"}'::jsonb,
+  '$.a[*] ? (@ > 2)'::jsonpath,
+  '127.0.0.1'::inet,
+  '127.0.0.0/8'::cidr,
+  '00:01:03:86:1c:ba'::macaddr8,
+  '00:01:03:86:1c:ba'::macaddr,
+  2::int2, 4::int4, 8::int8,
+  4::float4, '8'::float8, pi()::numeric,
+  'foo'::"char",
+  'c'::bpchar,
+  'abc'::varchar,
+  'name'::name,
+  'txt'::text,
+  true::bool,
+  E'\\xDEADBEEF'::bytea,
+  B'10001'::bit,
+  B'10001'::varbit AS varbit,
+  '12.34'::money,
+  'abc'::refcursor,
+  '1 2'::int2vector,
+  '1 2'::oidvector,
+  format('%I=UC/%I', USER, USER)::aclitem AS aclitem,
+  'a fat cat sat on a mat and ate a fat rat'::tsvector,
+  'fat & rat'::tsquery,
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
+  '11'::xid8,
+  'pg_class'::regclass,
+  'regtype'::regtype type,
+  'pg_monitor'::regrole,
+  'pg_class'::regclass::oid,
+  '(1,1)'::tid, '2'::xid, '3'::cid,
+  '10:20:10,14,15'::txid_snapshot,
+  '10:20:10,14,15'::pg_snapshot,
+  '16/B374D848'::pg_lsn,
+  1::information_schema.cardinal_number,
+  'l'::information_schema.character_data,
+  'n'::information_schema.sql_identifier,
+  'now'::information_schema.time_stamp,
+  'YES'::information_schema.yes_or_no,
+  '(1,2)'::int4range, '{(1,2)}'::int4multirange,
+  '(3,4)'::int8range, '{(3,4)}'::int8multirange,
+  '(3,4)'::numrange, '{(3,4)}'::nummultirange,
+  '(2020-01-02, 2021-02-03)'::daterange,
+  '{(2020-01-02, 2021-02-03)}'::datemultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tsrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tsmultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tstzrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tstzmultirange
+;
+ALTER PUBLICATION testpub5 ADD TABLE testpub_rf_tbl1 WHERE (a >= testpub_rf_func2())
+;
+-- Remove generated columns from column list, when 'publish_generated_columns'='none'
+ALTER PUBLICATION pub2 SET TABLE gencols(a)
+;
+CREATE PUBLICATION tap_pub_child_sync FOR TABLE tab_rowfilter_child_sync WHERE (a < 15)
+;
+ALTER PUBLICATION "dump_pub_qual_2ct" ADD TABLE ONLY "pubme"."t1" ("c")
+;
+alter view v1 rename column a to x
+;
+create index _tstidx on _ltreetest using gist (t gist__ltree_ops(siglen=2024))
+;
+create function mydouble(int) returns int strict immutable parallel safe
+begin atomic select $1 * 2; end
+;
+------------------------------------------------------------------------------------------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_tbl9 SET TABLE public.testpub_tbl7(a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_replace(string citext, pattern citext, replacement text, flags text) returns TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_replace( $1::text, $2::text, $3, CASE WHEN pg_catalog.strpos($4, 'c') = 0 THEN  $4 || 'i' ELSE $4 END)
+;
+----------
+[DROP_CATALOG] DROP DATABASE IF EXISTS split_db18_icu WITH (FORCE)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub3 FOR TABLE t_1 (a), t_2
+	  WITH (PUBLISH_VIA_PARTITION_ROOT)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_1(a text, b date) RETURNS boolean
+    LANGUAGE SQL
+    RETURN a = 'abcd' AND b > '2001-01-01'
+;
+----------
+[ALTER_PUB_SUB] -- failure - add a table with column list when there is already a schema in the
+-- publication
+ALTER PUBLICATION testpub_tbl9 ADD TABLE public.testpub_tbl7(a)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest30 ALTER COLUMN b DROP EXPRESSION
+;
+----------
+[ALTER_PUB_SUB] -- failure - cannot SET column list and schema together
+ALTER PUBLICATION testpub_tbl9 SET TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION split_sub DROP PUBLICATION split_pub_schema WITH (refresh = false)
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub3 WITH (refresh = false)
+;
+----------
+[ALTER_PUB_SUB] -- ok - delete publications
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub1, testpub2 WITH (refresh = false)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (1234)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_x FOR TABLE schema_rf_x.tab_rf_x WHERE (x > 10)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE ONLY "public"."cmmove3" ALTER COLUMN "f1" SET COMPRESSION pglz
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW limit_thousand_v_3 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST NULL ROWS WITH TIES
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA IF NOT EXISTS newschema3 AUTHORIZATION CURRENT_ROLE
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION latitude(earth)
+RETURNS float8
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN CASE
+  WHEN public.cube_ll_coord($1, 3) / earth() < '-1'::float8 THEN '-90'::float8
+  WHEN public.cube_ll_coord($1, 3) / earth() > '1'::float8 THEN '90'::float8
+  ELSE degrees(asin(public.cube_ll_coord($1, 3) / earth()))
+END
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (a IN (2, 4, 6))
+;
+----------
+[ALTER_TYPE] -- not allowed
+
+ALTER TYPE myvarchar SET (storage = extended)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_test_root FOR TABLE test_root (a) WITH (publish_via_partition_root = true)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION addr_pub_schema FOR TABLES IN SCHEMA addr_nsp
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_object_view AS
+SELECT JSON_OBJECT('foo' : '1' FORMAT JSON, 'bar' : 'baz' RETURNING json)
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX unique_idx2 ON unique_tbl (i) NULLS NOT DISTINCT
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] -- test alter compression method for partitioned tables
+ALTER TABLE cmpart1 ALTER COLUMN f1 SET COMPRESSION pglz
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_foralltables DROP TABLES IN SCHEMA pub_test
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION dump_pub_qual_2ct FOR
+  TABLE ONLY pubme.t0 (c) WHERE (c > 0),
+  TABLE ONLY pubme.t1 (c)
+;
+----------
+[CREATE_TABLE] CREATE TABLE not_leftmost (c text STORAGE PLAIN)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch1 WITH (PUBLISH_VIA_PARTITION_ROOT=1)
+;
+----------
+[UNKNOWN] ALTER INDEX e NO DEPENDS ON EXTENSION test_ext5
+;
+----------
+[ALTER_PUB_SUB] -- ok - add two publications into subscription
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub1, testpub2 WITH (refresh = false)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION integer_pl_date(integer, date)
+ RETURNS date
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_14() RETURNS bigint
+    RETURN (SELECT count(*) FROM functestv3)
+;
+----------
+[DROP_CATALOG] drop database if exists test_database_exists with (force)
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmpart(f1 text COMPRESSION lz4) PARTITION BY HASH(f1)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpubpart_forschema FOR TABLES IN SCHEMA pub_testpart2
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl6 (a, b, c)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_IS_7()
+    RETURNS int
+    LANGUAGE SQL
+    RETURN (SELECT count(a) FROM functest2)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl1 (id, ctid)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (ARRAY[a] <@ ARRAY[2, 4, 6])
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch2 WITH (PUBLISH_VIA_PARTITION_ROOT=0)
+;
+----------
+[ADD_INDEX] CREATE INDEX wowidx1 ON test_tsvector USING gist (a tsvector_ops(siglen=100, siglen = 200))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_13() RETURNS boolean
+    BEGIN ATOMIC
+        SELECT 1;
+        SELECT false;
+    END
+;
+----------
+[CREATE_TABLE|SELECT] -- Create a table that holds all the known in-core data types and leave it
+-- around so as pg_upgrade is able to test their binary compatibility.
+CREATE TABLE tab_core_types AS SELECT
+  '(11,12)'::point,
+  '(1,1),(2,2)'::line,
+  '((11,11),(12,12))'::lseg,
+  '((11,11),(13,13))'::box,
+  '((11,12),(13,13),(14,14))'::path AS openedpath,
+  '[(11,12),(13,13),(14,14)]'::path AS closedpath,
+  '((11,12),(13,13),(14,14))'::polygon,
+  '1,1,1'::circle,
+  'today'::date,
+  'now'::time,
+  'now'::timestamp,
+  'now'::timetz,
+  'now'::timestamptz,
+  '12 seconds'::interval,
+  '{"reason":"because"}'::json,
+  '{"when":"now"}'::jsonb,
+  '$.a[*] ? (@ > 2)'::jsonpath,
+  '127.0.0.1'::inet,
+  '127.0.0.0/8'::cidr,
+  '00:01:03:86:1c:ba'::macaddr8,
+  '00:01:03:86:1c:ba'::macaddr,
+  2::int2, 4::int4, 8::int8,
+  4::float4, '8'::float8, pi()::numeric,
+  'foo'::"char",
+  'c'::bpchar,
+  'abc'::varchar,
+  'name'::name,
+  'txt'::text,
+  true::bool,
+  E'\\xDEADBEEF'::bytea,
+  B'10001'::bit,
+  B'10001'::varbit AS varbit,
+  '12.34'::money,
+  'abc'::refcursor,
+  '1 2'::int2vector,
+  '1 2'::oidvector,
+  format('%I=UC/%I', USER, USER)::aclitem AS aclitem,
+  'a fat cat sat on a mat and ate a fat rat'::tsvector,
+  'fat & rat'::tsquery,
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
+  '11'::xid8,
+  'pg_class'::regclass,
+  'regtype'::regtype type,
+  'pg_monitor'::regrole,
+  'pg_class'::regclass::oid,
+  '(1,1)'::tid, '2'::xid, '3'::cid,
+  '10:20:10,14,15'::txid_snapshot,
+  '10:20:10,14,15'::pg_snapshot,
+  '16/B374D848'::pg_lsn,
+  1::information_schema.cardinal_number,
+  'l'::information_schema.character_data,
+  'n'::information_schema.sql_identifier,
+  'now'::information_schema.time_stamp,
+  'YES'::information_schema.yes_or_no,
+  '(1,2)'::int4range, '{(1,2)}'::int4multirange,
+  '(3,4)'::int8range, '{(3,4)}'::int8multirange,
+  '(3,4)'::numrange, '{(3,4)}'::nummultirange,
+  '(2020-01-02, 2021-02-03)'::daterange,
+  '{(2020-01-02, 2021-02-03)}'::datemultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tsrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tsmultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tstzrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tstzmultirange
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 ADD TABLE testpub_rf_tbl1 WHERE (a >= testpub_rf_func2())
+;
+----------
+[ALTER_PUB_SUB] -- Remove generated columns from column list, when 'publish_generated_columns'='none'
+ALTER PUBLICATION pub2 SET TABLE gencols(a)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_child_sync FOR TABLE tab_rowfilter_child_sync WHERE (a < 15)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_qual_2ct" ADD TABLE ONLY "pubme"."t1" ("c")
+;
+----------
+[RENAME_COLUMN] alter view v1 rename column a to x
+;
+----------
+[ADD_INDEX] create index _tstidx on _ltreetest using gist (t gist__ltree_ops(siglen=2024))
+;
+----------
+[CREATE_PROG_OBJ] create function mydouble(int) returns int strict immutable parallel safe
+begin atomic select $1 * 2; end
+;

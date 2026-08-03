@@ -1,0 +1,466 @@
+CREATE TABLE test_var_schema (
+    id BIGINT NOT NULL,
+    v1 VARIANT<
+        'enumString*' : STRING,
+        'enum*' : ARRAY<TEXT>,
+        'ip*' : IPV6
+    > NULL
+)
+PROPERTIES ("replication_num" = "1");
+
+-- If enumString1 matches both patterns, the first matching pattern in definition order (STRING) is used
+;
+CREATE TABLE example_table (
+  id INT,
+  data_variant VARIANT<
+      'path_1' : INT,
+      'path_2' : STRING,
+      properties(
+          'variant_max_subcolumns_count' = '2048',
+          'variant_enable_typed_paths_to_sparse' = 'true',
+          'variant_sparse_hash_shard_count' = '64'
+      )
+  >
+);
+CREATE TABLE example_table (
+  id INT,
+  data_variant VARIANT<
+      'path_1' : INT,
+      'path_2' : STRING,
+      properties(
+          'variant_enable_doc_mode' = 'true',
+          'variant_doc_materialization_min_rows' = '10000',
+          'variant_doc_hash_shard_count' = '64'
+      )
+  >
+);
+CREATE TABLE IF NOT EXISTS telemetry_wide (
+    ts DATETIME NOT NULL,
+    device_id BIGINT NOT NULL,
+    attributes VARIANT<
+        'device_type' : STRING,
+        'region' : STRING,
+        properties(
+            'variant_max_subcolumns_count' = '2048',
+            'variant_sparse_hash_shard_count' = '64'
+        )
+    >
+)
+DUPLICATE KEY(`ts`, `device_id`)
+DISTRIBUTED BY HASH(`device_id`) BUCKETS 32
+PROPERTIES (
+    "replication_num" = "1",
+    "storage_format" = "V3"
+);
+CREATE TABLE IF NOT EXISTS trace_archive (
+    ts DATETIME NOT NULL,
+    trace_id VARCHAR(64) NOT NULL,
+    span VARIANT<
+        'service_name' : STRING,
+        properties(
+            'variant_enable_doc_mode' = 'true',
+            'variant_doc_materialization_min_rows' = '10000',
+            'variant_doc_hash_shard_count' = '64'
+        )
+    >
+)
+DUPLICATE KEY(`ts`, `trace_id`)
+DISTRIBUTED BY HASH(`trace_id`) BUCKETS 32
+PROPERTIES (
+    "replication_num" = "1",
+    "storage_format" = "V3"
+);
+CREATE TABLE IF NOT EXISTS order_events (
+    ts DATETIME NOT NULL,
+    order_id BIGINT NOT NULL,
+    detail VARIANT<
+        'status' : STRING,
+        'amount' : DECIMAL(18, 2),
+        'currency' : STRING
+    >,
+    INDEX idx_status(detail) USING INVERTED PROPERTIES("field_pattern" = "status")
+)
+DUPLICATE KEY(`ts`, `order_id`)
+DISTRIBUTED BY HASH(`order_id`) BUCKETS 16
+PROPERTIES (
+    "replication_num" = "1",
+    "storage_format" = "V3"
+);
+CREATE TABLE t4
+(
+  c1 INT,
+  c2 INT GENERATED ALWAYS AS (c1 + 1)
+)
+DUPLICATE KEY(c1)
+DISTRIBUTED BY HASH(c1)
+PROPERTIES (
+  'replication_num' = '1'
+);
+CREATE TABLE test_var_schema (
+    id BIGINT NOT NULL,
+    v1 VARIANT<
+        'enumString*' : STRING,
+        'enum*' : ARRAY<TEXT>,
+        'ip*' : IPV6
+    > NULL
+)
+PROPERTIES ("replication_num" = "1");
+
+-- 若 enumString1 同时匹配上述两个 pattern，则采用定义顺序中第一个匹配到的类型（STRING）
+;
+CREATE TABLE t4
+(
+  c1 INT,
+  c2 INT GENERATED ALWAYS AS (c1 + 1)
+)
+DUPLICATE KEY(c1)
+DISTRIBUTED BY HASH(c1)
+PROPERTIES (
+  'replication_num' = '1'
+)
+;
+CREATE TABLE example_table (
+  id INT,
+  data_variant VARIANT<
+      'path_1' : INT,
+      'path_2' : STRING,
+      properties(
+          'variant_max_subcolumns_count' = '2048',
+          'variant_enable_typed_paths_to_sparse' = 'true'
+      )
+  >
+);
+CREATE TABLE IF NOT EXISTS telemetry_wide (
+    ts DATETIME NOT NULL,
+    device_id BIGINT NOT NULL,
+    attributes VARIANT<
+        'device_type' : STRING,
+        'region' : STRING,
+        properties(
+            'variant_max_subcolumns_count' = '2048',
+            'variant_enable_typed_paths_to_sparse' = 'true'
+        )
+    >
+)
+DUPLICATE KEY(`ts`, `device_id`)
+DISTRIBUTED BY HASH(`device_id`) BUCKETS 32
+PROPERTIES (
+    "replication_num" = "1"
+);
+CREATE TABLE IF NOT EXISTS order_events (
+    ts DATETIME NOT NULL,
+    order_id BIGINT NOT NULL,
+    detail VARIANT<
+        'status' : STRING,
+        'amount' : DECIMAL(18, 2),
+        'currency' : STRING
+    >,
+    INDEX idx_status(detail) USING INVERTED PROPERTIES("field_pattern" = "status")
+)
+DUPLICATE KEY(`ts`, `order_id`)
+DISTRIBUTED BY HASH(`order_id`) BUCKETS 16
+PROPERTIES (
+    "replication_num" = "1"
+);
+-- Enable sparse subcolumns and cap hot subcolumn count
+CREATE TABLE IF NOT EXISTS tbl (
+  k BIGINT,
+  v VARIANT<
+      properties("variant_max_subcolumns_count" = "2048") -- pick top-2048 hot keys
+  >
+) DUPLICATE KEY(k);
+-- Use wildcard-typed subpaths with per-pattern indexes
+CREATE TABLE IF NOT EXISTS tbl2 (
+  k BIGINT,
+  v VARIANT<
+      'pattern1_*' : STRING, -- batch-typing: all subpaths matching pattern1_* are STRING
+      'pattern2_*' : BIGINT, -- batch-typing: all subpaths matching pattern2_* are BIGINT
+      properties("variant_max_subcolumns_count" = "2048") -- enable sparse subcolumns; keep top-2048 hot keys
+  >,
+  INDEX idx_p1 (v) USING INVERTED
+    PROPERTIES("field_pattern"="pattern1_*", "parser" = "english"), -- tokenized inverted index for pattern1_* with english parser
+  INDEX idx_p2 (v) USING INVERTED
+    PROPERTIES("field_pattern"="pattern2_*") -- non-tokenized inverted index for pattern2_*
+) DUPLICATE KEY(k);
+-- Allow predefined typed paths to participate in sparse extraction
+CREATE TABLE IF NOT EXISTS tbl3 (
+  k BIGINT,
+  v VARIANT<
+    'message*' : STRING, -- batch-typing: all subpaths matching prefix 'message*' are STRING
+    properties(
+      "variant_max_subcolumns_count" = "2048",              -- enable sparse subcolumns; keep top-2048 hot keys
+      "variant_enable_typed_paths_to_sparse" = "true"       -- include typed (predefined) paths as sparse candidates (default: false)
+    )
+  >
+) DUPLICATE KEY(k);
+CREATE TABLE user_feature_wide (
+    uid BIGINT,
+    features VARIANT<
+        'user_id' : BIGINT,
+        'region' : STRING,
+        properties(
+            'variant_max_subcolumns_count' = '2048',
+            'variant_sparse_hash_shard_count' = '32'
+        )
+    >
+)
+DUPLICATE KEY(uid)
+DISTRIBUTED BY HASH(uid) BUCKETS 32
+PROPERTIES (
+    "storage_format" = "V3"
+);
+CREATE TABLE trace_archive (
+    ts DATETIME,
+    trace_id STRING,
+    span VARIANT<
+        'service_name' : STRING,
+        properties(
+            'variant_enable_doc_mode' = 'true',
+            'variant_doc_materialization_min_rows' = '100000',
+            'variant_doc_hash_shard_count' = '32'
+        )
+    >
+)
+DUPLICATE KEY(ts, trace_id)
+DISTRIBUTED BY HASH(trace_id) BUCKETS 32
+PROPERTIES (
+    "storage_format" = "V3"
+);
+------------------------------------------------------------------------------------------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE test_var_schema (
+    id BIGINT NOT NULL,
+    v1 VARIANT<
+        'enumString*' : STRING,
+        'enum*' : ARRAY<TEXT>,
+        'ip*' : IPV6
+    > NULL
+)
+PROPERTIES ("replication_num" = "1");
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE example_table (
+  id INT,
+  data_variant VARIANT<
+      'path_1' : INT,
+      'path_2' : STRING,
+      properties(
+          'variant_max_subcolumns_count' = '2048',
+          'variant_enable_typed_paths_to_sparse' = 'true',
+          'variant_sparse_hash_shard_count' = '64'
+      )
+  >
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE example_table (
+  id INT,
+  data_variant VARIANT<
+      'path_1' : INT,
+      'path_2' : STRING,
+      properties(
+          'variant_enable_doc_mode' = 'true',
+          'variant_doc_materialization_min_rows' = '10000',
+          'variant_doc_hash_shard_count' = '64'
+      )
+  >
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS telemetry_wide (
+    ts DATETIME NOT NULL,
+    device_id BIGINT NOT NULL,
+    attributes VARIANT<
+        'device_type' : STRING,
+        'region' : STRING,
+        properties(
+            'variant_max_subcolumns_count' = '2048',
+            'variant_sparse_hash_shard_count' = '64'
+        )
+    >
+)
+DUPLICATE KEY(`ts`, `device_id`)
+DISTRIBUTED BY HASH(`device_id`) BUCKETS 32
+PROPERTIES (
+    "replication_num" = "1",
+    "storage_format" = "V3"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS trace_archive (
+    ts DATETIME NOT NULL,
+    trace_id VARCHAR(64) NOT NULL,
+    span VARIANT<
+        'service_name' : STRING,
+        properties(
+            'variant_enable_doc_mode' = 'true',
+            'variant_doc_materialization_min_rows' = '10000',
+            'variant_doc_hash_shard_count' = '64'
+        )
+    >
+)
+DUPLICATE KEY(`ts`, `trace_id`)
+DISTRIBUTED BY HASH(`trace_id`) BUCKETS 32
+PROPERTIES (
+    "replication_num" = "1",
+    "storage_format" = "V3"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE IF NOT EXISTS order_events (
+    ts DATETIME NOT NULL,
+    order_id BIGINT NOT NULL,
+    detail VARIANT<
+        'status' : STRING,
+        'amount' : DECIMAL(18, 2),
+        'currency' : STRING
+    >,
+    INDEX idx_status(detail) USING INVERTED PROPERTIES("field_pattern" = "status")
+)
+DUPLICATE KEY(`ts`, `order_id`)
+DISTRIBUTED BY HASH(`order_id`) BUCKETS 16
+PROPERTIES (
+    "replication_num" = "1",
+    "storage_format" = "V3"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE t4
+(
+  c1 INT,
+  c2 INT GENERATED ALWAYS AS (c1 + 1)
+)
+DUPLICATE KEY(c1)
+DISTRIBUTED BY HASH(c1)
+PROPERTIES (
+  'replication_num' = '1'
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE test_var_schema (
+    id BIGINT NOT NULL,
+    v1 VARIANT<
+        'enumString*' : STRING,
+        'enum*' : ARRAY<TEXT>,
+        'ip*' : IPV6
+    > NULL
+)
+PROPERTIES ("replication_num" = "1");
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE t4
+(
+  c1 INT,
+  c2 INT GENERATED ALWAYS AS (c1 + 1)
+)
+DUPLICATE KEY(c1)
+DISTRIBUTED BY HASH(c1)
+PROPERTIES (
+  'replication_num' = '1'
+)
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE example_table (
+  id INT,
+  data_variant VARIANT<
+      'path_1' : INT,
+      'path_2' : STRING,
+      properties(
+          'variant_max_subcolumns_count' = '2048',
+          'variant_enable_typed_paths_to_sparse' = 'true'
+      )
+  >
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS telemetry_wide (
+    ts DATETIME NOT NULL,
+    device_id BIGINT NOT NULL,
+    attributes VARIANT<
+        'device_type' : STRING,
+        'region' : STRING,
+        properties(
+            'variant_max_subcolumns_count' = '2048',
+            'variant_enable_typed_paths_to_sparse' = 'true'
+        )
+    >
+)
+DUPLICATE KEY(`ts`, `device_id`)
+DISTRIBUTED BY HASH(`device_id`) BUCKETS 32
+PROPERTIES (
+    "replication_num" = "1"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE IF NOT EXISTS order_events (
+    ts DATETIME NOT NULL,
+    order_id BIGINT NOT NULL,
+    detail VARIANT<
+        'status' : STRING,
+        'amount' : DECIMAL(18, 2),
+        'currency' : STRING
+    >,
+    INDEX idx_status(detail) USING INVERTED PROPERTIES("field_pattern" = "status")
+)
+DUPLICATE KEY(`ts`, `order_id`)
+DISTRIBUTED BY HASH(`order_id`) BUCKETS 16
+PROPERTIES (
+    "replication_num" = "1"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- Enable sparse subcolumns and cap hot subcolumn count
+CREATE TABLE IF NOT EXISTS tbl (
+  k BIGINT,
+  v VARIANT<
+      properties("variant_max_subcolumns_count" = "2048") -- pick top-2048 hot keys
+  >
+) DUPLICATE KEY(k);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Use wildcard-typed subpaths with per-pattern indexes
+CREATE TABLE IF NOT EXISTS tbl2 (
+  k BIGINT,
+  v VARIANT<
+      'pattern1_*' : STRING, -- batch-typing: all subpaths matching pattern1_* are STRING
+      'pattern2_*' : BIGINT, -- batch-typing: all subpaths matching pattern2_* are BIGINT
+      properties("variant_max_subcolumns_count" = "2048") -- enable sparse subcolumns; keep top-2048 hot keys
+  >,
+  INDEX idx_p1 (v) USING INVERTED
+    PROPERTIES("field_pattern"="pattern1_*", "parser" = "english"), -- tokenized inverted index for pattern1_* with english parser
+  INDEX idx_p2 (v) USING INVERTED
+    PROPERTIES("field_pattern"="pattern2_*") -- non-tokenized inverted index for pattern2_*
+) DUPLICATE KEY(k);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- Allow predefined typed paths to participate in sparse extraction
+CREATE TABLE IF NOT EXISTS tbl3 (
+  k BIGINT,
+  v VARIANT<
+    'message*' : STRING, -- batch-typing: all subpaths matching prefix 'message*' are STRING
+    properties(
+      "variant_max_subcolumns_count" = "2048",              -- enable sparse subcolumns; keep top-2048 hot keys
+      "variant_enable_typed_paths_to_sparse" = "true"       -- include typed (predefined) paths as sparse candidates (default: false)
+    )
+  >
+) DUPLICATE KEY(k);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE user_feature_wide (
+    uid BIGINT,
+    features VARIANT<
+        'user_id' : BIGINT,
+        'region' : STRING,
+        properties(
+            'variant_max_subcolumns_count' = '2048',
+            'variant_sparse_hash_shard_count' = '32'
+        )
+    >
+)
+DUPLICATE KEY(uid)
+DISTRIBUTED BY HASH(uid) BUCKETS 32
+PROPERTIES (
+    "storage_format" = "V3"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE trace_archive (
+    ts DATETIME,
+    trace_id STRING,
+    span VARIANT<
+        'service_name' : STRING,
+        properties(
+            'variant_enable_doc_mode' = 'true',
+            'variant_doc_materialization_min_rows' = '100000',
+            'variant_doc_hash_shard_count' = '32'
+        )
+    >
+)
+DUPLICATE KEY(ts, trace_id)
+DISTRIBUTED BY HASH(trace_id) BUCKETS 32
+PROPERTIES (
+    "storage_format" = "V3"
+);

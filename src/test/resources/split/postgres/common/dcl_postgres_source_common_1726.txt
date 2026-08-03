@@ -1,0 +1,74 @@
+-- ok
+
+
+-- test leaky-function protections in selfuncs
+
+-- regress_priv_user1 will own a table and provide views for it.
+SET SESSION AUTHORIZATION regress_priv_user1
+;
+set search_path = default
+;
+EXECUTE dumpOpr('761')
+;
+ALTER AGGREGATE testagg6(int2) OWNER TO PUBLIC
+;
+-- ====================================================================
+-- Check that userid to use when querying the remote table is correctly
+-- propagated into foreign rels present in subqueries under an UNION ALL
+-- ====================================================================
+CREATE ROLE regress_view_owner_another
+;
+-- negative tests; should fail
+SET ROLE regress_no_maintain
+;
+CREATE USER MAPPING FOR CURRENT_USER SERVER loopback_nopw
+;
+COPY rls_t1 (a, b) TO stdout
+;
+-- get to generic plan by 5 executions
+set plan_cache_mode to auto
+;
+DROP ROLE regress_buffercache_normal
+;
+------------------------------------------------------------------------------------------
+[SWITCH_USER] -- ok
+
+
+-- test leaky-function protections in selfuncs
+
+-- regress_priv_user1 will own a table and provide views for it.
+SET SESSION AUTHORIZATION regress_priv_user1
+;
+----------
+[SESSION_SETTING_WRITE] set search_path = default
+;
+----------
+[UNSAFE] EXECUTE dumpOpr('761')
+;
+----------
+[TRANSFER_PRIVILEGE] ALTER AGGREGATE testagg6(int2) OWNER TO PUBLIC
+;
+----------
+[CREATE_ROLE] -- ====================================================================
+-- Check that userid to use when querying the remote table is correctly
+-- propagated into foreign rels present in subqueries under an UNION ALL
+-- ====================================================================
+CREATE ROLE regress_view_owner_another
+;
+----------
+[SWITCH_ROLE] -- negative tests; should fail
+SET ROLE regress_no_maintain
+;
+----------
+[GRANT] CREATE USER MAPPING FOR CURRENT_USER SERVER loopback_nopw
+;
+----------
+[DATA_EXPORT] COPY rls_t1 (a, b) TO stdout
+;
+----------
+[SESSION_SETTING_WRITE] -- get to generic plan by 5 executions
+set plan_cache_mode to auto
+;
+----------
+[DROP_ROLE] DROP ROLE regress_buffercache_normal
+;

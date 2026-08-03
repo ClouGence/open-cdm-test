@@ -1,0 +1,2401 @@
+DROP FUNCTION IF EXISTS py_concat(STRING, STRING);
+
+CREATE FUNCTION py_concat(STRING, STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(s1, s2):
+    if s1 is None or s2 is None:
+        return None
+    return s1 + s2
+$$;
+
+SELECT py_concat('Hello', ' World') AS result; -- 结果: Hello World
+SELECT py_concat(NULL, ' World') AS result;    -- 结果: NULL
+SELECT py_concat('Hello', NULL) AS result;     -- 结果: NULL
+;
+DROP FUNCTION IF EXISTS py_safe_divide(DOUBLE, DOUBLE);
+
+CREATE FUNCTION py_safe_divide(DOUBLE, DOUBLE)
+RETURNS DOUBLE
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(a, b):
+    if a is None or b is None:
+        return None
+    if b == 0:
+        return None
+    return a / b
+$$;
+
+SELECT py_safe_divide(10.0, 2.0);   -- 结果: 5.0
+SELECT py_safe_divide(10.0, 0.0);   -- 结果: NULL
+SELECT py_safe_divide(10.0, NULL);  -- 结果: NULL
+;
+DROP FUNCTION IF EXISTS py_vec_add(INT, INT);
+
+CREATE FUNCTION py_vec_add(INT, INT)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "add",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+import pandas as pd
+
+def add(a: pd.Series, b: pd.Series) -> pd.Series:
+    return a + b + 1
+$$;
+
+SELECT py_vec_add(1, 2); -- 结果: 4
+;
+DROP FUNCTION IF EXISTS py_vec_upper(STRING);
+
+CREATE FUNCTION py_vec_upper(STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "to_upper",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+import pandas as pd
+
+def to_upper(s: pd.Series) -> pd.Series:
+    return s.str.upper()
+$$;
+
+SELECT py_vec_upper('hello'); -- 结果: 'HELLO'
+;
+DROP FUNCTION IF EXISTS py_vec_sqrt(DOUBLE);
+
+CREATE FUNCTION py_vec_sqrt(DOUBLE)
+RETURNS DOUBLE
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "sqrt",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+import pandas as pd
+import numpy as np
+
+def sqrt(x: pd.Series) -> pd.Series:
+    return np.sqrt(x)
+$$;
+
+SELECT py_vec_sqrt(16); -- 结果: 4.0
+;
+DROP FUNCTION IF EXISTS py_array_sum(ARRAY<INT>);
+
+CREATE FUNCTION py_array_sum(ARRAY<INT>)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(arr):
+    """ Doris中的ARRAY类型对应Python中的list """
+    if arr is None:
+        return None
+    return sum(arr)
+$$;
+
+SELECT py_array_sum([1, 2, 3, 4, 5]) AS result; -- 结果: 15
+;
+DROP FUNCTION IF EXISTS py_array_filter_positive(ARRAY<INT>);
+
+CREATE FUNCTION py_array_filter_positive(ARRAY<INT>)
+RETURNS ARRAY<INT>
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(arr):
+    if arr is None:
+        return None
+    return [x for x in arr if x > 0]
+$$;
+
+SELECT py_array_filter_positive([1, -2, 3, -4, 5]) AS result; -- 结果: [1, 3, 5]
+;
+DROP FUNCTION IF EXISTS py_map_size(MAP<STRING, INT>);
+
+CREATE FUNCTION py_map_size(MAP<STRING, INT>)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(m):
+    """ Doris中的MAP类型对应Python中的dict """
+    if m is None:
+        return None
+    return len(m)
+$$;
+
+SELECT py_map_size({'a': 1, 'b': 2, 'c': 3}) AS result; -- 结果: 3
+;
+DROP FUNCTION IF EXISTS py_map_get(MAP<STRING, STRING>, STRING);
+
+CREATE FUNCTION py_map_get(MAP<STRING, STRING>, STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(m, key):
+    if m is None or key is None:
+        return None
+    return m.get(key)
+$$;
+
+SELECT py_map_get({'name': 'Alice', 'age': '30'}, 'name') AS result; -- 结果: Alice
+;
+DROP FUNCTION IF EXISTS py_struct_get_name(STRUCT<name: STRING, age: INT>);
+
+CREATE FUNCTION py_struct_get_name(STRUCT<name: STRING, age: INT>)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(s):
+    """ Doris中的STRUCT类型对应Python中的dict """
+    if s is None:
+        return None
+    return s.get('name')
+$$;
+
+SELECT py_struct_get_name({'Alice', 30}) AS result; -- 结果: Alice
+;
+DROP FUNCTION IF EXISTS py_mask_email(STRING);
+
+CREATE FUNCTION py_mask_email(STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(email):
+    if email is None or '@' not in email:
+        return None
+    parts = email.split('@')
+    if len(parts[0]) <= 1:
+        return email
+    masked_user = parts[0][0] + '***'
+    return f"{masked_user}@{parts[1]}"
+$$;
+
+SELECT py_mask_email('user@example.com') AS masked; -- 结果: u***@example.com
+;
+DROP FUNCTION IF EXISTS py_levenshtein_distance(STRING, STRING);
+
+CREATE FUNCTION py_levenshtein_distance(STRING, STRING)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(s1, s2):
+    if s1 is None or s2 is None:
+        return None
+    if len(s1) < len(s2):
+        return evaluate(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    
+    return previous_row[-1]
+$$;
+
+SELECT py_levenshtein_distance('kitten', 'sitting') AS distance; -- 结果: 3
+;
+DROP FUNCTION IF EXISTS py_days_between(DATE, DATE);
+
+CREATE FUNCTION py_days_between(DATE, DATE)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "volatility" = "immutable"
+)
+AS $$
+from datetime import datetime
+
+def evaluate(date1_str, date2_str):
+    if date1_str is None or date2_str is None:
+        return None
+    try:
+        d1 = datetime.strptime(str(date1_str), '%Y-%m-%d')
+        d2 = datetime.strptime(str(date2_str), '%Y-%m-%d')
+        return abs((d2 - d1).days)
+    except:
+        return None
+$$;
+
+SELECT py_days_between('2024-01-01', '2024-12-31') AS days; -- 结果: 365
+;
+DROP FUNCTION IF EXISTS py_validate_id_card(STRING);
+
+CREATE FUNCTION py_validate_id_card(STRING)
+RETURNS BOOLEAN
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(id_card):
+    if id_card is None or len(id_card) != 18:
+        return False
+    
+    # 校验前17位是否为数字
+    if not id_card[:17].isdigit():
+        return False
+    
+    # 校验码权重
+    weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+    check_codes = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2']
+    
+    # 计算校验码
+    total = sum(int(id_card[i]) * weights[i] for i in range(17))
+    check_code = check_codes[total % 11]
+    
+    return id_card[17].upper() == check_code
+$$;
+
+SELECT py_validate_id_card('11010519491231002X') AS is_valid;  -- 结果: True
+SELECT py_validate_id_card('110105194912310021x') AS is_valid; -- 结果: False
+;
+-- 常用属性：field_pattern（目标子路径）、analyzer、parser、support_phrase 等
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"),
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content")
+);
+
+-- v.content 同时具备分词与不分词的倒排索引
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+SELECT * FROM tbl WHERE v['content'] = 'Doris';
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'pattern_*' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "pattern_*"),
+    INDEX idx_v(v) USING INVERTED -- 全局指定非分词索引
+);
+
+SELECT * FROM tbl WHERE v['pattern_1'] MATCH 'Doris';
+SELECT * FROM tbl WHERE v['pattern_1'] = 'Doris';
+CREATE DATABASE db1;
+CREATE USER jack@'192.%' IDENTIFIED BY 'jack_pwd';
+CREATE USER jack@'%' IDENTIFIED BY 'jack_pwd';
+CREATE ROLE role1;
+CREATE ROLE role2;
+CREATE ROLE my_role;
+CREATE ROLE test_role;
+CREATE WORKLOAD GROUP g1 PROPERTIES("max_cpu_percent"="10");
+
+GRANT SELECT_PRIV ON db1.* TO 'jack'@'192.%';
+GRANT USAGE_PRIV ON RESOURCE 'spark_resource' TO 'jack'@'192.%';
+GRANT 'role1','role2' TO 'jack'@'192.%';
+GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO 'jack'@'%';
+GRANT USAGE_PRIV ON WORKLOAD GROUP '%' TO 'jack'@'%';
+GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO ROLE 'test_role';
+GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO 'jack'@'%';
+GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO ROLE 'my_role';
+GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO 'jack'@'%';
+GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO ROLE 'my_role';
+GRANT USAGE_PRIV ON STORAGE VAULT '%' TO 'jack'@'%';
+CREATE TABLE cte_uuid_seed (id INT) ENGINE=OLAP DUPLICATE KEY(id)
+    DISTRIBUTED BY HASH(id) BUCKETS 1 PROPERTIES ("replication_num" = "1");
+    INSERT INTO cte_uuid_seed VALUES (1),(2),(3);
+
+    DROP FUNCTION IF EXISTS py_uuid_token(INT);
+    CREATE FUNCTION py_uuid_token(INT)
+    RETURNS STRING
+    PROPERTIES (
+        "type" = "PYTHON_UDF",
+        "symbol" = "py_uuid_token_impl",
+        "always_nullable" = "false",
+        "runtime_version" = "3.12.11",
+        "volatility" = "volatile"
+    )
+    AS $$
+import uuid
+def py_uuid_token_impl(x):
+    return f"{x}-{uuid.uuid4()}"
+$$;
+
+    SET enable_cte_materialize = true;
+    SET inline_cte_referenced_threshold = 10;
+
+    WITH cte AS (SELECT id, py_uuid_token(id) AS token FROM cte_uuid_seed)
+    SELECT id, COUNT(DISTINCT token) AS distinct_tokens
+    FROM (SELECT id, token FROM cte UNION ALL SELECT id, token FROM cte) u
+    GROUP BY id ORDER BY id;
+DROP FUNCTION IF EXISTS py_uuid_token(INT);
+    CREATE FUNCTION py_uuid_token(INT)
+    RETURNS STRING
+    PROPERTIES (
+        "type" = "PYTHON_UDF",
+        "symbol" = "py_uuid_token_impl",
+        "always_nullable" = "false",
+        "runtime_version" = "3.12.11",
+        "volatility" = "immutable"
+    )
+    AS $$
+import uuid
+def py_uuid_token_impl(x):
+    return f"{x}-{uuid.uuid4()}"
+$$;
+-- 1. 创建不同分词策略的分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+
+-- 2. 在同一列上创建多个索引
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- 标准分词器用于分词搜索
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- 关键词分词器用于精确匹配
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- edge n-gram 分词器用于自动补全
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+-- 插入测试数据
+INSERT INTO articles VALUES
+    (1, 'hello world'),
+    (2, 'hello'),
+    (3, 'world'),
+    (4, 'hello world test');
+
+-- 分词搜索：匹配包含 'hello' 词项的行
+-- 返回：1, 2, 4
+SELECT id FROM articles WHERE content MATCH 'hello' USING ANALYZER std_analyzer ORDER BY id;
+
+-- 精确匹配：仅匹配精确的 'hello' 字符串
+-- 返回：2
+SELECT id FROM articles WHERE content MATCH 'hello' USING ANALYZER kw_analyzer ORDER BY id;
+
+-- 使用 edge n-gram 进行前缀匹配
+-- 返回：1, 2, 4（所有以 'hel' 开头的行）
+SELECT id FROM articles WHERE content MATCH 'hel' USING ANALYZER ngram_analyzer ORDER BY id;
+-- 构建指定索引（非云模式）
+BUILD INDEX idx_content_chinese ON articles;
+
+-- 构建所有索引（云模式）
+BUILD INDEX ON articles;
+
+-- 查看构建进度
+SHOW BUILD INDEX WHERE TableName='articles';
+-- 1. 创建自定义词元过滤器（如果需要特定参数）
+--    此处创建一个 ascii_folding 过滤器
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS my_ascii_folding
+PROPERTIES
+(
+    "type" = "ascii_folding",
+    "preserve_original" = "false"
+);
+
+-- 2. 创建标准化器
+--    组合使用 lowercase（内置）和 my_ascii_folding
+CREATE INVERTED INDEX NORMALIZER IF NOT EXISTS lowercase_ascii_normalizer
+PROPERTIES
+(
+    "token_filter" = "lowercase, my_ascii_folding"
+);
+
+-- 3. 建表使用
+CREATE TABLE product_table (
+    `id` bigint NOT NULL,
+    `product_name` text NULL,
+    INDEX idx_name (`product_name`) USING INVERTED PROPERTIES("normalizer" = "lowercase_ascii_normalizer")
+) ENGINE=OLAP
+DUPLICATE KEY(`id`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+
+-- 4. 验证测试
+select tokenize('Café-Products', '"normalizer"="lowercase_ascii_normalizer"');
+-- 示例：定义自定义分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "asciifolding, lowercase"
+);
+
+-- 在建表时使用自定义分词器
+CREATE TABLE docs (
+    id BIGINT,
+    content TEXT,
+    INDEX idx_content (content) USING INVERTED PROPERTIES(
+        "analyzer" = "keyword_lowercase",
+        "support_phrase" = "true"
+    )
+);
+-- 带 VARIANT 列与倒排索引
+CREATE TABLE test_variant_search_subcolumn (
+    id BIGINT,
+    properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+    INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+        "parser" = "unicode",
+        "lower_case" = "true",
+        "support_phrase" = "true"
+    )
+);
+
+-- 单词查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+
+-- AND / ALL 查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+
+-- 不同子列 OR 查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+-- 查看索引列表
+SHOW INDEX FROM document_vectors;
+
+-- 查看数据规模
+SHOW DATA ALL FROM document_vectors;
+
+-- 删除索引
+ALTER TABLE document_vectors DROP INDEX idx_embedding;
+-- Common properties: field_pattern (target subpath), analyzer, parser, support_phrase, etc.
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>, -- specify concrete type for subcolumn 'content'
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"), -- tokenized inverted index for 'content' with english parser
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content") -- non-tokenized inverted index for 'content'
+);
+
+-- v.content will have both a tokenized (english) inverted index and a non-tokenized inverted index
+
+-- Use tokenized index
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+
+-- Use non-tokenized index
+SELECT * FROM tbl WHERE v['content'] = 'Doris';
+-- 创建分支
+ALTER TABLE iceberg_tbl CREATE BRANCH b1;
+-- 写入数据到指定分支
+INSERT INTO iceberg_tbl@branch(b1) values(1, 2);
+-- 查询指定分支
+SELECT * FROM iceberg_tbl@branch(b1);
+-- 创建用于多值列分割的 char group tokenizer
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS multi_value_tokenizer
+PROPERTIES
+(
+    "type" = "char_group",
+    "tokenize_on_chars" = "[|]",
+    "max_token_length" = "255"
+);
+-- 创建多值列分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS multi_value_analyzer
+PROPERTIES
+(
+    "tokenizer" = "multi_value_tokenizer",
+    "token_filter" = "lowercase, asciifolding"
+);
+
+SELECT tokenize('alice|123456|company', '"analyzer"="multi_value_analyzer"');
+-- 结果为[alice]、[123456]、[company]
+
+-- MATCH_ANY(‘alice’)或者MATCH_ANY(‘123456’)都可以命中
+;
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_phone_number_tokenizer
+PROPERTIES
+(
+    "type" = "edge_ngram",
+    "min_gram" = "3",
+    "max_gram" = "10",
+    "token_chars" = "digit"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS edge_ngram_phone_number
+PROPERTIES
+(
+    "tokenizer" = "edge_ngram_phone_number_tokenizer"
+);
+
+CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "edge_ngram_phone_number")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+"replication_allocation" = "tag.location.default: 1"
+);
+-- Create pinyin tokenizer with multiple output formats
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS pinyin_tokenizer
+PROPERTIES (
+    "type" = "pinyin",
+    "keep_first_letter" = "true",
+    "keep_full_pinyin" = "true",
+    "keep_joined_full_pinyin" = "true",
+    "keep_original" = "true",
+    "keep_none_chinese" = "true",
+    "lowercase" = "true",
+    "remove_duplicated_term" = "true"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS pinyin_analyzer
+PROPERTIES (
+    "tokenizer" = "pinyin_tokenizer"
+);
+
+CREATE TABLE contacts (
+    id BIGINT NOT NULL AUTO_INCREMENT(1),
+    name TEXT NULL,
+    INDEX idx_name (name) USING INVERTED PROPERTIES("analyzer" = "pinyin_analyzer", "support_phrase" = "true")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+
+INSERT INTO contacts VALUES (1, "刘德华"), (2, "张学友"), (3, "郭富城");
+
+SELECT * FROM contacts WHERE name MATCH '刘德华';
+SELECT * FROM contacts WHERE name MATCH 'liudehua';
+SELECT * FROM contacts WHERE name MATCH 'liu';
+SELECT * FROM contacts WHERE name MATCH 'ldh';
+-- Create pinyin filter to apply after keyword tokenizer
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS pinyin_filter
+PROPERTIES (
+    "type" = "pinyin",
+    "keep_first_letter" = "true",
+    "keep_full_pinyin" = "true",
+    "keep_original" = "true",
+    "lowercase" = "true"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_pinyin
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "pinyin_filter"
+);
+
+CREATE TABLE stars (
+    id BIGINT NOT NULL AUTO_INCREMENT(1),
+    name TEXT NULL,
+    INDEX idx_name (name) USING INVERTED PROPERTIES("analyzer" = "keyword_pinyin")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+
+INSERT INTO stars VALUES (1, "刘德华"), (2, "张学友"), (3, "刘德华ABC");
+
+-- Supports multiple search modes:
+SELECT * FROM stars WHERE name MATCH '刘德华';
+SELECT * FROM stars WHERE name MATCH 'liu';
+SELECT * FROM stars WHERE name MATCH 'ldh';
+SELECT * FROM stars WHERE name MATCH 'zxy';
+-- Create analyzers with different tokenization strategies
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+
+-- Create table with multiple indexes on same column
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- Standard analyzer for tokenized search
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- Keyword analyzer for exact match
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- Edge n-gram analyzer for autocomplete
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+-- Insert test data
+INSERT INTO articles VALUES
+    (1, 'hello world'),
+    (2, 'hello'),
+    (3, 'world'),
+    (4, 'hello world test');
+
+-- Tokenized search: matches rows containing 'hello' token
+-- Returns: 1, 2, 4
+SELECT id FROM articles WHERE content MATCH 'hello' USING ANALYZER std_analyzer ORDER BY id;
+
+-- Exact match: only matches rows with exact 'hello' string
+-- Returns: 2
+SELECT id FROM articles WHERE content MATCH 'hello' USING ANALYZER kw_analyzer ORDER BY id;
+
+-- Prefix match with edge n-gram
+-- Returns: 1, 2, 4 (all rows starting with 'hel')
+SELECT id FROM articles WHERE content MATCH 'hel' USING ANALYZER ngram_analyzer ORDER BY id;
+-- Build specific index (non-cloud mode)
+BUILD INDEX idx_content_chinese ON articles;
+
+-- Build all indexes (cloud mode)
+BUILD INDEX ON articles;
+
+-- Check build progress
+SHOW BUILD INDEX WHERE TableName='articles';
+-- 1. Create a custom token filter (if specific parameters are needed)
+-- Create an ascii_folding filter here
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS my_ascii_folding
+PROPERTIES
+(
+    "type" = "ascii_folding",
+    "preserve_original" = "false"
+);
+
+-- 2. Create the normalizer
+-- Combine lowercase (built-in) and my_ascii_folding
+CREATE INVERTED INDEX NORMALIZER IF NOT EXISTS lowercase_ascii_normalizer
+PROPERTIES
+(
+    "token_filter" = "lowercase, my_ascii_folding"
+);
+
+-- 3. Use in table creation
+CREATE TABLE product_table (
+    `id` bigint NOT NULL,
+    `product_name` text NULL,
+    INDEX idx_name (`product_name`) USING INVERTED PROPERTIES("normalizer" = "lowercase_ascii_normalizer")
+) ENGINE=OLAP
+DUPLICATE KEY(`id`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+"replication_allocation" = "tag.location.default: 1"
+);
+
+-- 4. Verify and test
+select tokenize('Café-Products', '"normalizer"="lowercase_ascii_normalizer"');
+-- Define a custom analyzer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+  "tokenizer" = "keyword",
+  "token_filter" = "asciifolding, lowercase"
+);
+
+-- Use the analyzer in table creation
+CREATE TABLE docs (
+  id BIGINT,
+  content TEXT,
+  INDEX idx_content (content) USING INVERTED PROPERTIES (
+    "analyzer" = "keyword_lowercase",
+    "support_phrase" = "true"
+  )
+);
+-- Table with both tokenized and untokenized indexes
+CREATE TABLE t (
+  id INT,
+  content STRING,
+  INDEX idx_untokenized(content) USING INVERTED,
+  INDEX idx_tokenized(content)  USING INVERTED PROPERTIES("parser" = "standard")
+);
+
+-- Exact string match (uses untokenized index)
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning)')
+ORDER BY id;
+
+-- No match for partial token with EXACT
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine)')
+ORDER BY id;
+
+-- ANY/ALL use tokenized index
+SELECT id, content FROM t WHERE SEARCH('content:ANY(machine learning)') ORDER BY id;
+SELECT id, content FROM t WHERE SEARCH('content:ALL(machine learning)') ORDER BY id;
+
+-- Compare EXACT vs ANY
+SELECT id, content FROM t WHERE SEARCH('content:EXACT(deep learning)') ORDER BY id;
+SELECT id, content FROM t WHERE SEARCH('content:ANY(deep learning)') ORDER BY id;
+
+-- Mixed conditions
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning) OR content:ANY(intelligence)')
+ORDER BY id;
+
+-- Simplified syntax with default field/operator
+SELECT id, tags
+FROM tag_dataset
+WHERE SEARCH('deep learning', 'tags', 'and'); -- expands to tags:ALL(deep learning)
+
+-- Phrase and wildcard queries in one DSL
+SELECT id, content FROM t
+WHERE SEARCH('content:"deep learning" OR content:AI*')
+ORDER BY id;
+
+-- VARIANT column with inverted index
+CREATE TABLE test_variant_search_subcolumn (
+  id BIGINT,
+  properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+  INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+    "parser" = "unicode",
+    "lower_case" = "true",
+    "support_phrase" = "true"
+  )
+);
+
+-- Single term
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+
+-- AND / ALL
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+
+-- OR across different subcolumns
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+CREATE TABLE sift_1M (
+  id int NOT NULL,
+  embedding array<float>  NOT NULL  COMMENT "",
+  INDEX ann_index (embedding) USING ANN PROPERTIES(
+      "index_type"="hnsw",
+      "metric_type"="l2_distance",
+      "dim"="128"
+  )
+) ENGINE=OLAP
+DUPLICATE KEY(id) COMMENT "OLAP"
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES (
+  "replication_num" = "1"
+);
+
+INSERT INTO sift_1M
+SELECT *
+FROM S3(
+  "uri" = "https://selectdb-customers-tools-bj.oss-cn-beijing.aliyuncs.com/sift_database.tsv",
+  "format" = "csv");
+SHOW INDEX FROM document_vectors;
+SHOW DATA ALL FROM document_vectors;
+ALTER TABLE document_vectors DROP INDEX idx_embedding;
+-- Create source data table
+CREATE TABLE source_table (
+    id INT NOT NULL,
+    city VARCHAR(32) NOT NULL,
+    code VARCHAR(32) NOT NULL
+) ENGINE=OLAP
+DISTRIBUTED BY HASH(id) BUCKETS 1;
+
+-- Create dictionary table
+CREATE DICTIONARY city_dict USING source_table
+(
+    city KEY,
+    id VALUE
+)
+LAYOUT(HASH_MAP)
+PROPERTIES('data_lifetime' = '600');
+-- Create source data table
+    CREATE TABLE cities (
+        city_id INT NOT NULL,
+        city_name VARCHAR(32) NOT NULL,
+        region_code VARCHAR(32) NOT NULL
+    ) ENGINE=OLAP
+    DISTRIBUTED BY HASH(city_id) BUCKETS 1;
+
+    INSERT INTO cities VALUES
+    (1, 'Beijing', 'BJ'),
+    (2, 'Shanghai', 'SH'),
+    (3, 'Guangzhou', 'GZ');
+
+    -- Create dictionary table
+    CREATE DICTIONARY city_code_dict USING cities
+    (
+        city_name KEY,
+        region_code VALUE
+    )
+    LAYOUT(HASH_MAP)
+    PROPERTIES('data_lifetime' = '600');
+
+    -- Query using a dictionary table
+    SELECT dict_get("test_refresh_dict.city_code_dict", "region_code", "Beijing");
+CREATE TABLE ip_locations (
+        ip_range VARCHAR(30) NOT NULL,
+        country VARCHAR(64) NOT NULL,
+        region VARCHAR(64) NOT NULL,
+        city VARCHAR(64) NOT NULL
+    ) ENGINE=OLAP
+    DISTRIBUTED BY HASH(ip_range) BUCKETS 1;
+
+    INSERT INTO ip_locations VALUES
+    ('1.0.0.0/24', 'United States', 'California', 'Los Angeles'),
+    ('1.0.1.0/24', 'China', 'Beijing', 'Beijing'),
+    ('1.0.4.0/24', 'Japan', 'Tokyo', 'Tokyo');
+
+    -- Create an IP address dictionary table
+    CREATE DICTIONARY ip_location_dict USING ip_locations
+    (
+        ip_range KEY,
+        country VALUE,
+        region VALUE,
+        city VALUE
+    )
+    LAYOUT(IP_TRIE)
+    PROPERTIES('data_lifetime' = '600');
+
+    -- Query the location information corresponding to the IP address, based on CIDR matching.
+    SELECT
+        dict_get("test_refresh_dict.ip_location_dict", "country", cast('1.0.0.1' as ipv4)) AS country,
+        dict_get("test_refresh_dict.ip_location_dict", "region", cast('1.0.0.2' as ipv4)) AS region,
+        dict_get("test_refresh_dict.ip_location_dict", "city", cast('1.0.0.3' as ipv4)) AS city;
+-- Product SKU Dimension Table: Includes basic product attributes
+    CREATE TABLE product_sku_info (
+        product_id INT NOT NULL COMMENT "商品ID",
+        color_code VARCHAR(32) NOT NULL COMMENT "颜色编码",
+        size_code VARCHAR(32) NOT NULL COMMENT "尺码编码",
+        product_name VARCHAR(128) NOT NULL COMMENT "商品名称",
+        color_name VARCHAR(32) NOT NULL COMMENT "颜色名称",
+        size_name VARCHAR(32) NOT NULL COMMENT "尺码名称",
+        stock INT NOT NULL COMMENT "库存",
+        price DECIMAL(10,2) NOT NULL COMMENT "价格",
+        update_time DATETIME NOT NULL COMMENT "更新时间"
+    )
+    DISTRIBUTED BY HASH(`product_id`) BUCKETS 10;
+
+    -- Order Details Table: Records actual sales data
+    CREATE TABLE order_details (
+        order_id BIGINT NOT NULL COMMENT "订单ID",
+        product_id INT NOT NULL COMMENT "商品ID",
+        color_code VARCHAR(32) NOT NULL COMMENT "颜色编码",
+        size_code VARCHAR(32) NOT NULL COMMENT "尺码编码",
+        quantity INT NOT NULL COMMENT "购买数量",
+        order_time DATETIME NOT NULL COMMENT "下单时间"
+    )
+    DISTRIBUTED BY HASH(`order_id`) BUCKETS 10;
+
+    -- Insert product SKU data
+    INSERT INTO product_sku_info VALUES
+    (1001, 'BLK', 'M', 'Nike运动T恤', '黑色', 'M码', 100, 199.00, '2024-02-23 10:00:00'),
+    (1001, 'BLK', 'L', 'Nike运动T恤', '黑色', 'L码', 80, 199.00, '2024-02-23 10:00:00'),
+    (1001, 'WHT', 'M', 'Nike运动T恤', '白色', 'M码', 90, 199.00, '2024-02-23 10:00:00'),
+    (1001, 'WHT', 'L', 'Nike运动T恤', '白色', 'L码', 70, 199.00, '2024-02-23 10:00:00'),
+    (1002, 'RED', 'S', 'Adidas运动裤', '红色', 'S码', 50, 299.00, '2024-02-23 10:00:00'),
+    (1002, 'RED', 'M', 'Adidas运动裤', '红色', 'M码', 60, 299.00, '2024-02-23 10:00:00'),
+    (1002, 'BLU', 'S', 'Adidas运动裤', '蓝色', 'S码', 55, 299.00, '2024-02-23 10:00:00'),
+    (1002, 'BLU', 'M', 'Adidas运动裤', '蓝色', 'M码', 65, 299.00, '2024-02-23 10:00:00');
+
+    -- Insert order data
+    INSERT INTO order_details VALUES
+    (10001, 1001, 'BLK', 'M', 2, '2024-02-23 12:01:00'),
+    (10002, 1001, 'WHT', 'L', 1, '2024-02-23 12:05:00'),
+    (10003, 1002, 'RED', 'S', 1, '2024-02-23 12:10:00'),
+    (10004, 1001, 'BLK', 'L', 3, '2024-02-23 12:15:00'),
+    (10005, 1002, 'BLU', 'M', 2, '2024-02-23 12:20:00');
+
+    -- Create a multi-key multi-value dictionary
+    CREATE DICTIONARY sku_dict USING product_sku_info
+    (
+        product_id KEY,
+        color_code KEY,
+        size_code KEY,
+        product_name VALUE,
+        color_name VALUE,
+        size_name VALUE,
+        price VALUE,
+        stock VALUE
+    )
+    LAYOUT(HASH_MAP)
+    PROPERTIES('data_lifetime'='300');
+
+    -- Query example using dict_get_many: Retrieve order details and SKU information
+    WITH order_sku_info AS (
+        SELECT 
+            o.order_id,
+            o.quantity,
+            o.order_time,
+            dict_get_many("test.sku_dict", 
+                ["product_name", "color_name", "size_name", "price", "stock"],
+                struct(o.product_id, o.color_code, o.size_code)
+            ) as sku_info
+        FROM order_details o
+        WHERE o.order_time >= '2024-02-23 12:00:00'
+            AND o.order_time < '2024-02-23 13:00:00'
+    )
+    SELECT 
+        order_id,
+        order_time,
+        struct_element(sku_info, 'product_name') as product_name,
+        struct_element(sku_info, 'color_name') as color_name,
+        struct_element(sku_info, 'size_name') as size_name,
+        quantity,
+        struct_element(sku_info, 'price') as unit_price,
+        quantity * struct_element(sku_info, 'price') as total_amount,
+        struct_element(sku_info, 'stock') as current_stock
+    FROM order_sku_info
+    ORDER BY order_time;
+DROP FUNCTION IF EXISTS py_add(INT, INT);
+
+CREATE FUNCTION py_add(INT, INT)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+def evaluate(a, b):
+    return a + b
+$$;
+
+SELECT py_add(10, 20) AS result; -- Result: 30
+;
+DROP FUNCTION IF EXISTS py_concat(STRING, STRING);
+
+CREATE FUNCTION py_concat(STRING, STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+def evaluate(s1, s2):
+    if s1 is None or s2 is None:
+        return None
+    return s1 + s2
+$$;
+
+SELECT py_concat('Hello', ' World') AS result; -- Result: Hello World
+SELECT py_concat(NULL, ' World') AS result; -- Result: NULL
+SELECT py_concat('Hello', NULL) AS result; -- Result: NULL
+;
+DROP FUNCTION IF EXISTS py_safe_divide(DOUBLE, DOUBLE);
+
+CREATE FUNCTION py_safe_divide(DOUBLE, DOUBLE)
+RETURNS DOUBLE
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(a, b):
+    if a is None or b is None:
+        return None
+    if b == 0:
+        return None
+    return a / b
+$$;
+
+SELECT py_safe_divide(10.0, 2.0);   -- Result: 5.0
+SELECT py_safe_divide(10.0, 0.0);   -- Result: NULL
+SELECT py_safe_divide(10.0, NULL);  -- Result: NULL
+;
+DROP FUNCTION IF EXISTS py_vec_add(INT, INT);
+
+CREATE FUNCTION py_vec_add(INT, INT)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "add",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+import pandas as pd
+
+def add(a: pd.Series, b: pd.Series) -> pd.Series:
+    return a + b + 1
+$$;
+
+SELECT py_vec_add(1, 2); -- Result: 4
+;
+DROP FUNCTION IF EXISTS py_vec_upper(STRING);
+
+CREATE FUNCTION py_vec_upper(STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "to_upper",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+import pandas as pd
+
+def to_upper(s: pd.Series) -> pd.Series:
+    return s.str.upper()
+$$;
+
+SELECT py_vec_upper('hello'); -- Result: 'HELLO'
+;
+DROP FUNCTION IF EXISTS py_vec_sqrt(DOUBLE);
+
+CREATE FUNCTION py_vec_sqrt(DOUBLE)
+RETURNS DOUBLE
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "sqrt",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+import pandas as pd
+import numpy as np
+
+def sqrt(x: pd.Series) -> pd.Series:
+    return np.sqrt(x)
+$$;
+
+SELECT py_vec_sqrt(16); -- Result: 4.0
+;
+------------------------------------------------------------------------------------------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_concat(STRING, STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_concat(STRING, STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(s1, s2):
+    if s1 is None or s2 is None:
+        return None
+    return s1 + s2
+$$;
+----------
+[SELECT] SELECT py_concat('Hello', ' World') AS result;
+----------
+[SELECT] -- 结果: Hello World
+SELECT py_concat(NULL, ' World') AS result;
+----------
+[SELECT] -- 结果: NULL
+SELECT py_concat('Hello', NULL) AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_safe_divide(DOUBLE, DOUBLE);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_safe_divide(DOUBLE, DOUBLE)
+RETURNS DOUBLE
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(a, b):
+    if a is None or b is None:
+        return None
+    if b == 0:
+        return None
+    return a / b
+$$;
+----------
+[SELECT] SELECT py_safe_divide(10.0, 2.0);
+----------
+[SELECT] -- 结果: 5.0
+SELECT py_safe_divide(10.0, 0.0);
+----------
+[SELECT] -- 结果: NULL
+SELECT py_safe_divide(10.0, NULL);
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_vec_add(INT, INT);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_vec_add(INT, INT)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "add",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+import pandas as pd
+
+def add(a: pd.Series, b: pd.Series) -> pd.Series:
+    return a + b + 1
+$$;
+----------
+[SELECT] SELECT py_vec_add(1, 2);
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_vec_upper(STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_vec_upper(STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "to_upper",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+import pandas as pd
+
+def to_upper(s: pd.Series) -> pd.Series:
+    return s.str.upper()
+$$;
+----------
+[SELECT] SELECT py_vec_upper('hello');
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_vec_sqrt(DOUBLE);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_vec_sqrt(DOUBLE)
+RETURNS DOUBLE
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "sqrt",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+import pandas as pd
+import numpy as np
+
+def sqrt(x: pd.Series) -> pd.Series:
+    return np.sqrt(x)
+$$;
+----------
+[SELECT] SELECT py_vec_sqrt(16);
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_array_sum(ARRAY<INT>);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_array_sum(ARRAY<INT>)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(arr):
+    """ Doris中的ARRAY类型对应Python中的list """
+    if arr is None:
+        return None
+    return sum(arr)
+$$;
+----------
+[SELECT] SELECT py_array_sum([1, 2, 3, 4, 5]) AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_array_filter_positive(ARRAY<INT>);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_array_filter_positive(ARRAY<INT>)
+RETURNS ARRAY<INT>
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(arr):
+    if arr is None:
+        return None
+    return [x for x in arr if x > 0]
+$$;
+----------
+[SELECT] SELECT py_array_filter_positive([1, -2, 3, -4, 5]) AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_map_size(MAP<STRING, INT>);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_map_size(MAP<STRING, INT>)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(m):
+    """ Doris中的MAP类型对应Python中的dict """
+    if m is None:
+        return None
+    return len(m)
+$$;
+----------
+[SELECT] SELECT py_map_size({'a': 1, 'b': 2, 'c': 3}) AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_map_get(MAP<STRING, STRING>, STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_map_get(MAP<STRING, STRING>, STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(m, key):
+    if m is None or key is None:
+        return None
+    return m.get(key)
+$$;
+----------
+[SELECT] SELECT py_map_get({'name': 'Alice', 'age': '30'}, 'name') AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_struct_get_name(STRUCT<name: STRING, age: INT>);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_struct_get_name(STRUCT<name: STRING, age: INT>)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(s):
+    """ Doris中的STRUCT类型对应Python中的dict """
+    if s is None:
+        return None
+    return s.get('name')
+$$;
+----------
+[SELECT] SELECT py_struct_get_name({'Alice', 30}) AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_mask_email(STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_mask_email(STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(email):
+    if email is None or '@' not in email:
+        return None
+    parts = email.split('@')
+    if len(parts[0]) <= 1:
+        return email
+    masked_user = parts[0][0] + '***'
+    return f"{masked_user}@{parts[1]}"
+$$;
+----------
+[SELECT] SELECT py_mask_email('user@example.com') AS masked;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_levenshtein_distance(STRING, STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_levenshtein_distance(STRING, STRING)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(s1, s2):
+    if s1 is None or s2 is None:
+        return None
+    if len(s1) < len(s2):
+        return evaluate(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    
+    return previous_row[-1]
+$$;
+----------
+[SELECT] SELECT py_levenshtein_distance('kitten', 'sitting') AS distance;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_days_between(DATE, DATE);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_days_between(DATE, DATE)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "volatility" = "immutable"
+)
+AS $$
+from datetime import datetime
+
+def evaluate(date1_str, date2_str):
+    if date1_str is None or date2_str is None:
+        return None
+    try:
+        d1 = datetime.strptime(str(date1_str), '%Y-%m-%d')
+        d2 = datetime.strptime(str(date2_str), '%Y-%m-%d')
+        return abs((d2 - d1).days)
+    except:
+        return None
+$$;
+----------
+[SELECT] SELECT py_days_between('2024-01-01', '2024-12-31') AS days;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_validate_id_card(STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_validate_id_card(STRING)
+RETURNS BOOLEAN
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "volatility" = "immutable"
+)
+AS $$
+def evaluate(id_card):
+    if id_card is None or len(id_card) != 18:
+        return False
+    
+    # 校验前17位是否为数字
+    if not id_card[:17].isdigit():
+        return False
+    
+    # 校验码权重
+    weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+    check_codes = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2']
+    
+    # 计算校验码
+    total = sum(int(id_card[i]) * weights[i] for i in range(17))
+    check_code = check_codes[total % 11]
+    
+    return id_card[17].upper() == check_code
+$$;
+----------
+[SELECT] SELECT py_validate_id_card('11010519491231002X') AS is_valid;
+----------
+[SELECT] -- 结果: True
+SELECT py_validate_id_card('110105194912310021x') AS is_valid;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- 常用属性：field_pattern（目标子路径）、analyzer、parser、support_phrase 等
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"),
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content")
+);
+----------
+[SELECT] -- v.content 同时具备分词与不分词的倒排索引
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+----------
+[SELECT] SELECT * FROM tbl WHERE v['content'] = 'Doris';
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'pattern_*' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "pattern_*"),
+    INDEX idx_v(v) USING INVERTED -- 全局指定非分词索引
+);
+----------
+[SELECT] SELECT * FROM tbl WHERE v['pattern_1'] MATCH 'Doris';
+----------
+[SELECT] SELECT * FROM tbl WHERE v['pattern_1'] = 'Doris';
+----------
+[CREATE_SCHEMA] CREATE DATABASE db1;
+----------
+[CREATE_USER] CREATE USER jack@'192.%' IDENTIFIED BY 'jack_pwd';
+----------
+[CREATE_USER] CREATE USER jack@'%' IDENTIFIED BY 'jack_pwd';
+----------
+[CREATE_ROLE] CREATE ROLE role1;
+----------
+[CREATE_ROLE] CREATE ROLE role2;
+----------
+[CREATE_ROLE] CREATE ROLE my_role;
+----------
+[CREATE_ROLE] CREATE ROLE test_role;
+----------
+[CREATE_RESOURCE_GROUP] CREATE WORKLOAD GROUP g1 PROPERTIES("max_cpu_percent"="10");
+----------
+[GRANT] GRANT SELECT_PRIV ON db1.* TO 'jack'@'192.%';
+----------
+[GRANT] GRANT USAGE_PRIV ON RESOURCE 'spark_resource' TO 'jack'@'192.%';
+----------
+[GRANT] GRANT 'role1','role2' TO 'jack'@'192.%';
+----------
+[GRANT] GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON WORKLOAD GROUP '%' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO ROLE 'test_role';
+----------
+[GRANT] GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO ROLE 'my_role';
+----------
+[GRANT] GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO 'jack'@'%';
+----------
+[GRANT] GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO ROLE 'my_role';
+----------
+[GRANT] GRANT USAGE_PRIV ON STORAGE VAULT '%' TO 'jack'@'%';
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE cte_uuid_seed (id INT) ENGINE=OLAP DUPLICATE KEY(id)
+    DISTRIBUTED BY HASH(id) BUCKETS 1 PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO cte_uuid_seed VALUES (1),(2),(3);
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_uuid_token(INT);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_uuid_token(INT)
+    RETURNS STRING
+    PROPERTIES (
+        "type" = "PYTHON_UDF",
+        "symbol" = "py_uuid_token_impl",
+        "always_nullable" = "false",
+        "runtime_version" = "3.12.11",
+        "volatility" = "volatile"
+    )
+    AS $$
+import uuid
+def py_uuid_token_impl(x):
+    return f"{x}-{uuid.uuid4()}"
+$$;
+----------
+[SESSION_SETTING_WRITE] SET enable_cte_materialize = true;
+----------
+[SESSION_SETTING_WRITE] SET inline_cte_referenced_threshold = 10;
+----------
+[SELECT] WITH cte AS (SELECT id, py_uuid_token(id) AS token FROM cte_uuid_seed)
+    SELECT id, COUNT(DISTINCT token) AS distinct_tokens
+    FROM (SELECT id, token FROM cte UNION ALL SELECT id, token FROM cte) u
+    GROUP BY id ORDER BY id;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_uuid_token(INT);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_uuid_token(INT)
+    RETURNS STRING
+    PROPERTIES (
+        "type" = "PYTHON_UDF",
+        "symbol" = "py_uuid_token_impl",
+        "always_nullable" = "false",
+        "runtime_version" = "3.12.11",
+        "volatility" = "immutable"
+    )
+    AS $$
+import uuid
+def py_uuid_token_impl(x):
+    return f"{x}-{uuid.uuid4()}"
+$$;
+----------
+[SYSTEM_SETTING_WRITE] -- 1. 创建不同分词策略的分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- 2. 在同一列上创建多个索引
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- 标准分词器用于分词搜索
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- 关键词分词器用于精确匹配
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- edge n-gram 分词器用于自动补全
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+----------
+[INSERT] -- 插入测试数据
+INSERT INTO articles VALUES
+    (1, 'hello world'),
+    (2, 'hello'),
+    (3, 'world'),
+    (4, 'hello world test');
+----------
+[SELECT] -- 分词搜索：匹配包含 'hello' 词项的行
+-- 返回：1, 2, 4
+SELECT id FROM articles WHERE content MATCH 'hello' USING ANALYZER std_analyzer ORDER BY id;
+----------
+[SELECT] -- 精确匹配：仅匹配精确的 'hello' 字符串
+-- 返回：2
+SELECT id FROM articles WHERE content MATCH 'hello' USING ANALYZER kw_analyzer ORDER BY id;
+----------
+[SELECT] -- 使用 edge n-gram 进行前缀匹配
+-- 返回：1, 2, 4（所有以 'hel' 开头的行）
+SELECT id FROM articles WHERE content MATCH 'hel' USING ANALYZER ngram_analyzer ORDER BY id;
+----------
+[ADMIN] -- 构建指定索引（非云模式）
+BUILD INDEX idx_content_chinese ON articles;
+----------
+[ADMIN] -- 构建所有索引（云模式）
+BUILD INDEX ON articles;
+----------
+[METADATA] -- 查看构建进度
+SHOW BUILD INDEX WHERE TableName='articles';
+----------
+[SYSTEM_SETTING_WRITE] -- 1. 创建自定义词元过滤器（如果需要特定参数）
+--    此处创建一个 ascii_folding 过滤器
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS my_ascii_folding
+PROPERTIES
+(
+    "type" = "ascii_folding",
+    "preserve_original" = "false"
+);
+----------
+[SYSTEM_SETTING_WRITE] -- 2. 创建标准化器
+--    组合使用 lowercase（内置）和 my_ascii_folding
+CREATE INVERTED INDEX NORMALIZER IF NOT EXISTS lowercase_ascii_normalizer
+PROPERTIES
+(
+    "token_filter" = "lowercase, my_ascii_folding"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- 3. 建表使用
+CREATE TABLE product_table (
+    `id` bigint NOT NULL,
+    `product_name` text NULL,
+    INDEX idx_name (`product_name`) USING INVERTED PROPERTIES("normalizer" = "lowercase_ascii_normalizer")
+) ENGINE=OLAP
+DUPLICATE KEY(`id`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+----------
+[SELECT] -- 4. 验证测试
+select tokenize('Café-Products', '"normalizer"="lowercase_ascii_normalizer"');
+----------
+[SYSTEM_SETTING_WRITE] -- 示例：定义自定义分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "asciifolding, lowercase"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- 在建表时使用自定义分词器
+CREATE TABLE docs (
+    id BIGINT,
+    content TEXT,
+    INDEX idx_content (content) USING INVERTED PROPERTIES(
+        "analyzer" = "keyword_lowercase",
+        "support_phrase" = "true"
+    )
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- 带 VARIANT 列与倒排索引
+CREATE TABLE test_variant_search_subcolumn (
+    id BIGINT,
+    properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+    INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+        "parser" = "unicode",
+        "lower_case" = "true",
+        "support_phrase" = "true"
+    )
+);
+----------
+[SELECT] -- 单词查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+----------
+[SELECT] -- AND / ALL 查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+----------
+[SELECT] SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+----------
+[SELECT] -- 不同子列 OR 查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+----------
+[METADATA] -- 查看索引列表
+SHOW INDEX FROM document_vectors;
+----------
+[METADATA] -- 查看数据规模
+SHOW DATA ALL FROM document_vectors;
+----------
+[ALTER_TABLE|DROP_INDEX] -- 删除索引
+ALTER TABLE document_vectors DROP INDEX idx_embedding;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Common properties: field_pattern (target subpath), analyzer, parser, support_phrase, etc.
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>, -- specify concrete type for subcolumn 'content'
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"), -- tokenized inverted index for 'content' with english parser
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content") -- non-tokenized inverted index for 'content'
+);
+----------
+[SELECT] -- Use tokenized index
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+----------
+[SELECT] -- Use non-tokenized index
+SELECT * FROM tbl WHERE v['content'] = 'Doris';
+----------
+[ALTER_TABLE] -- 创建分支
+ALTER TABLE iceberg_tbl CREATE BRANCH b1;
+----------
+[INSERT] -- 写入数据到指定分支
+INSERT INTO iceberg_tbl@branch(b1) values(1, 2);
+----------
+[SELECT] -- 查询指定分支
+SELECT * FROM iceberg_tbl@branch(b1);
+----------
+[SYSTEM_SETTING_WRITE] -- 创建用于多值列分割的 char group tokenizer
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS multi_value_tokenizer
+PROPERTIES
+(
+    "type" = "char_group",
+    "tokenize_on_chars" = "[|]",
+    "max_token_length" = "255"
+);
+----------
+[SYSTEM_SETTING_WRITE] -- 创建多值列分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS multi_value_analyzer
+PROPERTIES
+(
+    "tokenizer" = "multi_value_tokenizer",
+    "token_filter" = "lowercase, asciifolding"
+);
+----------
+[SELECT] SELECT tokenize('alice|123456|company', '"analyzer"="multi_value_analyzer"');
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_phone_number_tokenizer
+PROPERTIES
+(
+    "type" = "edge_ngram",
+    "min_gram" = "3",
+    "max_gram" = "10",
+    "token_chars" = "digit"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS edge_ngram_phone_number
+PROPERTIES
+(
+    "tokenizer" = "edge_ngram_phone_number_tokenizer"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "edge_ngram_phone_number")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+"replication_allocation" = "tag.location.default: 1"
+);
+----------
+[SYSTEM_SETTING_WRITE] -- Create pinyin tokenizer with multiple output formats
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS pinyin_tokenizer
+PROPERTIES (
+    "type" = "pinyin",
+    "keep_first_letter" = "true",
+    "keep_full_pinyin" = "true",
+    "keep_joined_full_pinyin" = "true",
+    "keep_original" = "true",
+    "keep_none_chinese" = "true",
+    "lowercase" = "true",
+    "remove_duplicated_term" = "true"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS pinyin_analyzer
+PROPERTIES (
+    "tokenizer" = "pinyin_tokenizer"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE contacts (
+    id BIGINT NOT NULL AUTO_INCREMENT(1),
+    name TEXT NULL,
+    INDEX idx_name (name) USING INVERTED PROPERTIES("analyzer" = "pinyin_analyzer", "support_phrase" = "true")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+----------
+[INSERT] INSERT INTO contacts VALUES (1, "刘德华"), (2, "张学友"), (3, "郭富城");
+----------
+[SELECT] SELECT * FROM contacts WHERE name MATCH '刘德华';
+----------
+[SELECT] SELECT * FROM contacts WHERE name MATCH 'liudehua';
+----------
+[SELECT] SELECT * FROM contacts WHERE name MATCH 'liu';
+----------
+[SELECT] SELECT * FROM contacts WHERE name MATCH 'ldh';
+----------
+[SYSTEM_SETTING_WRITE] -- Create pinyin filter to apply after keyword tokenizer
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS pinyin_filter
+PROPERTIES (
+    "type" = "pinyin",
+    "keep_first_letter" = "true",
+    "keep_full_pinyin" = "true",
+    "keep_original" = "true",
+    "lowercase" = "true"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_pinyin
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "pinyin_filter"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE stars (
+    id BIGINT NOT NULL AUTO_INCREMENT(1),
+    name TEXT NULL,
+    INDEX idx_name (name) USING INVERTED PROPERTIES("analyzer" = "keyword_pinyin")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+----------
+[INSERT] INSERT INTO stars VALUES (1, "刘德华"), (2, "张学友"), (3, "刘德华ABC");
+----------
+[SELECT] -- Supports multiple search modes:
+SELECT * FROM stars WHERE name MATCH '刘德华';
+----------
+[SELECT] SELECT * FROM stars WHERE name MATCH 'liu';
+----------
+[SELECT] SELECT * FROM stars WHERE name MATCH 'ldh';
+----------
+[SELECT] SELECT * FROM stars WHERE name MATCH 'zxy';
+----------
+[SYSTEM_SETTING_WRITE] -- Create analyzers with different tokenization strategies
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+----------
+[SYSTEM_SETTING_WRITE] CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Create table with multiple indexes on same column
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- Standard analyzer for tokenized search
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- Keyword analyzer for exact match
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- Edge n-gram analyzer for autocomplete
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+----------
+[INSERT] -- Insert test data
+INSERT INTO articles VALUES
+    (1, 'hello world'),
+    (2, 'hello'),
+    (3, 'world'),
+    (4, 'hello world test');
+----------
+[SELECT] -- Tokenized search: matches rows containing 'hello' token
+-- Returns: 1, 2, 4
+SELECT id FROM articles WHERE content MATCH 'hello' USING ANALYZER std_analyzer ORDER BY id;
+----------
+[SELECT] -- Exact match: only matches rows with exact 'hello' string
+-- Returns: 2
+SELECT id FROM articles WHERE content MATCH 'hello' USING ANALYZER kw_analyzer ORDER BY id;
+----------
+[SELECT] -- Prefix match with edge n-gram
+-- Returns: 1, 2, 4 (all rows starting with 'hel')
+SELECT id FROM articles WHERE content MATCH 'hel' USING ANALYZER ngram_analyzer ORDER BY id;
+----------
+[ADMIN] -- Build specific index (non-cloud mode)
+BUILD INDEX idx_content_chinese ON articles;
+----------
+[ADMIN] -- Build all indexes (cloud mode)
+BUILD INDEX ON articles;
+----------
+[METADATA] -- Check build progress
+SHOW BUILD INDEX WHERE TableName='articles';
+----------
+[SYSTEM_SETTING_WRITE] -- 1. Create a custom token filter (if specific parameters are needed)
+-- Create an ascii_folding filter here
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS my_ascii_folding
+PROPERTIES
+(
+    "type" = "ascii_folding",
+    "preserve_original" = "false"
+);
+----------
+[SYSTEM_SETTING_WRITE] -- 2. Create the normalizer
+-- Combine lowercase (built-in) and my_ascii_folding
+CREATE INVERTED INDEX NORMALIZER IF NOT EXISTS lowercase_ascii_normalizer
+PROPERTIES
+(
+    "token_filter" = "lowercase, my_ascii_folding"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- 3. Use in table creation
+CREATE TABLE product_table (
+    `id` bigint NOT NULL,
+    `product_name` text NULL,
+    INDEX idx_name (`product_name`) USING INVERTED PROPERTIES("normalizer" = "lowercase_ascii_normalizer")
+) ENGINE=OLAP
+DUPLICATE KEY(`id`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+"replication_allocation" = "tag.location.default: 1"
+);
+----------
+[SELECT] -- 4. Verify and test
+select tokenize('Café-Products', '"normalizer"="lowercase_ascii_normalizer"');
+----------
+[SYSTEM_SETTING_WRITE] -- Define a custom analyzer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+  "tokenizer" = "keyword",
+  "token_filter" = "asciifolding, lowercase"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Use the analyzer in table creation
+CREATE TABLE docs (
+  id BIGINT,
+  content TEXT,
+  INDEX idx_content (content) USING INVERTED PROPERTIES (
+    "analyzer" = "keyword_lowercase",
+    "support_phrase" = "true"
+  )
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Table with both tokenized and untokenized indexes
+CREATE TABLE t (
+  id INT,
+  content STRING,
+  INDEX idx_untokenized(content) USING INVERTED,
+  INDEX idx_tokenized(content)  USING INVERTED PROPERTIES("parser" = "standard")
+);
+----------
+[SELECT] -- Exact string match (uses untokenized index)
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning)')
+ORDER BY id;
+----------
+[SELECT] -- No match for partial token with EXACT
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine)')
+ORDER BY id;
+----------
+[SELECT] -- ANY/ALL use tokenized index
+SELECT id, content FROM t WHERE SEARCH('content:ANY(machine learning)') ORDER BY id;
+----------
+[SELECT] SELECT id, content FROM t WHERE SEARCH('content:ALL(machine learning)') ORDER BY id;
+----------
+[SELECT] -- Compare EXACT vs ANY
+SELECT id, content FROM t WHERE SEARCH('content:EXACT(deep learning)') ORDER BY id;
+----------
+[SELECT] SELECT id, content FROM t WHERE SEARCH('content:ANY(deep learning)') ORDER BY id;
+----------
+[SELECT] -- Mixed conditions
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning) OR content:ANY(intelligence)')
+ORDER BY id;
+----------
+[SELECT] -- Simplified syntax with default field/operator
+SELECT id, tags
+FROM tag_dataset
+WHERE SEARCH('deep learning', 'tags', 'and');
+----------
+[SELECT] -- Phrase and wildcard queries in one DSL
+SELECT id, content FROM t
+WHERE SEARCH('content:"deep learning" OR content:AI*')
+ORDER BY id;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- VARIANT column with inverted index
+CREATE TABLE test_variant_search_subcolumn (
+  id BIGINT,
+  properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+  INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+    "parser" = "unicode",
+    "lower_case" = "true",
+    "support_phrase" = "true"
+  )
+);
+----------
+[SELECT] -- Single term
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+----------
+[SELECT] -- AND / ALL
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+----------
+[SELECT] SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+----------
+[SELECT] -- OR across different subcolumns
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+----------
+[CREATE_TABLE|ADD_COLUMN|COMMENT_COLUMN|ADD_INDEX|COMMENT_TABLE] CREATE TABLE sift_1M (
+  id int NOT NULL,
+  embedding array<float>  NOT NULL  COMMENT "",
+  INDEX ann_index (embedding) USING ANN PROPERTIES(
+      "index_type"="hnsw",
+      "metric_type"="l2_distance",
+      "dim"="128"
+  )
+) ENGINE=OLAP
+DUPLICATE KEY(id) COMMENT "OLAP"
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES (
+  "replication_num" = "1"
+);
+----------
+[INSERT|SELECT|DATA_IMPORT] INSERT INTO sift_1M
+SELECT *
+FROM S3(
+  "uri" = "https://selectdb-customers-tools-bj.oss-cn-beijing.aliyuncs.com/sift_database.tsv",
+  "format" = "csv");
+----------
+[METADATA] SHOW INDEX FROM document_vectors;
+----------
+[METADATA] SHOW DATA ALL FROM document_vectors;
+----------
+[ALTER_TABLE|DROP_INDEX] ALTER TABLE document_vectors DROP INDEX idx_embedding;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- Create source data table
+CREATE TABLE source_table (
+    id INT NOT NULL,
+    city VARCHAR(32) NOT NULL,
+    code VARCHAR(32) NOT NULL
+) ENGINE=OLAP
+DISTRIBUTED BY HASH(id) BUCKETS 1;
+----------
+[SYSTEM_SETTING_WRITE] -- Create dictionary table
+CREATE DICTIONARY city_dict USING source_table
+(
+    city KEY,
+    id VALUE
+)
+LAYOUT(HASH_MAP)
+PROPERTIES('data_lifetime' = '600');
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE cities (
+        city_id INT NOT NULL,
+        city_name VARCHAR(32) NOT NULL,
+        region_code VARCHAR(32) NOT NULL
+    ) ENGINE=OLAP
+    DISTRIBUTED BY HASH(city_id) BUCKETS 1;
+----------
+[INSERT] INSERT INTO cities VALUES
+    (1, 'Beijing', 'BJ'),
+    (2, 'Shanghai', 'SH'),
+    (3, 'Guangzhou', 'GZ');
+----------
+[SYSTEM_SETTING_WRITE] CREATE DICTIONARY city_code_dict USING cities
+    (
+        city_name KEY,
+        region_code VALUE
+    )
+    LAYOUT(HASH_MAP)
+    PROPERTIES('data_lifetime' = '600');
+----------
+[SELECT] SELECT dict_get("test_refresh_dict.city_code_dict", "region_code", "Beijing");
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE ip_locations (
+        ip_range VARCHAR(30) NOT NULL,
+        country VARCHAR(64) NOT NULL,
+        region VARCHAR(64) NOT NULL,
+        city VARCHAR(64) NOT NULL
+    ) ENGINE=OLAP
+    DISTRIBUTED BY HASH(ip_range) BUCKETS 1;
+----------
+[INSERT] INSERT INTO ip_locations VALUES
+    ('1.0.0.0/24', 'United States', 'California', 'Los Angeles'),
+    ('1.0.1.0/24', 'China', 'Beijing', 'Beijing'),
+    ('1.0.4.0/24', 'Japan', 'Tokyo', 'Tokyo');
+----------
+[SYSTEM_SETTING_WRITE] CREATE DICTIONARY ip_location_dict USING ip_locations
+    (
+        ip_range KEY,
+        country VALUE,
+        region VALUE,
+        city VALUE
+    )
+    LAYOUT(IP_TRIE)
+    PROPERTIES('data_lifetime' = '600');
+----------
+[SELECT] SELECT
+        dict_get("test_refresh_dict.ip_location_dict", "country", cast('1.0.0.1' as ipv4)) AS country,
+        dict_get("test_refresh_dict.ip_location_dict", "region", cast('1.0.0.2' as ipv4)) AS region,
+        dict_get("test_refresh_dict.ip_location_dict", "city", cast('1.0.0.3' as ipv4)) AS city;
+----------
+[CREATE_TABLE|ADD_COLUMN|COMMENT_COLUMN] CREATE TABLE product_sku_info (
+        product_id INT NOT NULL COMMENT "商品ID",
+        color_code VARCHAR(32) NOT NULL COMMENT "颜色编码",
+        size_code VARCHAR(32) NOT NULL COMMENT "尺码编码",
+        product_name VARCHAR(128) NOT NULL COMMENT "商品名称",
+        color_name VARCHAR(32) NOT NULL COMMENT "颜色名称",
+        size_name VARCHAR(32) NOT NULL COMMENT "尺码名称",
+        stock INT NOT NULL COMMENT "库存",
+        price DECIMAL(10,2) NOT NULL COMMENT "价格",
+        update_time DATETIME NOT NULL COMMENT "更新时间"
+    )
+    DISTRIBUTED BY HASH(`product_id`) BUCKETS 10;
+----------
+[CREATE_TABLE|ADD_COLUMN|COMMENT_COLUMN] CREATE TABLE order_details (
+        order_id BIGINT NOT NULL COMMENT "订单ID",
+        product_id INT NOT NULL COMMENT "商品ID",
+        color_code VARCHAR(32) NOT NULL COMMENT "颜色编码",
+        size_code VARCHAR(32) NOT NULL COMMENT "尺码编码",
+        quantity INT NOT NULL COMMENT "购买数量",
+        order_time DATETIME NOT NULL COMMENT "下单时间"
+    )
+    DISTRIBUTED BY HASH(`order_id`) BUCKETS 10;
+----------
+[INSERT] INSERT INTO product_sku_info VALUES
+    (1001, 'BLK', 'M', 'Nike运动T恤', '黑色', 'M码', 100, 199.00, '2024-02-23 10:00:00'),
+    (1001, 'BLK', 'L', 'Nike运动T恤', '黑色', 'L码', 80, 199.00, '2024-02-23 10:00:00'),
+    (1001, 'WHT', 'M', 'Nike运动T恤', '白色', 'M码', 90, 199.00, '2024-02-23 10:00:00'),
+    (1001, 'WHT', 'L', 'Nike运动T恤', '白色', 'L码', 70, 199.00, '2024-02-23 10:00:00'),
+    (1002, 'RED', 'S', 'Adidas运动裤', '红色', 'S码', 50, 299.00, '2024-02-23 10:00:00'),
+    (1002, 'RED', 'M', 'Adidas运动裤', '红色', 'M码', 60, 299.00, '2024-02-23 10:00:00'),
+    (1002, 'BLU', 'S', 'Adidas运动裤', '蓝色', 'S码', 55, 299.00, '2024-02-23 10:00:00'),
+    (1002, 'BLU', 'M', 'Adidas运动裤', '蓝色', 'M码', 65, 299.00, '2024-02-23 10:00:00');
+----------
+[INSERT] INSERT INTO order_details VALUES
+    (10001, 1001, 'BLK', 'M', 2, '2024-02-23 12:01:00'),
+    (10002, 1001, 'WHT', 'L', 1, '2024-02-23 12:05:00'),
+    (10003, 1002, 'RED', 'S', 1, '2024-02-23 12:10:00'),
+    (10004, 1001, 'BLK', 'L', 3, '2024-02-23 12:15:00'),
+    (10005, 1002, 'BLU', 'M', 2, '2024-02-23 12:20:00');
+----------
+[SYSTEM_SETTING_WRITE] CREATE DICTIONARY sku_dict USING product_sku_info
+    (
+        product_id KEY,
+        color_code KEY,
+        size_code KEY,
+        product_name VALUE,
+        color_name VALUE,
+        size_name VALUE,
+        price VALUE,
+        stock VALUE
+    )
+    LAYOUT(HASH_MAP)
+    PROPERTIES('data_lifetime'='300');
+----------
+[SELECT] WITH order_sku_info AS (
+        SELECT 
+            o.order_id,
+            o.quantity,
+            o.order_time,
+            dict_get_many("test.sku_dict", 
+                ["product_name", "color_name", "size_name", "price", "stock"],
+                struct(o.product_id, o.color_code, o.size_code)
+            ) as sku_info
+        FROM order_details o
+        WHERE o.order_time >= '2024-02-23 12:00:00'
+            AND o.order_time < '2024-02-23 13:00:00'
+    )
+    SELECT 
+        order_id,
+        order_time,
+        struct_element(sku_info, 'product_name') as product_name,
+        struct_element(sku_info, 'color_name') as color_name,
+        struct_element(sku_info, 'size_name') as size_name,
+        quantity,
+        struct_element(sku_info, 'price') as unit_price,
+        quantity * struct_element(sku_info, 'price') as total_amount,
+        struct_element(sku_info, 'stock') as current_stock
+    FROM order_sku_info
+    ORDER BY order_time;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_add(INT, INT);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_add(INT, INT)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+def evaluate(a, b):
+    return a + b
+$$;
+----------
+[SELECT] SELECT py_add(10, 20) AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_concat(STRING, STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_concat(STRING, STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+def evaluate(s1, s2):
+    if s1 is None or s2 is None:
+        return None
+    return s1 + s2
+$$;
+----------
+[SELECT] SELECT py_concat('Hello', ' World') AS result;
+----------
+[SELECT] -- Result: Hello World
+SELECT py_concat(NULL, ' World') AS result;
+----------
+[SELECT] -- Result: NULL
+SELECT py_concat('Hello', NULL) AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_safe_divide(DOUBLE, DOUBLE);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_safe_divide(DOUBLE, DOUBLE)
+RETURNS DOUBLE
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(a, b):
+    if a is None or b is None:
+        return None
+    if b == 0:
+        return None
+    return a / b
+$$;
+----------
+[SELECT] SELECT py_safe_divide(10.0, 2.0);
+----------
+[SELECT] -- Result: 5.0
+SELECT py_safe_divide(10.0, 0.0);
+----------
+[SELECT] -- Result: NULL
+SELECT py_safe_divide(10.0, NULL);
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_vec_add(INT, INT);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_vec_add(INT, INT)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "add",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+import pandas as pd
+
+def add(a: pd.Series, b: pd.Series) -> pd.Series:
+    return a + b + 1
+$$;
+----------
+[SELECT] SELECT py_vec_add(1, 2);
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_vec_upper(STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_vec_upper(STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "to_upper",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+import pandas as pd
+
+def to_upper(s: pd.Series) -> pd.Series:
+    return s.str.upper()
+$$;
+----------
+[SELECT] SELECT py_vec_upper('hello');
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_vec_sqrt(DOUBLE);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_vec_sqrt(DOUBLE)
+RETURNS DOUBLE
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "sqrt",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+import pandas as pd
+import numpy as np
+
+def sqrt(x: pd.Series) -> pd.Series:
+    return np.sqrt(x)
+$$;
+----------
+[SELECT] SELECT py_vec_sqrt(16);

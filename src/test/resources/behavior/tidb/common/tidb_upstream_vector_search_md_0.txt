@@ -1,0 +1,167 @@
+[select__common_tidb_upstream_vector_search_md_0_000]
+sql:
+-- Insert sample data ...
+-- Search using text vector
+SELECT id, image_url, vec_l2_distance(image_vec, '[4,5,6]') AS image_distance
+FROM rich_text_documents
+ORDER BY image_distance
+LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:22~3:37) /test/1/catalog1/schema1/vec_l2_distance/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:5~4:24) /test/1/catalog1/schema1/rich_text_documents/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_vector_search_md_0_001]
+sql:
+SELECT id, text, vec_cosine_distance(text_vec, '[1,2,3]') AS distance
+FROM documents
+ORDER BY distance
+LIMIT 3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:17~1:36) /test/1/catalog1/schema1/vec_cosine_distance/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:14) /test/1/catalog1/schema1/documents/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_vector_search_md_0_002]
+sql:
+INSERT INTO documents (id, text, text_vec, meta)
+VALUES
+    (1, 'dog', '[1,2,1]', '{"category": "animal"}'),
+    (2, 'fish', '[1,2,4]', '{"category": "animal"}'),
+    (3, 'tree', '[1,0,0]', '{"category": "plant"}');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:21) /test/1/catalog1/schema1/documents/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_vector_search_md_0_003]
+sql:
+SELECT *
+FROM (
+    SELECT id, text, meta, vec_cosine_distance(text_vec, '[1,2,3]') AS distance
+    FROM documents
+    ORDER BY distance
+    LIMIT 50
+) candidates
+WHERE meta->>'$.category' = 'animal'
+ORDER BY distance
+LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:27~3:46) /test/1/catalog1/schema1/vec_cosine_distance/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:9~4:18) /test/1/catalog1/schema1/documents/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_vector_search_md_0_004]
+sql:
+SELECT id, text, vec_l2_distance(text_vec, '[1,2,3]') AS distance
+FROM documents
+HAVING distance BETWEEN 0.01 AND 0.05
+ORDER BY distance
+LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:17~1:32) /test/1/catalog1/schema1/vec_l2_distance/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:14) /test/1/catalog1/schema1/documents/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_vector_search_md_0_005]
+sql:
+SELECT id, text, meta, vec_cosine_distance(text_vec, '[1,2,3]') AS distance
+FROM documents
+WHERE meta->>'$.category' = 'animal'
+ORDER BY distance
+LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:23~1:42) /test/1/catalog1/schema1/vec_cosine_distance/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:14) /test/1/catalog1/schema1/documents/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_vector_search_md_0_006]
+sql:
+SELECT id, text, vec_cosine_distance(text_vec, '[1,2,3]') AS distance
+FROM documents
+HAVING distance < 0.1
+ORDER BY distance
+LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:17~1:36) /test/1/catalog1/schema1/vec_cosine_distance/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:14) /test/1/catalog1/schema1/documents/",
+      "action" : "READ"
+    }
+  ]
+}

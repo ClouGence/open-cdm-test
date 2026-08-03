@@ -1,0 +1,470 @@
+DROP TABLE test2
+;
+/*
+ * 6.67
+ * TRANSLATIONS view
+ */
+
+-- feature not supported
+
+
+/*
+ * 6.68
+ * TRIGGERED_UPDATE_COLUMNS view
+ */
+
+CREATE VIEW triggered_update_columns AS
+    SELECT CAST(current_database() AS sql_identifier) AS trigger_catalog,
+           CAST(n.nspname AS sql_identifier) AS trigger_schema,
+           CAST(t.tgname AS sql_identifier) AS trigger_name,
+           CAST(current_database() AS sql_identifier) AS event_object_catalog,
+           CAST(n.nspname AS sql_identifier) AS event_object_schema,
+           CAST(c.relname AS sql_identifier) AS event_object_table,
+           CAST(a.attname AS sql_identifier) AS event_object_column
+
+    FROM pg_namespace n, pg_class c, pg_trigger t,
+         (SELECT tgoid, (ta0.tgat).x AS tgattnum, (ta0.tgat).n AS tgattpos
+          FROM (SELECT oid AS tgoid, information_schema._pg_expandarray(tgattr) AS tgat FROM pg_trigger) AS ta0) AS ta,
+         pg_attribute a
+
+    WHERE n.oid = c.relnamespace
+          AND c.oid = t.tgrelid
+          AND t.oid = ta.tgoid
+          AND (a.attrelid, a.attnum) = (t.tgrelid, ta.tgattnum)
+          AND NOT t.tgisinternal
+          AND (NOT pg_is_other_temp_schema(n.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_column_privilege(c.oid, a.attnum, 'INSERT, UPDATE, REFERENCES') )
+;
+CREATE FUNCTION "public"."test_strict"("text") RETURNS "text"
+    LANGUAGE "sql"
+    AS $_$select coalesce($1, 'got passed a null');$_$
+;
+ALTER TABLE pg_constraint ADD PRIMARY KEY USING INDEX pg_constraint_oid_index
+;
+CREATE TEXT SEARCH TEMPLATE addr_ts_temp (lexize=dsimple_lexize)
+;
+drop table inh_nn1, inh_nn2
+;
+-- Multiple base relations
+CREATE VIEW ro_view12 AS SELECT * FROM generate_series(1, 10) AS g(a)
+;
+call test.test_procedure()
+;
+alter operator family integer_ops using btree add
+  operator 3 = (int8alias1, int8alias1)
+;
+CREATE TABLE test11a AS (SELECT 1::priv_testdomain1 AS a)
+;
+CREATE SEQUENCE regress_pg_dump_seq
+;
+CREATE TEMPORARY TABLE oidtmp (oid oid)
+;
+CREATE SUBSCRIPTION tap_sub CONNECTION 'port=14979 host=/tmp/mHOFrz7Dxk dbname=postgres' PUBLICATION tap_pub WITH (copy_data = false)
+;
+ALTER OPERATOR FAMILY alt_opf15 USING hash ADD FUNCTION 1 fn_opf15(int4, int2)
+;
+COMMENT ON EVENT TRIGGER split_event_probe IS 'event trigger probe'
+;
+CREATE FUNCTION ftable_rowcount_trigf() RETURNS trigger LANGUAGE plpgsql AS
+$$
+begin
+	raise notice '%: there are % rows in ftable',
+		TG_NAME, (SELECT count(*) FROM ftable);
+	if TG_OP = 'DELETE' then
+		return OLD;
+	else
+		return NEW;
+	end if;
+end;
+$$
+;
+--
+-- Test INSERT/UPDATE/DELETE RETURNING
+--
+
+-- Simple cases
+
+CREATE TEMP TABLE foo (f1 serial, f2 text, f3 int default 42)
+;
+DROP TABLE concur_replident
+;
+CREATE VIEW pg_stat_progress_create_index AS
+    SELECT
+        S.pid AS pid, S.datid AS datid, D.datname AS datname,
+        S.relid AS relid,
+        CAST(S.param7 AS oid) AS index_relid,
+        CASE S.param1 WHEN 1 THEN 'CREATE INDEX'
+                      WHEN 2 THEN 'CREATE INDEX CONCURRENTLY'
+                      WHEN 3 THEN 'REINDEX'
+                      WHEN 4 THEN 'REINDEX CONCURRENTLY'
+                      END AS command,
+        CASE S.param10 WHEN 0 THEN 'initializing'
+                       WHEN 1 THEN 'waiting for writers before build'
+                       WHEN 2 THEN 'building index' ||
+                           COALESCE((': ' || pg_indexam_progress_phasename(S.param9::oid, S.param11)),
+                                    '')
+                       WHEN 3 THEN 'waiting for writers before validation'
+                       WHEN 4 THEN 'index validation: scanning index'
+                       WHEN 5 THEN 'index validation: sorting tuples'
+                       WHEN 6 THEN 'index validation: scanning table'
+                       WHEN 7 THEN 'waiting for old snapshots'
+                       WHEN 8 THEN 'waiting for readers before marking dead'
+                       WHEN 9 THEN 'waiting for readers before dropping'
+                       END as phase,
+        S.param4 AS lockers_total,
+        S.param5 AS lockers_done,
+        S.param6 AS current_locker_pid,
+        S.param16 AS blocks_total,
+        S.param17 AS blocks_done,
+        S.param12 AS tuples_total,
+        S.param13 AS tuples_done,
+        S.param14 AS partitions_total,
+        S.param15 AS partitions_done
+    FROM pg_stat_get_progress_info('CREATE INDEX') AS S
+        LEFT JOIN pg_database D ON S.datid = D.oid
+;
+ALTER TEXT SEARCH DICTIONARY xsyn (RULES='xsyn_sample', KEEPORIG=false, MATCHORIG=true, KEEPSYNONYMS=true, MATCHSYNONYMS=true)
+;
+-- fails
+CREATE COLLATION builtin2 ( PROVIDER = builtin, LC_CTYPE = "C", LC_COLLATE = "C" )
+;
+DO LANGUAGE plpgsql $$
+BEGIN
+  ROLLBACK;
+  CALL transaction_test9();
+END
+$$
+;
+-- create a tablespace we can use
+CREATE TABLESPACE regress_tblspace LOCATION ''
+;
+CREATE TABLE stream_test1(data bytea)
+;
+ALTER FUNCTION gbt_text_union(internal, internal) PARALLEL SAFE
+;
+DROP POLICY p2 ON t1
+;
+ALTER TABLE rewrite_test
+        ADD COLUMN notempty2_rewrite serial,
+        ADD COLUMN empty2 text
+;
+CREATE FOREIGN TABLE ftable ( x int ) SERVER loopback OPTIONS ( table_name 'batch_table', batch_size '10' )
+;
+CREATE TABLE plt3_adv_p1 PARTITION OF plt3_adv FOR VALUES IN ('0001')
+;
+ALTER TEXT SEARCH DICTIONARY xsyn (RULES='xsyn_sample', KEEPORIG=false, MATCHORIG=true, KEEPSYNONYMS=false, MATCHSYNONYMS=true)
+;
+VACUUM pg_catalog.pg_description
+;
+create table inserttest (col1 int4, col2 int4 NOT NULL, col3 text default 'testing')
+;
+DROP INDEX sro_cluster_idx
+;
+create function lock_excl(int,int) returns int language sql as
+  'select pg_advisory_xact_lock($1); select 1;' parallel safe
+;
+CREATE PUBLICATION testpub_table_ins WITH (publish = 'insert, truncate')
+;
+-- Create "internal" policies, to check that the policies from
+-- the hooks are combined correctly.
+CREATE POLICY p1 ON rls_test_permissive USING (data % 2 = 0)
+;
+create function anycompatiblearray_anycompatiblerange_func(a anycompatiblearray, r anycompatiblerange)
+  returns anycompatible as 'select $1[1] + lower($2);' language sql
+;
+ANALYZE public.bug_16784
+;
+CREATE FUNCTION citext_pattern_le( citext, citext )
+RETURNS bool
+AS '$libdir/citext'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+DROP TABLE pg_temp_13.pg_temp_25980_2, pg_temp_13.pg_temp_25980
+;
+ALTER OPERATOR >= (ean13, isbn) SET (
+	RESTRICT = scalargesel,
+	JOIN = scalargejoinsel)
+;
+ALTER TABLE t ENABLE ROW LEVEL SECURITY
+;
+CREATE COLLATION ctest_nondet (locale = 'en_US.utf8', deterministic = false)
+;
+ALTER TABLE pg_temp_24.pg_temp_25663_2 ADD COLUMN newdata pg_temp_24.pg_temp_25663
+;
+DROP VIEW rw_view1
+;
+ALTER TABLE ref ADD FOREIGN KEY(f1,f2) REFERENCES pt
+;
+ALTER FUNCTION gbt_macad_union(internal, internal) PARALLEL SAFE
+;
+CREATE FUNCTION gbt_bytea_compress(internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+VACUUM (FULL) pg_catalog.pg_statistic_ext
+;
+CREATE TABLE gtest_child3 (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS IDENTITY)
+;
+------------------------------------------------------------------------------------------
+[DROP_TABLE] DROP TABLE test2
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 6.67
+ * TRANSLATIONS view
+ */
+
+-- feature not supported
+
+
+/*
+ * 6.68
+ * TRIGGERED_UPDATE_COLUMNS view
+ */
+
+CREATE VIEW triggered_update_columns AS
+    SELECT CAST(current_database() AS sql_identifier) AS trigger_catalog,
+           CAST(n.nspname AS sql_identifier) AS trigger_schema,
+           CAST(t.tgname AS sql_identifier) AS trigger_name,
+           CAST(current_database() AS sql_identifier) AS event_object_catalog,
+           CAST(n.nspname AS sql_identifier) AS event_object_schema,
+           CAST(c.relname AS sql_identifier) AS event_object_table,
+           CAST(a.attname AS sql_identifier) AS event_object_column
+
+    FROM pg_namespace n, pg_class c, pg_trigger t,
+         (SELECT tgoid, (ta0.tgat).x AS tgattnum, (ta0.tgat).n AS tgattpos
+          FROM (SELECT oid AS tgoid, information_schema._pg_expandarray(tgattr) AS tgat FROM pg_trigger) AS ta0) AS ta,
+         pg_attribute a
+
+    WHERE n.oid = c.relnamespace
+          AND c.oid = t.tgrelid
+          AND t.oid = ta.tgoid
+          AND (a.attrelid, a.attnum) = (t.tgrelid, ta.tgattnum)
+          AND NOT t.tgisinternal
+          AND (NOT pg_is_other_temp_schema(n.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_column_privilege(c.oid, a.attnum, 'INSERT, UPDATE, REFERENCES') )
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."test_strict"("text") RETURNS "text"
+    LANGUAGE "sql"
+    AS $_$select coalesce($1, 'got passed a null');$_$
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE pg_constraint ADD PRIMARY KEY USING INDEX pg_constraint_oid_index
+;
+----------
+[CREATE_POLICY] CREATE TEXT SEARCH TEMPLATE addr_ts_temp (lexize=dsimple_lexize)
+;
+----------
+[DROP_TABLE] drop table inh_nn1, inh_nn2
+;
+----------
+[CREATE_VIEW(SELECT)] -- Multiple base relations
+CREATE VIEW ro_view12 AS SELECT * FROM generate_series(1, 10) AS g(a)
+;
+----------
+[CALL_PROG_OBJ] call test.test_procedure()
+;
+----------
+[ALTER_PROG_OBJ] alter operator family integer_ops using btree add
+  operator 3 = (int8alias1, int8alias1)
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE test11a AS (SELECT 1::priv_testdomain1 AS a)
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE regress_pg_dump_seq
+;
+----------
+[CREATE_TABLE] CREATE TEMPORARY TABLE oidtmp (oid oid)
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION tap_sub CONNECTION 'port=14979 host=/tmp/mHOFrz7Dxk dbname=postgres' PUBLICATION tap_pub WITH (copy_data = false)
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY alt_opf15 USING hash ADD FUNCTION 1 fn_opf15(int4, int2)
+;
+----------
+[COMMENT_TRIGGER] COMMENT ON EVENT TRIGGER split_event_probe IS 'event trigger probe'
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ftable_rowcount_trigf() RETURNS trigger LANGUAGE plpgsql AS
+$$
+begin
+	raise notice '%: there are % rows in ftable',
+		TG_NAME, (SELECT count(*) FROM ftable);
+	if TG_OP = 'DELETE' then
+		return OLD;
+	else
+		return NEW;
+	end if;
+end;
+$$
+;
+----------
+[CREATE_TABLE] --
+-- Test INSERT/UPDATE/DELETE RETURNING
+--
+
+-- Simple cases
+
+CREATE TEMP TABLE foo (f1 serial, f2 text, f3 int default 42)
+;
+----------
+[DROP_TABLE] DROP TABLE concur_replident
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW pg_stat_progress_create_index AS
+    SELECT
+        S.pid AS pid, S.datid AS datid, D.datname AS datname,
+        S.relid AS relid,
+        CAST(S.param7 AS oid) AS index_relid,
+        CASE S.param1 WHEN 1 THEN 'CREATE INDEX'
+                      WHEN 2 THEN 'CREATE INDEX CONCURRENTLY'
+                      WHEN 3 THEN 'REINDEX'
+                      WHEN 4 THEN 'REINDEX CONCURRENTLY'
+                      END AS command,
+        CASE S.param10 WHEN 0 THEN 'initializing'
+                       WHEN 1 THEN 'waiting for writers before build'
+                       WHEN 2 THEN 'building index' ||
+                           COALESCE((': ' || pg_indexam_progress_phasename(S.param9::oid, S.param11)),
+                                    '')
+                       WHEN 3 THEN 'waiting for writers before validation'
+                       WHEN 4 THEN 'index validation: scanning index'
+                       WHEN 5 THEN 'index validation: sorting tuples'
+                       WHEN 6 THEN 'index validation: scanning table'
+                       WHEN 7 THEN 'waiting for old snapshots'
+                       WHEN 8 THEN 'waiting for readers before marking dead'
+                       WHEN 9 THEN 'waiting for readers before dropping'
+                       END as phase,
+        S.param4 AS lockers_total,
+        S.param5 AS lockers_done,
+        S.param6 AS current_locker_pid,
+        S.param16 AS blocks_total,
+        S.param17 AS blocks_done,
+        S.param12 AS tuples_total,
+        S.param13 AS tuples_done,
+        S.param14 AS partitions_total,
+        S.param15 AS partitions_done
+    FROM pg_stat_get_progress_info('CREATE INDEX') AS S
+        LEFT JOIN pg_database D ON S.datid = D.oid
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH DICTIONARY xsyn (RULES='xsyn_sample', KEEPORIG=false, MATCHORIG=true, KEEPSYNONYMS=true, MATCHSYNONYMS=true)
+;
+----------
+[CREATE_POLICY] -- fails
+CREATE COLLATION builtin2 ( PROVIDER = builtin, LC_CTYPE = "C", LC_COLLATE = "C" )
+;
+----------
+[BLOCK] DO LANGUAGE plpgsql $$
+BEGIN
+  ROLLBACK;
+  CALL transaction_test9();
+END
+$$
+;
+----------
+[CREATE_TABLESPACE] -- create a tablespace we can use
+CREATE TABLESPACE regress_tblspace LOCATION ''
+;
+----------
+[CREATE_TABLE] CREATE TABLE stream_test1(data bytea)
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_text_union(internal, internal) PARALLEL SAFE
+;
+----------
+[DROP_POLICY] DROP POLICY p2 ON t1
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE rewrite_test
+        ADD COLUMN notempty2_rewrite serial,
+        ADD COLUMN empty2 text
+;
+----------
+[CREATE_TABLE] CREATE FOREIGN TABLE ftable ( x int ) SERVER loopback OPTIONS ( table_name 'batch_table', batch_size '10' )
+;
+----------
+[CREATE_TABLE] CREATE TABLE plt3_adv_p1 PARTITION OF plt3_adv FOR VALUES IN ('0001')
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH DICTIONARY xsyn (RULES='xsyn_sample', KEEPORIG=false, MATCHORIG=true, KEEPSYNONYMS=false, MATCHSYNONYMS=true)
+;
+----------
+[ADMIN_TABLE] VACUUM pg_catalog.pg_description
+;
+----------
+[CREATE_TABLE] create table inserttest (col1 int4, col2 int4 NOT NULL, col3 text default 'testing')
+;
+----------
+[DROP_INDEX] DROP INDEX sro_cluster_idx
+;
+----------
+[CREATE_PROG_OBJ] create function lock_excl(int,int) returns int language sql as
+  'select pg_advisory_xact_lock($1); select 1;' parallel safe
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_table_ins WITH (publish = 'insert, truncate')
+;
+----------
+[CREATE_POLICY] -- Create "internal" policies, to check that the policies from
+-- the hooks are combined correctly.
+CREATE POLICY p1 ON rls_test_permissive USING (data % 2 = 0)
+;
+----------
+[CREATE_PROG_OBJ] create function anycompatiblearray_anycompatiblerange_func(a anycompatiblearray, r anycompatiblerange)
+  returns anycompatible as 'select $1[1] + lower($2);' language sql
+;
+----------
+[ADMIN_TABLE] ANALYZE public.bug_16784
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION citext_pattern_le( citext, citext )
+RETURNS bool
+AS '$libdir/citext'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[DROP_TABLE] DROP TABLE pg_temp_13.pg_temp_25980_2, pg_temp_13.pg_temp_25980
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR >= (ean13, isbn) SET (
+	RESTRICT = scalargesel,
+	JOIN = scalargejoinsel)
+;
+----------
+[ALTER_TABLE] ALTER TABLE t ENABLE ROW LEVEL SECURITY
+;
+----------
+[CREATE_POLICY] CREATE COLLATION ctest_nondet (locale = 'en_US.utf8', deterministic = false)
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE pg_temp_24.pg_temp_25663_2 ADD COLUMN newdata pg_temp_24.pg_temp_25663
+;
+----------
+[DROP_VIEW] DROP VIEW rw_view1
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ref ADD FOREIGN KEY(f1,f2) REFERENCES pt
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_macad_union(internal, internal) PARALLEL SAFE
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_bytea_compress(internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[ADMIN_TABLE] VACUUM (FULL) pg_catalog.pg_statistic_ext
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_child3 (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS IDENTITY)
+;

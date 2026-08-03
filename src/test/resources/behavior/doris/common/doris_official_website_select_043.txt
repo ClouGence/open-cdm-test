@@ -1,0 +1,1594 @@
+[doris_official_website_select_043__select__0001]
+sql:
+-- 等价于：ASOF LEFT JOIN ... MATCH_CONDITION(l.ts >= r.ts)
+SELECT id, rid, val FROM (
+    SELECT l.id, r.id AS rid, r.val,
+           ROW_NUMBER() OVER (PARTITION BY l.id ORDER BY r.ts DESC) AS rn
+    FROM left_table l
+    LEFT JOIN right_table r
+        ON l.grp = r.grp AND l.ts >= r.ts
+) t
+WHERE rn = 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:11~4:21) /test/1/catalog1/schema1/ROW_NUMBER/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:9~5:19) /test/1/catalog1/schema1/left_table/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:14~6:25) /test/1/catalog1/schema1/right_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0002]
+sql:
+explain select *
+from 
+    (
+        -- t1 表按照 c1 做了 hash 分布，经过 group by 算子后，仍然保持按照 c1 做的 hash 分布
+        select c1 as c1, sum(c2) as c2
+        from t1
+        group by c1 
+    ) tx
+join 
+    (
+        -- t2 表按照 c1 做了 hash 分布，经过 group by 算子后，数据分布变成按照 c2 进行的 hash 分布
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c1 = ty.c2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:25~5:28) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:13~6:15) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(12:25~12:28) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:13~13:15) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0003]
+sql:
+explain select *
+from 
+    (
+        -- t1 表按照 c1 做了 hash 分布，经过 group by 算子后，数据分布变成按照 c2 进行的 hash 分布
+        select c2 as c2, sum(c1) as c1
+        from t1
+        group by c2 
+    ) tx
+join 
+    (
+        -- t2 表按照 c1 做了 hash 分布，经过 group by 算子后，数据分布变成按照 c2 进行的 hash 分布
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c2 = ty.c2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:25~5:28) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:13~6:15) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(12:25~12:28) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:13~13:15) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0004]
+sql:
+-- 标量子查询，当 t2 是空表时，子查询返回标量值 null
+select * from t1 where t1.c1 > (select sum(t2.c1) from t2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:39~2:42) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:55~2:57) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0005]
+sql:
+-- 非标量子查询，当 t2 是空表时，子查询返回 empty set (0 rows)
+select * from t1 where t1.c1 in (select t2.c1 from t2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:51~2:53) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0006]
+sql:
+-- 关联子查询，子查询内部使用了外部表的列 t1.c2
+select * from t1 where t1.c1 in (select t2.c1 from t2 where t2.c2 = t1.c2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:51~2:53) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0007]
+sql:
+-- 非关联子查询，子查询内部没有使用任何外部表 t1 的列
+select * from t1 where t1.c1 in (select t2.c1 from t2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:51~2:53) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0008]
+sql:
+-- 单个聚合函数，且无 group by，支持
+select * from t1 where t1.c1 < (select max(t2.c1) from t2 where t1.c2 = t2.c2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:39~2:42) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:55~2:57) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0009]
+sql:
+-- 等价改写的 SQL 如下：
+select t1.* from t1 inner join (select t2.c2 as c2, max(t2.c1) as c1 from t2 group by t2.c2) tx on t1.c1 < tx.c1 and t1.c2 = tx.c2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:17~2:19) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:52~2:55) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:74~2:76) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0010]
+sql:
+-- 非等值条件，不支持
+select * from t1 where t1.c1 = (select max(t2.c1) from t2 where t1.c2 > t2.c2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:39~2:42) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:55~2:57) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0011]
+sql:
+-- 没有聚合函数，不支持
+select * from t1 where t1.c1 = (select t2.c1 from t2 where t1.c2 = t2.c2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:50~2:52) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0012]
+sql:
+-- 有聚合函数，但包含 group by，不支持
+select * from t1 where t1.c1 = (select max(t2.c1) from t2 where t1.c2 = t2.c2 group by t2.c2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:39~2:42) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:55~2:57) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0013]
+sql:
+-- 带 limit 但无 offset，支持
+select * from t1 where exists (select t2.c1 from t2 where t1.c2 = t2.c2 limit 2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:49~2:51) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0014]
+sql:
+-- 等价改写 SQL 如下：
+select * from t1 left semi join t2 on t1.c2 = t2.c2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:32~2:34) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0015]
+sql:
+-- 带 offset 和 limit，不支持
+select * from t1 where exists (select t2.c1 from t2 where t1.c2 = t2.c2 limit 2, 3);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:49~2:51) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0016]
+sql:
+SELECT py_add_three(10, 20, 30) AS sum_result;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:19) /test/1/catalog1/schema1/py_add_three/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0017]
+sql:
+-- 结果: 60
+SELECT py_reverse('hello') AS reversed;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:17) /test/1/catalog1/schema1/py_reverse/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0018]
+sql:
+-- 结果: olleh
+SELECT py_is_prime(17) AS is_prime;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:18) /test/1/catalog1/schema1/py_is_prime/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0019]
+sql:
+-- UDF: 每行都会调用
+SELECT id, py_upper(name) FROM users;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:11~2:19) /test/1/catalog1/schema1/py_upper/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:31~2:36) /test/1/catalog1/schema1/users/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0020]
+sql:
+-- UDAF: 每组调用一次
+SELECT category, py_sum(amount) FROM sales GROUP BY category;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:17~2:23) /test/1/catalog1/schema1/py_sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:37~2:42) /test/1/catalog1/schema1/sales/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0021]
+sql:
+select cast('123' as int);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_043__select__0022]
+sql:
+explain select length(123);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:15~1:21) /test/1/catalog1/schema1/length/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0023]
+sql:
+SELECT ARRAY(1, 2, 3);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/ARRAY/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0024]
+sql:
+SELECT ARRAY(1, 2, 'abc');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/ARRAY/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0025]
+sql:
+SELECT ["abc", "def", "efg"];
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_043__select__0026]
+sql:
+SELECT [1, 2, 'abc'];
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_043__select__0027]
+sql:
+SELECT s.a, s.b FROM struct_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:21~1:33) /test/1/catalog1/schema1/struct_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0028]
+sql:
+SELECT s.s.s.s FROM nested_struct_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:20~1:39) /test/1/catalog1/schema1/nested_struct_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0029]
+sql:
+-- 字符串会保留为 VARIANT 字符串根值，即使内容看起来像 JSON。
+SELECT CAST(CAST('{"id": 1}' AS VARIANT) AS STRING) AS string_value,
+       VARIANT_TYPE(CAST('{"id": 1}' AS VARIANT)) AS root_type;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:7~3:19) /test/1/catalog1/schema1/VARIANT_TYPE/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0030]
+sql:
+-- 需要结构化 VARIANT 值时，显式解析 JSON 文本。
+SELECT PARSE_TO_VARIANT('{"id": 1}') AS parsed_object;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:23) /test/1/catalog1/schema1/PARSE_TO_VARIANT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0031]
+sql:
+-- JSON/JSONB 输入按结构转换。
+SELECT CAST(CAST('{"id": 1}' AS JSON) AS VARIANT) AS parsed_object;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_043__select__0032]
+sql:
+-- 1 和 1.0 只有一个 distinct logical value。
+SELECT COUNT(DISTINCT value) AS distinct_count
+FROM (
+    SELECT PARSE_TO_VARIANT('1') AS value
+    UNION ALL
+    SELECT PARSE_TO_VARIANT('1.0') AS value
+) AS numeric_values;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:11~4:27) /test/1/catalog1/schema1/PARSE_TO_VARIANT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:11~6:27) /test/1/catalog1/schema1/PARSE_TO_VARIANT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0033]
+sql:
+-- 对象 key 顺序被忽略；数组顺序会保留。
+SELECT COUNT(DISTINCT value) AS distinct_count
+FROM (
+    SELECT PARSE_TO_VARIANT('{"a": 1, "b": 2}') AS value
+    UNION ALL
+    SELECT PARSE_TO_VARIANT('{"b": 2, "a": 1}') AS value
+) AS object_values;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:11~4:27) /test/1/catalog1/schema1/PARSE_TO_VARIANT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:11~6:27) /test/1/catalog1/schema1/PARSE_TO_VARIANT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0034]
+sql:
+SELECT COUNT(DISTINCT value) AS distinct_count
+FROM (
+    SELECT PARSE_TO_VARIANT('[1, 2]') AS value
+    UNION ALL
+    SELECT PARSE_TO_VARIANT('[2, 1]') AS value
+) AS array_values;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:11~3:27) /test/1/catalog1/schema1/PARSE_TO_VARIANT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:11~5:27) /test/1/catalog1/schema1/PARSE_TO_VARIANT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0035]
+sql:
+-- JSON 成员带引号，因此类型为 STRING。这里使用 PARSE_TO_VARIANT，
+-- 因为 CAST(string AS VARIANT) 始终把整个输入保留为字符串。
+SELECT variant_type(PARSE_TO_VARIANT('{"a" : "12345"}')['a']);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:7~3:19) /test/1/catalog1/schema1/variant_type/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:20~3:36) /test/1/catalog1/schema1/PARSE_TO_VARIANT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0036]
+sql:
+SELECT * FROM tbl WHERE v['id'] = 123456;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0037]
+sql:
+-- 显式 CAST
+SELECT CAST(v['arr'] AS ARRAY<TEXT>) FROM tbl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:42~2:45) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0038]
+sql:
+SELECT * FROM tbl WHERE CAST(v['decimal'] AS DECIMAL(27, 9)) = 1.111111111;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0039]
+sql:
+SELECT * FROM tbl WHERE CAST(v['date'] AS DATE) = '2021-01-02';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0040]
+sql:
+-- 隐式 CAST
+SELECT * FROM tbl WHERE v['bool'];
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0041]
+sql:
+SELECT * FROM tbl WHERE v['str'] MATCH 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0042]
+sql:
+SELECT BOOLAND_AGG(c1), BOOLAND_AGG(c2), BOOLAND_AGG(c3), BOOLAND_AGG(c4)
+FROM test_boolean_agg;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:18) /test/1/catalog1/schema1/BOOLAND_AGG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:24~1:35) /test/1/catalog1/schema1/BOOLAND_AGG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:41~1:52) /test/1/catalog1/schema1/BOOLAND_AGG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:58~1:69) /test/1/catalog1/schema1/BOOLAND_AGG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:21) /test/1/catalog1/schema1/test_boolean_agg/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0043]
+sql:
+SELECT
+    BOOL_OR(c_int) AS bool_or_int,
+    BOOL_OR(c_float) AS bool_or_float,
+    BOOL_OR(c_decimal) AS bool_or_decimal,
+    BOOL_OR(c_bool) AS bool_or_bool
+FROM test_numeric_and_null;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:4~2:11) /test/1/catalog1/schema1/BOOL_OR/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:4~3:11) /test/1/catalog1/schema1/BOOL_OR/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:11) /test/1/catalog1/schema1/BOOL_OR/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:11) /test/1/catalog1/schema1/BOOL_OR/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:5~6:26) /test/1/catalog1/schema1/test_numeric_and_null/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0044]
+sql:
+select corr_welford(k1,k2) from test_corr where id=999;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:19) /test/1/catalog1/schema1/corr_welford/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:32~1:41) /test/1/catalog1/schema1/test_corr/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0045]
+sql:
+-- 该函数返回 DOUBLE，如需以整数形式展示可配合 ROUND/CAST
+SELECT CAST(ROUND(datasketches_hll_union_agg(sk)) AS BIGINT)
+FROM test_datasketches_hll_union_agg_tbl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:12~2:17) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:18~2:44) /test/1/catalog1/schema1/datasketches_hll_union_agg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:40) /test/1/catalog1/schema1/test_datasketches_hll_union_agg_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0046]
+sql:
+-- 别名用法
+SELECT
+    CAST(ROUND(datasketches_hll_union_agg(sk)) AS BIGINT) AS v1,
+    CAST(ROUND(ds_hll_estimate(sk)) AS BIGINT)            AS v2,
+    CAST(ROUND(datasketches_hll_estimate(sk)) AS BIGINT)  AS v3
+FROM test_datasketches_hll_union_agg_tbl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:9~3:14) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:15~3:41) /test/1/catalog1/schema1/datasketches_hll_union_agg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:9~4:14) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:15~4:30) /test/1/catalog1/schema1/ds_hll_estimate/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:9~5:14) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:15~5:40) /test/1/catalog1/schema1/datasketches_hll_estimate/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:5~6:40) /test/1/catalog1/schema1/test_datasketches_hll_union_agg_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0047]
+sql:
+-- 组内无合法数据返回 0
+SELECT datasketches_hll_union_agg(sk)
+FROM test_datasketches_hll_union_agg_tbl
+WHERE sk IS NULL;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:33) /test/1/catalog1/schema1/datasketches_hll_union_agg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:40) /test/1/catalog1/schema1/test_datasketches_hll_union_agg_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0048]
+sql:
+-- 非法 sketch 字节串将报错
+SELECT datasketches_hll_union_agg(from_base64('AA=='));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:33) /test/1/catalog1/schema1/datasketches_hll_union_agg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:34~2:45) /test/1/catalog1/schema1/from_base64/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0049]
+sql:
+-- 空字符串属于非法输入，将报错
+SELECT datasketches_hll_union_agg('');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:33) /test/1/catalog1/schema1/datasketches_hll_union_agg/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0050]
+sql:
+-- 使用相同数据，但 half_decay=1
+select exponential_moving_average(1.0, temp, ts) from temparature_data;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:33) /test/1/catalog1/schema1/exponential_moving_average/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:54~2:70) /test/1/catalog1/schema1/temparature_data/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0051]
+sql:
+-- 以下语句将报错：half_decay 必须为常量
+select exponential_moving_average(val, val, ts) from temparature_data;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:33) /test/1/catalog1/schema1/exponential_moving_average/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:53~2:69) /test/1/catalog1/schema1/temparature_data/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0052]
+sql:
+-- NULL 处理相关 case
+SELECT histogram(c_float) FROM histogram_test WHERE c_float IS NULL;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:16) /test/1/catalog1/schema1/histogram/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:31~2:45) /test/1/catalog1/schema1/histogram_test/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0053]
+sql:
+select intersect_count(user_id,dt,20250801,20250802) from pv_bitmap;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:22) /test/1/catalog1/schema1/intersect_count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:58~1:67) /test/1/catalog1/schema1/pv_bitmap/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0054]
+sql:
+select datetime,median(scan_rows) from log_statis group by datetime;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:16~1:22) /test/1/catalog1/schema1/median/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:39~1:49) /test/1/catalog1/schema1/log_statis/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0055]
+sql:
+SELECT 
+    -- 计算不同压缩度下的 90 分位数
+    percentile_approx_weighted(score, weight, 0.9) as p90_default,          -- 默认压缩度
+    percentile_approx_weighted(score, weight, 0.9, 2048) as p90_fast,       -- 低压缩度，更快
+    percentile_approx_weighted(score, weight, 0.9, 10000) as p90_accurate   -- 高压缩度，更精确
+FROM weighted_scores;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:30) /test/1/catalog1/schema1/percentile_approx_weighted/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:30) /test/1/catalog1/schema1/percentile_approx_weighted/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:30) /test/1/catalog1/schema1/percentile_approx_weighted/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:5~6:20) /test/1/catalog1/schema1/weighted_scores/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0056]
+sql:
+-- 使用不同压缩度计算 99 分位数
+SELECT 
+    percentile_approx(response_time, 0.99) as p99_default,          -- 默认压缩度
+    percentile_approx(response_time, 0.99, 2048) as p99_fast,       -- 低压缩度，更快
+    percentile_approx(response_time, 0.99, 10000) as p99_accurate   -- 高压缩度，更精确
+FROM response_times;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:21) /test/1/catalog1/schema1/percentile_approx/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:21) /test/1/catalog1/schema1/percentile_approx/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:21) /test/1/catalog1/schema1/percentile_approx/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:5~6:19) /test/1/catalog1/schema1/response_times/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0057]
+sql:
+SELECT 
+    percentile(sale_price, 0.5)  as median_price,     -- 中位数
+    percentile(sale_price, 0.75) as p75_price,        -- 75 分位数
+    percentile(sale_price, 0.90) as p90_price,        -- 90 分位数
+    percentile(sale_price, 0.95) as p95_price,        -- 95 分位数
+    percentile(null, 0.99)       as p99_null          -- null 的 99 分位数
+FROM sales_data;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:4~2:14) /test/1/catalog1/schema1/percentile/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:4~3:14) /test/1/catalog1/schema1/percentile/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:14) /test/1/catalog1/schema1/percentile/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:14) /test/1/catalog1/schema1/percentile/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:14) /test/1/catalog1/schema1/percentile/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:5~7:15) /test/1/catalog1/schema1/sales_data/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0058]
+sql:
+-- 每组仅包含一行，结果为 NULL。
+SELECT 
+  skew(val1), 
+  skew(val2) 
+FROM statistic_test
+GROUP BY tag;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:2~3:6) /test/1/catalog1/schema1/skew/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:2~4:6) /test/1/catalog1/schema1/skew/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:5~5:19) /test/1/catalog1/schema1/statistic_test/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0059]
+sql:
+SELECT id, comment FROM user_comments
+WHERE  AI_FILTER('resource_name', CONCAT('This is a positive comment: ', comment));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:24~1:37) /test/1/catalog1/schema1/user_comments/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:7~2:16) /test/1/catalog1/schema1/AI_FILTER/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:34~2:40) /test/1/catalog1/schema1/CONCAT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0060]
+sql:
+SELECT AI_GENERATE('resource_name', 'What is the fouding time of Apache Doris? Return only the date.') AS Result;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:18) /test/1/catalog1/schema1/AI_GENERATE/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0061]
+sql:
+SELECT AI_MASK('resource_name', 'My email is rarity@example.com and my phone is 123-456-7890',
+                ['email', 'phone_num']) AS RESULT
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:14) /test/1/catalog1/schema1/AI_MASK/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0062]
+sql:
+SELECT AI_SENTIMENT('resrouce_name', 'I hate sunny days.') AS Result;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:19) /test/1/catalog1/schema1/AI_SENTIMENT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0063]
+sql:
+SELECT AI_Translate('resource_name', 'This is an example', 'Franch') AS Result;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:19) /test/1/catalog1/schema1/AI_Translate/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0064]
+sql:
+-- 两个向量完全相同，相似度为 1
+SELECT COSINE_SIMILARITY([1, 2, 3], [1, 2, 3]);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:24) /test/1/catalog1/schema1/COSINE_SIMILARITY/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0065]
+sql:
+-- 两个向量正交，相似度为 0
+SELECT COSINE_SIMILARITY([1, 0], [0, 1]);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:24) /test/1/catalog1/schema1/COSINE_SIMILARITY/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0066]
+sql:
+-- 任一向量为零向量时，返回 0
+SELECT COSINE_SIMILARITY([0, 0, 0], [1, 2, 3]);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:24) /test/1/catalog1/schema1/COSINE_SIMILARITY/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0067]
+sql:
+-- 空数组返回 0
+SELECT COSINE_SIMILARITY([], []);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:24) /test/1/catalog1/schema1/COSINE_SIMILARITY/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0068]
+sql:
+-- 输入数组中包含 NULL，会报错
+SELECT COSINE_SIMILARITY([1, NULL, 3], [1, 2, 3]);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:24) /test/1/catalog1/schema1/COSINE_SIMILARITY/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0069]
+sql:
+select ARRAY_SORT([[6, 2], [5, 6]]);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:17) /test/1/catalog1/schema1/ARRAY_SORT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0070]
+sql:
+SELECT ARRAYS_OVERLAP(ARRAY(ARRAY('hello', 'aloha'), ARRAY('hi', 'hey')), ARRAY(ARRAY('hello', 'hi', 'hey'), ARRAY('aloha', 'hi')));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:21) /test/1/catalog1/schema1/ARRAYS_OVERLAP/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:22~1:27) /test/1/catalog1/schema1/ARRAY/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:28~1:33) /test/1/catalog1/schema1/ARRAY/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:53~1:58) /test/1/catalog1/schema1/ARRAY/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:74~1:79) /test/1/catalog1/schema1/ARRAY/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:80~1:85) /test/1/catalog1/schema1/ARRAY/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:109~1:114) /test/1/catalog1/schema1/ARRAY/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0071]
+sql:
+select bitmap_and_not_count(NULL, bitmap_from_string('1,2,3')) banc1, bitmap_and_not_count(bitmap_from_string('1,2,3') ,NULL) banc2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:27) /test/1/catalog1/schema1/bitmap_and_not_count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:34~1:52) /test/1/catalog1/schema1/bitmap_from_string/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:70~1:90) /test/1/catalog1/schema1/bitmap_and_not_count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:91~1:109) /test/1/catalog1/schema1/bitmap_from_string/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_043__select__0072]
+sql:
+select bitmap_has_all(bitmap_from_string('0, 1, 2'), bitmap_from_string('1, 2')) res;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:21) /test/1/catalog1/schema1/bitmap_has_all/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:22~1:40) /test/1/catalog1/schema1/bitmap_from_string/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:53~1:71) /test/1/catalog1/schema1/bitmap_from_string/",
+      "action" : "CALL"
+    }
+  ]
+}

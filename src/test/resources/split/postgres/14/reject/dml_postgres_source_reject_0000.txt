@@ -1,0 +1,604 @@
+MERGE INTO test USING test st ON (st.a = test.a)
+ WHEN NOT MATCHED THEN INSERT (a) VALUES (0)
+;
+MERGE INTO document d
+USING (SELECT 13 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge8 '
+WHEN NOT MATCHED THEN
+	INSERT VALUES (13, 44, 1, 'regress_rls_bob', 'new manga')
+;
+-- should fail
+MERGE INTO rw_view2 t USING (VALUES (6)) AS v(a) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET a = t.a - 10
+;
+MERGE INTO target
+USING target
+ON tid = tid
+WHEN MATCHED THEN DO NOTHING
+;
+MERGE INTO tgt USING src ON tgt.id = src.id
+             WHEN MATCHED THEN UPDATE SET val = src.val
+             WHEN NOT MATCHED THEN INSERT VALUES (src.id, src.val)
+;
+MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid AND t.tid IN (1,2,3,4)
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid - 1
+;
+--
+-- test target privileges
+--
+
+-- fail (no SELECT priv on t.b)
+MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED THEN
+	UPDATE SET b = t.b
+WHEN NOT MATCHED THEN
+	INSERT VALUES (a, NULL)
+;
+-- not allowed
+
+MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED THEN UPDATE SET bb = bb, cc = cc
+;
+MERGE INTO tv t
+USING source s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT DEFAULT VALUES
+;
+MERGE INTO target t
+  USING (SELECT 1 as key, 'merge1' as val) s
+  ON s.key = t.key
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+    UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+MERGE INTO target t
+  USING (SELECT 1 as key) s
+  ON s.key = t.key
+  WHEN MATCHED AND status = 's1' THEN
+	UPDATE SET status = 's2', val = t.val || ' when1'
+  WHEN MATCHED AND status = 's2' THEN
+	UPDATE SET status = 's3', val = t.val || ' when2'
+  WHEN MATCHED AND status = 's3' THEN
+	UPDATE SET status = 's4', val = t.val || ' when3'
+;
+MERGE INTO rw_view2 t
+  USING (VALUES ('Row 3', 3.0, 3)) AS v(b,c,a) ON t.aa = v.a
+  WHEN NOT MATCHED THEN INSERT VALUES (v.b, v.c, v.a)
+;
+MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED AND bb = 'xxx' THEN DELETE
+;
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT VALUES (s.sid, s.delta)
+;
+MERGE INTO rw_view2 t USING (VALUES (2, 'Row 2', 2.0)) AS v(a,b,c) ON t.aaa = v.a
+  WHEN NOT MATCHED THEN INSERT VALUES (v.c, v.a, v.b)
+;
+MERGE INTO rw_view2 t USING (VALUES (3, 'Row 3')) AS v(a,b) ON t.a = v.a
+  WHEN NOT MATCHED THEN INSERT VALUES (v.a, v.b)
+;
+WITH targq AS (
+	SELECT * FROM v
+)
+MERGE INTO sq_target t
+USING v
+ON tid = sid
+WHEN MATCHED AND tid >= 2 THEN
+    UPDATE SET balance = t.balance + delta
+WHEN NOT MATCHED THEN
+	INSERT (balance, tid) VALUES (balance + delta, sid)
+WHEN MATCHED AND tid < 2 THEN
+	DELETE
+;
+MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+  WHEN MATCHED THEN UPDATE SET bbb = bbb
+;
+explain (analyze, timing off, summary off, costs off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN MATCHED AND t.a < 10 THEN
+	UPDATE SET b = t.b + 1
+WHEN MATCHED AND t.a >= 30 AND t.a <= 40 THEN
+	DELETE
+WHEN NOT MATCHED AND s.a < 20 THEN
+	INSERT VALUES (a, b)
+;
+MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET b = 'fud'
+;
+MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN MATCHED AND t.balance = 199 OR s.balance > 100 THEN
+	UPDATE SET balance = t.balance + s.balance
+;
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT VALUES (4, 4)
+WHEN MATCHED THEN
+	UPDATE SET balance = 0
+;
+MERGE INTO sq_target
+USING v
+ON tid = sid
+WHEN MATCHED AND tid > 2 THEN
+    UPDATE SET balance = balance + delta
+WHEN NOT MATCHED THEN
+	INSERT (balance, tid) VALUES (balance + delta, sid)
+WHEN MATCHED AND tid < 2 THEN
+	DELETE
+;
+MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED AND s.b = 'x' THEN
+	UPDATE SET b = 'x'
+WHEN NOT MATCHED THEN
+	INSERT VALUES (a, NULL)
+;
+MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN NOT MATCHED AND FALSE THEN
+	INSERT (tid) VALUES (s.sid)
+;
+MERGE INTO target t
+  USING (SELECT 1 as key, 'merge2c' as val) s
+  ON s.key = t.key AND t.key < 2
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+	UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+-- not allowed
+MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+  WHEN MATCHED THEN UPDATE SET bbb = bbb
+;
+MERGE INTO pt t USING (VALUES (1, 'x'::text)) AS s(a, b)
+  ON false WHEN MATCHED THEN UPDATE SET b = s.b
+;
+-- not allowed
+MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET b = 'foo'
+;
+-- fail - missing REPLICA IDENTITY
+MERGE INTO testpub_merge_no_ri USING testpub_merge_pk s ON s.a >= 1
+ WHEN MATCHED THEN UPDATE SET b = s.b
+;
+MERGE INTO pgss_dml_tab USING pgss_dml_tab st ON (st.a = pgss_dml_tab.a AND st.a >= 4)
+ WHEN NOT MATCHED THEN DO NOTHING
+;
+MERGE INTO ONLY measurement m
+ USING new_measurement nm ON
+      (m.city_id = nm.city_id and m.logdate=nm.logdate)
+WHEN MATCHED AND nm.peaktemp IS NULL THEN DELETE
+WHEN MATCHED THEN UPDATE
+     SET peaktemp = greatest(m.peaktemp, nm.peaktemp),
+        unitsales = m.unitsales + coalesce(nm.unitsales, 0)
+WHEN NOT MATCHED THEN INSERT
+     (city_id, logdate, peaktemp, unitsales)
+   VALUES (city_id, logdate, peaktemp, unitsales)
+;
+MERGE INTO target t
+USING (SELECT sid, delta FROM source WHERE delta > 0) AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT (tid, balance) VALUES (s.sid, s.delta)
+;
+MERGE INTO target_tg t
+  USING (SELECT 1 as key) s
+  ON s.key = t.key
+  WHEN MATCHED AND balance < 100 THEN
+	UPDATE SET balance = balance * 2, val = t.val || ' when1'
+  WHEN MATCHED AND balance < 200 THEN
+	UPDATE SET balance = balance * 4, val = t.val || ' when2'
+  WHEN MATCHED AND balance < 300 THEN
+	UPDATE SET balance = balance * 8, val = t.val || ' when3'
+;
+-- not allowed
+MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED THEN UPDATE SET aa = aa
+;
+-- ok
+MERGE INTO document d
+USING (SELECT 1 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge4 '
+WHEN NOT MATCHED THEN
+	INSERT VALUES (12, 11, 1, 'regress_rls_bob', 'another novel')
+;
+MERGE INTO ro_view13 AS t USING (VALUES (1, 'Row 1')) AS v(a,b) ON t.a = v.a
+  WHEN MATCHED THEN DELETE
+;
+MERGE INTO cj_target t
+USING cj_source1 s1
+	INNER JOIN cj_source2 s2 ON sid1 = sid2
+ON t.tid = sid1
+WHEN NOT MATCHED THEN
+	INSERT VALUES (sid1, delta, sval)
+;
+MERGE INTO target t
+  USING (SELECT 1 as key, 'merge2a' as val) s
+  ON s.key = t.key
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+	UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+MERGE INTO pa_target t
+  USING (SELECT 1 as key, 'pa_merge2a' as val) s
+  ON s.key = t.key
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+	UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+  WHEN MATCHED THEN UPDATE SET aaa = aaa
+;
+MERGE INTO target t USING (SELECT 1 as key, 'merge_delete2' as val) s ON s.key = t.key WHEN NOT MATCHED THEN INSERT VALUES (s.key, s.val) WHEN MATCHED THEN DELETE
+;
+MERGE INTO rw_view2 t
+  USING (SELECT x, 'R'||x FROM generate_series(0,3) x) AS s(a,b) ON t.a = s.a
+  WHEN MATCHED THEN UPDATE SET b = s.b
+;
+MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET b = 'foo'
+;
+MERGE INTO cj_target t
+USING cj_source2 s2
+	INNER JOIN cj_source1 s1 ON sid1 = sid2 AND scat = 20
+ON t.tid = sid1
+WHEN NOT MATCHED THEN
+	INSERT VALUES (sid2, delta, sval)
+WHEN MATCHED THEN
+	DELETE
+;
+MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED THEN UPDATE SET bb = bb
+;
+MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED THEN UPDATE SET aa = aa, bb = bb
+;
+MERGE INTO target_tg t USING (SELECT 1 as key, 'merge2_tg' as val) s ON s.key = t.key WHEN NOT MATCHED THEN INSERT VALUES (s.key, s.val) WHEN MATCHED THEN UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+MERGE INTO test USING test st ON (st.a = test.a)
+ WHEN NOT MATCHED THEN INSERT (b, a) VALUES (NULL, 0)
+;
+MERGE INTO target t USING (SELECT 1 as key, 'merge2' as val) s ON s.key = t.key WHEN NOT MATCHED THEN INSERT VALUES (s.key, s.val) WHEN MATCHED THEN UPDATE set val = t.val || ' updated by merge2'
+;
+------------------------------------------------------------------------------------------
+[MERGE] MERGE INTO test USING test st ON (st.a = test.a)
+ WHEN NOT MATCHED THEN INSERT (a) VALUES (0)
+;
+----------
+[MERGE|SELECT] MERGE INTO document d
+USING (SELECT 13 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge8 '
+WHEN NOT MATCHED THEN
+	INSERT VALUES (13, 44, 1, 'regress_rls_bob', 'new manga')
+;
+----------
+[MERGE|SELECT] -- should fail
+MERGE INTO rw_view2 t USING (VALUES (6)) AS v(a) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET a = t.a - 10
+;
+----------
+[MERGE] MERGE INTO target
+USING target
+ON tid = tid
+WHEN MATCHED THEN DO NOTHING
+;
+----------
+[MERGE] MERGE INTO tgt USING src ON tgt.id = src.id
+             WHEN MATCHED THEN UPDATE SET val = src.val
+             WHEN NOT MATCHED THEN INSERT VALUES (src.id, src.val)
+;
+----------
+[MERGE] MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid AND t.tid IN (1,2,3,4)
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid - 1
+;
+----------
+[MERGE] --
+-- test target privileges
+--
+
+-- fail (no SELECT priv on t.b)
+MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED THEN
+	UPDATE SET b = t.b
+WHEN NOT MATCHED THEN
+	INSERT VALUES (a, NULL)
+;
+----------
+[MERGE|SELECT] -- not allowed
+
+MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED THEN UPDATE SET bb = bb, cc = cc
+;
+----------
+[MERGE] MERGE INTO tv t
+USING source s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT DEFAULT VALUES
+;
+----------
+[MERGE|SELECT] MERGE INTO target t
+  USING (SELECT 1 as key, 'merge1' as val) s
+  ON s.key = t.key
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+    UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+----------
+[MERGE|SELECT] MERGE INTO target t
+  USING (SELECT 1 as key) s
+  ON s.key = t.key
+  WHEN MATCHED AND status = 's1' THEN
+	UPDATE SET status = 's2', val = t.val || ' when1'
+  WHEN MATCHED AND status = 's2' THEN
+	UPDATE SET status = 's3', val = t.val || ' when2'
+  WHEN MATCHED AND status = 's3' THEN
+	UPDATE SET status = 's4', val = t.val || ' when3'
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t
+  USING (VALUES ('Row 3', 3.0, 3)) AS v(b,c,a) ON t.aa = v.a
+  WHEN NOT MATCHED THEN INSERT VALUES (v.b, v.c, v.a)
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED AND bb = 'xxx' THEN DELETE
+;
+----------
+[MERGE] MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT VALUES (s.sid, s.delta)
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t USING (VALUES (2, 'Row 2', 2.0)) AS v(a,b,c) ON t.aaa = v.a
+  WHEN NOT MATCHED THEN INSERT VALUES (v.c, v.a, v.b)
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t USING (VALUES (3, 'Row 3')) AS v(a,b) ON t.a = v.a
+  WHEN NOT MATCHED THEN INSERT VALUES (v.a, v.b)
+;
+----------
+[MERGE|SELECT] WITH targq AS (
+	SELECT * FROM v
+)
+MERGE INTO sq_target t
+USING v
+ON tid = sid
+WHEN MATCHED AND tid >= 2 THEN
+    UPDATE SET balance = t.balance + delta
+WHEN NOT MATCHED THEN
+	INSERT (balance, tid) VALUES (balance + delta, sid)
+WHEN MATCHED AND tid < 2 THEN
+	DELETE
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+  WHEN MATCHED THEN UPDATE SET bbb = bbb
+;
+----------
+[MERGE] explain (analyze, timing off, summary off, costs off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN MATCHED AND t.a < 10 THEN
+	UPDATE SET b = t.b + 1
+WHEN MATCHED AND t.a >= 30 AND t.a <= 40 THEN
+	DELETE
+WHEN NOT MATCHED AND s.a < 20 THEN
+	INSERT VALUES (a, b)
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET b = 'fud'
+;
+----------
+[MERGE] MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN MATCHED AND t.balance = 199 OR s.balance > 100 THEN
+	UPDATE SET balance = t.balance + s.balance
+;
+----------
+[MERGE] MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT VALUES (4, 4)
+WHEN MATCHED THEN
+	UPDATE SET balance = 0
+;
+----------
+[MERGE] MERGE INTO sq_target
+USING v
+ON tid = sid
+WHEN MATCHED AND tid > 2 THEN
+    UPDATE SET balance = balance + delta
+WHEN NOT MATCHED THEN
+	INSERT (balance, tid) VALUES (balance + delta, sid)
+WHEN MATCHED AND tid < 2 THEN
+	DELETE
+;
+----------
+[MERGE] MERGE INTO mtarget t USING msource s ON t.a = s.a
+WHEN MATCHED AND s.b = 'x' THEN
+	UPDATE SET b = 'x'
+WHEN NOT MATCHED THEN
+	INSERT VALUES (a, NULL)
+;
+----------
+[MERGE] MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN NOT MATCHED AND FALSE THEN
+	INSERT (tid) VALUES (s.sid)
+;
+----------
+[MERGE|SELECT] MERGE INTO target t
+  USING (SELECT 1 as key, 'merge2c' as val) s
+  ON s.key = t.key AND t.key < 2
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+	UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+----------
+[MERGE|SELECT] -- not allowed
+MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+  WHEN MATCHED THEN UPDATE SET bbb = bbb
+;
+----------
+[MERGE|SELECT] MERGE INTO pt t USING (VALUES (1, 'x'::text)) AS s(a, b)
+  ON false WHEN MATCHED THEN UPDATE SET b = s.b
+;
+----------
+[MERGE|SELECT] -- not allowed
+MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET b = 'foo'
+;
+----------
+[MERGE] -- fail - missing REPLICA IDENTITY
+MERGE INTO testpub_merge_no_ri USING testpub_merge_pk s ON s.a >= 1
+ WHEN MATCHED THEN UPDATE SET b = s.b
+;
+----------
+[MERGE] MERGE INTO pgss_dml_tab USING pgss_dml_tab st ON (st.a = pgss_dml_tab.a AND st.a >= 4)
+ WHEN NOT MATCHED THEN DO NOTHING
+;
+----------
+[MERGE] MERGE INTO ONLY measurement m
+ USING new_measurement nm ON
+      (m.city_id = nm.city_id and m.logdate=nm.logdate)
+WHEN MATCHED AND nm.peaktemp IS NULL THEN DELETE
+WHEN MATCHED THEN UPDATE
+     SET peaktemp = greatest(m.peaktemp, nm.peaktemp),
+        unitsales = m.unitsales + coalesce(nm.unitsales, 0)
+WHEN NOT MATCHED THEN INSERT
+     (city_id, logdate, peaktemp, unitsales)
+   VALUES (city_id, logdate, peaktemp, unitsales)
+;
+----------
+[MERGE|SELECT] MERGE INTO target t
+USING (SELECT sid, delta FROM source WHERE delta > 0) AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT (tid, balance) VALUES (s.sid, s.delta)
+;
+----------
+[MERGE|SELECT] MERGE INTO target_tg t
+  USING (SELECT 1 as key) s
+  ON s.key = t.key
+  WHEN MATCHED AND balance < 100 THEN
+	UPDATE SET balance = balance * 2, val = t.val || ' when1'
+  WHEN MATCHED AND balance < 200 THEN
+	UPDATE SET balance = balance * 4, val = t.val || ' when2'
+  WHEN MATCHED AND balance < 300 THEN
+	UPDATE SET balance = balance * 8, val = t.val || ' when3'
+;
+----------
+[MERGE|SELECT] -- not allowed
+MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED THEN UPDATE SET aa = aa
+;
+----------
+[MERGE|SELECT] -- ok
+MERGE INTO document d
+USING (SELECT 1 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge4 '
+WHEN NOT MATCHED THEN
+	INSERT VALUES (12, 11, 1, 'regress_rls_bob', 'another novel')
+;
+----------
+[MERGE|SELECT] MERGE INTO ro_view13 AS t USING (VALUES (1, 'Row 1')) AS v(a,b) ON t.a = v.a
+  WHEN MATCHED THEN DELETE
+;
+----------
+[MERGE] MERGE INTO cj_target t
+USING cj_source1 s1
+	INNER JOIN cj_source2 s2 ON sid1 = sid2
+ON t.tid = sid1
+WHEN NOT MATCHED THEN
+	INSERT VALUES (sid1, delta, sval)
+;
+----------
+[MERGE|SELECT] MERGE INTO target t
+  USING (SELECT 1 as key, 'merge2a' as val) s
+  ON s.key = t.key
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+	UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+----------
+[MERGE|SELECT] MERGE INTO pa_target t
+  USING (SELECT 1 as key, 'pa_merge2a' as val) s
+  ON s.key = t.key
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+	UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aaa = v.a
+  WHEN MATCHED THEN UPDATE SET aaa = aaa
+;
+----------
+[MERGE|SELECT] MERGE INTO target t USING (SELECT 1 as key, 'merge_delete2' as val) s ON s.key = t.key WHEN NOT MATCHED THEN INSERT VALUES (s.key, s.val) WHEN MATCHED THEN DELETE
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t
+  USING (SELECT x, 'R'||x FROM generate_series(0,3) x) AS s(a,b) ON t.a = s.a
+  WHEN MATCHED THEN UPDATE SET b = s.b
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.a = v.a
+  WHEN MATCHED THEN UPDATE SET b = 'foo'
+;
+----------
+[MERGE] MERGE INTO cj_target t
+USING cj_source2 s2
+	INNER JOIN cj_source1 s1 ON sid1 = sid2 AND scat = 20
+ON t.tid = sid1
+WHEN NOT MATCHED THEN
+	INSERT VALUES (sid2, delta, sval)
+WHEN MATCHED THEN
+	DELETE
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED THEN UPDATE SET bb = bb
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view1 t USING (VALUES (1)) AS v(a) ON t.aa = v.a
+  WHEN MATCHED THEN UPDATE SET aa = aa, bb = bb
+;
+----------
+[MERGE|SELECT] MERGE INTO target_tg t USING (SELECT 1 as key, 'merge2_tg' as val) s ON s.key = t.key WHEN NOT MATCHED THEN INSERT VALUES (s.key, s.val) WHEN MATCHED THEN UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+;
+----------
+[MERGE] MERGE INTO test USING test st ON (st.a = test.a)
+ WHEN NOT MATCHED THEN INSERT (b, a) VALUES (NULL, 0)
+;
+----------
+[MERGE|SELECT] MERGE INTO target t USING (SELECT 1 as key, 'merge2' as val) s ON s.key = t.key WHEN NOT MATCHED THEN INSERT VALUES (s.key, s.val) WHEN MATCHED THEN UPDATE set val = t.val || ' updated by merge2'
+;

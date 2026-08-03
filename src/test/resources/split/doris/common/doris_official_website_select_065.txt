@@ -1,0 +1,703 @@
+WITH example_data AS (
+    SELECT 1 as column1, 66 as column2, 'A' as group_name
+    UNION ALL
+    SELECT 1, 10, 'A'
+    UNION ALL
+    SELECT 1, 66, 'A'
+    UNION ALL
+    SELECT 1, 20, 'A'
+    UNION ALL
+    SELECT 2, 66, 'B'
+    UNION ALL
+    SELECT 2, 30, 'B'
+    UNION ALL
+    SELECT 2, 40, 'B'
+)
+SELECT 
+    group_name,
+    column1,
+    column2,
+    NTH_VALUE(column2, 2) OVER (
+        PARTITION BY column1 
+        ORDER BY column2
+        ROWS BETWEEN 1 preceding and 1 following
+    ) as nth
+FROM example_data
+ORDER BY column1, column2;
+-- TERM + PHRASE + NOT 
+SELECT request_id, error_msg, latency_ms
+FROM inference_logs
+WHERE search('
+  level:ERROR 
+  AND error_msg:"CUDA out of memory" 
+  AND NOT module:healthcheck 
+  AND model_name:gpt*
+')
+  AND log_time > NOW() - INTERVAL 1 HOUR
+ORDER BY latency_ms DESC LIMIT 100;
+
+-- BM25 
+SELECT request_id, error_msg, score() AS relevance
+FROM inference_logs
+WHERE search('error_msg:"memory allocation failed" OR error_msg:"CUDA error"')
+ORDER BY relevance DESC LIMIT 20;
+
+-- Search in VARIANT
+SELECT * FROM agent_logs
+WHERE search('NESTED(steps, status:error AND tool:code_exec)');
+
+-- search + aggregation
+SELECT model_name, COUNT(*) AS error_count,
+       PERCENTILE_APPROX(latency_ms, 0.99) AS p99_latency
+FROM inference_logs
+WHERE search('level:ERROR AND error_msg:"CUDA out of memory"')
+  AND log_time > NOW() - INTERVAL 1 HOUR
+GROUP BY model_name ORDER BY error_count DESC;
+SELECT CONCAT('a', 'b');
+SELECT * FROM test WHERE K4 < 1000 AND K5 = 80 AND K6 = 10000;
+SELECT * FROM test WHERE k4 < 1000 AND k5 = 80 OR k6 >= 10000;
+-- running difference(x)
+SELECT running_difference(x) FROM t ORDER BY k;
+
+-- window function
+SELECT x - lag(x, 1, 0) OVER (ORDER BY k) FROM t;
+SELECT * FROM tbl
+   INTO OUTFILE "hdfs://path/to/result_"
+   FORMAT AS CSV
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.hadoop.security.authentication" = "kerberos",
+       "broker.kerberos_principal" = "doris@YOUR.COM",
+       "broker.kerberos_keytab" = "/home/doris/my.keytab",
+       "column_separator" = ",",
+       "line_delimiter" = "\n",
+       "max_file_size" = "100MB"
+   );
+SELECT c1, c2, c3 FROM tbl
+   INTO OUTFILE "hdfs://path/to/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.hadoop.security.authentication" = "kerberos",
+       "broker.kerberos_principal" = "doris@YOUR.COM",
+       "broker.kerberos_keytab" = "/home/doris/my.keytab",
+       "schema"="required,int32,c1;required,byte_array,c2;required,byte_array,c2"
+   );
+SELECT k1 FROM tbl1 UNION SELECT k2 FROM tbl1
+   INTO OUTFILE "bos://bucket/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.bos_endpoint" = "http://bj.bcebos.com",
+       "broker.bos_accesskey" = "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
+       "broker.bos_secret_accesskey" = "yyyyyyyyyyyyyyyyyyyyyyyyy",
+       "schema"="required,int32,k1;required,byte_array,k2"
+   );
+select k1,k2,v1 from tbl1 limit 100000
+   into outfile "s3a://my_bucket/export/my_file_"
+   FORMAT AS CSV
+   PROPERTIES
+   (
+       "broker.name" = "hdfs_broker",
+       "broker.fs.s3a.access.key" = "xxx",
+       "broker.fs.s3a.secret.key" = "xxxx",
+       "broker.fs.s3a.endpoint" = "https://cos.xxxxxx.myqcloud.com/",
+       "column_separator" = ",",
+       "line_delimiter" = "\n",
+       "max_file_size" = "1024MB",
+       "success_file_name" = "SUCCESS"
+   )
+;
+-- the default port of fileSystem_port is 9000
+   SELECT * FROM tbl
+   INTO OUTFILE "hdfs://${host}:${fileSystem_port}/path/to/result_"
+   FORMAT AS CSV
+   PROPERTIES
+   (
+       "fs.defaultFS" = "hdfs://ip:port",
+       "hadoop.username" = "work"
+   );
+select * from query("catalog" = "jdbc_catalog", "query" = "select * from db_name.table_name where condition");
+SELECT c1, c2, c3 FROM tbl
+   INTO OUTFILE "hdfs://path/to/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.hadoop.security.authentication" = "kerberos",
+       "broker.kerberos_principal" = "doris@YOUR.COM",
+       "broker.kerberos_keytab" = "/home/doris/my.keytab"
+   );
+SELECT k1 FROM tbl1 UNION SELECT k2 FROM tbl1
+   INTO OUTFILE "bos://bucket/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.bos_endpoint" = "http://bj.bcebos.com",
+       "broker.bos_accesskey" = "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
+       "broker.bos_secret_accesskey" = "yyyyyyyyyyyyyyyyyyyyyyyyy"
+   );
+-- 2. Full-text search phrase matching using MATCH_PHRASE
+
+-- 2.1 Rows in the content column containing both keyword1 and keyword2, where keyword2 must immediately follow keyword1
+-- 'keyword1 keyword2', 'wordx keyword1 keyword2', 'wordx keyword1 keyword2 wordy' all match because they contain 'keyword1 keyword2' with keyword2 immediately following keyword1
+-- 'keyword1 wordx keyword2' does not match because there is a word between keyword1 and keyword2
+-- 'keyword2 keyword1' does not match because the order is reversed
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2';
+
+-- 2.2 Rows in the content column containing both keyword1 and keyword2, with a slop (maximum word distance) of 3
+-- 'keyword1 keyword2', 'keyword1 a keyword2', 'keyword1 a b c keyword2' all match because the slop is 0, 1, and 3 respectively, all within 3
+-- 'keyword1 a b c d keyword2' does not match because the slop is 4, exceeding 3
+-- 'keyword2 keyword1', 'keyword2 a keyword1', 'keyword2 a b c keyword1' also match because when slop > 0, the order of keyword1 and keyword2 is not required. To enforce the order, Doris provides a + sign after slop
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3';
+-- To enforce order, use a positive sign with slop; 'keyword1 a b c keyword2' matches, while 'keyword2 a b c keyword1' does not
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3+';
+
+-- 2.3 Prefix matching the last word keyword2, with a default limit of 50 prefixes (controlled by session variable inverted_index_max_expansions)
+-- It is necessary to ensure that keyword1 and keyword2 remain adjacent in the original text after tokenization, with no other words in between.
+-- 'keyword1 keyword2abc' matches because keyword1 is identical and keyword2abc is a prefix of keyword2
+-- 'keyword1 keyword2' also matches because keyword2 is a prefix of keyword2
+-- 'keyword1 keyword3' does not match because keyword3 is not a prefix of keyword2
+-- 'keyword1 keyword3abc' does not match because keyword3abc is not a prefix of keyword2
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1 keyword2';
+
+-- 2.4 If only one word is provided, it defaults to a prefix query with a limit of 50 prefixes (controlled by session variable inverted_index_max_expansions)
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1';
+
+-- 2.5 Regular expression matching on tokenized words, with a default limit of 50 matches (controlled by session variable inverted_index_max_expansions)
+-- Similar to MATCH_PHRASE_PREFIX but with regex instead of prefix
+SELECT * FROM table_name WHERE content MATCH_REGEXP 'key.*';
+-- 3. Normal equality, range, IN, and NOT IN queries using standard SQL syntax, for example:
+SELECT * FROM table_name WHERE id = 123;
+SELECT * FROM table_name WHERE ts > '2023-01-01 00:00:00';
+SELECT * FROM table_name WHERE op_type IN ('add', 'delete');
+SELECT
+    product_id,
+    any_value(product_title),
+    AVG(star_rating) AS rating,
+    COUNT(*) AS count
+FROM
+    amazon_reviews
+WHERE
+    review_body LIKE '%is super awesome%'
+GROUP BY
+    product_id
+ORDER BY
+    count DESC,
+    rating DESC,
+    product_id
+LIMIT 5;
+SELECT * FROM S3 (
+      "uri" = "s3://your_bucket/path/to/tvf_test/test.parquet",
+      "format" = "parquet",
+      "s3.endpoint" = "https://s3.us-east-1.amazonaws.com",
+      "s3.region" = "us-east-1",
+      "s3.role_arn" = "<your-bucket-role-arn>",
+      "s3.external_id" = "<your-external-id>"      -- option parameter
+  )
+;
+-- Full row retrieval
+SELECT * FROM tbl WHERE k1 = 1 AND k2 = 2;
+
+-- Partial column retrieval
+SELECT v1, v2 FROM tbl WHERE k1 = 1 AND k2 = 2;
+SELECT 1;
+-- Purpose: verify that the data was loaded successfully
+-- Expected: 4 rows are returned
+select * from demo.mytable;
+EXPLAIN
+SELECT o.o_orderpriority, COUNT(*) AS orders, SUM(l.l_extendedprice) AS revenue
+FROM   orders o
+JOIN   lineitem l ON o.o_orderkey = l.l_orderkey
+WHERE  o.o_orderdate >= '2026-01-01'
+GROUP BY o.o_orderpriority
+ORDER BY revenue DESC
+LIMIT 10;
+SELECT region, count(*) AS orders, sum(amount) AS revenue
+FROM s3(
+  "uri"    = "s3://demo-bucket/orders/year=2026/*.parquet",
+  "format" = "parquet",
+  "s3.endpoint"   = "https://s3.us-east-1.amazonaws.com",
+  "s3.access_key" = "AK...",
+  "s3.secret_key" = "SK..."
+)
+WHERE order_date >= '2026-04-01' AND status = 'PAID'
+GROUP BY region;
+WITH bm25 AS (
+  SELECT id, ROW_NUMBER() OVER (ORDER BY score() DESC) AS r
+  FROM docs WHERE body MATCH_ANY 'music' ORDER BY score() DESC LIMIT 100
+),
+ann AS (
+  SELECT id, ROW_NUMBER() OVER (ORDER BY l2_distance_approximate(
+           embedding, [0.1,0.1,0.2,0.2,0.3,0.3,0.4,0.4]) ASC) AS r
+  FROM docs ORDER BY l2_distance_approximate(
+           embedding, [0.1,0.1,0.2,0.2,0.3,0.3,0.4,0.4]) ASC LIMIT 100
+)
+SELECT COALESCE(b.id, a.id) AS id,
+       COALESCE(1.0/(60+b.r), 0) + COALESCE(1.0/(60+a.r), 0) AS rrf
+FROM bm25 b FULL OUTER JOIN ann a ON b.id = a.id
+ORDER BY rrf DESC LIMIT 5;
+SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'hive_ctl' AND engine_name = 'hive'
+ORDER BY entry_name;
+SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'iceberg_ctl' AND engine_name = 'iceberg'
+ORDER BY entry_name;
+SELECT id, _row_id, _last_updated_sequence_number FROM iceberg_tbl;
+SELECT * FROM iceberg_table$all_manifests;
+SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'paimon_ctl' AND engine_name = 'paimon'
+ORDER BY entry_name;
+-- between snapshots [0, 5)
+SELECT * FROM paimon_table@incr('startSnapshotId'='0', 'endSnapshotId'='5');
+
+-- between snapshots [0, 5) with specified scan mode
+SELECT * FROM paimon_table@incr('startSnapshotId'='0', 'endSnapshotId'='5', 'incrementalBetweenScanMode'='diff');
+
+-- read from start timestamp
+SELECT * FROM paimon_table@incr('startTimestamp'='1750844949000');
+
+-- read between timestamp
+SELECT * FROM paimon_table@incr('startTimestamp'='1750844949000', 'endTimestamp'='1750944949000');
+SELECT `bucket`, COUNT(*) as file_count, SUM(file_size_in_bytes)/1024/1024 as total_size_mb FROM paimon_s3.tpcds.catalog_sales$files GROUP BY `bucket` ORDER BY total_size_mb;
+-- 目的：验证数据导入成功
+-- 期望：看到 4 行数据
+select * from demo.mytable;
+SELECT * FROM iceberg_tbl FOR TIME AS OF "2022-10-07 17:20:37";
+
+SELECT * FROM iceberg_tbl FOR VERSION AS OF 868895038966572;
+-- 查询当前快照的数据文件
+SELECT * FROM iceberg_table$data_files;
+
+-- 查询当前快照的删除文件
+SELECT * FROM iceberg_table$delete_files;
+
+-- 查询所有快照的所有文件（包括数据和删除文件）
+SELECT * FROM iceberg_table$all_files;
+
+-- 查询所有快照的数据文件
+SELECT * FROM iceberg_table$all_data_files;
+
+-- 查询所有快照的删除文件
+SELECT * FROM iceberg_table$all_delete_files;
+-- Search for "Kafka streaming" with embedding [0.7, 0.3, 0.2, 0.4, 0.2]
+WITH vector_results AS (
+    -- Similarity search: find conceptually similar documents
+    SELECT
+        id, content,
+        1 - cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) AS vector_score,
+        ROW_NUMBER() OVER (ORDER BY cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) ASC) AS vector_rank
+    FROM rag_documents
+    ORDER BY cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) ASC
+    LIMIT 10
+),
+text_results AS (
+    -- Full-text search: find exact term matches
+    SELECT
+        id, content,
+        1.0 AS text_score,
+        ROW_NUMBER() OVER (ORDER BY id) AS text_rank
+    FROM rag_documents
+    WHERE content MATCH 'Kafka streaming'
+    LIMIT 10
+),
+combined AS (
+    -- Combine results from both methods
+    SELECT
+        COALESCE(v.id, t.id) AS id,
+        COALESCE(v.content, t.content) AS content,
+        COALESCE(v.vector_score, 0) AS vector_score,
+        COALESCE(t.text_score, 0) AS text_score,
+        COALESCE(v.vector_rank, 999) AS vector_rank,
+        COALESCE(t.text_rank, 999) AS text_rank
+    FROM vector_results v
+    FULL OUTER JOIN text_results t ON v.id = t.id
+)
+-- RRF fusion: combine rankings with 1/(k + rank) formula
+SELECT
+    id, content, vector_score, text_score,
+    (0.5 / (60 + vector_rank) + 0.5 / (60 + text_rank)) AS hybrid_score
+FROM combined
+ORDER BY hybrid_score DESC
+LIMIT 5;
+------------------------------------------------------------------------------------------
+[SELECT] WITH example_data AS (
+    SELECT 1 as column1, 66 as column2, 'A' as group_name
+    UNION ALL
+    SELECT 1, 10, 'A'
+    UNION ALL
+    SELECT 1, 66, 'A'
+    UNION ALL
+    SELECT 1, 20, 'A'
+    UNION ALL
+    SELECT 2, 66, 'B'
+    UNION ALL
+    SELECT 2, 30, 'B'
+    UNION ALL
+    SELECT 2, 40, 'B'
+)
+SELECT 
+    group_name,
+    column1,
+    column2,
+    NTH_VALUE(column2, 2) OVER (
+        PARTITION BY column1 
+        ORDER BY column2
+        ROWS BETWEEN 1 preceding and 1 following
+    ) as nth
+FROM example_data
+ORDER BY column1, column2;
+----------
+[SELECT] -- TERM + PHRASE + NOT 
+SELECT request_id, error_msg, latency_ms
+FROM inference_logs
+WHERE search('
+  level:ERROR 
+  AND error_msg:"CUDA out of memory" 
+  AND NOT module:healthcheck 
+  AND model_name:gpt*
+')
+  AND log_time > NOW() - INTERVAL 1 HOUR
+ORDER BY latency_ms DESC LIMIT 100;
+----------
+[SELECT] -- BM25 
+SELECT request_id, error_msg, score() AS relevance
+FROM inference_logs
+WHERE search('error_msg:"memory allocation failed" OR error_msg:"CUDA error"')
+ORDER BY relevance DESC LIMIT 20;
+----------
+[SELECT] -- Search in VARIANT
+SELECT * FROM agent_logs
+WHERE search('NESTED(steps, status:error AND tool:code_exec)');
+----------
+[SELECT] -- search + aggregation
+SELECT model_name, COUNT(*) AS error_count,
+       PERCENTILE_APPROX(latency_ms, 0.99) AS p99_latency
+FROM inference_logs
+WHERE search('level:ERROR AND error_msg:"CUDA out of memory"')
+  AND log_time > NOW() - INTERVAL 1 HOUR
+GROUP BY model_name ORDER BY error_count DESC;
+----------
+[SELECT] SELECT CONCAT('a', 'b');
+----------
+[SELECT] SELECT * FROM test WHERE K4 < 1000 AND K5 = 80 AND K6 = 10000;
+----------
+[SELECT] SELECT * FROM test WHERE k4 < 1000 AND k5 = 80 OR k6 >= 10000;
+----------
+[SELECT] -- running difference(x)
+SELECT running_difference(x) FROM t ORDER BY k;
+----------
+[SELECT] -- window function
+SELECT x - lag(x, 1, 0) OVER (ORDER BY k) FROM t;
+----------
+[SELECT|DATA_EXPORT] SELECT * FROM tbl
+   INTO OUTFILE "hdfs://path/to/result_"
+   FORMAT AS CSV
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.hadoop.security.authentication" = "kerberos",
+       "broker.kerberos_principal" = "doris@YOUR.COM",
+       "broker.kerberos_keytab" = "/home/doris/my.keytab",
+       "column_separator" = ",",
+       "line_delimiter" = "\n",
+       "max_file_size" = "100MB"
+   );
+----------
+[SELECT|DATA_EXPORT] SELECT c1, c2, c3 FROM tbl
+   INTO OUTFILE "hdfs://path/to/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.hadoop.security.authentication" = "kerberos",
+       "broker.kerberos_principal" = "doris@YOUR.COM",
+       "broker.kerberos_keytab" = "/home/doris/my.keytab",
+       "schema"="required,int32,c1;required,byte_array,c2;required,byte_array,c2"
+   );
+----------
+[SELECT|DATA_EXPORT] SELECT k1 FROM tbl1 UNION SELECT k2 FROM tbl1
+   INTO OUTFILE "bos://bucket/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.bos_endpoint" = "http://bj.bcebos.com",
+       "broker.bos_accesskey" = "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
+       "broker.bos_secret_accesskey" = "yyyyyyyyyyyyyyyyyyyyyyyyy",
+       "schema"="required,int32,k1;required,byte_array,k2"
+   );
+----------
+[SELECT|DATA_EXPORT] select k1,k2,v1 from tbl1 limit 100000
+   into outfile "s3a://my_bucket/export/my_file_"
+   FORMAT AS CSV
+   PROPERTIES
+   (
+       "broker.name" = "hdfs_broker",
+       "broker.fs.s3a.access.key" = "xxx",
+       "broker.fs.s3a.secret.key" = "xxxx",
+       "broker.fs.s3a.endpoint" = "https://cos.xxxxxx.myqcloud.com/",
+       "column_separator" = ",",
+       "line_delimiter" = "\n",
+       "max_file_size" = "1024MB",
+       "success_file_name" = "SUCCESS"
+   )
+----------
+[SELECT|DATA_EXPORT] SELECT * FROM tbl
+   INTO OUTFILE "hdfs://${host}:${fileSystem_port}/path/to/result_"
+   FORMAT AS CSV
+   PROPERTIES
+   (
+       "fs.defaultFS" = "hdfs://ip:port",
+       "hadoop.username" = "work"
+   );
+----------
+[SELECT] select * from query("catalog" = "jdbc_catalog", "query" = "select * from db_name.table_name where condition");
+----------
+[SELECT|DATA_EXPORT] SELECT c1, c2, c3 FROM tbl
+   INTO OUTFILE "hdfs://path/to/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.hadoop.security.authentication" = "kerberos",
+       "broker.kerberos_principal" = "doris@YOUR.COM",
+       "broker.kerberos_keytab" = "/home/doris/my.keytab"
+   );
+----------
+[SELECT|DATA_EXPORT] SELECT k1 FROM tbl1 UNION SELECT k2 FROM tbl1
+   INTO OUTFILE "bos://bucket/result_"
+   FORMAT AS PARQUET
+   PROPERTIES
+   (
+       "broker.name" = "my_broker",
+       "broker.bos_endpoint" = "http://bj.bcebos.com",
+       "broker.bos_accesskey" = "xxxxxxxxxxxxxxxxxxxxxxxxxxx",
+       "broker.bos_secret_accesskey" = "yyyyyyyyyyyyyyyyyyyyyyyyy"
+   );
+----------
+[SELECT] -- 2.1 Rows in the content column containing both keyword1 and keyword2, where keyword2 must immediately follow keyword1
+-- 'keyword1 keyword2', 'wordx keyword1 keyword2', 'wordx keyword1 keyword2 wordy' all match because they contain 'keyword1 keyword2' with keyword2 immediately following keyword1
+-- 'keyword1 wordx keyword2' does not match because there is a word between keyword1 and keyword2
+-- 'keyword2 keyword1' does not match because the order is reversed
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2';
+----------
+[SELECT] -- 2.2 Rows in the content column containing both keyword1 and keyword2, with a slop (maximum word distance) of 3
+-- 'keyword1 keyword2', 'keyword1 a keyword2', 'keyword1 a b c keyword2' all match because the slop is 0, 1, and 3 respectively, all within 3
+-- 'keyword1 a b c d keyword2' does not match because the slop is 4, exceeding 3
+-- 'keyword2 keyword1', 'keyword2 a keyword1', 'keyword2 a b c keyword1' also match because when slop > 0, the order of keyword1 and keyword2 is not required. To enforce the order, Doris provides a + sign after slop
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3';
+----------
+[SELECT] -- To enforce order, use a positive sign with slop; 'keyword1 a b c keyword2' matches, while 'keyword2 a b c keyword1' does not
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3+';
+----------
+[SELECT] -- 2.3 Prefix matching the last word keyword2, with a default limit of 50 prefixes (controlled by session variable inverted_index_max_expansions)
+-- It is necessary to ensure that keyword1 and keyword2 remain adjacent in the original text after tokenization, with no other words in between.
+-- 'keyword1 keyword2abc' matches because keyword1 is identical and keyword2abc is a prefix of keyword2
+-- 'keyword1 keyword2' also matches because keyword2 is a prefix of keyword2
+-- 'keyword1 keyword3' does not match because keyword3 is not a prefix of keyword2
+-- 'keyword1 keyword3abc' does not match because keyword3abc is not a prefix of keyword2
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1 keyword2';
+----------
+[SELECT] -- 2.4 If only one word is provided, it defaults to a prefix query with a limit of 50 prefixes (controlled by session variable inverted_index_max_expansions)
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1';
+----------
+[SELECT] -- 2.5 Regular expression matching on tokenized words, with a default limit of 50 matches (controlled by session variable inverted_index_max_expansions)
+-- Similar to MATCH_PHRASE_PREFIX but with regex instead of prefix
+SELECT * FROM table_name WHERE content MATCH_REGEXP 'key.*';
+----------
+[SELECT] -- 3. Normal equality, range, IN, and NOT IN queries using standard SQL syntax, for example:
+SELECT * FROM table_name WHERE id = 123;
+----------
+[SELECT] SELECT * FROM table_name WHERE ts > '2023-01-01 00:00:00';
+----------
+[SELECT] SELECT * FROM table_name WHERE op_type IN ('add', 'delete');
+----------
+[SELECT] SELECT
+    product_id,
+    any_value(product_title),
+    AVG(star_rating) AS rating,
+    COUNT(*) AS count
+FROM
+    amazon_reviews
+WHERE
+    review_body LIKE '%is super awesome%'
+GROUP BY
+    product_id
+ORDER BY
+    count DESC,
+    rating DESC,
+    product_id
+LIMIT 5;
+----------
+[SELECT|DATA_IMPORT] SELECT * FROM S3 (
+      "uri" = "s3://your_bucket/path/to/tvf_test/test.parquet",
+      "format" = "parquet",
+      "s3.endpoint" = "https://s3.us-east-1.amazonaws.com",
+      "s3.region" = "us-east-1",
+      "s3.role_arn" = "<your-bucket-role-arn>",
+      "s3.external_id" = "<your-external-id>"      -- option parameter
+  )
+----------
+[SELECT] -- Full row retrieval
+SELECT * FROM tbl WHERE k1 = 1 AND k2 = 2;
+----------
+[SELECT] -- Partial column retrieval
+SELECT v1, v2 FROM tbl WHERE k1 = 1 AND k2 = 2;
+----------
+[SELECT] SELECT 1;
+----------
+[SELECT] -- Purpose: verify that the data was loaded successfully
+-- Expected: 4 rows are returned
+select * from demo.mytable;
+----------
+[SELECT] EXPLAIN
+SELECT o.o_orderpriority, COUNT(*) AS orders, SUM(l.l_extendedprice) AS revenue
+FROM   orders o
+JOIN   lineitem l ON o.o_orderkey = l.l_orderkey
+WHERE  o.o_orderdate >= '2026-01-01'
+GROUP BY o.o_orderpriority
+ORDER BY revenue DESC
+LIMIT 10;
+----------
+[SELECT|DATA_IMPORT] SELECT region, count(*) AS orders, sum(amount) AS revenue
+FROM s3(
+  "uri"    = "s3://demo-bucket/orders/year=2026/*.parquet",
+  "format" = "parquet",
+  "s3.endpoint"   = "https://s3.us-east-1.amazonaws.com",
+  "s3.access_key" = "AK...",
+  "s3.secret_key" = "SK..."
+)
+WHERE order_date >= '2026-04-01' AND status = 'PAID'
+GROUP BY region;
+----------
+[SELECT] WITH bm25 AS (
+  SELECT id, ROW_NUMBER() OVER (ORDER BY score() DESC) AS r
+  FROM docs WHERE body MATCH_ANY 'music' ORDER BY score() DESC LIMIT 100
+),
+ann AS (
+  SELECT id, ROW_NUMBER() OVER (ORDER BY l2_distance_approximate(
+           embedding, [0.1,0.1,0.2,0.2,0.3,0.3,0.4,0.4]) ASC) AS r
+  FROM docs ORDER BY l2_distance_approximate(
+           embedding, [0.1,0.1,0.2,0.2,0.3,0.3,0.4,0.4]) ASC LIMIT 100
+)
+SELECT COALESCE(b.id, a.id) AS id,
+       COALESCE(1.0/(60+b.r), 0) + COALESCE(1.0/(60+a.r), 0) AS rrf
+FROM bm25 b FULL OUTER JOIN ann a ON b.id = a.id
+ORDER BY rrf DESC LIMIT 5;
+----------
+[SELECT] SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'hive_ctl' AND engine_name = 'hive'
+ORDER BY entry_name;
+----------
+[SELECT] SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'iceberg_ctl' AND engine_name = 'iceberg'
+ORDER BY entry_name;
+----------
+[SELECT] SELECT id, _row_id, _last_updated_sequence_number FROM iceberg_tbl;
+----------
+[SELECT] SELECT * FROM iceberg_table$all_manifests;
+----------
+[SELECT] SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'paimon_ctl' AND engine_name = 'paimon'
+ORDER BY entry_name;
+----------
+[SELECT] -- between snapshots [0, 5)
+SELECT * FROM paimon_table@incr('startSnapshotId'='0', 'endSnapshotId'='5');
+----------
+[SELECT] -- between snapshots [0, 5) with specified scan mode
+SELECT * FROM paimon_table@incr('startSnapshotId'='0', 'endSnapshotId'='5', 'incrementalBetweenScanMode'='diff');
+----------
+[SELECT] -- read from start timestamp
+SELECT * FROM paimon_table@incr('startTimestamp'='1750844949000');
+----------
+[SELECT] -- read between timestamp
+SELECT * FROM paimon_table@incr('startTimestamp'='1750844949000', 'endTimestamp'='1750944949000');
+----------
+[SELECT] SELECT `bucket`, COUNT(*) as file_count, SUM(file_size_in_bytes)/1024/1024 as total_size_mb FROM paimon_s3.tpcds.catalog_sales$files GROUP BY `bucket` ORDER BY total_size_mb;
+----------
+[SELECT] -- 目的：验证数据导入成功
+-- 期望：看到 4 行数据
+select * from demo.mytable;
+----------
+[SELECT] SELECT * FROM iceberg_tbl FOR TIME AS OF "2022-10-07 17:20:37";
+----------
+[SELECT] SELECT * FROM iceberg_tbl FOR VERSION AS OF 868895038966572;
+----------
+[SELECT] -- 查询当前快照的数据文件
+SELECT * FROM iceberg_table$data_files;
+----------
+[SELECT] -- 查询当前快照的删除文件
+SELECT * FROM iceberg_table$delete_files;
+----------
+[SELECT] -- 查询所有快照的所有文件（包括数据和删除文件）
+SELECT * FROM iceberg_table$all_files;
+----------
+[SELECT] -- 查询所有快照的数据文件
+SELECT * FROM iceberg_table$all_data_files;
+----------
+[SELECT] -- 查询所有快照的删除文件
+SELECT * FROM iceberg_table$all_delete_files;
+----------
+[SELECT] -- Search for "Kafka streaming" with embedding [0.7, 0.3, 0.2, 0.4, 0.2]
+WITH vector_results AS (
+    -- Similarity search: find conceptually similar documents
+    SELECT
+        id, content,
+        1 - cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) AS vector_score,
+        ROW_NUMBER() OVER (ORDER BY cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) ASC) AS vector_rank
+    FROM rag_documents
+    ORDER BY cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) ASC
+    LIMIT 10
+),
+text_results AS (
+    -- Full-text search: find exact term matches
+    SELECT
+        id, content,
+        1.0 AS text_score,
+        ROW_NUMBER() OVER (ORDER BY id) AS text_rank
+    FROM rag_documents
+    WHERE content MATCH 'Kafka streaming'
+    LIMIT 10
+),
+combined AS (
+    -- Combine results from both methods
+    SELECT
+        COALESCE(v.id, t.id) AS id,
+        COALESCE(v.content, t.content) AS content,
+        COALESCE(v.vector_score, 0) AS vector_score,
+        COALESCE(t.text_score, 0) AS text_score,
+        COALESCE(v.vector_rank, 999) AS vector_rank,
+        COALESCE(t.text_rank, 999) AS text_rank
+    FROM vector_results v
+    FULL OUTER JOIN text_results t ON v.id = t.id
+)
+-- RRF fusion: combine rankings with 1/(k + rank) formula
+SELECT
+    id, content, vector_score, text_score,
+    (0.5 / (60 + vector_rank) + 0.5 / (60 + text_rank)) AS hybrid_score
+FROM combined
+ORDER BY hybrid_score DESC
+LIMIT 5;

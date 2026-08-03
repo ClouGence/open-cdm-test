@@ -1,0 +1,532 @@
+CREATE FUNCTION pg_visibility(regclass, blkno OUT bigint,
+							  all_visible OUT boolean,
+							  all_frozen OUT boolean,
+							  pd_all_visible OUT boolean)
+RETURNS SETOF record
+AS '$libdir/pg_visibility', 'pg_visibility_rel'
+LANGUAGE C STRICT
+;
+ALTER TABLE ONLY "public"."d" INHERIT "public"."a"
+;
+COMMENT ON FUNCTION seg_cmp(seg, seg) IS 'btree comparison function'
+;
+ALTER INDEX pg_toast.pg_toast_30582_index RENAME TO reind_con_toast_idx
+;
+create table pktable2 (a int, b int, primary key (a, b))
+;
+do $$
+begin
+  for i in 1..3 by -1 loop
+    raise notice '1..3 by -1: i = %', i;
+  end loop;
+end$$
+;
+-- error
+EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
+  CREATE TABLE IF NOT EXISTS ctas_ine_tbl AS SELECT 1 / 0
+;
+-- Tests for partitioned table
+
+-- set PUBLISH_VIA_PARTITION_ROOT to false and test column list for partitioned
+-- table
+ALTER PUBLICATION testpub6 SET (PUBLISH_VIA_PARTITION_ROOT=0)
+;
+CREATE TEMP TABLE vctable (f1 varchar(25))
+;
+-- Use uncompressed data stored in toast.
+CREATE INDEX no_index_cleanup_idx ON no_index_cleanup(t)
+;
+ANALYZE pg_catalog.pg_foreign_data_wrapper
+;
+CREATE TABLE gtest1_2 () INHERITS (gtest0, gtesty)
+;
+CREATE FUNCTION "public"."mvtest_drop_the_index"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  EXECUTE 'DROP INDEX IF EXISTS mvtest_drop_idx';
+  RETURN true;
+END;
+$$
+;
+/* contrib/amcheck/amcheck--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+--
+-- bt_index_check()
+--
+CREATE FUNCTION bt_index_check(index regclass)
+RETURNS VOID
+AS '$libdir/amcheck', 'bt_index_check'
+LANGUAGE C STRICT PARALLEL RESTRICTED
+;
+DROP TABLE stxdinh, stxdinh1, stxdinh2
+;
+create domain insert_nnarray as int[]
+  check (value[1] is not null and value[2] is not null)
+;
+VACUUM (FREEZE) pg_catalog.pg_range
+;
+CREATE FUNCTION cube_inter(cube, cube)
+RETURNS cube
+AS '$libdir/cube'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+CREATE TABLE prt3_adv_p2 PARTITION OF prt3_adv FOR VALUES FROM (300) TO (400)
+;
+ALTER TABLE ONLY "public"."parted_self_fk" ATTACH PARTITION "public"."part3_self_fk" FOR VALUES FROM ('30') TO ('40')
+;
+CREATE FUNCTION auth_func(text, text) RETURNS bool
+    LANGUAGE sql
+    AS 'SELECT sepgsql_setcon(regexp_replace(sepgsql_getcon(), ''_r:.*$'', ''_r:'' || label))
+        FROM auth_tbl WHERE uname = $1 AND credential = $2'
+;
+CREATE FUNCTION "public"."wait_for_stats"() RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$
+declare
+  start_time timestamptz := clock_timestamp();
+  updated1 bool;
+  updated2 bool;
+  updated3 bool;
+  updated4 bool;
+begin
+  -- we don't want to wait forever; loop will exit after 30 seconds
+  for i in 1 .. 300 loop
+
+    -- With parallel query, the seqscan and indexscan on tenk2 might be done
+    -- in parallel worker processes, which will send their stats counters
+    -- asynchronously to what our own session does.  So we must check for
+    -- those counts to be registered separately from the update counts.
+
+    -- check to see if seqscan has been sensed
+    SELECT (st.seq_scan >= pr.seq_scan + 1) INTO updated1
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if indexscan has been sensed
+    SELECT (st.idx_scan >= pr.idx_scan + 1) INTO updated2
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if all updates have been sensed
+    SELECT (n_tup_ins > 0) INTO updated3
+      FROM pg_stat_user_tables WHERE relname='trunc_stats_test4';
+
+    -- We must also check explicitly that pg_stat_get_snapshot_timestamp has
+    -- advanced, because that comes from the global stats file which might
+    -- be older than the per-DB stats file we got the other values from.
+    SELECT (pr.snap_ts < pg_stat_get_snapshot_timestamp()) INTO updated4
+      FROM prevstats AS pr;
+
+    exit when updated1 and updated2 and updated3 and updated4;
+
+    -- wait a little
+    perform pg_sleep_for('100 milliseconds');
+
+    -- reset stats snapshot so we can test again
+    perform pg_stat_clear_snapshot();
+
+  end loop;
+
+  -- report time waited in postmaster log (where it won't change test output)
+  raise log 'wait_for_stats delayed % seconds',
+    extract(epoch from clock_timestamp() - start_time);
+end
+$$
+;
+CREATE TABLE tab_expr_stats (a int, b int)
+;
+ALTER TABLE tt0 OF tt_t0
+;
+CREATE SCHEMA test_s_dep
+;
+drop table stts_t1, stts_t2, stts_t3
+;
+ALTER TABLE ONLY "public"."prt2_m" ATTACH PARTITION "public"."prt2_m_p1" FOR VALUES FROM (0, 0) TO (250, 250)
+;
+CREATE RULE "rtest_t4_ins1" AS
+    ON INSERT TO "public"."rtest_t4"
+   WHERE (("new"."a" >= 10) AND ("new"."a" < 20)) DO INSTEAD  INSERT INTO "public"."rtest_t5" ("a", "b")
+  VALUES ("new"."a", "new"."b")
+;
+CREATE FUNCTION immut_func (a int) RETURNS int AS $$ SELECT a + random()::int; $$ LANGUAGE SQL
+;
+drop table mutable2
+;
+CREATE POLICY p1 ON y2 FOR ALL USING (a % 2 = 0)
+;
+CREATE FUNCTION ltxtq_out(ltxtquery)
+RETURNS cstring
+AS '$libdir/ltree'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+CREATE FUNCTION trigger_return_old ()
+        RETURNS trigger
+        AS '/src/src/test/regress/regress.so'
+        LANGUAGE C
+;
+ALTER INDEX "public"."part3_self_fk_pkey" ATTACH PARTITION "public"."part33_self_fk_pkey"
+;
+COMMENT ON TEXT SEARCH DICTIONARY italian_stem IS 'snowball stemmer for italian language'
+;
+--
+-- Now test longer arrays of char
+--
+
+CREATE TABLE VARCHAR_TBL(f1 varchar(4))
+;
+CREATE OR REPLACE VIEW viewtest AS
+	SELECT a, b, c::numeric(10,2), d FROM viewtest_tbl
+;
+-- Test arrays over domains of composite
+
+create type comptype as (cf1 int, cf2 int)
+;
+CREATE TRIGGER merge_bsi BEFORE INSERT ON target FOR EACH STATEMENT EXECUTE PROCEDURE merge_trigfunc ()
+;
+CREATE FUNCTION functest_C_3(int) RETURNS bool LANGUAGE 'sql'
+       SECURITY INVOKER AS 'SELECT $1 < 0'
+;
+CREATE TABLESPACE tblspc3 LOCATION '/tmp/54tbCZ2rt3/tempdir/superlongname_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+;
+DROP FUNCTION unbounded_syntax_test1a, unbounded_syntax_test1b,
+              unbounded_syntax_test2a, unbounded_syntax_test2b
+;
+ANALYZE pg_temp_11.pg_temp_41261
+;
+DROP TABLE encoding_tests
+;
+CREATE SCHEMA pgss_schema_1
+;
+VACUUM (TRUNCATE FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_shdepend
+;
+CREATE FUNCTION lquery_in(cstring)
+RETURNS lquery
+AS '$libdir/ltree'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+CREATE TABLE collate_test6 (
+    a int,
+    b text COLLATE "en_US"
+)
+;
+/*
+ * text search configuration for indonesian language
+ *
+ * Copyright (c) 2007-2021, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * indonesian and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY indonesian_stem
+	(TEMPLATE = snowball, Language = indonesian )
+;
+CREATE FUNCTION "public"."int44out"("public"."city_budget") RETURNS "cstring"
+    LANGUAGE "c" IMMUTABLE STRICT
+    AS '/src/src/test/regress/regress.so', 'int44out'
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE FUNCTION pg_visibility(regclass, blkno OUT bigint,
+							  all_visible OUT boolean,
+							  all_frozen OUT boolean,
+							  pd_all_visible OUT boolean)
+RETURNS SETOF record
+AS '$libdir/pg_visibility', 'pg_visibility_rel'
+LANGUAGE C STRICT
+;
+----------
+[ALTER_TABLE] ALTER TABLE ONLY "public"."d" INHERIT "public"."a"
+;
+----------
+[COMMENT_PROG_OBJ] COMMENT ON FUNCTION seg_cmp(seg, seg) IS 'btree comparison function'
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_30582_index RENAME TO reind_con_toast_idx
+;
+----------
+[CREATE_TABLE] create table pktable2 (a int, b int, primary key (a, b))
+;
+----------
+[BLOCK] do $$
+begin
+  for i in 1..3 by -1 loop
+    raise notice '1..3 by -1: i = %', i;
+  end loop;
+end$$
+;
+----------
+[CREATE_TABLE|SELECT] -- error
+EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
+  CREATE TABLE IF NOT EXISTS ctas_ine_tbl AS SELECT 1 / 0
+;
+----------
+[ALTER_PUB_SUB] -- Tests for partitioned table
+
+-- set PUBLISH_VIA_PARTITION_ROOT to false and test column list for partitioned
+-- table
+ALTER PUBLICATION testpub6 SET (PUBLISH_VIA_PARTITION_ROOT=0)
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE vctable (f1 varchar(25))
+;
+----------
+[ADD_INDEX] -- Use uncompressed data stored in toast.
+CREATE INDEX no_index_cleanup_idx ON no_index_cleanup(t)
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_catalog.pg_foreign_data_wrapper
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest1_2 () INHERITS (gtest0, gtesty)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."mvtest_drop_the_index"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+BEGIN
+  EXECUTE 'DROP INDEX IF EXISTS mvtest_drop_idx';
+  RETURN true;
+END;
+$$
+;
+----------
+[CREATE_PROG_OBJ] /* contrib/amcheck/amcheck--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+--
+-- bt_index_check()
+--
+CREATE FUNCTION bt_index_check(index regclass)
+RETURNS VOID
+AS '$libdir/amcheck', 'bt_index_check'
+LANGUAGE C STRICT PARALLEL RESTRICTED
+;
+----------
+[DROP_TABLE] DROP TABLE stxdinh, stxdinh1, stxdinh2
+;
+----------
+[CREATE_TYPE] create domain insert_nnarray as int[]
+  check (value[1] is not null and value[2] is not null)
+;
+----------
+[ADMIN_TABLE] VACUUM (FREEZE) pg_catalog.pg_range
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION cube_inter(cube, cube)
+RETURNS cube
+AS '$libdir/cube'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] CREATE TABLE prt3_adv_p2 PARTITION OF prt3_adv FOR VALUES FROM (300) TO (400)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "public"."parted_self_fk" ATTACH PARTITION "public"."part3_self_fk" FOR VALUES FROM ('30') TO ('40')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION auth_func(text, text) RETURNS bool
+    LANGUAGE sql
+    AS 'SELECT sepgsql_setcon(regexp_replace(sepgsql_getcon(), ''_r:.*$'', ''_r:'' || label))
+        FROM auth_tbl WHERE uname = $1 AND credential = $2'
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."wait_for_stats"() RETURNS "void"
+    LANGUAGE "plpgsql"
+    AS $$
+declare
+  start_time timestamptz := clock_timestamp();
+  updated1 bool;
+  updated2 bool;
+  updated3 bool;
+  updated4 bool;
+begin
+  -- we don't want to wait forever; loop will exit after 30 seconds
+  for i in 1 .. 300 loop
+
+    -- With parallel query, the seqscan and indexscan on tenk2 might be done
+    -- in parallel worker processes, which will send their stats counters
+    -- asynchronously to what our own session does.  So we must check for
+    -- those counts to be registered separately from the update counts.
+
+    -- check to see if seqscan has been sensed
+    SELECT (st.seq_scan >= pr.seq_scan + 1) INTO updated1
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if indexscan has been sensed
+    SELECT (st.idx_scan >= pr.idx_scan + 1) INTO updated2
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if all updates have been sensed
+    SELECT (n_tup_ins > 0) INTO updated3
+      FROM pg_stat_user_tables WHERE relname='trunc_stats_test4';
+
+    -- We must also check explicitly that pg_stat_get_snapshot_timestamp has
+    -- advanced, because that comes from the global stats file which might
+    -- be older than the per-DB stats file we got the other values from.
+    SELECT (pr.snap_ts < pg_stat_get_snapshot_timestamp()) INTO updated4
+      FROM prevstats AS pr;
+
+    exit when updated1 and updated2 and updated3 and updated4;
+
+    -- wait a little
+    perform pg_sleep_for('100 milliseconds');
+
+    -- reset stats snapshot so we can test again
+    perform pg_stat_clear_snapshot();
+
+  end loop;
+
+  -- report time waited in postmaster log (where it won't change test output)
+  raise log 'wait_for_stats delayed % seconds',
+    extract(epoch from clock_timestamp() - start_time);
+end
+$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE tab_expr_stats (a int, b int)
+;
+----------
+[ALTER_TABLE] ALTER TABLE tt0 OF tt_t0
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA test_s_dep
+;
+----------
+[DROP_TABLE] drop table stts_t1, stts_t2, stts_t3
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "public"."prt2_m" ATTACH PARTITION "public"."prt2_m_p1" FOR VALUES FROM (0, 0) TO (250, 250)
+;
+----------
+[CREATE_POLICY] CREATE RULE "rtest_t4_ins1" AS
+    ON INSERT TO "public"."rtest_t4"
+   WHERE (("new"."a" >= 10) AND ("new"."a" < 20)) DO INSTEAD  INSERT INTO "public"."rtest_t5" ("a", "b")
+  VALUES ("new"."a", "new"."b")
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION immut_func (a int) RETURNS int AS $$ SELECT a + random()::int; $$ LANGUAGE SQL
+;
+----------
+[DROP_TABLE] drop table mutable2
+;
+----------
+[CREATE_POLICY] CREATE POLICY p1 ON y2 FOR ALL USING (a % 2 = 0)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ltxtq_out(ltxtquery)
+RETURNS cstring
+AS '$libdir/ltree'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION trigger_return_old ()
+        RETURNS trigger
+        AS '/src/src/test/regress/regress.so'
+        LANGUAGE C
+;
+----------
+[ALTER_INDEX] ALTER INDEX "public"."part3_self_fk_pkey" ATTACH PARTITION "public"."part33_self_fk_pkey"
+;
+----------
+[ALTER_POLICY] COMMENT ON TEXT SEARCH DICTIONARY italian_stem IS 'snowball stemmer for italian language'
+;
+----------
+[CREATE_TABLE] --
+-- Now test longer arrays of char
+--
+
+CREATE TABLE VARCHAR_TBL(f1 varchar(4))
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE OR REPLACE VIEW viewtest AS
+	SELECT a, b, c::numeric(10,2), d FROM viewtest_tbl
+;
+----------
+[CREATE_TYPE] -- Test arrays over domains of composite
+
+create type comptype as (cf1 int, cf2 int)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER merge_bsi BEFORE INSERT ON target FOR EACH STATEMENT EXECUTE PROCEDURE merge_trigfunc ()
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_C_3(int) RETURNS bool LANGUAGE 'sql'
+       SECURITY INVOKER AS 'SELECT $1 < 0'
+;
+----------
+[CREATE_TABLESPACE] CREATE TABLESPACE tblspc3 LOCATION '/tmp/54tbCZ2rt3/tempdir/superlongname_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION unbounded_syntax_test1a, unbounded_syntax_test1b,
+              unbounded_syntax_test2a, unbounded_syntax_test2b
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_11.pg_temp_41261
+;
+----------
+[DROP_TABLE] DROP TABLE encoding_tests
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA pgss_schema_1
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_shdepend
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION lquery_in(cstring)
+RETURNS lquery
+AS '$libdir/ltree'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] CREATE TABLE collate_test6 (
+    a int,
+    b text COLLATE "en_US"
+)
+;
+----------
+[CREATE_POLICY] /*
+ * text search configuration for indonesian language
+ *
+ * Copyright (c) 2007-2021, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * indonesian and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY indonesian_stem
+	(TEMPLATE = snowball, Language = indonesian )
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."int44out"("public"."city_budget") RETURNS "cstring"
+    LANGUAGE "c" IMMUTABLE STRICT
+    AS '/src/src/test/regress/regress.so', 'int44out'
+;

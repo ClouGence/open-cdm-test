@@ -1,0 +1,613 @@
+select * from tasks("type"="insert");
+SELECT 
+    sales_person,
+    sales_date,
+    sales_amount,
+    CUME_DIST() OVER (PARTITION BY sales_date ORDER BY sales_amount ASC) AS cumulative_sales_percentage
+FROM 
+    sales;
+select x, y, dense_rank() over(partition by x order by y) as rank from int_t;
+WITH example_data AS (
+    SELECT 1 as column1, NULL as column2, 'A' as group_name
+    UNION ALL
+    SELECT 1, 10, 'A'
+    UNION ALL
+    SELECT 1, NULL, 'A'
+    UNION ALL
+    SELECT 1, 20, 'A'
+    UNION ALL
+    SELECT 2, NULL, 'B'
+    UNION ALL
+    SELECT 2, 30, 'B'
+    UNION ALL
+    SELECT 2, 40, 'B'
+)
+SELECT 
+    group_name,
+    column1,
+    column2,
+    FIRST_VALUE(column2) OVER (
+        PARTITION BY column1 
+        ORDER BY column2 NULLS LAST
+    ) AS first_value_default,
+    FIRST_VALUE(column2, true) OVER (
+        PARTITION BY column1 
+        ORDER BY column2
+    ) AS first_value_ignore_null
+FROM example_data
+ORDER BY column1, column2;
+select stock_symbol, closing_date, closing_price,    
+lag(closing_price,1, 0) over (partition by stock_symbol order by closing_date) as "yesterday closing"   
+from stock_ticker   
+order by closing_date;
+WITH example_data AS (
+    SELECT 1 as id, 21 as myday, '04-21-11' as time_col, NULL as state
+    UNION ALL
+    SELECT 2, 21, '04-21-12', 2
+    UNION ALL
+    SELECT 3, 21, '04-21-13', 3
+    UNION ALL
+    SELECT 4, 22, '04-22-10-21', NULL
+    UNION ALL
+    SELECT 5, 22, '04-22-10-22', NULL
+    UNION ALL
+    SELECT 6, 22, '04-22-10-23', 5
+    UNION ALL
+    SELECT 7, 22, '04-22-10-24', NULL
+    UNION ALL
+    SELECT 8, 22, '04-22-10-25', 9
+    UNION ALL
+    SELECT 9, 23, '04-23-11', NULL
+    UNION ALL
+    SELECT 10, 23, '04-23-12', 10
+    UNION ALL
+    SELECT 11, 23, '04-23-13', NULL
+    UNION ALL
+    SELECT 12, 24, '02-24-10-21', NULL
+)
+SELECT 
+    *,
+    last_value(`state`, 1) OVER(
+        PARTITION BY `myday` 
+        ORDER BY `time_col` DESC 
+        ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+    ) as ignore_null,
+    last_value(`state`, 0) OVER(
+        PARTITION BY `myday` 
+        ORDER BY `time_col` DESC 
+        ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+    ) as not_ignore_null,
+    last_value(`state`) OVER(
+        PARTITION BY `myday` 
+        ORDER BY `time_col` DESC 
+        ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+    ) as ignore_null_default
+FROM example_data 
+ORDER BY `id`, `myday`, `time_col`;
+select stock_symbol, closing_date, closing_price,    
+case   
+(lead(closing_price,1, 0)   
+over (partition by stock_symbol order by closing_date)-closing_price) > 0   
+when true then "higher"   
+when false then "flat or lower"    
+end as "trending"   
+from stock_ticker    
+order by closing_date;
+SELECT 
+    name,
+    score,
+    NTILE(4) OVER (ORDER BY score DESC) as quarter
+FROM student_scores;
+SELECT
+        item_id,
+        date_time,
+        sales,
+        sum(sales) OVER (
+        ORDER BY item_id,
+        date_time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum
+FROM
+        test_window_order;
+SELECT
+    productLine,
+    orderYear,
+    orderValue,
+    ROUND(
+    PERCENT_RANK()
+    OVER (
+        PARTITION BY orderYear
+        ORDER BY orderValue
+    ),2) percentile_rank
+FROM
+    test_percent_rank
+ORDER BY
+    orderYear;
+SELECT 
+    department,
+    employee_name,
+    salary,
+    RANK() OVER (
+        PARTITION BY department 
+        ORDER BY salary DESC
+    ) as salary_rank
+FROM employees;
+select x, y, row_number() over(partition by x order by y) as rank from int_t;
+SELECT * FROM BACKENDS();
+SELECT * FROM FRONTENDS_DISKS();
+SELECT * FROM FRONTENDS();
+SELECT * FROM (SELECT * FROM table1 WHERE (c1 = 'a' AND c2 = 'b') AND (c3 = 'c' OR c4 = 'd'))
+;
+SELECT * FROM merge_into_source_table;
+SELECT * FROM merge_into_target_base_table;
+select * from tbl1 limit 10 
+   INTO OUTFILE "file:///home/work/path/result_";
+SELECT * FROM tbl
+    INTO OUTFILE "hdfs://path/to/result_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "broker.name" = "my_broker",
+        "broker.hadoop.security.authentication" = "kerberos",
+        "broker.kerberos_principal" = "doris@YOUR.COM",
+        "broker.kerberos_keytab" = "/home/doris/my.keytab",
+        "column_separator" = ",",
+        "line_delimiter" = "\n",
+        "max_file_size" = "100MB"
+    );
+SELECT c1, c2, c3 FROM tbl
+    INTO OUTFILE "hdfs://path/to/result_"
+    FORMAT AS PARQUET
+    PROPERTIES
+    (
+        "broker.name" = "my_broker",
+        "broker.hadoop.security.authentication" = "kerberos",
+        "broker.kerberos_principal" = "doris@YOUR.COM",
+        "broker.kerberos_keytab" = "/home/doris/my.keytab"
+    );
+SELECT k1 FROM tbl1 UNION SELECT k2 FROM tbl1
+    INTO OUTFILE "bos://bucket/result_"
+    FORMAT AS PARQUET
+    PROPERTIES
+    (
+        "broker.name" = "my_broker",
+        "broker.bos_endpoint" = "http://bj.bcebos.com",
+        "broker.bos_accesskey" = "xxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "broker.bos_secret_accesskey" = "yyyyyyyyyyyyyyyyyyyyyyyyyy"
+    );
+select k1,k2,v1 from tbl1 limit 100000
+    into outfile "s3a://my_bucket/export/my_file_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "broker.name" = "hdfs_broker",
+        "broker.fs.s3a.access.key" = "xxx",
+        "broker.fs.s3a.secret.key" = "xxxx",
+        "broker.fs.s3a.endpoint" = "https://cos.xxxxxx.myqcloud.com/",
+        "column_separator" = ",",
+        "line_delimiter" = "\n",
+        "max_file_size" = "1024MB",
+        "success_file_name" = "SUCCESS"
+    )
+;
+-- fileSystem_port default value is 9000
+    SELECT * FROM tbl
+    INTO OUTFILE "hdfs://${host}:${fileSystem_port}/path/to/result_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "fs.defaultFS" = "hdfs://ip:port",
+        "hadoop.username" = "work"
+    );
+select k1,k2,v1 from tbl1 limit 100000
+    into outfile "cosn://my_bucket/export/my_file_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "broker.name" = "broker_name",
+        "broker.fs.cosn.userinfo.secretId" = "xxx",
+        "broker.fs.cosn.userinfo.secretKey" = "xxxx",
+        "broker.fs.cosn.bucket.endpoint_suffix" = "cos.xxxxxx.myqcloud.com",
+        "column_separator" = ",",
+        "line_delimiter" = "\n",
+        "max_file_size" = "1024MB",
+        "success_file_name" = "SUCCESS"
+    )
+;
+WITH
+  cte1 AS (SELECT a，b FROM table1),
+  cte2 AS (SELECT c，d FROM table2)
+SELECT b，d FROM cte1 JOIN cte2
+WHERE cte1.a = cte2.c;
+select Name from student where age in (18,20,25);
+-- Query all information except the students' age
+   select * except(age) from student;
+--Query the tb_book table, group by type, and find the average price of each type of book,
+   select type,avg(price) from tb_book group by type;
+--Query all records in the tb_book table, sort them in descending order by id, and display three records
+   select * from tb_book order by id desc limit 3;
+--1. Display 3 records in descending order
+   select * from tb_book order by price desc limit 3;
+   
+   --2. Display 4 records from id=1
+   select * from tb_book where id limit 1,4;
+--Combine name and price into a new string output
+   select id,concat(name,":",price) as info,type from tb_book;
+--Calculate the total price of various books in the tb_book table
+   select sum(price) as total,type from tb_book group by type;
+   --20% off price
+   select *,(price * 0.8) as "20%" from tb_book;
+SELECT a FROM t1 WHERE a = 10 AND B = 1 ORDER BY a LIMIT 10
+    UNION
+    SELECT a FROM t2 WHERE a = 11 AND B = 2 ORDER BY a LIMIT 10;
+WITH cte AS
+    (
+      SELECT 1 AS col1, 2 AS col2
+      UNION ALL
+      SELECT 3, 4
+    )
+    SELECT col1, col2 FROM cte;
+SELECT * FROM t1 LEFT JOIN (t2, t3, t4)
+                     ON (t2.a = t1.a AND t3.b = t1.b AND t4.c = t1.c)
+;
+SELECT * FROM t1 LEFT JOIN (t2 CROSS JOIN t3 CROSS JOIN t4)
+                     ON (t2.a = t1.a AND t3.b = t1.b AND t4.c = t1.c)
+;
+SELECT t1.name, t2.salary
+      FROM employee AS t1 INNER JOIN info AS t2 ON t1.name = t2.name;
+    
+    SELECT t1.name, t2.salary
+      FROM employee t1 INNER JOIN info t2 ON t1.name = t2.name;
+SELECT left_tbl.*
+      FROM left_tbl LEFT JOIN right_tbl ON left_tbl.id = right_tbl.id
+      WHERE right_tbl.id IS NULL;
+--Pseudo-randomly sample 1000 rows in t1. Note that several Tablets are actually selected according to the statistics of the table, and the total number of selected Tablet rows may be greater than 1000, so if you want to explicitly return 1000 rows, you need to add Limit.
+    SELECT * FROM t1 TABLET(10001) TABLESAMPLE(1000 ROWS) REPEATABLE 2 limit 1000;
+SELECT college, region, seed FROM tournament
+       ORDER BY region, seed;
+     
+     SELECT college, region AS r, seed AS s FROM tournament
+       ORDER BY r, s;
+     
+     SELECT college, region, seed FROM tournament
+       ORDER BY 2, 3;
+SELECT a, COUNT(b) FROM test_table GROUP BY a ORDER BY NULL;
+SELECT COUNT(col1) AS col2 FROM t GROUP BY col2 HAVING col2 = 2;
+SELECT user, MAX(salary) FROM users
+       GROUP BY user HAVING MAX(salary) > 10;
+/*Retrieve 6~15 rows in the result set*/
+     SELECT * FROM tbl LIMIT 5,10;
+     /*Then if you want to retrieve all rows after a certain offset is set, you can set a very large constant for the second parameter. The following query fetches all data from row 96 onwards */
+     SELECT * FROM tbl LIMIT 95,18446744073709551615;
+     /*If LIMIT has only one parameter, the parameter specifies the number of rows that should be retrieved, and the offset defaults to 0, that is, starting from the first row*/
+;
+WITH cte AS (SELECT id, py_uuid_token(id) AS token FROM cte_uuid_seed)
+   SELECT id, COUNT(DISTINCT token) AS distinct_tokens
+   FROM (SELECT id, token FROM cte UNION ALL SELECT id, token FROM cte) u
+   GROUP BY id ORDER BY id;
+SELECT HEX(AES_ENCRYPT("Doris is Great", KEY my_key));
+SELECT AES_DECRYPT(UNHEX('D26DB38579D6A343350EDDC6F2AD47C6'), KEY my_key);
+select connection_id()
+;
+select k0, k1,k2, sum(k3) from baseall  where k9 > 1 group by k0,k1,k2
+;
+------------------------------------------------------------------------------------------
+[SELECT] select * from tasks("type"="insert");
+----------
+[SELECT] SELECT 
+    sales_person,
+    sales_date,
+    sales_amount,
+    CUME_DIST() OVER (PARTITION BY sales_date ORDER BY sales_amount ASC) AS cumulative_sales_percentage
+FROM 
+    sales;
+----------
+[SELECT] select x, y, dense_rank() over(partition by x order by y) as rank from int_t;
+----------
+[SELECT] WITH example_data AS (
+    SELECT 1 as column1, NULL as column2, 'A' as group_name
+    UNION ALL
+    SELECT 1, 10, 'A'
+    UNION ALL
+    SELECT 1, NULL, 'A'
+    UNION ALL
+    SELECT 1, 20, 'A'
+    UNION ALL
+    SELECT 2, NULL, 'B'
+    UNION ALL
+    SELECT 2, 30, 'B'
+    UNION ALL
+    SELECT 2, 40, 'B'
+)
+SELECT 
+    group_name,
+    column1,
+    column2,
+    FIRST_VALUE(column2) OVER (
+        PARTITION BY column1 
+        ORDER BY column2 NULLS LAST
+    ) AS first_value_default,
+    FIRST_VALUE(column2, true) OVER (
+        PARTITION BY column1 
+        ORDER BY column2
+    ) AS first_value_ignore_null
+FROM example_data
+ORDER BY column1, column2;
+----------
+[SELECT] select stock_symbol, closing_date, closing_price,    
+lag(closing_price,1, 0) over (partition by stock_symbol order by closing_date) as "yesterday closing"   
+from stock_ticker   
+order by closing_date;
+----------
+[SELECT] WITH example_data AS (
+    SELECT 1 as id, 21 as myday, '04-21-11' as time_col, NULL as state
+    UNION ALL
+    SELECT 2, 21, '04-21-12', 2
+    UNION ALL
+    SELECT 3, 21, '04-21-13', 3
+    UNION ALL
+    SELECT 4, 22, '04-22-10-21', NULL
+    UNION ALL
+    SELECT 5, 22, '04-22-10-22', NULL
+    UNION ALL
+    SELECT 6, 22, '04-22-10-23', 5
+    UNION ALL
+    SELECT 7, 22, '04-22-10-24', NULL
+    UNION ALL
+    SELECT 8, 22, '04-22-10-25', 9
+    UNION ALL
+    SELECT 9, 23, '04-23-11', NULL
+    UNION ALL
+    SELECT 10, 23, '04-23-12', 10
+    UNION ALL
+    SELECT 11, 23, '04-23-13', NULL
+    UNION ALL
+    SELECT 12, 24, '02-24-10-21', NULL
+)
+SELECT 
+    *,
+    last_value(`state`, 1) OVER(
+        PARTITION BY `myday` 
+        ORDER BY `time_col` DESC 
+        ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+    ) as ignore_null,
+    last_value(`state`, 0) OVER(
+        PARTITION BY `myday` 
+        ORDER BY `time_col` DESC 
+        ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+    ) as not_ignore_null,
+    last_value(`state`) OVER(
+        PARTITION BY `myday` 
+        ORDER BY `time_col` DESC 
+        ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+    ) as ignore_null_default
+FROM example_data 
+ORDER BY `id`, `myday`, `time_col`;
+----------
+[SELECT] select stock_symbol, closing_date, closing_price,    
+case   
+(lead(closing_price,1, 0)   
+over (partition by stock_symbol order by closing_date)-closing_price) > 0   
+when true then "higher"   
+when false then "flat or lower"    
+end as "trending"   
+from stock_ticker    
+order by closing_date;
+----------
+[SELECT] SELECT 
+    name,
+    score,
+    NTILE(4) OVER (ORDER BY score DESC) as quarter
+FROM student_scores;
+----------
+[SELECT] SELECT
+        item_id,
+        date_time,
+        sales,
+        sum(sales) OVER (
+        ORDER BY item_id,
+        date_time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum
+FROM
+        test_window_order;
+----------
+[SELECT] SELECT
+    productLine,
+    orderYear,
+    orderValue,
+    ROUND(
+    PERCENT_RANK()
+    OVER (
+        PARTITION BY orderYear
+        ORDER BY orderValue
+    ),2) percentile_rank
+FROM
+    test_percent_rank
+ORDER BY
+    orderYear;
+----------
+[SELECT] SELECT 
+    department,
+    employee_name,
+    salary,
+    RANK() OVER (
+        PARTITION BY department 
+        ORDER BY salary DESC
+    ) as salary_rank
+FROM employees;
+----------
+[SELECT] select x, y, row_number() over(partition by x order by y) as rank from int_t;
+----------
+[SELECT] SELECT * FROM BACKENDS();
+----------
+[SELECT] SELECT * FROM FRONTENDS_DISKS();
+----------
+[SELECT] SELECT * FROM FRONTENDS();
+----------
+[SELECT] SELECT * FROM (SELECT * FROM table1 WHERE (c1 = 'a' AND c2 = 'b') AND (c3 = 'c' OR c4 = 'd'))
+----------
+[SELECT] SELECT * FROM merge_into_source_table;
+----------
+[SELECT] SELECT * FROM merge_into_target_base_table;
+----------
+[SELECT|DATA_EXPORT] select * from tbl1 limit 10 
+   INTO OUTFILE "file:///home/work/path/result_";
+----------
+[SELECT|DATA_EXPORT] SELECT * FROM tbl
+    INTO OUTFILE "hdfs://path/to/result_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "broker.name" = "my_broker",
+        "broker.hadoop.security.authentication" = "kerberos",
+        "broker.kerberos_principal" = "doris@YOUR.COM",
+        "broker.kerberos_keytab" = "/home/doris/my.keytab",
+        "column_separator" = ",",
+        "line_delimiter" = "\n",
+        "max_file_size" = "100MB"
+    );
+----------
+[SELECT|DATA_EXPORT] SELECT c1, c2, c3 FROM tbl
+    INTO OUTFILE "hdfs://path/to/result_"
+    FORMAT AS PARQUET
+    PROPERTIES
+    (
+        "broker.name" = "my_broker",
+        "broker.hadoop.security.authentication" = "kerberos",
+        "broker.kerberos_principal" = "doris@YOUR.COM",
+        "broker.kerberos_keytab" = "/home/doris/my.keytab"
+    );
+----------
+[SELECT|DATA_EXPORT] SELECT k1 FROM tbl1 UNION SELECT k2 FROM tbl1
+    INTO OUTFILE "bos://bucket/result_"
+    FORMAT AS PARQUET
+    PROPERTIES
+    (
+        "broker.name" = "my_broker",
+        "broker.bos_endpoint" = "http://bj.bcebos.com",
+        "broker.bos_accesskey" = "xxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "broker.bos_secret_accesskey" = "yyyyyyyyyyyyyyyyyyyyyyyyyy"
+    );
+----------
+[SELECT|DATA_EXPORT] select k1,k2,v1 from tbl1 limit 100000
+    into outfile "s3a://my_bucket/export/my_file_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "broker.name" = "hdfs_broker",
+        "broker.fs.s3a.access.key" = "xxx",
+        "broker.fs.s3a.secret.key" = "xxxx",
+        "broker.fs.s3a.endpoint" = "https://cos.xxxxxx.myqcloud.com/",
+        "column_separator" = ",",
+        "line_delimiter" = "\n",
+        "max_file_size" = "1024MB",
+        "success_file_name" = "SUCCESS"
+    )
+----------
+[SELECT|DATA_EXPORT] SELECT * FROM tbl
+    INTO OUTFILE "hdfs://${host}:${fileSystem_port}/path/to/result_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "fs.defaultFS" = "hdfs://ip:port",
+        "hadoop.username" = "work"
+    );
+----------
+[SELECT|DATA_EXPORT] select k1,k2,v1 from tbl1 limit 100000
+    into outfile "cosn://my_bucket/export/my_file_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "broker.name" = "broker_name",
+        "broker.fs.cosn.userinfo.secretId" = "xxx",
+        "broker.fs.cosn.userinfo.secretKey" = "xxxx",
+        "broker.fs.cosn.bucket.endpoint_suffix" = "cos.xxxxxx.myqcloud.com",
+        "column_separator" = ",",
+        "line_delimiter" = "\n",
+        "max_file_size" = "1024MB",
+        "success_file_name" = "SUCCESS"
+    )
+----------
+[SELECT] WITH
+  cte1 AS (SELECT a，b FROM table1),
+  cte2 AS (SELECT c，d FROM table2)
+SELECT b，d FROM cte1 JOIN cte2
+WHERE cte1.a = cte2.c;
+----------
+[SELECT] select Name from student where age in (18,20,25);
+----------
+[SELECT] select * except(age) from student;
+----------
+[SELECT] select type,avg(price) from tb_book group by type;
+----------
+[SELECT] select * from tb_book order by id desc limit 3;
+----------
+[SELECT] select * from tb_book order by price desc limit 3;
+----------
+[SELECT] select * from tb_book where id limit 1,4;
+----------
+[SELECT] select id,concat(name,":",price) as info,type from tb_book;
+----------
+[SELECT] select sum(price) as total,type from tb_book group by type;
+----------
+[SELECT] select *,(price * 0.8) as "20%" from tb_book;
+----------
+[SELECT] SELECT a FROM t1 WHERE a = 10 AND B = 1 ORDER BY a LIMIT 10
+    UNION
+    SELECT a FROM t2 WHERE a = 11 AND B = 2 ORDER BY a LIMIT 10;
+----------
+[SELECT] WITH cte AS
+    (
+      SELECT 1 AS col1, 2 AS col2
+      UNION ALL
+      SELECT 3, 4
+    )
+    SELECT col1, col2 FROM cte;
+----------
+[SELECT] SELECT * FROM t1 LEFT JOIN (t2, t3, t4)
+                     ON (t2.a = t1.a AND t3.b = t1.b AND t4.c = t1.c)
+----------
+[SELECT] SELECT * FROM t1 LEFT JOIN (t2 CROSS JOIN t3 CROSS JOIN t4)
+                     ON (t2.a = t1.a AND t3.b = t1.b AND t4.c = t1.c)
+----------
+[SELECT] SELECT t1.name, t2.salary
+      FROM employee AS t1 INNER JOIN info AS t2 ON t1.name = t2.name;
+----------
+[SELECT] SELECT t1.name, t2.salary
+      FROM employee t1 INNER JOIN info t2 ON t1.name = t2.name;
+----------
+[SELECT] SELECT left_tbl.*
+      FROM left_tbl LEFT JOIN right_tbl ON left_tbl.id = right_tbl.id
+      WHERE right_tbl.id IS NULL;
+----------
+[SELECT] SELECT * FROM t1 TABLET(10001) TABLESAMPLE(1000 ROWS) REPEATABLE 2 limit 1000;
+----------
+[SELECT] SELECT college, region, seed FROM tournament
+       ORDER BY region, seed;
+----------
+[SELECT] SELECT college, region AS r, seed AS s FROM tournament
+       ORDER BY r, s;
+----------
+[SELECT] SELECT college, region, seed FROM tournament
+       ORDER BY 2, 3;
+----------
+[SELECT] SELECT a, COUNT(b) FROM test_table GROUP BY a ORDER BY NULL;
+----------
+[SELECT] SELECT COUNT(col1) AS col2 FROM t GROUP BY col2 HAVING col2 = 2;
+----------
+[SELECT] SELECT user, MAX(salary) FROM users
+       GROUP BY user HAVING MAX(salary) > 10;
+----------
+[SELECT] SELECT * FROM tbl LIMIT 5,10;
+----------
+[SELECT] SELECT * FROM tbl LIMIT 95,18446744073709551615;
+----------
+[SELECT] WITH cte AS (SELECT id, py_uuid_token(id) AS token FROM cte_uuid_seed)
+   SELECT id, COUNT(DISTINCT token) AS distinct_tokens
+   FROM (SELECT id, token FROM cte UNION ALL SELECT id, token FROM cte) u
+   GROUP BY id ORDER BY id;
+----------
+[SELECT] SELECT HEX(AES_ENCRYPT("Doris is Great", KEY my_key));
+----------
+[SELECT] SELECT AES_DECRYPT(UNHEX('D26DB38579D6A343350EDDC6F2AD47C6'), KEY my_key);
+----------
+[SELECT] select connection_id()
+----------
+[SELECT] select k0, k1,k2, sum(k3) from baseall  where k9 > 1 group by k0,k1,k2

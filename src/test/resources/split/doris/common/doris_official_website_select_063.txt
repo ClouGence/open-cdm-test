@@ -1,0 +1,401 @@
+-- English Text Tokenization
+SELECT TOKENIZE('Hello World! This is a test.', '"parser"="basic"');
+-- Result: ["hello", "world", "this", "is", "a", "test"]
+
+-- Chinese Text Tokenization
+SELECT TOKENIZE('你好世界', '"parser"="basic"');
+-- Result: ["你", "好", "世", "界"]
+
+-- Mixed-Language Tokenization
+SELECT TOKENIZE('Hello你好World世界', '"parser"="basic"');
+-- Result: ["hello", "你", "好", "world", "世", "界"]
+
+-- Supports Numbers and Special Characters
+SELECT TOKENIZE('GET /images/hm_bg.jpg HTTP/1.0', '"parser"="basic"');
+-- Result: ["get", "images", "hm", "bg", "jpg", "http", "1", "0"]
+
+-- Handles Long Numeric Sequences
+SELECT TOKENIZE('12345678901234567890', '"parser"="basic"');
+-- Result: ["12345678901234567890"]
+;
+SELECT *, now() as etl_time from big_view;
+select median(scan_rows) from log_statis group by datetime;
+SELECT REGR_INTERCEPT(y, x) FROM test_regr_intercept where x>100;
+SELECT REGR_SLOPE(y, x) FROM test_regr_slope;
+SELECT REGR_SLOPE(y, x) FROM test_regr_slope where x>100;
+SELECT AI_SUMMARIZE('resourse_name','Doris supports high-concurrency, real-time analytics and is widely used in business intelligence scenarios.') AS Result;
+SELECT id,
+       L2_distance_approximate(embedding,
+[0,11,77,24,3,0,0,0,28,70,125,8,0,0,0,0,44,35,50,45,9,0,0,0,4,0,4,56,18,0,3,9,16,17,59,10,10,8,57,57,100,105,125,41,1,0,6,92,8,14,73,125,29,7,0,5,0,0,8,124,66,6,3,1,63,5,0,1,49,32,17,35,125,21,0,3,2,12,6,109,21,0,0,35,74,125,14,23,0,0,6,50,25,70,64,7,59,18,7,16,22,5,0,1,125,23,1,0,7,30,14,32,4,0,2,2,59,125,19,4,0,0,2,1,6,53,33,2]
+) AS distance
+FROM   sift_1M
+ORDER  BY distance DESC
+LIMIT  10
+;
+select bitmap_to_string(bitmap_hash(NULL));
+-- %Y、%y、%m、%d、%c、%eのプレースホルダーは対応する桁数の0を返す
+SELECT fmt, TIME_FORMAT('12:13:14.123456', fmt) AS res FROM test_format;
+-- その他のプレースホルダー（`%D`、`%j`、`%M`、`%u`、`%U`、`%v`、`%V`、`%w`、`%W`、`%x`、`%X`）はNULLを返します。
+SELECT TIME_FORMAT('11:22:33', '%h:%i:%s, %j');
+-- いずれかのパラメータがNULLの場合、NULLを返す
+SELECT TIME_FORMAT('12:34:56', NULL);
+select JSON_EXTRACT('{"id": 123, "name": "doris"}', '$.name', '$.id2', '$.not_exists');
+SELECT json_parse_error_to_null('{"k1":"v31","k2":300}','{}');
+SELECT mask_last_n('Helloṭṛ123', 9);
+select * from jobs("type"="mv");
+select * from mv_infos("database"="test");
+select * from mv_infos("database"="test") where Name = "mv1";
+select * from tasks("type"="mv");
+select dim1, dim3, dim5, user_id_bitmap as uv, pv from dws_agg_tbl;
+select * from records_tbl order by `key`, `name` limit 100;
+select * from records_tbl order by `key`, `name` limit 100 offset 100;
+-- 2. Full-text search phrase matching using MATCH_PHRASE
+
+-- 2.1 Rows in the content column containing both keyword1 and keyword2, where keyword2 must immediately follow keyword1
+-- 'keyword1 keyword2', 'wordx keyword1 keyword2', 'wordx keyword1 keyword2 wordy' all match because they contain 'keyword1 keyword2' with keyword2 immediately following keyword1
+-- 'keyword1 wordx keyword2' does not match because there is a word between keyword1 and keyword2
+-- 'keyword2 keyword1' does not match because the order is reversed
+-- To use MATCH_PHRASE, you need to enable "support_phrase" = "true" in PROPERTIES.
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2';
+
+-- 2.2 Rows in the content column containing both keyword1 and keyword2, with a slop (maximum word distance) of 3
+-- 'keyword1 keyword2', 'keyword1 a keyword2', 'keyword1 a b c keyword2' all match because the slop is 0, 1, and 3 respectively, all within 3
+-- 'keyword1 a b c d keyword2' does not match because the slop is 4, exceeding 3
+-- 'keyword2 keyword1', 'keyword2 a keyword1', 'keyword2 a b c keyword1' also match because when slop > 0, the order of keyword1 and keyword2 is not required. To enforce the order, Doris provides a + sign after slop
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3';
+-- To enforce order, use a positive sign with slop; 'keyword1 a b c keyword2' matches, while 'keyword2 a b c keyword1' does not
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3+';
+
+-- 2.3 Prefix matching the last word keyword2, with a default limit of 50 prefixes (controlled by session variable inverted_index_max_expansions)
+-- It is necessary to ensure that keyword1 and keyword2 remain adjacent in the original text after tokenization, with no other words in between.
+-- 'keyword1 keyword2abc' matches because keyword1 is identical and keyword2abc is a prefix of keyword2
+-- 'keyword1 keyword2' also matches because keyword2 is a prefix of keyword2
+-- 'keyword1 keyword3' does not match because keyword3 is not a prefix of keyword2
+-- 'keyword1 keyword3abc' does not match because keyword3abc is not a prefix of keyword2
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1 keyword2';
+
+-- 2.4 If only one word is provided, it defaults to a prefix query with a limit of 50 prefixes (controlled by session variable inverted_index_max_expansions)
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1';
+
+-- 2.5 Regular expression matching on tokenized words, with a default limit of 50 matches (controlled by session variable inverted_index_max_expansions)
+-- Similar to MATCH_PHRASE_PREFIX but with regex instead of prefix
+SELECT * FROM table_name WHERE content MATCH_REGEXP 'key.*';
+
+-- 3. Normal equality, range, IN, and NOT IN queries using standard SQL syntax, for example:
+SELECT * FROM table_name WHERE id = 123;
+SELECT * FROM table_name WHERE ts > '2023-01-01 00:00:00';
+SELECT * FROM table_name WHERE op_type IN ('add', 'delete');
+
+-- 4. Full-text search across multiple columns using the multi_match function
+-- Parameters:
+--   First N parameters are column names to search
+--   Second-to-last parameter specifies match mode: 'any'/'all'/'phrase'/'phrase_prefix'
+--   Last parameter is the keyword or phrase to search for
+
+-- 4.1 Rows where 'keyword1' appears in ANY of col1,col2,col3 (OR logic)
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'any', 'keyword1');
+
+-- 4.2 Rows where 'keyword1' appears in ALL of col1,col2,col3 (AND logic)
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'all', 'keyword1');
+
+-- 4.3 Rows where the exact phrase 'keyword1' appears in ANY of col1,col2,col3 (exact phrase match)
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'phrase', 'keyword1');
+
+-- 4.4 Rows where a phrase starting with 'keyword1' appears in ANY of col1,col2,col3 (phrase prefix match)
+-- For example, will match content like "keyword123"
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'phrase_prefix', 'keyword1');
+SELECT
+    product_id,
+    any(product_title),
+    AVG(star_rating) AS rating,
+    COUNT(*) AS count
+FROM
+    amazon_reviews
+WHERE
+    review_body LIKE '%is super awesome%'
+GROUP BY
+    product_id
+ORDER BY
+    count DESC,
+    rating DESC,
+    product_id
+LIMIT 5;
+SELECT
+l_linestatus,
+sum(
+l_extendedprice * (1 - l_discount)
+) AS revenue,
+ps_partkey,
+date_trunc(l_ordertime, 'day') as order_date
+FROM
+lineitem
+LEFT JOIN partsupp ON l_partkey = ps_partkey
+and l_suppkey = ps_suppkey
+GROUP BY
+l_linestatus,
+ps_partkey,
+date_trunc(l_ordertime, 'day')
+UNION ALL
+SELECT
+l_linestatus,
+l_extendedprice,
+ps_partkey,
+date_trunc(l_ordertime, 'day') as order_date
+FROM
+lineitem
+LEFT JOIN partsupp ON l_partkey = ps_partkey
+and l_suppkey = ps_suppkey;
+SELECT ARRAY_SIZE(['a', 'b', 'c']),ARRAY_SIZE([NULL]),ARRAY_SIZE([]);
+SELECT user_id, IF(user_id = 1, 'true', 'false') AS test_if FROM test;
+select hour_ceil("2023-07-13 22:28:18", 5);
+SELECT MICROSECONDS_DIFF('2020-12-25 21:00:00.623000', '2020-12-25 21:00:00.123000');
+select NOW(), NOW(3), NOW(6);
+SELECT SECOND_FLOOR('2025-01-23 12:34:56', 5)
+;
+-- Convert a string to DATETIME
+SELECT TIMESTAMP('2019-01-01 12:00:00');
+-- Combine date and time into DATETIME
+SELECT TIMESTAMP('2019-01-01', '12:00:00');
+SELECT get_json_bigint('{"k1":"v1", "my.key":[1, 1678708107000, 3]}', '$. "my.key"[1]');
+SELECT get_json_bigint('{"k1.key":{"k2":[1678708107000, 2]}}', '$. "k1.key".k2[0]');
+SELECT get_json_double('{"k1":"v1", "my.key":[1.1, 2.2, 3.3]}', '$. "my.key"[1]');
+SELECT JSON_CONTAINS('{"a": 1, "b": 2, "c": {"d": 4}}', '1', '$.a');
+SELECT json_contains('[1, 2, {"x": 3}]', '1');
+SELECT JSON_PARSE_NOTNULL_ERROR_TO_VALUE('{"name": "Alice", "age": 30}', '{"name": "Unknown", "age":  0}') AS parsed_json;
+SELECT ST_Touches(ST_Polygon("POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"), ST_LineStringFromText("LINESTRING (5 5, 15 5)"));
+SELECT LCASE("AbC123"),LOWER("AbC123")
+;
+SELECT LOCATE('bar', 'foobarbar'),LOCATE('xbar', 'foobar'),LOCATE('bar', 'foobarbar', 5)
+;
+-- RTRIM_IN removes any 'a' and 'b' characters from the right end
+SELECT rtrim_in('ababccaab', 'ab') str;
+select sub_replace("this is origin str","NEW-STR",1);
+select * from tbl1 limit 10
+   INTO OUTFILE "file:///home/work/path/result_";
+-- Read data as of a specific timestamp
+SELECT * FROM iceberg_table FOR TIME AS OF '2023-01-01 00:00:00';
+
+-- Read data as of a specific snapshot ID
+SELECT * FROM iceberg_table FOR VERSION AS OF 123456789;
+SELECT * FROM iceberg_table$system_table_name;
+SELECT * FROM iceberg_table$history;
+SELECT * FROM iceberg_table$entries;
+SELECT * FROM iceberg_table$files;
+------------------------------------------------------------------------------------------
+[SELECT] -- English Text Tokenization
+SELECT TOKENIZE('Hello World! This is a test.', '"parser"="basic"');
+----------
+[SELECT] -- Chinese Text Tokenization
+SELECT TOKENIZE('你好世界', '"parser"="basic"');
+----------
+[SELECT] -- Mixed-Language Tokenization
+SELECT TOKENIZE('Hello你好World世界', '"parser"="basic"');
+----------
+[SELECT] -- Supports Numbers and Special Characters
+SELECT TOKENIZE('GET /images/hm_bg.jpg HTTP/1.0', '"parser"="basic"');
+----------
+[SELECT] -- Handles Long Numeric Sequences
+SELECT TOKENIZE('12345678901234567890', '"parser"="basic"');
+----------
+[SELECT] SELECT *, now() as etl_time from big_view;
+----------
+[SELECT] select median(scan_rows) from log_statis group by datetime;
+----------
+[SELECT] SELECT REGR_INTERCEPT(y, x) FROM test_regr_intercept where x>100;
+----------
+[SELECT] SELECT REGR_SLOPE(y, x) FROM test_regr_slope;
+----------
+[SELECT] SELECT REGR_SLOPE(y, x) FROM test_regr_slope where x>100;
+----------
+[SELECT] SELECT AI_SUMMARIZE('resourse_name','Doris supports high-concurrency, real-time analytics and is widely used in business intelligence scenarios.') AS Result;
+----------
+[SELECT] SELECT id,
+       L2_distance_approximate(embedding,
+[0,11,77,24,3,0,0,0,28,70,125,8,0,0,0,0,44,35,50,45,9,0,0,0,4,0,4,56,18,0,3,9,16,17,59,10,10,8,57,57,100,105,125,41,1,0,6,92,8,14,73,125,29,7,0,5,0,0,8,124,66,6,3,1,63,5,0,1,49,32,17,35,125,21,0,3,2,12,6,109,21,0,0,35,74,125,14,23,0,0,6,50,25,70,64,7,59,18,7,16,22,5,0,1,125,23,1,0,7,30,14,32,4,0,2,2,59,125,19,4,0,0,2,1,6,53,33,2]
+) AS distance
+FROM   sift_1M
+ORDER  BY distance DESC
+LIMIT  10
+----------
+[SELECT] select bitmap_to_string(bitmap_hash(NULL));
+----------
+[SELECT] -- %Y、%y、%m、%d、%c、%eのプレースホルダーは対応する桁数の0を返す
+SELECT fmt, TIME_FORMAT('12:13:14.123456', fmt) AS res FROM test_format;
+----------
+[SELECT] -- その他のプレースホルダー（`%D`、`%j`、`%M`、`%u`、`%U`、`%v`、`%V`、`%w`、`%W`、`%x`、`%X`）はNULLを返します。
+SELECT TIME_FORMAT('11:22:33', '%h:%i:%s, %j');
+----------
+[SELECT] -- いずれかのパラメータがNULLの場合、NULLを返す
+SELECT TIME_FORMAT('12:34:56', NULL);
+----------
+[SELECT] select JSON_EXTRACT('{"id": 123, "name": "doris"}', '$.name', '$.id2', '$.not_exists');
+----------
+[SELECT] SELECT json_parse_error_to_null('{"k1":"v31","k2":300}','{}');
+----------
+[SELECT] SELECT mask_last_n('Helloṭṛ123', 9);
+----------
+[SELECT] select * from jobs("type"="mv");
+----------
+[SELECT] select * from mv_infos("database"="test");
+----------
+[SELECT] select * from mv_infos("database"="test") where Name = "mv1";
+----------
+[SELECT] select * from tasks("type"="mv");
+----------
+[SELECT] select dim1, dim3, dim5, user_id_bitmap as uv, pv from dws_agg_tbl;
+----------
+[SELECT] select * from records_tbl order by `key`, `name` limit 100;
+----------
+[SELECT] select * from records_tbl order by `key`, `name` limit 100 offset 100;
+----------
+[SELECT] -- 2.1 Rows in the content column containing both keyword1 and keyword2, where keyword2 must immediately follow keyword1
+-- 'keyword1 keyword2', 'wordx keyword1 keyword2', 'wordx keyword1 keyword2 wordy' all match because they contain 'keyword1 keyword2' with keyword2 immediately following keyword1
+-- 'keyword1 wordx keyword2' does not match because there is a word between keyword1 and keyword2
+-- 'keyword2 keyword1' does not match because the order is reversed
+-- To use MATCH_PHRASE, you need to enable "support_phrase" = "true" in PROPERTIES.
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2';
+----------
+[SELECT] -- 2.2 Rows in the content column containing both keyword1 and keyword2, with a slop (maximum word distance) of 3
+-- 'keyword1 keyword2', 'keyword1 a keyword2', 'keyword1 a b c keyword2' all match because the slop is 0, 1, and 3 respectively, all within 3
+-- 'keyword1 a b c d keyword2' does not match because the slop is 4, exceeding 3
+-- 'keyword2 keyword1', 'keyword2 a keyword1', 'keyword2 a b c keyword1' also match because when slop > 0, the order of keyword1 and keyword2 is not required. To enforce the order, Doris provides a + sign after slop
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3';
+----------
+[SELECT] -- To enforce order, use a positive sign with slop; 'keyword1 a b c keyword2' matches, while 'keyword2 a b c keyword1' does not
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3+';
+----------
+[SELECT] -- 2.3 Prefix matching the last word keyword2, with a default limit of 50 prefixes (controlled by session variable inverted_index_max_expansions)
+-- It is necessary to ensure that keyword1 and keyword2 remain adjacent in the original text after tokenization, with no other words in between.
+-- 'keyword1 keyword2abc' matches because keyword1 is identical and keyword2abc is a prefix of keyword2
+-- 'keyword1 keyword2' also matches because keyword2 is a prefix of keyword2
+-- 'keyword1 keyword3' does not match because keyword3 is not a prefix of keyword2
+-- 'keyword1 keyword3abc' does not match because keyword3abc is not a prefix of keyword2
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1 keyword2';
+----------
+[SELECT] -- 2.4 If only one word is provided, it defaults to a prefix query with a limit of 50 prefixes (controlled by session variable inverted_index_max_expansions)
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1';
+----------
+[SELECT] -- 2.5 Regular expression matching on tokenized words, with a default limit of 50 matches (controlled by session variable inverted_index_max_expansions)
+-- Similar to MATCH_PHRASE_PREFIX but with regex instead of prefix
+SELECT * FROM table_name WHERE content MATCH_REGEXP 'key.*';
+----------
+[SELECT] -- 3. Normal equality, range, IN, and NOT IN queries using standard SQL syntax, for example:
+SELECT * FROM table_name WHERE id = 123;
+----------
+[SELECT] SELECT * FROM table_name WHERE ts > '2023-01-01 00:00:00';
+----------
+[SELECT] SELECT * FROM table_name WHERE op_type IN ('add', 'delete');
+----------
+[SELECT] -- 4.1 Rows where 'keyword1' appears in ANY of col1,col2,col3 (OR logic)
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'any', 'keyword1');
+----------
+[SELECT] -- 4.2 Rows where 'keyword1' appears in ALL of col1,col2,col3 (AND logic)
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'all', 'keyword1');
+----------
+[SELECT] -- 4.3 Rows where the exact phrase 'keyword1' appears in ANY of col1,col2,col3 (exact phrase match)
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'phrase', 'keyword1');
+----------
+[SELECT] -- 4.4 Rows where a phrase starting with 'keyword1' appears in ANY of col1,col2,col3 (phrase prefix match)
+-- For example, will match content like "keyword123"
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'phrase_prefix', 'keyword1');
+----------
+[SELECT] SELECT
+    product_id,
+    any(product_title),
+    AVG(star_rating) AS rating,
+    COUNT(*) AS count
+FROM
+    amazon_reviews
+WHERE
+    review_body LIKE '%is super awesome%'
+GROUP BY
+    product_id
+ORDER BY
+    count DESC,
+    rating DESC,
+    product_id
+LIMIT 5;
+----------
+[SELECT] SELECT
+l_linestatus,
+sum(
+l_extendedprice * (1 - l_discount)
+) AS revenue,
+ps_partkey,
+date_trunc(l_ordertime, 'day') as order_date
+FROM
+lineitem
+LEFT JOIN partsupp ON l_partkey = ps_partkey
+and l_suppkey = ps_suppkey
+GROUP BY
+l_linestatus,
+ps_partkey,
+date_trunc(l_ordertime, 'day')
+UNION ALL
+SELECT
+l_linestatus,
+l_extendedprice,
+ps_partkey,
+date_trunc(l_ordertime, 'day') as order_date
+FROM
+lineitem
+LEFT JOIN partsupp ON l_partkey = ps_partkey
+and l_suppkey = ps_suppkey;
+----------
+[SELECT] SELECT ARRAY_SIZE(['a', 'b', 'c']),ARRAY_SIZE([NULL]),ARRAY_SIZE([]);
+----------
+[SELECT] SELECT user_id, IF(user_id = 1, 'true', 'false') AS test_if FROM test;
+----------
+[SELECT] select hour_ceil("2023-07-13 22:28:18", 5);
+----------
+[SELECT] SELECT MICROSECONDS_DIFF('2020-12-25 21:00:00.623000', '2020-12-25 21:00:00.123000');
+----------
+[SELECT] select NOW(), NOW(3), NOW(6);
+----------
+[SELECT] SELECT SECOND_FLOOR('2025-01-23 12:34:56', 5)
+----------
+[SELECT] -- Convert a string to DATETIME
+SELECT TIMESTAMP('2019-01-01 12:00:00');
+----------
+[SELECT] -- Combine date and time into DATETIME
+SELECT TIMESTAMP('2019-01-01', '12:00:00');
+----------
+[SELECT] SELECT get_json_bigint('{"k1":"v1", "my.key":[1, 1678708107000, 3]}', '$. "my.key"[1]');
+----------
+[SELECT] SELECT get_json_bigint('{"k1.key":{"k2":[1678708107000, 2]}}', '$. "k1.key".k2[0]');
+----------
+[SELECT] SELECT get_json_double('{"k1":"v1", "my.key":[1.1, 2.2, 3.3]}', '$. "my.key"[1]');
+----------
+[SELECT] SELECT JSON_CONTAINS('{"a": 1, "b": 2, "c": {"d": 4}}', '1', '$.a');
+----------
+[SELECT] SELECT json_contains('[1, 2, {"x": 3}]', '1');
+----------
+[SELECT] SELECT JSON_PARSE_NOTNULL_ERROR_TO_VALUE('{"name": "Alice", "age": 30}', '{"name": "Unknown", "age":  0}') AS parsed_json;
+----------
+[SELECT] SELECT ST_Touches(ST_Polygon("POLYGON ((0 0, 10 0, 10 10, 0 10, 0 0))"), ST_LineStringFromText("LINESTRING (5 5, 15 5)"));
+----------
+[SELECT] SELECT LCASE("AbC123"),LOWER("AbC123")
+----------
+[SELECT] SELECT LOCATE('bar', 'foobarbar'),LOCATE('xbar', 'foobar'),LOCATE('bar', 'foobarbar', 5)
+----------
+[SELECT] -- RTRIM_IN removes any 'a' and 'b' characters from the right end
+SELECT rtrim_in('ababccaab', 'ab') str;
+----------
+[SELECT] select sub_replace("this is origin str","NEW-STR",1);
+----------
+[SELECT|DATA_EXPORT] select * from tbl1 limit 10
+   INTO OUTFILE "file:///home/work/path/result_";
+----------
+[SELECT] -- Read data as of a specific timestamp
+SELECT * FROM iceberg_table FOR TIME AS OF '2023-01-01 00:00:00';
+----------
+[SELECT] -- Read data as of a specific snapshot ID
+SELECT * FROM iceberg_table FOR VERSION AS OF 123456789;
+----------
+[SELECT] SELECT * FROM iceberg_table$system_table_name;
+----------
+[SELECT] SELECT * FROM iceberg_table$history;
+----------
+[SELECT] SELECT * FROM iceberg_table$entries;
+----------
+[SELECT] SELECT * FROM iceberg_table$files;

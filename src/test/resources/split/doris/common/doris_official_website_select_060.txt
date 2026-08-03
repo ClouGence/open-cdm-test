@@ -1,0 +1,301 @@
+select e1 from (select 1 k1) as t lateral view explode_numbers_outer(0) tmp1 as e1;
+select * from example1 order by k1;
+select k1, e1 from example1 lateral view explode_split(k2, ',') tmp1 as e1 where k1 = 1 order by k1, e1;
+select k1, e1 from example1 lateral view explode_split(k2, ',') tmp1 as e1 where k1 = 3 order by k1, e1;
+select k1, e1 from example1 lateral view explode_split(k2, ',') tmp1 as e1 where k1 = 4 order by k1, e1;
+select k1, e1 from example1 lateral view explode_split(k2, ',') tmp1 as e1 where k1 = 5 order by k1, e1;
+select k1, e1 from example1 lateral view explode_split(k2, ',') tmp1 as e1 where k1 = 6 order by k1, e1;
+select id, e1 from example2 lateral view explode_split_outer(str, ',') tmp1 as e1 where id = 2 order by id, e1;
+select e1 from (select 1 k1) as t lateral view explode_outer(null) tmp1 as e1;
+select e1 from (select 1 k1) as t lateral view explode([null,1,null]) tmp1 as e1;
+select e1 from (select 1 k1) as t lateral view explode_outer([null,1,null]) tmp1 as e1;
+select TaskId, JobName, MvName, Status, CreateTime, FinishTime
+from tasks("type"="mv")
+where JobName = "inner_mtmv_19494"
+order by CreateTime desc;
+select TaskId, JobName, MvName, Status, ErrorMsg, CreateTime, FinishTime
+from tasks("type"="mv")
+where JobName = "inner_mtmv_19494"
+order by CreateTime desc
+limit 1;
+select user_id, name, address, city, nation, region, phone, mktsegment
+from records_tbl2, (select unique_value as max_value from records_tbl2 order by unique_value limit 1 offset 9999) as previous_data
+where records_tbl2.unique_value > previous_data.max_value
+order by unique_value limit 100;
+-- 等价于 3.0.4 版本前的 SHOW CACHE HOTSPOT "/"
+WITH t1 AS (
+  SELECT
+    cluster_id,
+    cluster_name,
+    table_id,
+    table_name,
+    insert_day,
+    SUM(query_per_day) AS query_per_day_total,
+    SUM(query_per_week) AS query_per_week_total
+  FROM __internal_schema.cloud_cache_hotspot
+  GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+  cluster_id AS ComputeGroupId,
+  cluster_name AS ComputeGroupName,
+  table_id AS TableId,
+  table_name AS TableName
+FROM (
+  SELECT
+    ROW_NUMBER() OVER (
+      PARTITION BY cluster_id
+      ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+    ) AS dr2,
+    *
+  FROM t1
+) t2
+WHERE dr2 = 1;
+-- 等价于 3.0.4 版本前的 SHOW CACHE HOTSPOT '/compute_group_name0';
+WITH t1 AS (
+  SELECT
+    cluster_id,
+    cluster_name,
+    table_id,
+    table_name,
+    insert_day,
+    SUM(query_per_day) AS query_per_day_total,
+    SUM(query_per_week) AS query_per_week_total
+  FROM __internal_schema.cloud_cache_hotspot
+  WHERE cluster_name = "compute_group_name0" -- 替换为实际的计算组名称，例如 "default_compute_group"
+  GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+  cluster_id AS ComputeGroupId,
+  cluster_name AS ComputeGroupName,
+  table_id AS TableId,
+  table_name AS TableName
+FROM (
+  SELECT
+    ROW_NUMBER() OVER (
+      PARTITION BY cluster_id
+      ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+    ) AS dr2,
+    *
+  FROM t1
+) t2
+WHERE dr2 = 1;
+SELECT *
+FROM jobs("type"="mv")
+WHERE Name="inner_mtmv_75043";
+select * from statistic_test;
+select array_reverse_split([1,2,3,4,5], [1,0,1,0,0]);
+select array_reverse_split((x,y)->y, [1,2,3,4,5], [1,0,0,0,0]);
+select array_reverse_split((x,y)->(y+1), ['a', 'b', 'c', 'd'], [-1, -1, 0, -1]);
+select array_reverse_split(x->(year(x)>2013),["2020-12-12", "2013-12-12", "2015-12-12", null]);
+select array_split([1,2,3,4,5], [1,0,1,0,0]);
+select array_split((x,y)->y, [1,2,3,4,5], [1,0,0,0,0]);
+select array_split((x,y)->(y+1), ['a', 'b', 'c', 'd'], [-1, -1, 0, -1]);
+select array_split(x->(year(x)>2013),["2020-12-12", "2013-12-12", "2015-12-12", null]);
+select months_between('2020-12-26','2020-10-25'),months_between('2020-10-25 10:00:00','2020-12-26 11:00:00',false);
+select quarters_add("2020-01-31 02:02:02", 1);
+select quarters_sub("2020-01-31 02:02:02", 1);
+SELECT TIMESTAMPDIFF(QUARTER,'2002-05-01','2001-01-01');
+SELECT JSON_KEYS('[]');
+SELECT JSON_PARSE_NULLABLE('{"name": "John", "age": 30}');
+SELECT JSON_PARSE_NULLABLE('{"name": "John", "age": }');
+SELECT ELT(1, 'aaa', 'bbb'),ELT(2, 'aaa', 'bbb'), ELT(0, 'aaa', 'bbb'),ELT(2, 'aaa', 'bbb')
+;
+select overlay('Quadratic', 3, 4, 'What');
+select overlay('Quadratic', null, 4, 'What');
+select overlay('Quadratic', -1, 4, 'What');
+select overlay('Quadratic', 2, -4, 'What');
+-- 标准分词器
+SELECT TOKENIZE("Hello World", '"built_in_analyzer"="standard"');
+-- 英语分词器(带词干提取)
+SELECT TOKENIZE("running quickly", '"built_in_analyzer"="english"');
+-- 中文分词器
+SELECT TOKENIZE('我来到北京清华大学', '"built_in_analyzer"="chinese"');
+-- Unicode 分词器
+SELECT TOKENIZE('Apache Doris数据库', '"built_in_analyzer"="unicode"');
+-- ICU 分词器处理多语言文本
+SELECT TOKENIZE("Hello World 世界", '"built_in_analyzer"="icu"');
+-- 基础分词器
+SELECT TOKENIZE("GET /images/hm_bg.jpg HTTP/1.0", '"built_in_analyzer"="basic"');
+-- IK 分词器处理中文文本
+SELECT TOKENIZE("中华人民共和国国歌", '"built_in_analyzer"="ik"');
+SELECT TOKENIZE('我来到北京清华大学', '"built_in_analyzer"="chinese", "parser_mode"="fine_grained"');
+SELECT TOKENIZE('GET /images/hm_bg.jpg HTTP/1.0 test:abc=bcd',
+    '"built_in_analyzer"="unicode","char_filter_type" = "char_replace","char_filter_pattern" = "._=:,","char_filter_replacement" = " "');
+SELECT xpath_string('<a><![CDATA[123]]></a>', '/a'), xpath_string('<a><!-- comment -->123</a>', '/a');
+select * from table_test order by id;
+select id,name,score, k,v from table_test lateral view posexplode(score) tmp as k,v order by id;
+------------------------------------------------------------------------------------------
+[SELECT] select e1 from (select 1 k1) as t lateral view explode_numbers_outer(0) tmp1 as e1;
+----------
+[SELECT] select * from example1 order by k1;
+----------
+[SELECT] select k1, e1 from example1 lateral view explode_split(k2, ',') tmp1 as e1 where k1 = 1 order by k1, e1;
+----------
+[SELECT] select k1, e1 from example1 lateral view explode_split(k2, ',') tmp1 as e1 where k1 = 3 order by k1, e1;
+----------
+[SELECT] select k1, e1 from example1 lateral view explode_split(k2, ',') tmp1 as e1 where k1 = 4 order by k1, e1;
+----------
+[SELECT] select k1, e1 from example1 lateral view explode_split(k2, ',') tmp1 as e1 where k1 = 5 order by k1, e1;
+----------
+[SELECT] select k1, e1 from example1 lateral view explode_split(k2, ',') tmp1 as e1 where k1 = 6 order by k1, e1;
+----------
+[SELECT] select id, e1 from example2 lateral view explode_split_outer(str, ',') tmp1 as e1 where id = 2 order by id, e1;
+----------
+[SELECT] select e1 from (select 1 k1) as t lateral view explode_outer(null) tmp1 as e1;
+----------
+[SELECT] select e1 from (select 1 k1) as t lateral view explode([null,1,null]) tmp1 as e1;
+----------
+[SELECT] select e1 from (select 1 k1) as t lateral view explode_outer([null,1,null]) tmp1 as e1;
+----------
+[SELECT] select TaskId, JobName, MvName, Status, CreateTime, FinishTime
+from tasks("type"="mv")
+where JobName = "inner_mtmv_19494"
+order by CreateTime desc;
+----------
+[SELECT] select TaskId, JobName, MvName, Status, ErrorMsg, CreateTime, FinishTime
+from tasks("type"="mv")
+where JobName = "inner_mtmv_19494"
+order by CreateTime desc
+limit 1;
+----------
+[SELECT] select user_id, name, address, city, nation, region, phone, mktsegment
+from records_tbl2, (select unique_value as max_value from records_tbl2 order by unique_value limit 1 offset 9999) as previous_data
+where records_tbl2.unique_value > previous_data.max_value
+order by unique_value limit 100;
+----------
+[SELECT] -- 等价于 3.0.4 版本前的 SHOW CACHE HOTSPOT "/"
+WITH t1 AS (
+  SELECT
+    cluster_id,
+    cluster_name,
+    table_id,
+    table_name,
+    insert_day,
+    SUM(query_per_day) AS query_per_day_total,
+    SUM(query_per_week) AS query_per_week_total
+  FROM __internal_schema.cloud_cache_hotspot
+  GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+  cluster_id AS ComputeGroupId,
+  cluster_name AS ComputeGroupName,
+  table_id AS TableId,
+  table_name AS TableName
+FROM (
+  SELECT
+    ROW_NUMBER() OVER (
+      PARTITION BY cluster_id
+      ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+    ) AS dr2,
+    *
+  FROM t1
+) t2
+WHERE dr2 = 1;
+----------
+[SELECT] -- 等价于 3.0.4 版本前的 SHOW CACHE HOTSPOT '/compute_group_name0';
+WITH t1 AS (
+  SELECT
+    cluster_id,
+    cluster_name,
+    table_id,
+    table_name,
+    insert_day,
+    SUM(query_per_day) AS query_per_day_total,
+    SUM(query_per_week) AS query_per_week_total
+  FROM __internal_schema.cloud_cache_hotspot
+  WHERE cluster_name = "compute_group_name0" -- 替换为实际的计算组名称，例如 "default_compute_group"
+  GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+  cluster_id AS ComputeGroupId,
+  cluster_name AS ComputeGroupName,
+  table_id AS TableId,
+  table_name AS TableName
+FROM (
+  SELECT
+    ROW_NUMBER() OVER (
+      PARTITION BY cluster_id
+      ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+    ) AS dr2,
+    *
+  FROM t1
+) t2
+WHERE dr2 = 1;
+----------
+[SELECT] SELECT *
+FROM jobs("type"="mv")
+WHERE Name="inner_mtmv_75043";
+----------
+[SELECT] select * from statistic_test;
+----------
+[SELECT] select array_reverse_split([1,2,3,4,5], [1,0,1,0,0]);
+----------
+[SELECT] select array_reverse_split((x,y)->y, [1,2,3,4,5], [1,0,0,0,0]);
+----------
+[SELECT] select array_reverse_split((x,y)->(y+1), ['a', 'b', 'c', 'd'], [-1, -1, 0, -1]);
+----------
+[SELECT] select array_reverse_split(x->(year(x)>2013),["2020-12-12", "2013-12-12", "2015-12-12", null]);
+----------
+[SELECT] select array_split([1,2,3,4,5], [1,0,1,0,0]);
+----------
+[SELECT] select array_split((x,y)->y, [1,2,3,4,5], [1,0,0,0,0]);
+----------
+[SELECT] select array_split((x,y)->(y+1), ['a', 'b', 'c', 'd'], [-1, -1, 0, -1]);
+----------
+[SELECT] select array_split(x->(year(x)>2013),["2020-12-12", "2013-12-12", "2015-12-12", null]);
+----------
+[SELECT] select months_between('2020-12-26','2020-10-25'),months_between('2020-10-25 10:00:00','2020-12-26 11:00:00',false);
+----------
+[SELECT] select quarters_add("2020-01-31 02:02:02", 1);
+----------
+[SELECT] select quarters_sub("2020-01-31 02:02:02", 1);
+----------
+[SELECT] SELECT TIMESTAMPDIFF(QUARTER,'2002-05-01','2001-01-01');
+----------
+[SELECT] SELECT JSON_KEYS('[]');
+----------
+[SELECT] SELECT JSON_PARSE_NULLABLE('{"name": "John", "age": 30}');
+----------
+[SELECT] SELECT JSON_PARSE_NULLABLE('{"name": "John", "age": }');
+----------
+[SELECT] SELECT ELT(1, 'aaa', 'bbb'),ELT(2, 'aaa', 'bbb'), ELT(0, 'aaa', 'bbb'),ELT(2, 'aaa', 'bbb')
+----------
+[SELECT] select overlay('Quadratic', 3, 4, 'What');
+----------
+[SELECT] select overlay('Quadratic', null, 4, 'What');
+----------
+[SELECT] select overlay('Quadratic', -1, 4, 'What');
+----------
+[SELECT] select overlay('Quadratic', 2, -4, 'What');
+----------
+[SELECT] -- 标准分词器
+SELECT TOKENIZE("Hello World", '"built_in_analyzer"="standard"');
+----------
+[SELECT] -- 英语分词器(带词干提取)
+SELECT TOKENIZE("running quickly", '"built_in_analyzer"="english"');
+----------
+[SELECT] -- 中文分词器
+SELECT TOKENIZE('我来到北京清华大学', '"built_in_analyzer"="chinese"');
+----------
+[SELECT] -- Unicode 分词器
+SELECT TOKENIZE('Apache Doris数据库', '"built_in_analyzer"="unicode"');
+----------
+[SELECT] -- ICU 分词器处理多语言文本
+SELECT TOKENIZE("Hello World 世界", '"built_in_analyzer"="icu"');
+----------
+[SELECT] -- 基础分词器
+SELECT TOKENIZE("GET /images/hm_bg.jpg HTTP/1.0", '"built_in_analyzer"="basic"');
+----------
+[SELECT] -- IK 分词器处理中文文本
+SELECT TOKENIZE("中华人民共和国国歌", '"built_in_analyzer"="ik"');
+----------
+[SELECT] SELECT TOKENIZE('我来到北京清华大学', '"built_in_analyzer"="chinese", "parser_mode"="fine_grained"');
+----------
+[SELECT] SELECT TOKENIZE('GET /images/hm_bg.jpg HTTP/1.0 test:abc=bcd',
+    '"built_in_analyzer"="unicode","char_filter_type" = "char_replace","char_filter_pattern" = "._=:,","char_filter_replacement" = " "');
+----------
+[SELECT] SELECT xpath_string('<a><![CDATA[123]]></a>', '/a'), xpath_string('<a><!-- comment -->123</a>', '/a');
+----------
+[SELECT] select * from table_test order by id;
+----------
+[SELECT] select id,name,score, k,v from table_test lateral view posexplode(score) tmp as k,v order by id;

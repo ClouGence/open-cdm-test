@@ -1,0 +1,396 @@
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING float8 error on error)
+;
+-- JSON_TABLE: nested paths
+
+-- Duplicate path names
+SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$' AS a
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS a
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+SELECT * FROM JSON_TABLE(
+  jsonb '{"favorites":[{"kind":"comedy","films":[{"title":"Bananas","director":"Woody Allen"},{"title":"The Dinner Game","director":"Francis Veber"}]},{"kind":"horror","films":[{"title":"Psycho","director":"Alfred Hitchcock"}]}]}',
+  '$.favorites[*]'
+  COLUMNS (
+    id FOR ORDINALITY,
+    kind text PATH '$.kind',
+    NESTED PATH '$.films[*]' COLUMNS (
+      film_id FOR ORDINALITY,
+      title text FORMAT JSON PATH '$.title' OMIT QUOTES,
+      director text PATH '$.director' KEEP QUOTES
+    )
+  )
+) AS jt
+;
+SELECT JSON_QUERY(jsonb '[{"a": "a", "b": "foo", "t": "aaa", "js": [1, "2", {}], "jb": {"x": [1, "2", {}]}},  {"a": 2}]', '$[0]' RETURNING sqljsonb_rec ERROR ON ERROR)
+;
+explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() + 2 as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+SELECT JSON_SERIALIZE('123' RETURNING sqljson_char2)
+;
+SELECT JSON_QUERY(jsonb '"1"', '$' RETURNING qf_char_domain OMIT QUOTES ERROR ON ERROR)
+;
+SELECT JSON_VALUE('"purple"'::jsonb, 'lax $[*]' RETURNING rgb ERROR ON ERROR)
+;
+SELECT TIMESTAMP '2001-02-16 20:38:40' AT TIME ZONE 'America/Denver' AS denver_ts,
+       TIMESTAMP WITH TIME ZONE '2001-02-16 20:38:40-05' AT LOCAL AS local_ts,
+       TIME WITH TIME ZONE '20:38:40-05' AT LOCAL AS local_time
+;
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamp '2018-02-21 12:34:56 +10' AS ts RETURNING timestamp)
+;
+SELECT json_value('"aaa"', jsonpaths RETURNING json) FROM jsonpaths
+;
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING float8 omit quotes error on error)
+;
+SELECT JSON_QUERY(jsonb '[{"a": 1, "b": "foo", "t": "aaa", "js": [1, "2", {}], "jb": {"x": [1, "2", {}]}},  {"a": 2}]', '$[0]' RETURNING sqljsonb_rec)
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON('123' WITHOUT UNIQUE KEYS)
+;
+SELECT json_value('"aaa"', path RETURNING json) FROM jsonpaths
+;
+SELECT JSON_VALUE(jsonb 'null', '$a' PASSING point ' (1, 2 )' AS a)
+;
+SELECT JSON_QUERY(jsonb '[{"a": 1, "b": "foo", "t": "aaa", "js": [1, "2", {}], "jb": {"x": [1, "2", {}]}},  {"a": 2}]', '$[0]' RETURNING jsonpath)
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$[*]' RETURNING json EMPTY OBJECT ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '[1,[2,3],null]', 'lax $[*][$off]' PASSING 1 AS off WITH CONDITIONAL WRAPPER) AS conditional_wrapper
+;
+-- All pruned.
+explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() + 2 as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+SELECT JSON_QUERY(js, '$'  RETURNING int DEFAULT (SELECT 1) ON ERROR) FROM test_jsonb_mutability
+;
+SELECT JSON_VALUE(jsonb '"aaa"', '$' RETURNING int)
+;
+-- Also test RETURNING json[b]
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING json)
+;
+SELECT JSON_VALUE(jsonb '{"d1": "foo"}', '$.a2' RETURNING queryfuncs_test_domain DEFAULT 'foo1'::queryfuncs_test_domain ON EMPTY)
+;
+SELECT JSON_SERIALIZE('1' FORMAT JSON)
+;
+SELECT JSON_VALUE(jsonb 'null', '$' RETURNING sqljsonb_int_not_null DEFAULT 2 ON EMPTY ERROR ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1234', '$' RETURNING bit(3)  DEFAULT 1 ON ERROR)
+;
+-- Test PASSING argument parsing
+SELECT JSON_QUERY(jsonb 'null', '$xyz' PASSING 1 AS xy)
+;
+-- JSON_TABLE: ON EMPTY/ON ERROR behavior
+SELECT *
+FROM
+	(VALUES ('1'), ('"err"')) vals(js),
+	JSON_TABLE(vals.js::jsonb, '$' COLUMNS (a int PATH '$')) jt
+;
+SELECT JSON_VALUE(jsonb '[1,2]', '$[*]' ERROR ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1', 'lax $.a' DEFAULT '2' ON EMPTY DEFAULT '3' ON ERROR)
+;
+/* jsonb bytea ??? */
+SELECT JSON_VALUE(jsonb '123', '$' RETURNING bytea ERROR ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1', 'strict $.*' DEFAULT 2 ON ERROR)
+;
+SELECT JSON_QUERY(jsonb 'null', '$xyz' PASSING 1 AS xy)
+;
+-- RelabelType
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int DEFAULT (SELECT 1)::oid::int ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1234', '$' RETURNING queryfuncs_d_varbit3  DEFAULT '111111' ON ERROR)
+;
+-- Test PASSING args
+SELECT *
+FROM JSON_TABLE(
+	jsonb '[1,2,3]',
+	'$[*] ? (@ < $x)'
+		PASSING 3 AS x
+		COLUMNS (y text FORMAT JSON PATH '$')
+	) jt
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON EMPTY)
+;
+SELECT sub.* FROM s,
+	(VALUES (23)) x(x), generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y COLUMNS (
+		NESTED PATH '$.a.za[2]' COLUMNS (
+			NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$')),
+			NESTED PATH '$.a.za[1]' columns (d int[] PATH '$.z21'),
+			NESTED PATH '$.a.za[0]' columns (NESTED PATH '$.z1[*]' as z1 COLUMNS (a int PATH  '$')),
+			xx1 int PATH '$.c',
+			NESTED PATH '$.a.za[1]'  columns (NESTED PATH '$.z21[*]' as z21 COLUMNS (b int PATH '$')),
+			xx int PATH '$.c'
+	)) sub
+;
+SELECT JSON_QUERY(jsonb '{"a": 1}', '$.a' RETURNING sqljsonb_int_not_null)
+;
+SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$'
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS b
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING char(10))
+;
+explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() + 1 as pid) as q join part_abc_2 pt2 on (q.pid = pt2.a) on pt.a = stable_one() + 2
+when not matched then insert values (1, 'd', false) returning pt.a
+;
+-- Column and path names must be distinct
+SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' as js2 COLUMNS (js2 int path '$'))
+;
+SELECT JSON('{ "a" : 1 } ' FORMAT JSON ENCODING UTF8)
+;
+SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') ERROR ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '{"a":"[1, 2]"}', 'lax $.a' OMIT QUOTES) AS omitted_quotes
+;
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int exists empty object on error))
+;
+-- Test ON ERROR / EMPTY value validity for the function and column types;
+-- all fail
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int) NULL ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '"111"', '$'  RETURNING bit(2) ERROR ON ERROR)
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING float8 error on error)
+;
+----------
+[SELECT] -- JSON_TABLE: nested paths
+
+-- Duplicate path names
+SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$' AS a
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS a
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+  jsonb '{"favorites":[{"kind":"comedy","films":[{"title":"Bananas","director":"Woody Allen"},{"title":"The Dinner Game","director":"Francis Veber"}]},{"kind":"horror","films":[{"title":"Psycho","director":"Alfred Hitchcock"}]}]}',
+  '$.favorites[*]'
+  COLUMNS (
+    id FOR ORDINALITY,
+    kind text PATH '$.kind',
+    NESTED PATH '$.films[*]' COLUMNS (
+      film_id FOR ORDINALITY,
+      title text FORMAT JSON PATH '$.title' OMIT QUOTES,
+      director text PATH '$.director' KEEP QUOTES
+    )
+  )
+) AS jt
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[{"a": "a", "b": "foo", "t": "aaa", "js": [1, "2", {}], "jb": {"x": [1, "2", {}]}},  {"a": 2}]', '$[0]' RETURNING sqljsonb_rec ERROR ON ERROR)
+;
+----------
+[PERFORMANCE] explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() + 2 as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+----------
+[SELECT] SELECT JSON_SERIALIZE('123' RETURNING sqljson_char2)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"1"', '$' RETURNING qf_char_domain OMIT QUOTES ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE('"purple"'::jsonb, 'lax $[*]' RETURNING rgb ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT TIMESTAMP '2001-02-16 20:38:40' AT TIME ZONE 'America/Denver' AS denver_ts,
+       TIMESTAMP WITH TIME ZONE '2001-02-16 20:38:40-05' AT LOCAL AS local_ts,
+       TIME WITH TIME ZONE '20:38:40-05' AT LOCAL AS local_time
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamp '2018-02-21 12:34:56 +10' AS ts RETURNING timestamp)
+;
+----------
+[SELECT] SELECT json_value('"aaa"', jsonpaths RETURNING json) FROM jsonpaths
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING float8 omit quotes error on error)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[{"a": 1, "b": "foo", "t": "aaa", "js": [1, "2", {}], "jb": {"x": [1, "2", {}]}},  {"a": 2}]', '$[0]' RETURNING sqljsonb_rec)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON('123' WITHOUT UNIQUE KEYS)
+;
+----------
+[SELECT] SELECT json_value('"aaa"', path RETURNING json) FROM jsonpaths
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$a' PASSING point ' (1, 2 )' AS a)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[{"a": 1, "b": "foo", "t": "aaa", "js": [1, "2", {}], "jb": {"x": [1, "2", {}]}},  {"a": 2}]', '$[0]' RETURNING jsonpath)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$[*]' RETURNING json EMPTY OBJECT ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,[2,3],null]', 'lax $[*][$off]' PASSING 1 AS off WITH CONDITIONAL WRAPPER) AS conditional_wrapper
+;
+----------
+[PERFORMANCE] -- All pruned.
+explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() + 2 as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+----------
+[SELECT] SELECT JSON_QUERY(js, '$'  RETURNING int DEFAULT (SELECT 1) ON ERROR) FROM test_jsonb_mutability
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"aaa"', '$' RETURNING int)
+;
+----------
+[SELECT] -- Also test RETURNING json[b]
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING json)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '{"d1": "foo"}', '$.a2' RETURNING queryfuncs_test_domain DEFAULT 'foo1'::queryfuncs_test_domain ON EMPTY)
+;
+----------
+[SELECT] SELECT JSON_SERIALIZE('1' FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$' RETURNING sqljsonb_int_not_null DEFAULT 2 ON EMPTY ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1234', '$' RETURNING bit(3)  DEFAULT 1 ON ERROR)
+;
+----------
+[SELECT] -- Test PASSING argument parsing
+SELECT JSON_QUERY(jsonb 'null', '$xyz' PASSING 1 AS xy)
+;
+----------
+[SELECT] -- JSON_TABLE: ON EMPTY/ON ERROR behavior
+SELECT *
+FROM
+	(VALUES ('1'), ('"err"')) vals(js),
+	JSON_TABLE(vals.js::jsonb, '$' COLUMNS (a int PATH '$')) jt
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '[1,2]', '$[*]' ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'lax $.a' DEFAULT '2' ON EMPTY DEFAULT '3' ON ERROR)
+;
+----------
+[SELECT] /* jsonb bytea ??? */
+SELECT JSON_VALUE(jsonb '123', '$' RETURNING bytea ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'strict $.*' DEFAULT 2 ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$xyz' PASSING 1 AS xy)
+;
+----------
+[SELECT] -- RelabelType
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int DEFAULT (SELECT 1)::oid::int ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1234', '$' RETURNING queryfuncs_d_varbit3  DEFAULT '111111' ON ERROR)
+;
+----------
+[SELECT] -- Test PASSING args
+SELECT *
+FROM JSON_TABLE(
+	jsonb '[1,2,3]',
+	'$[*] ? (@ < $x)'
+		PASSING 3 AS x
+		COLUMNS (y text FORMAT JSON PATH '$')
+	) jt
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON EMPTY)
+;
+----------
+[SELECT] SELECT sub.* FROM s,
+	(VALUES (23)) x(x), generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y COLUMNS (
+		NESTED PATH '$.a.za[2]' COLUMNS (
+			NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$')),
+			NESTED PATH '$.a.za[1]' columns (d int[] PATH '$.z21'),
+			NESTED PATH '$.a.za[0]' columns (NESTED PATH '$.z1[*]' as z1 COLUMNS (a int PATH  '$')),
+			xx1 int PATH '$.c',
+			NESTED PATH '$.a.za[1]'  columns (NESTED PATH '$.z21[*]' as z21 COLUMNS (b int PATH '$')),
+			xx int PATH '$.c'
+	)) sub
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '{"a": 1}', '$.a' RETURNING sqljsonb_int_not_null)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$'
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS b
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING char(10))
+;
+----------
+[PERFORMANCE] explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() + 1 as pid) as q join part_abc_2 pt2 on (q.pid = pt2.a) on pt.a = stable_one() + 2
+when not matched then insert values (1, 'd', false) returning pt.a
+;
+----------
+[SELECT] -- Column and path names must be distinct
+SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' as js2 COLUMNS (js2 int path '$'))
+;
+----------
+[SELECT] SELECT JSON('{ "a" : 1 } ' FORMAT JSON ENCODING UTF8)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '{"a":"[1, 2]"}', 'lax $.a' OMIT QUOTES) AS omitted_quotes
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int exists empty object on error))
+;
+----------
+[SELECT] -- Test ON ERROR / EMPTY value validity for the function and column types;
+-- all fail
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int) NULL ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"111"', '$'  RETURNING bit(2) ERROR ON ERROR)
+;

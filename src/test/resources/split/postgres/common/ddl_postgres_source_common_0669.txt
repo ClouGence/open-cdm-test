@@ -1,0 +1,548 @@
+ALTER TEXT SEARCH CONFIGURATION "public"."synonym_tst"
+    ADD MAPPING FOR "numhword" WITH "simple"
+;
+CREATE UNIQUE INDEX ON upsert(lower(key)) INCLUDE (payload)
+;
+ALTER TABLE regtest_table RESET (fillfactor)
+;
+-- don't include the hash_ovfl_heap stuff in the distribution
+-- the data set is too large for what it's worth
+--
+-- CREATE TABLE hash_ovfl_heap (
+--	x			int4,
+--	y			int4
+-- );
+
+CREATE TABLE bt_i4_heap (
+	seqno 		int4,
+	random 		int4
+)
+;
+CREATE OPERATOR CLASS float8_ops
+DEFAULT FOR TYPE float8 USING gin
+AS
+    OPERATOR        1       <,
+    OPERATOR        2       <=,
+    OPERATOR        3       =,
+    OPERATOR        4       >=,
+    OPERATOR        5       >,
+    FUNCTION        1       btfloat8cmp(float8,float8),
+    FUNCTION        2       gin_extract_value_float8(float8, internal),
+    FUNCTION        3       gin_extract_query_float8(float8, internal, int2, internal, internal),
+    FUNCTION        4       gin_btree_consistent(internal, int2, anyelement, int4, internal, internal),
+    FUNCTION        5       gin_compare_prefix_float8(float8,float8,int2, internal),
+STORAGE         float8
+;
+-- should truncate all partitions
+TRUNCATE TABLE truncpart
+;
+CREATE INDEX hash_name_index ON hash_name_heap USING hash (random name_ops)
+;
+create or replace function explain_analyze_inc_sort_nodes(query text)
+returns jsonb language plpgsql
+as
+$$
+declare
+  elements jsonb;
+  element jsonb;
+  matching_nodes jsonb := '[]'::jsonb;
+begin
+  execute 'explain (analyze, costs off, summary off, timing off, buffers off, format ''json'') ' || query into strict elements;
+  while jsonb_array_length(elements) > 0 loop
+    element := elements->0;
+    elements := elements - 0;
+    case jsonb_typeof(element)
+    when 'array' then
+      if jsonb_array_length(element) > 0 then
+        elements := elements || element;
+      end if;
+    when 'object' then
+      if element ? 'Plan' then
+        elements := elements || jsonb_build_array(element->'Plan');
+        element := element - 'Plan';
+      else
+        if element ? 'Plans' then
+          elements := elements || jsonb_build_array(element->'Plans');
+          element := element - 'Plans';
+        end if;
+        if (element->>'Node Type')::text = 'Incremental Sort' then
+          matching_nodes := matching_nodes || element;
+        end if;
+      end if;
+    end case;
+  end loop;
+  return matching_nodes;
+end;
+$$
+;
+DROP VIEW jsonb_table_view6
+;
+DROP TABLE foo
+;
+CREATE TEMP TABLE temp (id serial PRIMARY KEY, id2 text)
+;
+ANALYZE pg_temp_13.pg_temp_26293
+;
+CREATE TABLE tab3 (a int PRIMARY KEY, c text DEFAULT 'sub2_tab3', b text)
+;
+CREATE TABLE pitest2_p2 PARTITION OF pitest2 FOR VALUES FROM ('2016-08-01') TO ('2016-09-01')
+;
+TRUNCATE temporal_rng
+;
+drop table brtrigpartcon
+;
+VACUUM (SKIP_DATABASE_STATS, PARALLEL 0) pg_catalog.pg_db_role_setting
+;
+VACUUM (FULL) pg_catalog.pg_attribute
+;
+alter type insenum add value 'i16' before 'L2'
+;
+CREATE TABLE "public"."mcv_lists_bool" (
+    "a" boolean,
+    "b" boolean,
+    "c" boolean
+)
+;
+VACUUM (PARALLEL 0, FULL TRUE) tmp
+;
+--
+-- For fkeys:
+-- 	(fkey1, fkey2)	--> pkeys (pkey1, pkey2)
+-- 	(fkey3)		--> fkeys2 (pkey23)
+--
+create trigger check_fkeys_pkey_exist
+	before insert or update on fkeys
+	for each row
+	execute function
+	check_primary_key ('fkey1', 'fkey2', 'pkeys', 'pkey1', 'pkey2')
+;
+CREATE SUBSCRIPTION tap_sub CONNECTION 'port=13396 host=/tmp/QGH4Hh755I dbname=postgres' PUBLICATION tap_pub
+;
+VACUUM (TRUNCATE FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_aggregate
+;
+CREATE FUNCTION isngt(issn13, ean13)
+	RETURNS boolean
+	AS 'int8gt'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+drop domain dia
+;
+create table bar1 (a integer, b integer not null default 1)
+  partition by range (a)
+;
+CREATE FUNCTION pg_catalog.pg_logfile_rotate()
+RETURNS int4
+AS 'pg_rotate_logfile'
+LANGUAGE INTERNAL VOLATILE STRICT
+;
+/*
+ * text search configuration for danish language
+ *
+ * Copyright (c) 2007-2023, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * danish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY danish_stem
+	(TEMPLATE = snowball, Language = danish , StopWords=danish)
+;
+ALTER TABLE ONLY test_constraints DROP CONSTRAINT test_constraints_val1_val2_key
+;
+CREATE FUNCTION int_custom_in(cstring)
+RETURNS int_custom
+AS '$libdir/test_custom_types'
+LANGUAGE C IMMUTABLE STRICT
+;
+CREATE FUNCTION crosstab_out(text,
+	OUT rowid text, OUT att1 text, OUT att2 text, OUT att3 text)
+RETURNS setof record
+AS '$libdir/tablefunc','crosstab'
+LANGUAGE C STABLE STRICT
+;
+create table mcrparted1_lt_b partition of mcrparted for values from (minvalue, minvalue) to ('b', minvalue)
+;
+ALTER TABLE pg_temp_9.pg_temp_26894_2 ADD COLUMN newdata pg_temp_9.pg_temp_26894
+;
+ALTER TEXT SEARCH CONFIGURATION french ADD MAPPING
+    FOR word, hword_part, hword
+	WITH french_stem
+;
+-- Helper functions to track changes of relfilenodes in a partition tree.
+-- Create a table tracking the relfilenode state.
+CREATE OR REPLACE FUNCTION create_relfilenode_part(relname text, indname text)
+  RETURNS VOID AS
+  $func$
+  BEGIN
+  EXECUTE format('
+    CREATE TABLE %I AS
+      SELECT oid, relname, relfilenode, relkind, reltoastrelid
+      FROM pg_class
+      WHERE oid IN
+         (SELECT relid FROM pg_partition_tree(''%I''));',
+	 relname, indname);
+  END
+  $func$ LANGUAGE plpgsql
+;
+CREATE SUBSCRIPTION sub1 CONNECTION 'port=14269 host=/tmp/534TSsbOop dbname=postgres' PUBLICATION pub3
+;
+DROP FUNCTION bt_metap(text)
+;
+DROP TYPE test_type_exists
+;
+ALTER FOREIGN TABLE agg_bad OPTIONS (ADD log_verbosity 'silent')
+;
+CREATE FUNCTION text_soundex(text) RETURNS text
+AS '$libdir/fuzzystrmatch', 'soundex'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+COMMENT ON LARGE OBJECT 34966 IS 'I Wandered Lonely as a Cloud'
+;
+CREATE UNIQUE INDEX func_index_index on func_index_heap ((f1 || f2) text_ops)
+;
+DROP TABLE IF EXISTS tbl1
+;
+CREATE TABLE ctlt13_inh () INHERITS (ctlt1, ctlt3)
+;
+-- portable "random"
+CREATE TABLE toasttable(
+       id serial primary key,
+       toasted_col1 text,
+       rand1 float8 DEFAULT nextval('toasttable_rand_seq'),
+       toasted_col2 text,
+       rand2 float8 DEFAULT nextval('toasttable_rand_seq')
+       )
+;
+CREATE FUNCTION is_valid(ismn13)
+	RETURNS boolean
+	AS '$libdir/isn'
+	LANGUAGE C
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+CREATE TABLE upsert_test (
+    a   INT PRIMARY KEY,
+    b   TEXT
+)
+;
+create or replace function vari(variadic int[])
+returns void as $$
+begin
+  for i in array_lower($1,1)..array_upper($1,1) loop
+    raise notice '%', $1[i];
+  end loop; end;
+$$ language plpgsql
+;
+VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_index
+;
+------------------------------------------------------------------------------------------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION "public"."synonym_tst"
+    ADD MAPPING FOR "numhword" WITH "simple"
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX ON upsert(lower(key)) INCLUDE (payload)
+;
+----------
+[ALTER_TABLE] ALTER TABLE regtest_table RESET (fillfactor)
+;
+----------
+[CREATE_TABLE] -- don't include the hash_ovfl_heap stuff in the distribution
+-- the data set is too large for what it's worth
+--
+-- CREATE TABLE hash_ovfl_heap (
+--	x			int4,
+--	y			int4
+-- );
+
+CREATE TABLE bt_i4_heap (
+	seqno 		int4,
+	random 		int4
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR CLASS float8_ops
+DEFAULT FOR TYPE float8 USING gin
+AS
+    OPERATOR        1       <,
+    OPERATOR        2       <=,
+    OPERATOR        3       =,
+    OPERATOR        4       >=,
+    OPERATOR        5       >,
+    FUNCTION        1       btfloat8cmp(float8,float8),
+    FUNCTION        2       gin_extract_value_float8(float8, internal),
+    FUNCTION        3       gin_extract_query_float8(float8, internal, int2, internal, internal),
+    FUNCTION        4       gin_btree_consistent(internal, int2, anyelement, int4, internal, internal),
+    FUNCTION        5       gin_compare_prefix_float8(float8,float8,int2, internal),
+STORAGE         float8
+;
+----------
+[TRUNCATE_TABLE] -- should truncate all partitions
+TRUNCATE TABLE truncpart
+;
+----------
+[ADD_INDEX] CREATE INDEX hash_name_index ON hash_name_heap USING hash (random name_ops)
+;
+----------
+[CREATE_PROG_OBJ] create or replace function explain_analyze_inc_sort_nodes(query text)
+returns jsonb language plpgsql
+as
+$$
+declare
+  elements jsonb;
+  element jsonb;
+  matching_nodes jsonb := '[]'::jsonb;
+begin
+  execute 'explain (analyze, costs off, summary off, timing off, buffers off, format ''json'') ' || query into strict elements;
+  while jsonb_array_length(elements) > 0 loop
+    element := elements->0;
+    elements := elements - 0;
+    case jsonb_typeof(element)
+    when 'array' then
+      if jsonb_array_length(element) > 0 then
+        elements := elements || element;
+      end if;
+    when 'object' then
+      if element ? 'Plan' then
+        elements := elements || jsonb_build_array(element->'Plan');
+        element := element - 'Plan';
+      else
+        if element ? 'Plans' then
+          elements := elements || jsonb_build_array(element->'Plans');
+          element := element - 'Plans';
+        end if;
+        if (element->>'Node Type')::text = 'Incremental Sort' then
+          matching_nodes := matching_nodes || element;
+        end if;
+      end if;
+    end case;
+  end loop;
+  return matching_nodes;
+end;
+$$
+;
+----------
+[DROP_VIEW] DROP VIEW jsonb_table_view6
+;
+----------
+[DROP_TABLE] DROP TABLE foo
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE temp (id serial PRIMARY KEY, id2 text)
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_13.pg_temp_26293
+;
+----------
+[CREATE_TABLE] CREATE TABLE tab3 (a int PRIMARY KEY, c text DEFAULT 'sub2_tab3', b text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE pitest2_p2 PARTITION OF pitest2 FOR VALUES FROM ('2016-08-01') TO ('2016-09-01')
+;
+----------
+[TRUNCATE_TABLE] TRUNCATE temporal_rng
+;
+----------
+[DROP_TABLE] drop table brtrigpartcon
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, PARALLEL 0) pg_catalog.pg_db_role_setting
+;
+----------
+[ADMIN_TABLE] VACUUM (FULL) pg_catalog.pg_attribute
+;
+----------
+[ALTER_TYPE] alter type insenum add value 'i16' before 'L2'
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."mcv_lists_bool" (
+    "a" boolean,
+    "b" boolean,
+    "c" boolean
+)
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 0, FULL TRUE) tmp
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] --
+-- For fkeys:
+-- 	(fkey1, fkey2)	--> pkeys (pkey1, pkey2)
+-- 	(fkey3)		--> fkeys2 (pkey23)
+--
+create trigger check_fkeys_pkey_exist
+	before insert or update on fkeys
+	for each row
+	execute function
+	check_primary_key ('fkey1', 'fkey2', 'pkeys', 'pkey1', 'pkey2')
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION tap_sub CONNECTION 'port=13396 host=/tmp/QGH4Hh755I dbname=postgres' PUBLICATION tap_pub
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_aggregate
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isngt(issn13, ean13)
+	RETURNS boolean
+	AS 'int8gt'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[DROP_TYPE] drop domain dia
+;
+----------
+[CREATE_TABLE] create table bar1 (a integer, b integer not null default 1)
+  partition by range (a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION pg_catalog.pg_logfile_rotate()
+RETURNS int4
+AS 'pg_rotate_logfile'
+LANGUAGE INTERNAL VOLATILE STRICT
+;
+----------
+[CREATE_POLICY] /*
+ * text search configuration for danish language
+ *
+ * Copyright (c) 2007-2023, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * danish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY danish_stem
+	(TEMPLATE = snowball, Language = danish , StopWords=danish)
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] ALTER TABLE ONLY test_constraints DROP CONSTRAINT test_constraints_val1_val2_key
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION int_custom_in(cstring)
+RETURNS int_custom
+AS '$libdir/test_custom_types'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION crosstab_out(text,
+	OUT rowid text, OUT att1 text, OUT att2 text, OUT att3 text)
+RETURNS setof record
+AS '$libdir/tablefunc','crosstab'
+LANGUAGE C STABLE STRICT
+;
+----------
+[CREATE_TABLE] create table mcrparted1_lt_b partition of mcrparted for values from (minvalue, minvalue) to ('b', minvalue)
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE pg_temp_9.pg_temp_26894_2 ADD COLUMN newdata pg_temp_9.pg_temp_26894
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION french ADD MAPPING
+    FOR word, hword_part, hword
+	WITH french_stem
+;
+----------
+[CREATE_PROG_OBJ] -- Helper functions to track changes of relfilenodes in a partition tree.
+-- Create a table tracking the relfilenode state.
+CREATE OR REPLACE FUNCTION create_relfilenode_part(relname text, indname text)
+  RETURNS VOID AS
+  $func$
+  BEGIN
+  EXECUTE format('
+    CREATE TABLE %I AS
+      SELECT oid, relname, relfilenode, relkind, reltoastrelid
+      FROM pg_class
+      WHERE oid IN
+         (SELECT relid FROM pg_partition_tree(''%I''));',
+	 relname, indname);
+  END
+  $func$ LANGUAGE plpgsql
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION sub1 CONNECTION 'port=14269 host=/tmp/534TSsbOop dbname=postgres' PUBLICATION pub3
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION bt_metap(text)
+;
+----------
+[DROP_TYPE] DROP TYPE test_type_exists
+;
+----------
+[ALTER_TABLE] ALTER FOREIGN TABLE agg_bad OPTIONS (ADD log_verbosity 'silent')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION text_soundex(text) RETURNS text
+AS '$libdir/fuzzystrmatch', 'soundex'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[UNKNOWN] COMMENT ON LARGE OBJECT 34966 IS 'I Wandered Lonely as a Cloud'
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX func_index_index on func_index_heap ((f1 || f2) text_ops)
+;
+----------
+[DROP_TABLE] DROP TABLE IF EXISTS tbl1
+;
+----------
+[CREATE_TABLE] CREATE TABLE ctlt13_inh () INHERITS (ctlt1, ctlt3)
+;
+----------
+[CREATE_TABLE] -- portable "random"
+CREATE TABLE toasttable(
+       id serial primary key,
+       toasted_col1 text,
+       rand1 float8 DEFAULT nextval('toasttable_rand_seq'),
+       toasted_col2 text,
+       rand2 float8 DEFAULT nextval('toasttable_rand_seq')
+       )
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION is_valid(ismn13)
+	RETURNS boolean
+	AS '$libdir/isn'
+	LANGUAGE C
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] CREATE TABLE upsert_test (
+    a   INT PRIMARY KEY,
+    b   TEXT
+)
+;
+----------
+[CREATE_PROG_OBJ] create or replace function vari(variadic int[])
+returns void as $$
+begin
+  for i in array_lower($1,1)..array_upper($1,1) loop
+    raise notice '%', $1[i];
+  end loop; end;
+$$ language plpgsql
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_index
+;

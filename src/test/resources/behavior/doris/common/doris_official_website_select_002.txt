@@ -1,0 +1,1927 @@
+[doris_official_website_select_002__select__0001]
+sql:
+SELECT
+  FLOOR(UNIX_TIMESTAMP(timestamp) / 20) * 20 AS time,
+  CAST(resource_attributes['k8s.pod.name'] AS VARCHAR) AS metric,
+  AVG(value) AS value
+FROM otel.otel_metrics_gauge
+WHERE metric_name = 'k8s.pod.cpu.usage'
+  AND timestamp >= FROM_UNIXTIME($__from/1000)
+  AND timestamp < FROM_UNIXTIME($__to/1000)
+GROUP BY time, metric
+ORDER BY time
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:2~2:7) /test/1/catalog1/schema1/FLOOR/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:8~2:22) /test/1/catalog1/schema1/UNIX_TIMESTAMP/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:2~4:5) /test/1/catalog1/schema1/AVG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:5~5:28) /test/1/catalog1/otel/otel_metrics_gauge/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(7:19~7:32) /test/1/catalog1/schema1/FROM_UNIXTIME/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:18~8:31) /test/1/catalog1/schema1/FROM_UNIXTIME/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0002]
+sql:
+SELECT
+  t.timestamp AS time,
+  t.device AS metric,
+  CASE
+    WHEN UNIX_TIMESTAMP(t.timestamp) > UNIX_TIMESTAMP(t.prev_ts)
+         AND t.value >= t.prev_value
+    THEN (t.value - t.prev_value) / (UNIX_TIMESTAMP(t.timestamp) - UNIX_TIMESTAMP(t.prev_ts))
+    ELSE NULL
+  END AS value
+FROM (
+  SELECT timestamp, CAST(attributes['device'] AS VARCHAR) AS device, value,
+    LAG(value) OVER (PARTITION BY CAST(attributes['device'] AS VARCHAR) ORDER BY timestamp) AS prev_value,
+    LAG(timestamp) OVER (PARTITION BY CAST(attributes['device'] AS VARCHAR) ORDER BY timestamp) AS prev_ts
+  FROM otel.otel_metrics_sum
+  WHERE metric_name = 'node_network_receive_bytes_total'
+    AND $__timeFilter(timestamp)
+) t
+WHERE t.prev_ts IS NOT NULL
+ORDER BY time
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:9~5:23) /test/1/catalog1/schema1/UNIX_TIMESTAMP/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:39~5:53) /test/1/catalog1/schema1/UNIX_TIMESTAMP/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:37~7:51) /test/1/catalog1/schema1/UNIX_TIMESTAMP/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:67~7:81) /test/1/catalog1/schema1/UNIX_TIMESTAMP/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:4~12:7) /test/1/catalog1/schema1/LAG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(13:4~13:7) /test/1/catalog1/schema1/LAG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(14:7~14:28) /test/1/catalog1/otel/otel_metrics_sum/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(16:8~16:21) /test/1/catalog1/schema1/$__timeFilter/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0003]
+sql:
+SELECT value
+FROM otel.otel_metrics_gauge
+WHERE metric_name = 'node_memory_MemAvailable_bytes'
+  AND $__timeFilter(timestamp)
+ORDER BY timestamp DESC
+LIMIT 1
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:5~2:28) /test/1/catalog1/otel/otel_metrics_gauge/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:19) /test/1/catalog1/schema1/$__timeFilter/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0004]
+sql:
+SELECT
+  timestamp,
+  service_name,
+  severity_text,
+  body,
+  CAST(log_attributes['your_key'] AS VARCHAR) AS your_key
+FROM otel.otel_logs
+WHERE $__timeFilter(timestamp)
+ORDER BY timestamp DESC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(7:5~7:19) /test/1/catalog1/otel/otel_logs/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(8:6~8:19) /test/1/catalog1/schema1/$__timeFilter/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0005]
+sql:
+SELECT log_attributes FROM otel.otel_logs LIMIT 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:27~1:41) /test/1/catalog1/otel/otel_logs/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0006]
+sql:
+SELECT timestamp AS time,
+  SUM(CASE WHEN metric_name = 'node_memory_MemAvailable_bytes' THEN value END) AS available,
+  SUM(CASE WHEN metric_name = 'node_memory_MemTotal_bytes' THEN value END) AS total
+FROM otel.otel_metrics_gauge
+WHERE metric_name IN ('node_memory_MemTotal_bytes', 'node_memory_MemAvailable_bytes')
+GROUP BY timestamp
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:2~2:5) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:2~3:5) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:5~4:28) /test/1/catalog1/otel/otel_metrics_gauge/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0007]
+sql:
+SELECT * FROM your_table_name ORDER BY ts DESC LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:29) /test/1/catalog1/schema1/your_table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0008]
+sql:
+SELECT * FROM your_table_name WHERE host = '8.8.8.8' ORDER BY ts DESC LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:29) /test/1/catalog1/schema1/your_table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0009]
+sql:
+SELECT * FROM your_table_name WHERE message MATCH_ANY 'error 404'
+    ORDER BY ts DESC LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:29) /test/1/catalog1/schema1/your_table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0010]
+sql:
+SELECT * FROM your_table_name WHERE message MATCH_ALL 'image faq'
+    ORDER BY ts DESC LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:29) /test/1/catalog1/schema1/your_table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0011]
+sql:
+SELECT * FROM your_table_name WHERE message MATCH_PHRASE 'image faq'
+    ORDER BY ts DESC LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:29) /test/1/catalog1/schema1/your_table_name/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0012]
+sql:
+SELECT * FROM orders WHERE region = 'ASIA';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:20) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0013]
+sql:
+SELECT count(*) FROM orders WHERE region = 'ASIA';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:27) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0014]
+sql:
+SELECT order_id, amount
+FROM orders
+WHERE region = 'ASIA' AND order_date >= '2023-01-01';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:5~2:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0015]
+sql:
+-- Count the number of orders and total sales for each category
+SELECT 
+    p.category_name,
+    p.brand_name,
+    COUNT(DISTINCT o.order_id) as order_count,
+    SUM(o.quantity) as total_quantity,
+    SUM(o.actual_price * o.quantity) as total_amount
+FROM orders o
+LEFT JOIN products p ON o.product_id = p.product_id
+WHERE o.order_time >= '2024-02-22 00:00:00'
+GROUP BY p.category_name, p.brand_name
+ORDER BY total_amount DESC;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:4~5:9) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:7) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:4~7:7) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:5~8:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:10~9:18) /test/1/catalog1/schema1/products/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0016]
+sql:
+SELECT
+    dict_get("test.product_info_dict", "category_name", o.product_id) as category_name,
+    dict_get("test.product_info_dict", "brand_name", o.product_id) as brand_name,
+    COUNT(DISTINCT o.order_id) as order_count,
+    SUM(o.quantity) as total_quantity,
+    SUM(o.actual_price * o.quantity) as total_amount
+FROM orders o
+WHERE o.order_time >= '2024-02-22 00:00:00'
+GROUP BY
+    dict_get("test.product_info_dict", "category_name", o.product_id),
+    dict_get("test.product_info_dict", "brand_name", o.product_id)
+ORDER BY total_amount DESC;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:4~2:12) /test/1/catalog1/schema1/dict_get/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:4~3:12) /test/1/catalog1/schema1/dict_get/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:9) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:7) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:7) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:5~7:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(10:4~10:12) /test/1/catalog1/schema1/dict_get/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:4~11:12) /test/1/catalog1/schema1/dict_get/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0017]
+sql:
+SELECT dict_get("test_db.city_dict", "id", "Beijing");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:15) /test/1/catalog1/schema1/dict_get/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0018]
+sql:
+SELECT dict_get_many("test_db.single_key_dict", ["k1", "k3"], struct(1));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:20) /test/1/catalog1/schema1/dict_get_many/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:62~1:68) /test/1/catalog1/schema1/struct/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0019]
+sql:
+SELECT dict_get_many("test_db.multi_key_dict", ["k2", "k3"], struct(2, 'ABC'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:20) /test/1/catalog1/schema1/dict_get_many/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:61~1:67) /test/1/catalog1/schema1/struct/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0020]
+sql:
+SELECT k1, v1, v2 FROM tbl_point_query WHERE k1 = 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:23~1:38) /test/1/catalog1/schema1/tbl_point_query/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0021]
+sql:
+explain shape plan
+    select 
+        nation,
+        o_year,
+        sum(amount) as sum_profit
+    from
+        (
+            select
+                /*+ leading(orders shuffle {lineitem shuffle part} shuffle {supplier broadcast nation} shuffle partsupp) */
+                n_name as nation,
+                extract(year from o_orderdate) as o_year,
+                l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity as amount
+            from
+                part,
+                supplier,
+                lineitem,
+                partsupp,
+                orders,
+                nation
+            where
+                s_suppkey = l_suppkey
+                and ps_suppkey = l_suppkey
+                and ps_partkey = l_partkey
+                and p_partkey = l_partkey
+                and o_orderkey = l_orderkey
+                and s_nationkey = n_nationkey
+                and p_name like '%green%'
+        ) as profit
+    group by
+        nation,
+        o_year
+    order by
+        nation,
+        o_year desc;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:8~5:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(14:16~14:20) /test/1/catalog1/schema1/part/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:16~15:24) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:16~16:24) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:16~17:24) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:16~18:22) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(19:16~19:22) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0022]
+sql:
+-------- test outer join which can swap
+-- (t1 leftjoin t2  on (P12)) innerjoin t3 on (P13) = (t1 innerjoin t3 on (P13)) leftjoin t2  on (P12)
+explain shape plan select * from t1 left join t2 on c1 = c2 join t3 on c1 = c3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:33~3:35) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:46~3:48) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:65~3:67) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0023]
+sql:
+explain shape plan select /*+ leading(t1 t3 t2) */ * from t1 left join t2 on c1 = c2 join t3 on c1 = c3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:58~1:60) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:71~1:73) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:90~1:92) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0024]
+sql:
+-- (t1 leftjoin t2  on (P12)) leftjoin t3 on (P13) = (t1 leftjoin t3 on (P13)) leftjoin t2  on (P12)
+explain shape plan select * from t1 left join t2 on c1 = c2 left join t3 on c1 = c3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:33~2:35) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:46~2:48) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:70~2:72) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0025]
+sql:
+explain shape plan select /*+ leading(t1 t3 t2) */ * from t1 left join t2 on c1 = c2 left join t3 on c1 = c3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:58~1:60) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:71~1:73) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:95~1:97) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0026]
+sql:
+-- (t1 leftjoin t2  on (P12)) leftjoin t3 on (P23) = t1 leftjoin (t2  leftjoin t3 on (P23)) on (P12)
+select /*+ leading(t2 t3 t1) SWAP_INPUT(t1) */ * from t1 left join t2 on c1 = c2 left join t3 on c2 = c3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:54~2:56) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:67~2:69) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:91~2:93) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0027]
+sql:
+explain shape plan select /*+ leading(t1 {t2 t3}) */ * from t1 left join t2 on c1 = c2 left join t3 on c2 = c3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:60~1:62) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:73~1:75) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:97~1:99) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0028]
+sql:
+explain shape plan select /*+ leading(t1 {t2 t3}) */ * from t1 left join t2 on c1 = c2 left join t3 on c2 = c3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:60~1:62) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:73~1:75) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:97~1:99) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0029]
+sql:
+-------- test outer join which can not swap
+--  t1 leftjoin (t2  join t3 on (P23)) on (P12) != (t1 leftjoin t2  on (P12)) join t3 on (P23)
+-- eliminated to inner join
+explain shape plan select /*+ leading(t1 {t2 t3}) */ * from t1 left join t2 on c1 = c2 join t3 on c2 = c3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(4:60~4:62) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:73~4:75) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:92~4:94) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0030]
+sql:
+explain graph select /*+ leading(t1 t2 t3) */ * from t1 left join (select * from t2 join t3 on c2 = c3) on c1 = c2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:53~1:55) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:81~1:83) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:89~1:91) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0031]
+sql:
+-- test semi join
+explain shape plan select * from t1 where c1 in (select c2 from t2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:33~2:35) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:64~2:66) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0032]
+sql:
+explain shape plan select /*+ leading(t2 t1) */ * from t1 where c1 in (select c2 from t2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:55~1:57) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:86~1:88) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0033]
+sql:
+-- test anti join
+explain shape plan select * from t1 where exists (select c2 from t2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:33~2:35) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:65~2:67) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0034]
+sql:
+explain
+SELECT l_shipdate, l_orderkey, O_ORDERDATE, count(*)
+FROM lineitem  
+LEFT OUTER JOIN orders on l_orderkey = o_orderkey
+GROUP BY l_shipdate, l_orderkey, O_ORDERDATE;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:44~2:49) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:16~4:22) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0035]
+sql:
+explain
+SELECT l_shipdate, l_linestatus, O_ORDERDATE, count(*)
+FROM orders 
+LEFT OUTER JOIN lineitem on l_orderkey = o_orderkey
+GROUP BY l_shipdate, l_linestatus, O_ORDERDATE;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:46~2:51) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:16~4:24) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0036]
+sql:
+explain
+SELECT l_shipdate, l_linestatus, O_ORDERDATE, count(*)
+FROM lineitem
+LEFT OUTER JOIN orders on l_orderkey = o_orderkey
+GROUP BY l_shipdate, l_linestatus, O_ORDERDATE;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:46~2:51) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:16~4:22) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0037]
+sql:
+SELECT t1.l_linenumber,
+       o_custkey,
+       o_orderdate
+FROM (SELECT * FROM lineitem WHERE l_linenumber > 1) t1
+LEFT OUTER JOIN orders
+ON l_orderkey = o_orderkey
+WHERE o_orderdate = '2023-10-18';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(4:20~4:28) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:16~5:22) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0038]
+sql:
+SELECT
+    l_linenumber,
+    o_custkey
+FROM mv_5
+WHERE l_linenumber > 1 AND o_orderdate = '2023-10-18';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(4:5~4:9) /test/1/catalog1/schema1/mv_5/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0039]
+sql:
+SELECT l_linenumber,
+       o_custkey,
+       o_orderdate
+FROM lineitem
+LEFT OUTER JOIN orders
+ON l_orderkey = o_orderkey
+WHERE l_linenumber > 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(4:5~4:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:16~5:22) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0040]
+sql:
+SELECT l_linenumber,
+       o_custkey,
+       o_orderdate
+FROM lineitem
+LEFT OUTER JOIN orders
+ON l_orderkey = o_orderkey
+WHERE l_linenumber > 2 AND o_orderdate = '2023-10-19';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(4:5~4:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:16~5:22) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0041]
+sql:
+SELECT l_linenumber,
+       o_custkey
+FROM lineitem
+LEFT OUTER JOIN orders
+ON l_orderkey = o_orderkey
+WHERE l_linenumber > 1 AND o_orderdate = '2023-10-18';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:16~4:22) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0042]
+sql:
+SELECT
+    l_shipdate, l_suppkey, o_orderdate,
+    sum(o_totalprice) AS sum_total,
+    max(o_totalprice) AS max_total,
+    min(o_totalprice) AS min_total,
+    count(*) AS count_all,
+    count(distinct CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END) AS bitmap_union_basic
+FROM lineitem
+INNER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+WHERE o_orderdate = '2023-10-18' AND l_suppkey = 3
+GROUP BY
+    l_shipdate,
+    l_suppkey,
+    o_orderdate;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:7) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:7) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:4~7:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:5~8:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:11~9:17) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0043]
+sql:
+SELECT
+    o_shippriority, o_comment,
+    count(distinct CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END) AS cnt_1,
+    count(distinct CASE WHEN O_SHIPPRIORITY > 2 AND o_orderkey IN (2) THEN o_custkey ELSE null END) AS cnt_2,
+    sum(o_totalprice),
+    max(o_totalprice),
+    min(o_totalprice),
+    count(*)
+FROM orders
+WHERE o_shippriority IN (1, 2)
+GROUP BY
+    o_shippriority,
+    o_comment;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:7) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:4~7:7) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:4~8:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(9:5~9:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0044]
+sql:
+SELECT
+    l_shipdate, l_suppkey,
+    sum(o_totalprice) AS sum_total,
+    max(o_totalprice) AS max_total,
+    min(o_totalprice) AS min_total,
+    count(*) AS count_all,
+    count(distinct CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END) AS bitmap_union_basic
+FROM lineitem
+LEFT OUTER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+WHERE o_orderdate = '2023-10-18' AND l_partkey = 3
+GROUP BY
+    l_shipdate,
+    l_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:7) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:7) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:4~7:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:5~8:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:16~9:22) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0045]
+sql:
+SELECT o_orderstatus, o_orderdate, o_orderpriority,
+       sum(o_totalprice),
+       max(o_totalprice),
+       min(o_totalprice),
+       count(*)
+FROM orders
+GROUP BY
+    GROUPING SETS ((o_orderstatus, o_orderdate), (o_orderpriority), (o_orderstatus), ());
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:7~3:10) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:7~4:10) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:7~5:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:5~6:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0046]
+sql:
+SELECT l_shipdate, o_orderdate, l_partkey, l_suppkey, sum(o_totalprice) AS sum_total
+FROM lineitem
+LEFT JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+    l_shipdate,
+    o_orderdate,
+    l_partkey,
+    l_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:54~1:57) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:10~3:16) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0047]
+sql:
+SELECT *
+FROM mv7
+UNION ALL
+SELECT t1.l_shipdate, o_orderdate, t1.l_partkey, t1.l_suppkey, sum(o_totalprice) AS sum_total
+FROM (SELECT * FROM lineitem WHERE l_shipdate = '2023-10-21') t1
+LEFT JOIN orders ON t1.l_orderkey = orders.o_orderkey AND t1.l_shipdate = o_orderdate
+GROUP BY
+    t1.l_shipdate,
+    o_orderdate,
+    t1.l_partkey,
+    t1.l_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:5~2:8) /test/1/catalog1/schema1/mv7/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:63~4:66) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:20~5:28) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:10~6:16) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0048]
+sql:
+SELECT lineitem.l_linenumber
+FROM lineitem
+INNER JOIN orders ON l_orderkey = o_orderkey
+INNER JOIN partsupp ON l_partkey = ps_partkey AND l_suppkey = ps_suppkey
+WHERE o_orderstatus = 'o';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:5~2:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:11~3:17) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:11~4:19) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0049]
+sql:
+SELECT l_shipdate, o_orderdate, l_partkey,
+       l_suppkey, sum(o_totalprice) AS sum_total
+FROM lineitem
+LEFT JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+    l_shipdate,
+    o_orderdate,
+    l_partkey,
+    l_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:18~2:21) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:10~4:16) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0050]
+sql:
+SELECT *
+FROM (
+    SELECT
+        o_orderkey,
+        FIRST_VALUE(o_custkey) OVER (
+            PARTITION BY o_orderdate
+            ORDER BY o_totalprice NULLS LAST
+            RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS first_value,
+        RANK() OVER (
+            PARTITION BY o_orderdate, o_orderstatus
+            ORDER BY o_totalprice NULLS LAST
+            RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS rank_value
+    FROM orders
+) t
+WHERE o_orderkey > 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:8~5:19) /test/1/catalog1/schema1/FIRST_VALUE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:8~10:12) /test/1/catalog1/schema1/RANK/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(15:9~15:15) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0051]
+sql:
+SELECT
+    o_orderdate,
+    FIRST_VALUE(o_custkey) OVER (
+        PARTITION BY o_orderdate
+        ORDER BY o_totalprice NULLS LAST
+        RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS first_value,
+    RANK() OVER (
+        PARTITION BY o_orderdate, o_orderstatus
+        ORDER BY o_totalprice NULLS LAST
+        RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS rank_value
+FROM orders
+WHERE o_orderdate > '2023-12-10';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:15) /test/1/catalog1/schema1/FIRST_VALUE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:4~8:8) /test/1/catalog1/schema1/RANK/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:5~13:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0052]
+sql:
+SELECT
+    o_orderdate,
+    count(o_shippriority),
+    count(o_comment),
+    l_orderkey,
+    count(l_partkey)
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey
+LEFT JOIN partsupp ON ps_partkey = l_partkey AND l_suppkey = ps_suppkey
+GROUP BY o_orderdate, l_orderkey
+LIMIT 4 OFFSET 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:5~7:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:10~8:18) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:10~9:18) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0053]
+sql:
+SELECT
+    o_orderdate,
+    count(o_shippriority),
+    count(o_comment),
+    l_orderkey,
+    count(l_partkey)
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey
+LEFT JOIN partsupp ON ps_partkey = l_partkey AND l_suppkey = ps_suppkey
+WHERE o_orderdate > '2023-12-08'
+GROUP BY o_orderdate, l_orderkey
+LIMIT 4 OFFSET 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:5~7:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:10~8:18) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:10~9:18) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0054]
+sql:
+SELECT
+    o_orderdate,
+    o_shippriority,
+    o_comment,
+    l_orderkey,
+    l_partkey
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey
+LEFT JOIN partsupp ON ps_partkey = l_partkey AND l_suppkey = ps_suppkey
+WHERE o_orderdate > '2023-12-08'
+ORDER BY o_orderkey
+LIMIT 2 OFFSET 3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(7:5~7:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:10~8:18) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:10~9:18) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0055]
+sql:
+SELECT *
+FROM jobs("type"="mv")
+WHERE Name = "inner_mtmv_75043";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_002__select__0056]
+sql:
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  ps_partkey 
+FROM 
+  lineitem 
+  LEFT JOIN partsupp ON l_partkey = ps_partkey 
+  AND l_suppkey = ps_suppkey 
+WHERE 
+  date_trunc(l_ordertime, 'day') <= DATE '2024-05-25' 
+  AND date_trunc(l_ordertime, 'day') >= DATE '2024-05-05' 
+GROUP BY 
+  l_linestatus, 
+  ps_partkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:2~3:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:2~8:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:12~9:20) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(12:2~12:12) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(13:6~13:16) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0057]
+sql:
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  o_shippriority 
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+WHERE 
+  o_orderdate <= DATE '2024-06-30' 
+  AND o_orderdate >= DATE '2024-05-01' 
+GROUP BY 
+  l_linestatus, 
+  o_shippriority,
+  l_partkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:2~3:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:2~8:8) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:12~9:20) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0058]
+sql:
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  o_shippriority 
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+WHERE 
+  o_orderdate <= DATE '2024-06-30' 
+  AND o_orderdate >= DATE '2024-05-01' 
+GROUP BY 
+  l_linestatus, 
+  o_shippriority,
+  l_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:2~3:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:2~8:8) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:12~9:20) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0059]
+sql:
+SELECT 
+  l_linestatus, 
+  l_extendedprice * (1 - l_discount),
+  o_shippriority 
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+WHERE 
+  o_orderdate <= DATE '2024-06-30' 
+  AND o_orderdate >= DATE '2024-05-01';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(6:2~6:8) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:12~7:20) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0060]
+sql:
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  o_orderdate, 
+  o_shippriority 
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+WHERE 
+  o_orderdate <= DATE '2024-06-30' 
+  AND o_orderdate >= DATE '2024-05-01' 
+GROUP BY 
+  l_linestatus, 
+  o_orderdate, 
+  o_shippriority;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:2~3:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(9:2~9:8) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:12~10:20) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0061]
+sql:
+SELECT 
+  l_linestatus, 
+  l_extendedprice * (1 - l_discount),
+  o_orderdate, 
+  o_shippriority 
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(7:2~7:8) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:12~8:20) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_002__select__0062]
+sql:
+SELECT 
+    decision, 
+    CONCAT(
+        CONCAT(
+          DATE_FORMAT(
+            `time`, '%Y-%m-%d'
+          ), 
+          '', 
+          LPAD(
+            cast(FLOOR(MINUTE(`time`) / 15) AS decimal(9, 0)) * 15, 
+            5, 
+            '00'
+          ), 
+          ':00'
+        )
+      ) AS time, 
+      count(id) AS cnt 
+FROM 
+  test 
+WHERE 
+  date_trunc(time, 'minute') BETWEEN '2024-07-02 18:00:00' 
+  AND '2024-07-03 20:00:00' 
+GROUP BY 
+  decision, 
+  DATE_FORMAT(
+    `time`, "%Y-%m-%d"
+  ), 
+  cast(FLOOR(MINUTE(`time`) / 15) AS decimal(9, 0));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:10) /test/1/catalog1/schema1/CONCAT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:8~4:14) /test/1/catalog1/schema1/CONCAT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:10~5:21) /test/1/catalog1/schema1/DATE_FORMAT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:10~9:14) /test/1/catalog1/schema1/LPAD/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:17~10:22) /test/1/catalog1/schema1/FLOOR/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:23~10:29) /test/1/catalog1/schema1/MINUTE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(17:6~17:11) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(19:2~19:6) /test/1/catalog1/schema1/test/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(21:2~21:12) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(25:2~25:13) /test/1/catalog1/schema1/DATE_FORMAT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(28:7~28:12) /test/1/catalog1/schema1/FLOOR/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(28:13~28:19) /test/1/catalog1/schema1/MINUTE/",
+      "action" : "CALL"
+    }
+  ]
+}

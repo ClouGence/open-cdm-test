@@ -1,0 +1,668 @@
+CREATE OPERATOR = (
+    LEFTARG    = CITEXT,
+    RIGHTARG   = CITEXT,
+    COMMUTATOR = =,
+    NEGATOR    = <>,
+    PROCEDURE  = citext_eq,
+    RESTRICT   = eqsel,
+    JOIN       = eqjoinsel,
+    HASHES,
+    MERGES
+)
+;
+CREATE TABLE "public"."quad_box_tbl" (
+    "id" integer,
+    "b" "box"
+)
+;
+CREATE TABLE stats_plan_test ()
+;
+CREATE TABLE FKTABLE (ftest1 int, ftest2 inet, FOREIGN KEY(ftest2, ftest1) REFERENCES pktable)
+;
+CREATE OPERATOR = (
+	PROCEDURE = isneq,
+	LEFTARG = issn,
+	RIGHTARG = issn,
+	COMMUTATOR = =,
+	NEGATOR = <>,
+	RESTRICT = eqsel,
+	JOIN = eqjoinsel,
+	MERGES,
+	HASHES)
+;
+CREATE TABLE "fkpart4"."droppk_d" (
+    "a" integer NOT NULL
+)
+;
+-- error
+
+-- reset
+ALTER SEQUENCE IF EXISTS sequence_test2 RESTART WITH 32 START WITH 32
+  INCREMENT BY 4 MAXVALUE 36 MINVALUE 5 CYCLE
+;
+-- function number should be between 1 and 5
+ALTER OPERATOR FAMILY alt_opf4 USING btree ADD STORAGE invalid_storage
+;
+-- foreign keys (should use collation of primary key)
+
+-- PK is case-sensitive, FK is case-insensitive
+CREATE TABLE test10pk (x text COLLATE case_sensitive PRIMARY KEY)
+;
+ALTER TABLE test_add_column
+	DROP c6
+;
+create table iboolpart_default partition of iboolpart default
+;
+create table mc3p4 partition of mc3p for values from (10, 10, 20) to (10, maxvalue, maxvalue)
+;
+-- WITH CHECK OPTION with scalar array ops
+
+CREATE TABLE base_tbl (a int, b int[])
+;
+DROP TABLE  BOOLTBL1
+;
+ANALYZE pg_temp_18.pg_temp_27200
+;
+ALTER TABLE parted_self_fk ATTACH PARTITION part3_self_fk FOR VALUES FROM (30) TO (40)
+;
+CREATE FUNCTION isnle(ismn, ean13)
+	RETURNS boolean
+	AS 'int8le'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+VACUUM (PARALLEL 2) pg_catalog.pg_tablespace
+;
+DROP PUBLICATION testpub3
+;
+/*
+ * 6.30
+ * DOMAINS view
+ */
+
+CREATE VIEW domains AS
+    SELECT CAST(current_database() AS sql_identifier) AS domain_catalog,
+           CAST(nt.nspname AS sql_identifier) AS domain_schema,
+           CAST(t.typname AS sql_identifier) AS domain_name,
+
+           CAST(
+             CASE WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                  WHEN nbt.nspname = 'pg_catalog' THEN format_type(t.typbasetype, null)
+                  ELSE 'USER-DEFINED' END
+             AS character_data)
+             AS data_type,
+
+           CAST(
+             _pg_char_max_length(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS character_maximum_length,
+
+           CAST(
+             _pg_char_octet_length(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS character_octet_length,
+
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+
+           CAST(
+             _pg_numeric_precision(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_precision,
+
+           CAST(
+             _pg_numeric_precision_radix(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_precision_radix,
+
+           CAST(
+             _pg_numeric_scale(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_scale,
+
+           CAST(
+             _pg_datetime_precision(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS datetime_precision,
+
+           CAST(
+             _pg_interval_type(t.typbasetype, t.typtypmod)
+             AS character_data)
+             AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(t.typdefault AS character_data) AS domain_default,
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nbt.nspname AS sql_identifier) AS udt_schema,
+           CAST(bt.typname AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(1 AS sql_identifier) AS dtd_identifier
+
+    FROM (pg_type t JOIN pg_namespace nt ON t.typnamespace = nt.oid)
+         JOIN (pg_type bt JOIN pg_namespace nbt ON bt.typnamespace = nbt.oid)
+           ON (t.typbasetype = bt.oid AND t.typtype = 'd')
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON t.typcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+
+    WHERE (pg_has_role(t.typowner, 'USAGE')
+           OR has_type_privilege(t.oid, 'USAGE'))
+;
+/*
+ * text search configuration for lithuanian language
+ *
+ * Copyright (c) 2007-2019, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * lithuanian and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY lithuanian_stem
+	(TEMPLATE = snowball, Language = lithuanian )
+;
+ALTER VIEW view_stats ALTER COLUMN a SET DEFAULT 2
+;
+CREATE TABLE hpart_5_a PARTITION OF hpart_5 FOR VALUES IN ('1', '2', '3')
+;
+CREATE TABLE batch_cp_up_test1 PARTITION OF batch_cp_upd_test
+	FOR VALUES IN (2)
+;
+ALTER TABLE pg_toast.pg_toast_30579 RENAME TO reind_con_toast
+;
+alter table foo alter f1 TYPE integer
+;
+ALTER TABLE ONLY "fkpart3"."pk4"
+    ADD CONSTRAINT "pk4_pkey" PRIMARY KEY ("a")
+;
+ANALYZE public.alpha_pos_p1
+;
+ALTER FOREIGN TABLE ftable OPTIONS ( SET batch_size '10' )
+;
+alter table inh_nn4 inherit inh_nn2, inherit inh_nn1, inherit inh_nn3
+;
+-- fail
+alter index idxpart_2_idx attach partition idxpart1_2c_idx
+;
+CREATE TABLE only_parted1 PARTITION OF only_parted FOR VALUES IN (1)
+;
+DROP PUBLICATION testpub3_forschema, testpub4_forschema, testpub5_forschema, testpub6_forschema, testpub_fortable
+;
+ANALYZE public.mlparted_def2
+;
+VACUUM (DISABLE_PAGE_SKIPPING) pg_catalog.pg_pltemplate
+;
+truncate parted_conflict_test
+;
+CREATE TABLE index_relfilenodes (parent regclass, indname text, indoid oid, relfilenode oid)
+;
+create table perm_parted (a int) partition by list (a)
+;
+--
+-- CREATE_TABLE
+--
+
+-- Datatypes
+CREATE TABLE datatype_table (
+    id             SERIAL,
+    id_big         BIGSERIAL,
+    is_small       SMALLSERIAL,
+    v_bytea        BYTEA,
+    v_smallint     SMALLINT,
+    v_int          INT,
+    v_bigint       BIGINT,
+    v_char         CHAR(1),
+    v_varchar      VARCHAR(10),
+    v_text         TEXT,
+    v_bool         BOOLEAN,
+    v_inet         INET,
+    v_cidr         CIDR,
+    v_macaddr      MACADDR,
+    v_numeric      NUMERIC(1,0),
+    v_real         REAL,
+    v_float        FLOAT(1),
+    v_float8       FLOAT8,
+    v_money        MONEY,
+    v_tsquery      TSQUERY,
+    v_tsvector     TSVECTOR,
+    v_date         DATE,
+    v_time         TIME,
+    v_time_tz      TIME WITH TIME ZONE,
+    v_timestamp    TIMESTAMP,
+    v_timestamp_tz TIMESTAMP WITH TIME ZONE,
+    v_interval     INTERVAL,
+    v_bit          BIT,
+    v_bit4         BIT(4),
+    v_varbit       VARBIT,
+    v_varbit4      VARBIT(4),
+    v_box          BOX,
+    v_circle       CIRCLE,
+    v_lseg         LSEG,
+    v_path         PATH,
+    v_point        POINT,
+    v_polygon      POLYGON,
+    v_json         JSON,
+    v_xml          XML,
+    v_uuid         UUID,
+    v_pg_snapshot  pg_snapshot,
+    v_enum         ENUM_TEST,
+    v_postal_code  japanese_postal_code,
+    v_int2range    int2range,
+    PRIMARY KEY (id),
+    UNIQUE (id_big)
+)
+;
+CREATE TRIGGER trig_instead_of_insert_tbl_view
+  INSTEAD OF INSERT ON instead_of_insert_tbl_view
+  FOR EACH ROW EXECUTE PROCEDURE fun_instead_of_insert_tbl()
+;
+DROP VIEW ctlv1
+;
+CREATE TABLE brin_date_test(a DATE)
+;
+CREATE OPERATOR CLASS int4_custom_ops3 FOR TYPE int4 USING btree AS
+		OPERATOR 1 < (int4, int4), OPERATOR 2 <= (int4, int4),
+		OPERATOR 3 = (int4, int4), OPERATOR 4 >= (int4, int4),
+		OPERATOR 5 > (int4, int4), FUNCTION 1 bad_cmp3(int4, int4)
+;
+create type comp as (a int, b int)
+;
+-- should succeed
+
+-- int4 promotes to real
+ALTER TABLE fktable ADD CONSTRAINT fk_1_3
+FOREIGN KEY (x1) REFERENCES pktable(id3)
+;
+ALTER TABLE pitest1 ATTACH PARTITION pitest1_pfail FOR VALUES FROM ('2016-11-01') TO ('2016-12-01')
+;
+ALTER TEXT SEARCH CONFIGURATION "public"."hunspell_tst"
+    ADD MAPPING FOR "asciiword" WITH "public"."hunspell_num", "english_stem"
+;
+-- create custom operator class and hash function, for the same reason
+-- explained in alter_table.sql
+create or replace function dummy_hashint4(a int4, seed int8) returns int8 as
+$$ begin return (a + seed); end; $$ language 'plpgsql' immutable
+;
+create or replace function brtrigpartcon1trigf() returns trigger as $$begin new.a := 2; return new; end$$ language plpgsql
+;
+CREATE TABLE atnnparted (id int, col1 int) PARTITION BY LIST (id)
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE OPERATOR = (
+    LEFTARG    = CITEXT,
+    RIGHTARG   = CITEXT,
+    COMMUTATOR = =,
+    NEGATOR    = <>,
+    PROCEDURE  = citext_eq,
+    RESTRICT   = eqsel,
+    JOIN       = eqjoinsel,
+    HASHES,
+    MERGES
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."quad_box_tbl" (
+    "id" integer,
+    "b" "box"
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE stats_plan_test ()
+;
+----------
+[CREATE_TABLE] CREATE TABLE FKTABLE (ftest1 int, ftest2 inet, FOREIGN KEY(ftest2, ftest1) REFERENCES pktable)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR = (
+	PROCEDURE = isneq,
+	LEFTARG = issn,
+	RIGHTARG = issn,
+	COMMUTATOR = =,
+	NEGATOR = <>,
+	RESTRICT = eqsel,
+	JOIN = eqjoinsel,
+	MERGES,
+	HASHES)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "fkpart4"."droppk_d" (
+    "a" integer NOT NULL
+)
+;
+----------
+[ALTER_SEQUENCE] -- error
+
+-- reset
+ALTER SEQUENCE IF EXISTS sequence_test2 RESTART WITH 32 START WITH 32
+  INCREMENT BY 4 MAXVALUE 36 MINVALUE 5 CYCLE
+;
+----------
+[ALTER_PROG_OBJ] -- function number should be between 1 and 5
+ALTER OPERATOR FAMILY alt_opf4 USING btree ADD STORAGE invalid_storage
+;
+----------
+[CREATE_TABLE] -- foreign keys (should use collation of primary key)
+
+-- PK is case-sensitive, FK is case-insensitive
+CREATE TABLE test10pk (x text COLLATE case_sensitive PRIMARY KEY)
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE test_add_column
+	DROP c6
+;
+----------
+[CREATE_TABLE] create table iboolpart_default partition of iboolpart default
+;
+----------
+[CREATE_TABLE] create table mc3p4 partition of mc3p for values from (10, 10, 20) to (10, maxvalue, maxvalue)
+;
+----------
+[CREATE_TABLE] -- WITH CHECK OPTION with scalar array ops
+
+CREATE TABLE base_tbl (a int, b int[])
+;
+----------
+[DROP_TABLE] DROP TABLE  BOOLTBL1
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_18.pg_temp_27200
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE parted_self_fk ATTACH PARTITION part3_self_fk FOR VALUES FROM (30) TO (40)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isnle(ismn, ean13)
+	RETURNS boolean
+	AS 'int8le'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 2) pg_catalog.pg_tablespace
+;
+----------
+[DROP_PUB_SUB] DROP PUBLICATION testpub3
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 6.30
+ * DOMAINS view
+ */
+
+CREATE VIEW domains AS
+    SELECT CAST(current_database() AS sql_identifier) AS domain_catalog,
+           CAST(nt.nspname AS sql_identifier) AS domain_schema,
+           CAST(t.typname AS sql_identifier) AS domain_name,
+
+           CAST(
+             CASE WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                  WHEN nbt.nspname = 'pg_catalog' THEN format_type(t.typbasetype, null)
+                  ELSE 'USER-DEFINED' END
+             AS character_data)
+             AS data_type,
+
+           CAST(
+             _pg_char_max_length(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS character_maximum_length,
+
+           CAST(
+             _pg_char_octet_length(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS character_octet_length,
+
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+
+           CAST(
+             _pg_numeric_precision(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_precision,
+
+           CAST(
+             _pg_numeric_precision_radix(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_precision_radix,
+
+           CAST(
+             _pg_numeric_scale(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_scale,
+
+           CAST(
+             _pg_datetime_precision(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS datetime_precision,
+
+           CAST(
+             _pg_interval_type(t.typbasetype, t.typtypmod)
+             AS character_data)
+             AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(t.typdefault AS character_data) AS domain_default,
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nbt.nspname AS sql_identifier) AS udt_schema,
+           CAST(bt.typname AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(1 AS sql_identifier) AS dtd_identifier
+
+    FROM (pg_type t JOIN pg_namespace nt ON t.typnamespace = nt.oid)
+         JOIN (pg_type bt JOIN pg_namespace nbt ON bt.typnamespace = nbt.oid)
+           ON (t.typbasetype = bt.oid AND t.typtype = 'd')
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON t.typcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+
+    WHERE (pg_has_role(t.typowner, 'USAGE')
+           OR has_type_privilege(t.oid, 'USAGE'))
+;
+----------
+[CREATE_POLICY] /*
+ * text search configuration for lithuanian language
+ *
+ * Copyright (c) 2007-2019, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * lithuanian and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY lithuanian_stem
+	(TEMPLATE = snowball, Language = lithuanian )
+;
+----------
+[ALTER_VIEW|ALTER_COLUMN] ALTER VIEW view_stats ALTER COLUMN a SET DEFAULT 2
+;
+----------
+[CREATE_TABLE] CREATE TABLE hpart_5_a PARTITION OF hpart_5 FOR VALUES IN ('1', '2', '3')
+;
+----------
+[CREATE_TABLE] CREATE TABLE batch_cp_up_test1 PARTITION OF batch_cp_upd_test
+	FOR VALUES IN (2)
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_30579 RENAME TO reind_con_toast
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table foo alter f1 TYPE integer
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "fkpart3"."pk4"
+    ADD CONSTRAINT "pk4_pkey" PRIMARY KEY ("a")
+;
+----------
+[ADMIN_TABLE] ANALYZE public.alpha_pos_p1
+;
+----------
+[ALTER_TABLE] ALTER FOREIGN TABLE ftable OPTIONS ( SET batch_size '10' )
+;
+----------
+[ALTER_TABLE] alter table inh_nn4 inherit inh_nn2, inherit inh_nn1, inherit inh_nn3
+;
+----------
+[ALTER_INDEX] -- fail
+alter index idxpart_2_idx attach partition idxpart1_2c_idx
+;
+----------
+[CREATE_TABLE] CREATE TABLE only_parted1 PARTITION OF only_parted FOR VALUES IN (1)
+;
+----------
+[DROP_PUB_SUB] DROP PUBLICATION testpub3_forschema, testpub4_forschema, testpub5_forschema, testpub6_forschema, testpub_fortable
+;
+----------
+[ADMIN_TABLE] ANALYZE public.mlparted_def2
+;
+----------
+[ADMIN_TABLE] VACUUM (DISABLE_PAGE_SKIPPING) pg_catalog.pg_pltemplate
+;
+----------
+[TRUNCATE_TABLE] truncate parted_conflict_test
+;
+----------
+[CREATE_TABLE] CREATE TABLE index_relfilenodes (parent regclass, indname text, indoid oid, relfilenode oid)
+;
+----------
+[CREATE_TABLE] create table perm_parted (a int) partition by list (a)
+;
+----------
+[CREATE_TABLE] --
+-- CREATE_TABLE
+--
+
+-- Datatypes
+CREATE TABLE datatype_table (
+    id             SERIAL,
+    id_big         BIGSERIAL,
+    is_small       SMALLSERIAL,
+    v_bytea        BYTEA,
+    v_smallint     SMALLINT,
+    v_int          INT,
+    v_bigint       BIGINT,
+    v_char         CHAR(1),
+    v_varchar      VARCHAR(10),
+    v_text         TEXT,
+    v_bool         BOOLEAN,
+    v_inet         INET,
+    v_cidr         CIDR,
+    v_macaddr      MACADDR,
+    v_numeric      NUMERIC(1,0),
+    v_real         REAL,
+    v_float        FLOAT(1),
+    v_float8       FLOAT8,
+    v_money        MONEY,
+    v_tsquery      TSQUERY,
+    v_tsvector     TSVECTOR,
+    v_date         DATE,
+    v_time         TIME,
+    v_time_tz      TIME WITH TIME ZONE,
+    v_timestamp    TIMESTAMP,
+    v_timestamp_tz TIMESTAMP WITH TIME ZONE,
+    v_interval     INTERVAL,
+    v_bit          BIT,
+    v_bit4         BIT(4),
+    v_varbit       VARBIT,
+    v_varbit4      VARBIT(4),
+    v_box          BOX,
+    v_circle       CIRCLE,
+    v_lseg         LSEG,
+    v_path         PATH,
+    v_point        POINT,
+    v_polygon      POLYGON,
+    v_json         JSON,
+    v_xml          XML,
+    v_uuid         UUID,
+    v_pg_snapshot  pg_snapshot,
+    v_enum         ENUM_TEST,
+    v_postal_code  japanese_postal_code,
+    v_int2range    int2range,
+    PRIMARY KEY (id),
+    UNIQUE (id_big)
+)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER trig_instead_of_insert_tbl_view
+  INSTEAD OF INSERT ON instead_of_insert_tbl_view
+  FOR EACH ROW EXECUTE PROCEDURE fun_instead_of_insert_tbl()
+;
+----------
+[DROP_VIEW] DROP VIEW ctlv1
+;
+----------
+[CREATE_TABLE] CREATE TABLE brin_date_test(a DATE)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR CLASS int4_custom_ops3 FOR TYPE int4 USING btree AS
+		OPERATOR 1 < (int4, int4), OPERATOR 2 <= (int4, int4),
+		OPERATOR 3 = (int4, int4), OPERATOR 4 >= (int4, int4),
+		OPERATOR 5 > (int4, int4), FUNCTION 1 bad_cmp3(int4, int4)
+;
+----------
+[CREATE_TYPE] create type comp as (a int, b int)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] -- should succeed
+
+-- int4 promotes to real
+ALTER TABLE fktable ADD CONSTRAINT fk_1_3
+FOREIGN KEY (x1) REFERENCES pktable(id3)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE pitest1 ATTACH PARTITION pitest1_pfail FOR VALUES FROM ('2016-11-01') TO ('2016-12-01')
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION "public"."hunspell_tst"
+    ADD MAPPING FOR "asciiword" WITH "public"."hunspell_num", "english_stem"
+;
+----------
+[CREATE_PROG_OBJ] -- create custom operator class and hash function, for the same reason
+-- explained in alter_table.sql
+create or replace function dummy_hashint4(a int4, seed int8) returns int8 as
+$$ begin return (a + seed); end; $$ language 'plpgsql' immutable
+;
+----------
+[CREATE_PROG_OBJ] create or replace function brtrigpartcon1trigf() returns trigger as $$begin new.a := 2; return new; end$$ language plpgsql
+;
+----------
+[CREATE_TABLE] CREATE TABLE atnnparted (id int, col1 int) PARTITION BY LIST (id)
+;

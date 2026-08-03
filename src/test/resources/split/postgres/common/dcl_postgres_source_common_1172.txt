@@ -1,0 +1,70 @@
+--
+-- Partitioned indexes aren't analyzed but it is possible to set
+-- stats. The locking rules are different from normal indexes due to
+-- the rules for in-place updates: both the partitioned table and the
+-- partitioned index are locked in ShareUpdateExclusive mode.
+--
+BEGIN
+;
+-- not allowed outside a transaction block
+COMMIT AND CHAIN
+;
+SET test_oat_hooks.user_var2 = true
+;
+EXECUTE dumpFunc('35438')
+;
+EXECUTE dumpDomain('35787')
+;
+CREATE STATISTICS IF NOT EXISTS ab1_a_b_stats ON a, b FROM ab1
+;
+EXECUTE dumpCompositeType('38640')
+;
+REVOKE SELECT ON deptest FROM GROUP regress_dep_group
+;
+PREPARE TRANSACTION 'regress_foo2'
+;
+-- On most machines, 10ms will be enough to be sure that we've sent the slow
+-- query.  We may sometimes exercise the race condition where we send cancel
+-- before the remote side starts the query, but that's fine too.
+SET LOCAL statement_timeout = '10ms'
+;
+------------------------------------------------------------------------------------------
+[TRANSACTION] --
+-- Partitioned indexes aren't analyzed but it is possible to set
+-- stats. The locking rules are different from normal indexes due to
+-- the rules for in-place updates: both the partitioned table and the
+-- partitioned index are locked in ShareUpdateExclusive mode.
+--
+BEGIN
+;
+----------
+[TRANSACTION] -- not allowed outside a transaction block
+COMMIT AND CHAIN
+;
+----------
+[SESSION_SETTING_WRITE] SET test_oat_hooks.user_var2 = true
+;
+----------
+[UNSAFE] EXECUTE dumpFunc('35438')
+;
+----------
+[UNSAFE] EXECUTE dumpDomain('35787')
+;
+----------
+[ADMIN_PERFORMANCE] CREATE STATISTICS IF NOT EXISTS ab1_a_b_stats ON a, b FROM ab1
+;
+----------
+[UNSAFE] EXECUTE dumpCompositeType('38640')
+;
+----------
+[REVOKE] REVOKE SELECT ON deptest FROM GROUP regress_dep_group
+;
+----------
+[TRANSACTION] PREPARE TRANSACTION 'regress_foo2'
+;
+----------
+[SESSION_SETTING_WRITE] -- On most machines, 10ms will be enough to be sure that we've sent the slow
+-- query.  We may sometimes exercise the race condition where we send cancel
+-- before the remote side starts the query, but that's fine too.
+SET LOCAL statement_timeout = '10ms'
+;

@@ -1,0 +1,743 @@
+SELECT
+n_name,
+date_trunc(o.o_orderdate, 'month') AS month,
+count(distinct o.o_orderkey) AS order_count,
+sum(l.l_extendedprice * (1 - l.l_discount)) AS revenue
+FROM orders o
+JOIN lineitem l ON o.o_orderkey = l.l_orderkey
+JOIN customer c ON o.o_custkey = c.c_custkey
+JOIN nation n ON c.c_nationkey = n.n_nationkey
+JOIN region r ON n.n_regionkey = r.r_regionkey
+GROUP BY n_name, month;
+SELECT
+nation_name,
+month,
+bitmap_union_count(order_count),
+sum(net_revenue) AS revenue
+FROM dws_daily_sales
+GROUP BY nation_name, month;
+SELECT
+n_name,
+sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM
+customer,
+orders,
+lineitem,
+supplier,
+nation,
+region
+WHERE
+c_custkey = o_custkey
+AND l_orderkey = o_orderkey
+AND l_suppkey = s_suppkey
+AND c_nationkey = s_nationkey
+AND s_nationkey = n_nationkey
+AND n_regionkey = r_regionkey
+AND r_name = 'ASIA'
+AND o_orderdate >= DATE '1994-01-01'
+AND o_orderdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+GROUP BY
+n_name
+ORDER BY
+revenue DESC;
+select store_id, sum(sale_amt) from sales_records group by store_id;
+explain select store_id, sum(sale_amt) from sales_records group by store_id;
+select 
+        advertiser, 
+        channel, 
+        count(distinct user_id) 
+    from 
+        advertiser_view_record 
+    group by 
+        advertiser, channel;
+select 
+        advertiser, 
+        channel, 
+        bitmap_union_count(to_bitmap(user_id)) 
+    from 
+        advertiser_uv 
+    group by 
+        advertiser, channel;
+explain select 
+        advertiser, 
+        channel, 
+        count(distinct user_id) 
+    from 
+        advertiser_view_record 
+    group by 
+        advertiser, channel;
+explain select k1, k2, k3 from test_table where k3=3;
+-- Hits mv1
+    select 
+        abs(k1)+k2+1,
+        sum(abs(k2+2)+k3+3) 
+    from 
+        d_table 
+    group by 
+        abs(k1)+k2+1;
+        
+    -- Hits mv1
+    select 
+        bin(abs(k1)+k2+1),
+        sum(abs(k2+2)+k3+3) 
+    from 
+        d_table 
+    group by 
+        bin(abs(k1)+k2+1);
+    
+    -- Hits mv2
+    select 
+        year(k4) + month(k4) 
+    from 
+        d_table 
+    where 
+        year(k4) = 2020;
+    
+    -- Hits the original table d_table; does not hit mv2 because the where condition does not match
+    select 
+        year(k4),
+        month(k4) 
+    from 
+        d_table;
+SELECT k1, SUM(v1) FROM A,B WHERE A.k2 = B.k2 GROUP BY k1 ORDER BY SUM(v1);
+select count(*)
+from orders join customer on o_custkey = c_custkey
+where c_nation = "china"
+;
+select count(*)
+from orders join customer on o_custkey = c_custkey
+where c_nation = "china" and o_custkey in (c001, c003)
+;
+select count(*)
+from orders join customer on o_custkey > c_custkey
+where c_name = "China"
+;
+select count(*) from orders join customer on o_custkey=c_custkey;
+select o_orderkey from orders order by o_orderdate limit 5;
+select o_orderkey from orders order by o_orderdate limit 20;
+SELECT region, SUM(revenue) FROM orders WHERE dt = '2024-01-01' GROUP BY region;
+SELECT region, SUM(revenue) FROM orders WHERE dt = '2024-01-01' GROUP BY region;
+-- Query A
+SELECT region, SUM(revenue) FROM orders
+WHERE dt >= '2024-01-01' AND dt < '2024-01-03' GROUP BY region;
+
+-- Query B
+SELECT region, SUM(revenue) FROM orders
+WHERE dt >= '2024-01-02' AND dt < '2024-01-04' GROUP BY region;
+-- First execution: cache miss, compute the result and write it to the cache
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+
+-- Second execution: cache hit, return the result directly from the cache
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+SELECT c.c_name,
+       Count(o.o_orderkey) AS total_orders,
+       Sum(o.o_totalprice) AS total_spent
+FROM   customer c
+       JOIN orders o
+         ON c.c_custkey = o.o_custkey
+GROUP  BY c.c_name
+LIMIT  20
+;
+SELECT /*+SET_VAR(parallel_pipeline_task_num=8)*/ *
+    FROM nation, lineitem
+    WHERE lineitem.l_suppkey = nation.n_nationkey;
+
+    SELECT /*+SET_VAR(parallel_pipeline_task_num=8,runtime_filter_mode=global)*/ *
+    FROM nation, lineitem
+    WHERE lineitem.l_suppkey = nation.n_nationkey;
+SELECT COUNT(*) FROM orders o JOIN [broadcast] customer c ON o.customer_number = c.customer_number;
+select count(*) 
+from orders, customer 
+where o_custkey = c_custkey
+and o_orderdate < '1920-01-02';
+select /*+leading(orders customer)*/ count(*) 
+  from orders, customer 
+  where o_custkey = c_custkey
+  and o_orderdate < '1920-01-02'
+;
+SELECT /*+SET_VAR(parallel_pipeline_task_num=8)*/ *
+FROM nation, lineitem
+WHERE lineitem.l_suppkey = nation.n_nationkey;
+
+SELECT /*+SET_VAR(parallel_pipeline_task_num=8,runtime_filter_mode=global)*/ *
+FROM nation, lineitem
+WHERE lineitem.l_suppkey = nation.n_nationkey;
+-- Force the right table to use Broadcast distribution
+SELECT COUNT(*) FROM t2 JOIN [broadcast] t1 ON t1.c1 = t2.c2;
+
+-- Force the right table to use Shuffle distribution
+SELECT COUNT(*) FROM t2 JOIN [shuffle] t1 ON t1.c1 = t2.c2;
+EXPLAIN SHAPE PLAN SELECT COUNT(*) FROM t1 JOIN t2 ON t1.c1 = t2.c2;
+EXPLAIN SHAPE PLAN SELECT COUNT(*) FROM t1 JOIN [broadcast] t2 ON t1.c1 = t2.c2;
+explain shape plan
+    select /*+ USE_CBO_RULE(push_down_agg_through_join_one_side) */
+            a.event_id,
+            b.group_id,
+            COUNT(a.event_id)
+    from a
+    join b on
+            a.device_id = b.device_id
+    group by
+            a.event_id,
+            b.group_id
+    ;
+select * from t1 where t1.c2 = '1';
+select * from t1 where t1.c2 in ('1', '2', '3');
+SELECT SUM(amount) AS total_amount
+FROM sales
+WHERE date BETWEEN '2023-01-15' AND '2023-02-15';
+EXPLAIN SELECT SUM(amount) AS total_amount
+FROM sales
+WHERE date BETWEEN '2023-01-15' AND '2023-02-15';
+select c2, count(*) cnt from t1 group by c2 order by cnt desc limit 10;
+select * from t1 where t1.c1 = 1;
+select * from t1 where t1.c1 > 1 and t1.c1 < 10;
+select * from t1 where t1.c1 in (1, 2, 3);
+SELECT store_id, SUM(sale_amt) FROM sales_records GROUP BY store_id;
+EXPLAIN SELECT store_id, SUM(sale_amt) FROM sales_records GROUP BY store_id;
+-- Equivalent to: ASOF LEFT JOIN ... MATCH_CONDITION(l.ts >= r.ts)
+SELECT id, rid, val FROM (
+    SELECT l.id, r.id AS rid, r.val,
+           ROW_NUMBER() OVER (PARTITION BY l.id ORDER BY r.ts DESC) AS rn
+    FROM left_table l
+    LEFT JOIN right_table r
+        ON l.grp = r.grp AND l.ts >= r.ts
+) t
+WHERE rn = 1;
+WITH
+    cte1 AS (SELECT a, b FROM table1),
+    cte2 AS (SELECT c, d FROM table2)
+SELECT b, d FROM cte1 JOIN cte2
+WHERE cte1.a = cte2.c;
+WITH
+    cte1 AS (SELECT a, b FROM table1),
+    cte2 AS (SELECT c, d FROM cte1)
+SELECT b, d FROM cte1 JOIN cte2
+WHERE cte1.a = cte2.c;
+explain select *
+from 
+    (
+        -- Table t1 is hash-distributed by c1, and after the group by operator, it remains hash-distributed by c1.
+        select c1 as c1, sum(c2) as c2
+        from t1
+        group by c1 
+    ) tx
+join 
+    (
+        -- Table t2 is hash-distributed by c1, and after the group by operator, the data distribution becomes hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c1 = ty.c2;
+explain select *
+from 
+    (
+        -- Table t1 is hash-distributed by c1, and after the group by operator, the data distribution becomes hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t1
+        group by c2 
+    ) tx
+join 
+    (
+        -- Table t2 is hash-distributed by c1, and after the group by operator, the data distribution becomes hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c2 = ty.c2;
+SELECT * FROM person
+LATERAL VIEW EXPLODE(ARRAY(30, 60)) tableName AS c_age;
+SELECT … GROUP BY ROLLUP(grouping_column_reference_list)
+;
+SELECT
+        YEAR(d_date),
+        MONTH(d_date),
+        SUM(ss_net_paid) AS total_sum
+FROM
+        store_sales,
+        date_dim d1
+WHERE
+        d1.d_date_sk = ss_sold_date_sk
+        AND YEAR(d_date) IN (2001, 2002)
+        AND MONTH(d_date) IN (1, 2, 3)
+GROUP BY
+        ROLLUP(YEAR(d_date), MONTH(d_date))
+ORDER BY
+        YEAR(d_date), MONTH(d_date);
+SELECT … GROUP BY CUBE(grouping_column_reference_list)
+;
+SELECT
+        YEAR(d_date),
+        i_category,
+        ca_state,
+        SUM(ss_net_paid) AS total_sum
+FROM
+        store_sales,
+        date_dim d1,
+        item,
+        customer_address ca
+WHERE
+        d1.d_date_sk = ss_sold_date_sk
+        AND i_item_sk = ss_item_sk
+        AND ss_addr_sk = ca_address_sk
+        AND i_category IN ("Books", "Electronics")
+        AND YEAR(d_date) IN (1998, 1999)
+        AND ca_state IN ("LA", "AK")
+GROUP BY CUBE(YEAR(d_date), i_category, ca_state)
+ORDER BY YEAR(d_date), i_category, ca_state;
+SELECT
+        year(d_date),
+        month(d_date),
+        sum(ss_net_paid) AS total_sum,
+        grouping(year(d_date)),
+        grouping(month(d_date))
+FROM
+        store_sales,
+        date_dim d1
+WHERE
+        d1.d_date_sk = ss_sold_date_sk
+        AND year(d_date) IN (2001, 2002)
+        AND month(d_date) IN (1, 2, 3)
+GROUP BY
+        ROLLUP(year(d_date), month(d_date))
+ORDER BY
+        year(d_date), month(d_date);
+SELECT
+        year(d_date),
+        i_category,
+        ca_state,
+        sum(ss_net_paid) AS total_sum
+FROM
+        store_sales,
+        date_dim d1,
+        item,
+        customer_address ca
+WHERE
+        d1.d_date_sk = ss_sold_date_sk
+        AND i_item_sk = ss_item_sk
+        AND ss_addr_sk = ca_address_sk
+        AND i_category IN ("Books", "Electronics")
+        AND year(d_date) IN (1998, 1999)
+        AND ca_state IN ("LA", "AK")
+GROUP BY CUBE(year(d_date), i_category, ca_state)
+HAVING grouping(year(d_date)) = 1 AND grouping(i_category) = 1 AND grouping(ca_state) = 1
+    OR grouping(year(d_date)) = 0 AND grouping(i_category) = 1 AND grouping(ca_state) = 1
+    OR grouping(year(d_date)) = 1 AND grouping(i_category) = 1 AND grouping(ca_state) = 0
+ORDER BY year(d_date), i_category, ca_state;
+SELECT
+        IF(grouping(year(d_date)) = 1, "Multi-year sum", year(d_date)) AS year,
+        IF(grouping(i_category) = 1, "Multi-category sum", i_category) AS category,
+        sum(ss_net_paid) AS total_sum
+FROM
+        store_sales,
+        date_dim d1,
+        item,
+        customer_address ca
+WHERE
+        d1.d_date_sk = ss_sold_date_sk
+        AND i_item_sk = ss_item_sk
+        AND ss_addr_sk = ca_address_sk
+        AND i_category IN ("Books", "Electronics")
+        AND year(d_date) IN (1998, 1999)
+        AND ca_state IN ("LA", "AK")
+GROUP BY CUBE(year(d_date), i_category)
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT
+n_name,
+date_trunc(o.o_orderdate, 'month') AS month,
+count(distinct o.o_orderkey) AS order_count,
+sum(l.l_extendedprice * (1 - l.l_discount)) AS revenue
+FROM orders o
+JOIN lineitem l ON o.o_orderkey = l.l_orderkey
+JOIN customer c ON o.o_custkey = c.c_custkey
+JOIN nation n ON c.c_nationkey = n.n_nationkey
+JOIN region r ON n.n_regionkey = r.r_regionkey
+GROUP BY n_name, month;
+----------
+[SELECT] SELECT
+nation_name,
+month,
+bitmap_union_count(order_count),
+sum(net_revenue) AS revenue
+FROM dws_daily_sales
+GROUP BY nation_name, month;
+----------
+[SELECT] SELECT
+n_name,
+sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM
+customer,
+orders,
+lineitem,
+supplier,
+nation,
+region
+WHERE
+c_custkey = o_custkey
+AND l_orderkey = o_orderkey
+AND l_suppkey = s_suppkey
+AND c_nationkey = s_nationkey
+AND s_nationkey = n_nationkey
+AND n_regionkey = r_regionkey
+AND r_name = 'ASIA'
+AND o_orderdate >= DATE '1994-01-01'
+AND o_orderdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+GROUP BY
+n_name
+ORDER BY
+revenue DESC;
+----------
+[SELECT] select store_id, sum(sale_amt) from sales_records group by store_id;
+----------
+[SELECT] explain select store_id, sum(sale_amt) from sales_records group by store_id;
+----------
+[SELECT] select 
+        advertiser, 
+        channel, 
+        count(distinct user_id) 
+    from 
+        advertiser_view_record 
+    group by 
+        advertiser, channel;
+----------
+[SELECT] select 
+        advertiser, 
+        channel, 
+        bitmap_union_count(to_bitmap(user_id)) 
+    from 
+        advertiser_uv 
+    group by 
+        advertiser, channel;
+----------
+[SELECT] explain select 
+        advertiser, 
+        channel, 
+        count(distinct user_id) 
+    from 
+        advertiser_view_record 
+    group by 
+        advertiser, channel;
+----------
+[SELECT] explain select k1, k2, k3 from test_table where k3=3;
+----------
+[SELECT] select 
+        abs(k1)+k2+1,
+        sum(abs(k2+2)+k3+3) 
+    from 
+        d_table 
+    group by 
+        abs(k1)+k2+1;
+----------
+[SELECT] select 
+        bin(abs(k1)+k2+1),
+        sum(abs(k2+2)+k3+3) 
+    from 
+        d_table 
+    group by 
+        bin(abs(k1)+k2+1);
+----------
+[SELECT] select 
+        year(k4) + month(k4) 
+    from 
+        d_table 
+    where 
+        year(k4) = 2020;
+----------
+[SELECT] select 
+        year(k4),
+        month(k4) 
+    from 
+        d_table;
+----------
+[SELECT] SELECT k1, SUM(v1) FROM A,B WHERE A.k2 = B.k2 GROUP BY k1 ORDER BY SUM(v1);
+----------
+[SELECT] select count(*)
+from orders join customer on o_custkey = c_custkey
+where c_nation = "china"
+----------
+[SELECT] select count(*)
+from orders join customer on o_custkey = c_custkey
+where c_nation = "china" and o_custkey in (c001, c003)
+----------
+[SELECT] select count(*)
+from orders join customer on o_custkey > c_custkey
+where c_name = "China"
+----------
+[SELECT] select count(*) from orders join customer on o_custkey=c_custkey;
+----------
+[SELECT] select o_orderkey from orders order by o_orderdate limit 5;
+----------
+[SELECT] select o_orderkey from orders order by o_orderdate limit 20;
+----------
+[SELECT] SELECT region, SUM(revenue) FROM orders WHERE dt = '2024-01-01' GROUP BY region;
+----------
+[SELECT] SELECT region, SUM(revenue) FROM orders WHERE dt = '2024-01-01' GROUP BY region;
+----------
+[SELECT] -- Query A
+SELECT region, SUM(revenue) FROM orders
+WHERE dt >= '2024-01-01' AND dt < '2024-01-03' GROUP BY region;
+----------
+[SELECT] -- Query B
+SELECT region, SUM(revenue) FROM orders
+WHERE dt >= '2024-01-02' AND dt < '2024-01-04' GROUP BY region;
+----------
+[SELECT] -- First execution: cache miss, compute the result and write it to the cache
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+----------
+[SELECT] -- Second execution: cache hit, return the result directly from the cache
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+----------
+[SELECT] SELECT c.c_name,
+       Count(o.o_orderkey) AS total_orders,
+       Sum(o.o_totalprice) AS total_spent
+FROM   customer c
+       JOIN orders o
+         ON c.c_custkey = o.o_custkey
+GROUP  BY c.c_name
+LIMIT  20
+----------
+[SELECT] SELECT /*+SET_VAR(parallel_pipeline_task_num=8)*/ *
+    FROM nation, lineitem
+    WHERE lineitem.l_suppkey = nation.n_nationkey;
+----------
+[SELECT] SELECT /*+SET_VAR(parallel_pipeline_task_num=8,runtime_filter_mode=global)*/ *
+    FROM nation, lineitem
+    WHERE lineitem.l_suppkey = nation.n_nationkey;
+----------
+[SELECT] SELECT COUNT(*) FROM orders o JOIN [broadcast] customer c ON o.customer_number = c.customer_number;
+----------
+[SELECT] select count(*) 
+from orders, customer 
+where o_custkey = c_custkey
+and o_orderdate < '1920-01-02';
+----------
+[SELECT] select /*+leading(orders customer)*/ count(*) 
+  from orders, customer 
+  where o_custkey = c_custkey
+  and o_orderdate < '1920-01-02'
+----------
+[SELECT] SELECT /*+SET_VAR(parallel_pipeline_task_num=8)*/ *
+FROM nation, lineitem
+WHERE lineitem.l_suppkey = nation.n_nationkey;
+----------
+[SELECT] SELECT /*+SET_VAR(parallel_pipeline_task_num=8,runtime_filter_mode=global)*/ *
+FROM nation, lineitem
+WHERE lineitem.l_suppkey = nation.n_nationkey;
+----------
+[SELECT] -- Force the right table to use Broadcast distribution
+SELECT COUNT(*) FROM t2 JOIN [broadcast] t1 ON t1.c1 = t2.c2;
+----------
+[SELECT] -- Force the right table to use Shuffle distribution
+SELECT COUNT(*) FROM t2 JOIN [shuffle] t1 ON t1.c1 = t2.c2;
+----------
+[SELECT] EXPLAIN SHAPE PLAN SELECT COUNT(*) FROM t1 JOIN t2 ON t1.c1 = t2.c2;
+----------
+[SELECT] EXPLAIN SHAPE PLAN SELECT COUNT(*) FROM t1 JOIN [broadcast] t2 ON t1.c1 = t2.c2;
+----------
+[SELECT] explain shape plan
+    select /*+ USE_CBO_RULE(push_down_agg_through_join_one_side) */
+            a.event_id,
+            b.group_id,
+            COUNT(a.event_id)
+    from a
+    join b on
+            a.device_id = b.device_id
+    group by
+            a.event_id,
+            b.group_id
+----------
+[SELECT] select * from t1 where t1.c2 = '1';
+----------
+[SELECT] select * from t1 where t1.c2 in ('1', '2', '3');
+----------
+[SELECT] SELECT SUM(amount) AS total_amount
+FROM sales
+WHERE date BETWEEN '2023-01-15' AND '2023-02-15';
+----------
+[SELECT] EXPLAIN SELECT SUM(amount) AS total_amount
+FROM sales
+WHERE date BETWEEN '2023-01-15' AND '2023-02-15';
+----------
+[SELECT] select c2, count(*) cnt from t1 group by c2 order by cnt desc limit 10;
+----------
+[SELECT] select * from t1 where t1.c1 = 1;
+----------
+[SELECT] select * from t1 where t1.c1 > 1 and t1.c1 < 10;
+----------
+[SELECT] select * from t1 where t1.c1 in (1, 2, 3);
+----------
+[SELECT] SELECT store_id, SUM(sale_amt) FROM sales_records GROUP BY store_id;
+----------
+[SELECT] EXPLAIN SELECT store_id, SUM(sale_amt) FROM sales_records GROUP BY store_id;
+----------
+[SELECT] -- Equivalent to: ASOF LEFT JOIN ... MATCH_CONDITION(l.ts >= r.ts)
+SELECT id, rid, val FROM (
+    SELECT l.id, r.id AS rid, r.val,
+           ROW_NUMBER() OVER (PARTITION BY l.id ORDER BY r.ts DESC) AS rn
+    FROM left_table l
+    LEFT JOIN right_table r
+        ON l.grp = r.grp AND l.ts >= r.ts
+) t
+WHERE rn = 1;
+----------
+[SELECT] WITH
+    cte1 AS (SELECT a, b FROM table1),
+    cte2 AS (SELECT c, d FROM table2)
+SELECT b, d FROM cte1 JOIN cte2
+WHERE cte1.a = cte2.c;
+----------
+[SELECT] WITH
+    cte1 AS (SELECT a, b FROM table1),
+    cte2 AS (SELECT c, d FROM cte1)
+SELECT b, d FROM cte1 JOIN cte2
+WHERE cte1.a = cte2.c;
+----------
+[SELECT] explain select *
+from 
+    (
+        -- Table t1 is hash-distributed by c1, and after the group by operator, it remains hash-distributed by c1.
+        select c1 as c1, sum(c2) as c2
+        from t1
+        group by c1 
+    ) tx
+join 
+    (
+        -- Table t2 is hash-distributed by c1, and after the group by operator, the data distribution becomes hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c1 = ty.c2;
+----------
+[SELECT] explain select *
+from 
+    (
+        -- Table t1 is hash-distributed by c1, and after the group by operator, the data distribution becomes hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t1
+        group by c2 
+    ) tx
+join 
+    (
+        -- Table t2 is hash-distributed by c1, and after the group by operator, the data distribution becomes hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c2 = ty.c2;
+----------
+[SELECT] SELECT * FROM person
+LATERAL VIEW EXPLODE(ARRAY(30, 60)) tableName AS c_age;
+----------
+[SELECT] SELECT … GROUP BY ROLLUP(grouping_column_reference_list)
+----------
+[SELECT] SELECT
+        YEAR(d_date),
+        MONTH(d_date),
+        SUM(ss_net_paid) AS total_sum
+FROM
+        store_sales,
+        date_dim d1
+WHERE
+        d1.d_date_sk = ss_sold_date_sk
+        AND YEAR(d_date) IN (2001, 2002)
+        AND MONTH(d_date) IN (1, 2, 3)
+GROUP BY
+        ROLLUP(YEAR(d_date), MONTH(d_date))
+ORDER BY
+        YEAR(d_date), MONTH(d_date);
+----------
+[SELECT] SELECT … GROUP BY CUBE(grouping_column_reference_list)
+----------
+[SELECT] SELECT
+        YEAR(d_date),
+        i_category,
+        ca_state,
+        SUM(ss_net_paid) AS total_sum
+FROM
+        store_sales,
+        date_dim d1,
+        item,
+        customer_address ca
+WHERE
+        d1.d_date_sk = ss_sold_date_sk
+        AND i_item_sk = ss_item_sk
+        AND ss_addr_sk = ca_address_sk
+        AND i_category IN ("Books", "Electronics")
+        AND YEAR(d_date) IN (1998, 1999)
+        AND ca_state IN ("LA", "AK")
+GROUP BY CUBE(YEAR(d_date), i_category, ca_state)
+ORDER BY YEAR(d_date), i_category, ca_state;
+----------
+[SELECT] SELECT
+        year(d_date),
+        month(d_date),
+        sum(ss_net_paid) AS total_sum,
+        grouping(year(d_date)),
+        grouping(month(d_date))
+FROM
+        store_sales,
+        date_dim d1
+WHERE
+        d1.d_date_sk = ss_sold_date_sk
+        AND year(d_date) IN (2001, 2002)
+        AND month(d_date) IN (1, 2, 3)
+GROUP BY
+        ROLLUP(year(d_date), month(d_date))
+ORDER BY
+        year(d_date), month(d_date);
+----------
+[SELECT] SELECT
+        year(d_date),
+        i_category,
+        ca_state,
+        sum(ss_net_paid) AS total_sum
+FROM
+        store_sales,
+        date_dim d1,
+        item,
+        customer_address ca
+WHERE
+        d1.d_date_sk = ss_sold_date_sk
+        AND i_item_sk = ss_item_sk
+        AND ss_addr_sk = ca_address_sk
+        AND i_category IN ("Books", "Electronics")
+        AND year(d_date) IN (1998, 1999)
+        AND ca_state IN ("LA", "AK")
+GROUP BY CUBE(year(d_date), i_category, ca_state)
+HAVING grouping(year(d_date)) = 1 AND grouping(i_category) = 1 AND grouping(ca_state) = 1
+    OR grouping(year(d_date)) = 0 AND grouping(i_category) = 1 AND grouping(ca_state) = 1
+    OR grouping(year(d_date)) = 1 AND grouping(i_category) = 1 AND grouping(ca_state) = 0
+ORDER BY year(d_date), i_category, ca_state;
+----------
+[SELECT] SELECT
+        IF(grouping(year(d_date)) = 1, "Multi-year sum", year(d_date)) AS year,
+        IF(grouping(i_category) = 1, "Multi-category sum", i_category) AS category,
+        sum(ss_net_paid) AS total_sum
+FROM
+        store_sales,
+        date_dim d1,
+        item,
+        customer_address ca
+WHERE
+        d1.d_date_sk = ss_sold_date_sk
+        AND i_item_sk = ss_item_sk
+        AND ss_addr_sk = ca_address_sk
+        AND i_category IN ("Books", "Electronics")
+        AND year(d_date) IN (1998, 1999)
+        AND ca_state IN ("LA", "AK")
+GROUP BY CUBE(year(d_date), i_category)

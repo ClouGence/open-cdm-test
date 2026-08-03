@@ -1,0 +1,502 @@
+-- operator family
+DROP OPERATOR FAMILY test_operator_family USING btree
+;
+create table t2count (i int)
+;
+VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_opclass
+;
+create unique index cities_names_unique on cities (name)
+;
+-- enum values added later take some different codepaths internally,
+-- so make sure we have coverage for those too
+alter type rainbow add value 'y' before 'g'
+;
+create or replace function returnsrecord(int) returns record language plpgsql as
+$$ declare r record; begin r := row($1,$1+1); return r; end $$
+;
+CREATE MATERIALIZED VIEW mvtest_tvmm AS SELECT sum(totamt) AS grandtot FROM mvtest_tvm
+;
+VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_foreign_table
+;
+CREATE TEMPORARY TABLE bitwise_test(
+  i2 INT2,
+  i4 INT4,
+  i8 INT8,
+  i INTEGER,
+  x INT2,
+  y BIT(4)
+)
+;
+CREATE OPERATOR ~ (
+    PROCEDURE = texticregexeq,
+    LEFTARG   = citext,
+    RIGHTARG  = citext,
+    NEGATOR   = !~,
+    RESTRICT  = icregexeqsel,
+    JOIN      = icregexeqjoinsel
+)
+;
+do $$
+declare x var_record not null := row(41,42);
+begin
+  raise notice 'x = %', x;
+  x := row(null,null);  -- ok
+  raise notice 'x = %', x;
+  x := null;  -- fail
+end$$
+;
+-- an example with some ordinary arguments too
+create function concat(text, variadic anyarray) returns text as $$
+  select array_to_string($2, $1);
+$$ language sql immutable strict
+;
+CREATE FUNCTION "public"."sum_int_randrestart_minvfunc"(integer, integer) RETURNS integer
+    LANGUAGE "sql" STRICT
+    AS $_$ SELECT CASE WHEN random() < 0.2 THEN NULL ELSE $1 - $2 END $_$
+;
+DO $$
+DECLARE
+  result integer;
+BEGIN
+MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid + 1, balance = balance + delta, val = val || ' updated by merge'
+  WHEN NOT MATCHED THEN
+    INSERT VALUES (sid, delta, 'inserted by merge')
+  WHEN NOT MATCHED BY SOURCE THEN
+    UPDATE SET val = val || ' not matched by source';
+GET DIAGNOSTICS result := ROW_COUNT;
+RAISE NOTICE 'ROW_COUNT = %', result;
+END;
+$$
+;
+ANALYZE pg_temp_3.pg_temp_28852_2
+;
+ANALYZE pg_catalog.pg_ts_config_map
+;
+create table foo (a text)
+;
+CREATE TABLE h2part_4 PARTITION OF hash_parted2 FOR VALUES WITH (MODULUS 8, REMAINDER 5)
+;
+create table trans_tab_child2 partition of trans_tab_parent for values in ('BBB1', 'BBB2')
+;
+CREATE FUNCTION set_val_in_shmem(val INT) RETURNS VOID
+	AS '$libdir/test_dsm_registry' LANGUAGE C
+;
+CREATE SEQUENCE testseq START 5432
+;
+ANALYZE pg_temp_13.pg_temp_25481
+;
+CREATE TABLE base_tbl (a int, b int[])
+;
+DROP TABLE truncparted
+;
+VACUUM (TRUNCATE FALSE) pg_catalog.pg_depend
+;
+/*
+ * PostgreSQL System Views
+ *
+ * Copyright (c) 1996-2024, PostgreSQL Global Development Group
+ *
+ * src/backend/catalog/system_views.sql
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE VIEW pg_roles AS
+    SELECT
+        rolname,
+        rolsuper,
+        rolinherit,
+        rolcreaterole,
+        rolcreatedb,
+        rolcanlogin,
+        rolreplication,
+        rolconnlimit,
+        '********'::text as rolpassword,
+        rolvaliduntil,
+        rolbypassrls,
+        setconfig as rolconfig,
+        pg_authid.oid
+    FROM pg_authid LEFT JOIN pg_db_role_setting s
+    ON (pg_authid.oid = setrole AND setdatabase = 0)
+;
+CREATE EXTENSION test_ext_extschema SCHEMA "has space"
+;
+CREATE VIEW mysecview3 WITH (security_barrier=false)
+       AS SELECT * FROM tbl1 WHERE a < 0
+;
+CREATE EVENT TRIGGER regress_event_trigger_drop_objects ON sql_drop
+	WHEN TAG IN ('drop table', 'drop function', 'drop view',
+		'drop owned', 'drop schema', 'alter table')
+	EXECUTE PROCEDURE test_evtrig_dropped_objects()
+;
+DROP FUNCTION test_function_exists()
+;
+create temp table tt3 () inherits(tt2)
+;
+create table part_ab_cd partition of list_parted for values in ('ab', 'cd')
+;
+DROP TABLE pgss_select_into
+;
+CREATE INDEX clstr_tst_b_c ON clstr_tst (b,c)
+;
+-- range -> jsonb
+CREATE FUNCTION testRange() RETURNS jsonb
+LANGUAGE plpython3u
+TRANSFORM FOR TYPE jsonb
+AS $$
+x = range(3)
+return x
+$$
+;
+ALTER TABLE pg_tablespace ADD PRIMARY KEY USING INDEX pg_tablespace_oid_index
+;
+alter table mlparted add d int, add e int
+;
+create function build_ordered_int8s(i int8, j int8) returns ordered_int8s as $$
+begin return row(i,j); end
+$$ language plpgsql
+;
+create temp table q (a int, b int, c int) partition by list (a)
+;
+CALL test_proc5('abc')
+;
+CREATE TABLE tab_no_replidentity_index(c1 int)
+;
+create table fktable2 (x float8, y float8, foreign key (x, y) references pktable2 (a, b) on update cascade)
+;
+CREATE EXTENSION test_lfind
+;
+create table agg_data_20k as
+select g from generate_series(0, 19999) g
+;
+CREATE VIEW pg_policies AS
+    SELECT
+        N.nspname AS schemaname,
+        C.relname AS tablename,
+        pol.polname AS policyname,
+        CASE
+            WHEN pol.polpermissive THEN
+                'PERMISSIVE'
+            ELSE
+                'RESTRICTIVE'
+        END AS permissive,
+        CASE
+            WHEN pol.polroles = '{0}' THEN
+                string_to_array('public', '')
+            ELSE
+                ARRAY
+                (
+                    SELECT rolname
+                    FROM pg_catalog.pg_authid
+                    WHERE oid = ANY (pol.polroles) ORDER BY 1
+                )
+        END AS roles,
+        CASE pol.polcmd
+            WHEN 'r' THEN 'SELECT'
+            WHEN 'a' THEN 'INSERT'
+            WHEN 'w' THEN 'UPDATE'
+            WHEN 'd' THEN 'DELETE'
+            WHEN '*' THEN 'ALL'
+        END AS cmd,
+        pg_catalog.pg_get_expr(pol.polqual, pol.polrelid) AS qual,
+        pg_catalog.pg_get_expr(pol.polwithcheck, pol.polrelid) AS with_check
+    FROM pg_catalog.pg_policy pol
+    JOIN pg_catalog.pg_class C ON (C.oid = pol.polrelid)
+    LEFT JOIN pg_catalog.pg_namespace N ON (N.oid = C.relnamespace)
+;
+drop domain restrictedmultirange
+;
+drop function mlparted11_trig_fn()
+;
+CREATE TRIGGER "tg_hslot_bu" BEFORE UPDATE ON "public"."hslot" FOR EACH ROW EXECUTE FUNCTION "public"."tg_hslot_bu"()
+;
+CREATE SUBSCRIPTION split_sub CONNECTION 'host=127.0.0.1 port=5432 dbname=postgres user=postgres' PUBLICATION split_pub WITH (connect = false, enabled = false)
+;
+ANALYZE public.plt2_p3
+;
+------------------------------------------------------------------------------------------
+[DROP_PROG_OBJ] -- operator family
+DROP OPERATOR FAMILY test_operator_family USING btree
+;
+----------
+[CREATE_TABLE] create table t2count (i int)
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_opclass
+;
+----------
+[ADD_INDEX] create unique index cities_names_unique on cities (name)
+;
+----------
+[ALTER_TYPE] -- enum values added later take some different codepaths internally,
+-- so make sure we have coverage for those too
+alter type rainbow add value 'y' before 'g'
+;
+----------
+[CREATE_PROG_OBJ] create or replace function returnsrecord(int) returns record language plpgsql as
+$$ declare r record; begin r := row($1,$1+1); return r; end $$
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mvtest_tvmm AS SELECT sum(totamt) AS grandtot FROM mvtest_tvm
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_foreign_table
+;
+----------
+[CREATE_TABLE] CREATE TEMPORARY TABLE bitwise_test(
+  i2 INT2,
+  i4 INT4,
+  i8 INT8,
+  i INTEGER,
+  x INT2,
+  y BIT(4)
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR ~ (
+    PROCEDURE = texticregexeq,
+    LEFTARG   = citext,
+    RIGHTARG  = citext,
+    NEGATOR   = !~,
+    RESTRICT  = icregexeqsel,
+    JOIN      = icregexeqjoinsel
+)
+;
+----------
+[BLOCK] do $$
+declare x var_record not null := row(41,42);
+begin
+  raise notice 'x = %', x;
+  x := row(null,null);  -- ok
+  raise notice 'x = %', x;
+  x := null;  -- fail
+end$$
+;
+----------
+[CREATE_PROG_OBJ] -- an example with some ordinary arguments too
+create function concat(text, variadic anyarray) returns text as $$
+  select array_to_string($2, $1);
+$$ language sql immutable strict
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."sum_int_randrestart_minvfunc"(integer, integer) RETURNS integer
+    LANGUAGE "sql" STRICT
+    AS $_$ SELECT CASE WHEN random() < 0.2 THEN NULL ELSE $1 - $2 END $_$
+;
+----------
+[BLOCK] DO $$
+DECLARE
+  result integer;
+BEGIN
+MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid + 1, balance = balance + delta, val = val || ' updated by merge'
+  WHEN NOT MATCHED THEN
+    INSERT VALUES (sid, delta, 'inserted by merge')
+  WHEN NOT MATCHED BY SOURCE THEN
+    UPDATE SET val = val || ' not matched by source';
+GET DIAGNOSTICS result := ROW_COUNT;
+RAISE NOTICE 'ROW_COUNT = %', result;
+END;
+$$
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_3.pg_temp_28852_2
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_catalog.pg_ts_config_map
+;
+----------
+[CREATE_TABLE] create table foo (a text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE h2part_4 PARTITION OF hash_parted2 FOR VALUES WITH (MODULUS 8, REMAINDER 5)
+;
+----------
+[CREATE_TABLE] create table trans_tab_child2 partition of trans_tab_parent for values in ('BBB1', 'BBB2')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION set_val_in_shmem(val INT) RETURNS VOID
+	AS '$libdir/test_dsm_registry' LANGUAGE C
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE testseq START 5432
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_13.pg_temp_25481
+;
+----------
+[CREATE_TABLE] CREATE TABLE base_tbl (a int, b int[])
+;
+----------
+[DROP_TABLE] DROP TABLE truncparted
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) pg_catalog.pg_depend
+;
+----------
+[CREATE_VIEW(SELECT)] /*
+ * PostgreSQL System Views
+ *
+ * Copyright (c) 1996-2024, PostgreSQL Global Development Group
+ *
+ * src/backend/catalog/system_views.sql
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE VIEW pg_roles AS
+    SELECT
+        rolname,
+        rolsuper,
+        rolinherit,
+        rolcreaterole,
+        rolcreatedb,
+        rolcanlogin,
+        rolreplication,
+        rolconnlimit,
+        '********'::text as rolpassword,
+        rolvaliduntil,
+        rolbypassrls,
+        setconfig as rolconfig,
+        pg_authid.oid
+    FROM pg_authid LEFT JOIN pg_db_role_setting s
+    ON (pg_authid.oid = setrole AND setdatabase = 0)
+;
+----------
+[CREATE_LIBRARY] CREATE EXTENSION test_ext_extschema SCHEMA "has space"
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW mysecview3 WITH (security_barrier=false)
+       AS SELECT * FROM tbl1 WHERE a < 0
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE EVENT TRIGGER regress_event_trigger_drop_objects ON sql_drop
+	WHEN TAG IN ('drop table', 'drop function', 'drop view',
+		'drop owned', 'drop schema', 'alter table')
+	EXECUTE PROCEDURE test_evtrig_dropped_objects()
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION test_function_exists()
+;
+----------
+[CREATE_TABLE] create temp table tt3 () inherits(tt2)
+;
+----------
+[CREATE_TABLE] create table part_ab_cd partition of list_parted for values in ('ab', 'cd')
+;
+----------
+[DROP_TABLE] DROP TABLE pgss_select_into
+;
+----------
+[ADD_INDEX] CREATE INDEX clstr_tst_b_c ON clstr_tst (b,c)
+;
+----------
+[CREATE_PROG_OBJ] -- range -> jsonb
+CREATE FUNCTION testRange() RETURNS jsonb
+LANGUAGE plpython3u
+TRANSFORM FOR TYPE jsonb
+AS $$
+x = range(3)
+return x
+$$
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE pg_tablespace ADD PRIMARY KEY USING INDEX pg_tablespace_oid_index
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] alter table mlparted add d int, add e int
+;
+----------
+[CREATE_PROG_OBJ] create function build_ordered_int8s(i int8, j int8) returns ordered_int8s as $$
+begin return row(i,j); end
+$$ language plpgsql
+;
+----------
+[CREATE_TABLE] create temp table q (a int, b int, c int) partition by list (a)
+;
+----------
+[CALL_PROG_OBJ] CALL test_proc5('abc')
+;
+----------
+[CREATE_TABLE] CREATE TABLE tab_no_replidentity_index(c1 int)
+;
+----------
+[CREATE_TABLE] create table fktable2 (x float8, y float8, foreign key (x, y) references pktable2 (a, b) on update cascade)
+;
+----------
+[CREATE_LIBRARY] CREATE EXTENSION test_lfind
+;
+----------
+[CREATE_TABLE|SELECT] create table agg_data_20k as
+select g from generate_series(0, 19999) g
+;
+----------
+[CREATE_VIEW(METADATA)] CREATE VIEW pg_policies AS
+    SELECT
+        N.nspname AS schemaname,
+        C.relname AS tablename,
+        pol.polname AS policyname,
+        CASE
+            WHEN pol.polpermissive THEN
+                'PERMISSIVE'
+            ELSE
+                'RESTRICTIVE'
+        END AS permissive,
+        CASE
+            WHEN pol.polroles = '{0}' THEN
+                string_to_array('public', '')
+            ELSE
+                ARRAY
+                (
+                    SELECT rolname
+                    FROM pg_catalog.pg_authid
+                    WHERE oid = ANY (pol.polroles) ORDER BY 1
+                )
+        END AS roles,
+        CASE pol.polcmd
+            WHEN 'r' THEN 'SELECT'
+            WHEN 'a' THEN 'INSERT'
+            WHEN 'w' THEN 'UPDATE'
+            WHEN 'd' THEN 'DELETE'
+            WHEN '*' THEN 'ALL'
+        END AS cmd,
+        pg_catalog.pg_get_expr(pol.polqual, pol.polrelid) AS qual,
+        pg_catalog.pg_get_expr(pol.polwithcheck, pol.polrelid) AS with_check
+    FROM pg_catalog.pg_policy pol
+    JOIN pg_catalog.pg_class C ON (C.oid = pol.polrelid)
+    LEFT JOIN pg_catalog.pg_namespace N ON (N.oid = C.relnamespace)
+;
+----------
+[DROP_TYPE] drop domain restrictedmultirange
+;
+----------
+[DROP_PROG_OBJ] drop function mlparted11_trig_fn()
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER "tg_hslot_bu" BEFORE UPDATE ON "public"."hslot" FOR EACH ROW EXECUTE FUNCTION "public"."tg_hslot_bu"()
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION split_sub CONNECTION 'host=127.0.0.1 port=5432 dbname=postgres user=postgres' PUBLICATION split_pub WITH (connect = false, enabled = false)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.plt2_p3
+;

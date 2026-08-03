@@ -1,0 +1,670 @@
+CREATE TEMP TABLE pg_temp_13.pg_temp_27032_2 (tid pg_catalog.tid)
+;
+-- ===================================================================
+-- test partitionwise aggregates
+-- ===================================================================
+
+CREATE TABLE pagg_tab (a int, b int, c text) PARTITION BY RANGE(a)
+;
+-- stable because depends on pg_trgm.word_similarity_threshold
+
+CREATE OPERATOR <% (
+        LEFTARG = text,
+        RIGHTARG = text,
+        PROCEDURE = word_similarity_op,
+        COMMUTATOR = '%>',
+        RESTRICT = contsel,
+        JOIN = contjoinsel
+)
+;
+CREATE TYPE test8a AS (a int, b int)
+;
+-- WITH NO DATA, passes.
+CREATE TABLE selinto_schema.tbl_nodata1 (a) AS
+  SELECT generate_series(1,3) WITH NO DATA
+;
+ALTER TABLE rf_tbl_abcd_pk ALTER COLUMN c SET NOT NULL
+;
+alter table p2 drop column name
+;
+ALTER TABLE ONLY "public"."trigger_parted_p2_2"
+    ADD CONSTRAINT "trigger_parted_p2_2_pkey" PRIMARY KEY ("a")
+;
+drop index tricky_expr_comp_key_index
+;
+ANALYZE public.prt2_m_p1
+;
+CREATE FUNCTION _pg_char_octet_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+    AS
+$$SELECT
+  CASE WHEN $1 IN (25, 1042, 1043) /* text, char, varchar */
+       THEN CASE WHEN $2 = -1 /* default typmod */
+                 THEN CAST(2^30 AS integer)
+                 ELSE information_schema._pg_char_max_length($1, $2) *
+                      pg_catalog.pg_encoding_max_length((SELECT encoding FROM pg_catalog.pg_database WHERE datname = pg_catalog.current_database()))
+            END
+       ELSE null
+  END$$
+;
+CREATE TABLE "public"."gtest26" (
+    "a" integer NOT NULL,
+    "b" integer GENERATED ALWAYS AS (("a" * 2)) STORED
+)
+;
+CREATE TABLE fk11 PARTITION OF fk1 FOR VALUES IN (1)
+;
+ALTER TABLE pg_toast.pg_toast_30332 RENAME TO reind_con_toast
+;
+CREATE FUNCTION handle_get_twice()
+RETURNS pg_catalog.void STRICT
+AS 'MODULE_PATHNAME' LANGUAGE C
+;
+-- list partitioning on array type column
+CREATE TABLE arrlp (a int[]) PARTITION BY LIST (a)
+;
+-- Base table with event trigger, used in a regression test involving
+-- extension upgrades.
+CREATE TABLE t (id text)
+;
+CREATE TABLE t2 (name TEXT, n INTEGER)
+;
+-- test reporting of errors in extension scripts
+alter extension test_ext7 update to '2.1bad'
+;
+create function strictf(bool, bool) returns bool
+language plpgsql as $$begin return $1 and not $2; end$$ strict
+;
+DROP PUBLICATION tap_pub_rep_full
+;
+CREATE VIEW constraint_column_usage AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(tblschema AS sql_identifier) AS table_schema,
+           CAST(tblname AS sql_identifier) AS table_name,
+           CAST(colname AS sql_identifier) AS column_name,
+           CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(cstrschema AS sql_identifier) AS constraint_schema,
+           CAST(cstrname AS sql_identifier) AS constraint_name
+
+    FROM (
+        /* check constraints */
+        SELECT DISTINCT nr.nspname, r.relname, r.relowner, a.attname, nc.nspname, c.conname
+          FROM pg_namespace nr, pg_class r, pg_attribute a, pg_depend d, pg_namespace nc, pg_constraint c
+          WHERE nr.oid = r.relnamespace
+            AND r.oid = a.attrelid
+            AND d.refclassid = 'pg_catalog.pg_class'::regclass
+            AND d.refobjid = r.oid
+            AND d.refobjsubid = a.attnum
+            AND d.classid = 'pg_catalog.pg_constraint'::regclass
+            AND d.objid = c.oid
+            AND c.connamespace = nc.oid
+            AND c.contype = 'c'
+            AND r.relkind IN ('r', 'p')
+            AND NOT a.attisdropped
+
+        UNION ALL
+
+        /* not-null constraints */
+        SELECT DISTINCT nr.nspname, r.relname, r.relowner, a.attname, nc.nspname, c.conname
+          FROM pg_namespace nr, pg_class r, pg_attribute a, pg_namespace nc, pg_constraint c
+          WHERE nr.oid = r.relnamespace
+            AND r.oid = a.attrelid
+            AND r.oid = c.conrelid
+            AND a.attnum = c.conkey[1]
+            AND c.connamespace = nc.oid
+            AND c.contype = 'n'
+            AND r.relkind in ('r', 'p')
+            AND not a.attisdropped
+
+        UNION ALL
+
+        /* unique/primary key/foreign key constraints */
+        SELECT nr.nspname, r.relname, r.relowner, a.attname, nc.nspname, c.conname
+          FROM pg_namespace nr, pg_class r, pg_attribute a, pg_namespace nc,
+               pg_constraint c
+          WHERE nr.oid = r.relnamespace
+            AND r.oid = a.attrelid
+            AND nc.oid = c.connamespace
+            AND r.oid = CASE c.contype WHEN 'f' THEN c.confrelid ELSE c.conrelid END
+            AND a.attnum = ANY (CASE c.contype WHEN 'f' THEN c.confkey ELSE c.conkey END)
+            AND NOT a.attisdropped
+            AND c.contype IN ('p', 'u', 'f')
+            AND r.relkind IN ('r', 'p')
+
+      ) AS x (tblschema, tblname, tblowner, colname, cstrschema, cstrname)
+
+    WHERE pg_has_role(x.tblowner, 'USAGE')
+;
+CREATE TABLE list_parted (
+	a int
+) PARTITION BY LIST (a)
+;
+CREATE TYPE public.digit AS ENUM (
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9'
+)
+;
+create table c1 () inherits (p1)
+;
+-- trying to specify list for range partitioned table
+CREATE TABLE fail_part PARTITION OF range_parted FOR VALUES IN ('a')
+;
+drop domain domaintext
+;
+CREATE INDEX test_gist_idx_inc ON test_gist
+  USING gist (p) INCLUDE (t, i)
+;
+DROP FUNCTION getrngfunc5(int)
+;
+CREATE SUBSCRIPTION tap_sub_A_B CONNECTION 'port=11381 host=/tmp/C6o4PTAnCK dbname=postgres' PUBLICATION tap_pub_A
+;
+create table foo (f1 int, f2 int)
+;
+create function tg_pslot_bu() returns trigger as '
+begin
+    if new.slotname != old.slotname then
+        delete from PSlot where slotname = old.slotname;
+	insert into PSlot (
+		    slotname,
+		    pfname,
+		    slotlink,
+		    backlink
+		) values (
+		    new.slotname,
+		    new.pfname,
+		    new.slotlink,
+		    new.backlink
+		);
+        return null;
+    end if;
+    return new;
+end;
+' language plpgsql
+;
+/*
+ * text search configuration for swedish language
+ *
+ * Copyright (c) 2007-2023, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * swedish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY swedish_stem
+	(TEMPLATE = snowball, Language = swedish , StopWords=swedish)
+;
+CREATE TYPE casttesttype
+;
+do $$
+declare r1 record;
+        r2 r1%type;
+begin
+  r2 := row(1,2);
+  raise notice 'r2 = %', r2;
+  r2 := row(3,4,5);
+  raise notice 'r2 = %', r2;
+end$$
+;
+CREATE TABLE "public"."array_op_test" (
+    "seqno" integer,
+    "i" integer[],
+    "t" "text"[]
+)
+;
+CREATE AGGREGATE "public"."myaggn08a"("anyelement") (
+    SFUNC = "public"."tf2p",
+    STYPE = integer[],
+    INITCOND = '{}',
+    FINALFUNC = "public"."ffnp"
+)
+;
+DROP TABLE mcv_lists_partial
+;
+CREATE TABLE dump_test.ordering_table (id int primary key, data int)
+;
+CREATE VIEW routine_sequence_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS specific_catalog,
+           CAST(np.nspname AS sql_identifier) AS specific_schema,
+           CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier) AS specific_name,
+           CAST(current_database() AS sql_identifier) AS routine_catalog,
+           CAST(np.nspname AS sql_identifier) AS routine_schema,
+           CAST(p.proname AS sql_identifier) AS routine_name,
+           CAST(current_database() AS sql_identifier) AS sequence_catalog,
+           CAST(ns.nspname AS sql_identifier) AS sequence_schema,
+           CAST(s.relname AS sql_identifier) AS sequence_name
+
+    FROM pg_namespace np, pg_proc p, pg_depend d,
+         pg_class s, pg_namespace ns
+
+    WHERE np.oid = p.pronamespace
+          AND p.oid = d.objid
+          AND d.classid = 'pg_catalog.pg_proc'::regclass
+          AND d.refobjid = s.oid
+          AND d.refclassid = 'pg_catalog.pg_class'::regclass
+          AND s.relnamespace = ns.oid
+          AND s.relkind = 'S'
+          AND pg_has_role(s.relowner, 'USAGE')
+;
+CREATE TABLE testpub_rf_tbl4 (g text)
+;
+ALTER TABLE "fkpart5"."fk"
+    ADD CONSTRAINT "fk_a_fkey" FOREIGN KEY ("a") REFERENCES "fkpart5"."pk"("a")
+;
+ALTER FUNCTION gbt_bit_picksplit(internal, internal) PARALLEL SAFE
+;
+create function testpolym(a int, out a int) returns int as $$ select $1;$$ language sql
+;
+-- unrecognized object types
+DO $$
+DECLARE
+	objtype text;
+BEGIN
+	FOR objtype IN VALUES ('toast table'), ('index column'), ('sequence column'),
+		('toast table column'), ('view column'), ('materialized view column')
+	LOOP
+		BEGIN
+			PERFORM pg_get_object_address(objtype, '{one}', '{}');
+		EXCEPTION WHEN invalid_parameter_value THEN
+			RAISE WARNING 'error for %: %', objtype, sqlerrm;
+		END;
+	END LOOP;
+END;
+$$
+;
+ANALYZE pg_temp_12.pg_temp_26654_2
+;
+CREATE FUNCTION avals(hstore)
+RETURNS text[]
+AS '$libdir/hstore','hstore_avals'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+-- WITH LOCAL/CASCADED CHECK OPTION
+
+CREATE TABLE base_tbl (a int)
+;
+CREATE TABLE tab2 (a int, gen1 int GENERATED ALWAYS AS (a * 2) STORED)
+;
+VACUUM pg_catalog.pg_opfamily
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] CREATE TEMP TABLE pg_temp_13.pg_temp_27032_2 (tid pg_catalog.tid)
+;
+----------
+[CREATE_TABLE] -- ===================================================================
+-- test partitionwise aggregates
+-- ===================================================================
+
+CREATE TABLE pagg_tab (a int, b int, c text) PARTITION BY RANGE(a)
+;
+----------
+[CREATE_PROG_OBJ] -- stable because depends on pg_trgm.word_similarity_threshold
+
+CREATE OPERATOR <% (
+        LEFTARG = text,
+        RIGHTARG = text,
+        PROCEDURE = word_similarity_op,
+        COMMUTATOR = '%>',
+        RESTRICT = contsel,
+        JOIN = contjoinsel
+)
+;
+----------
+[CREATE_TYPE] CREATE TYPE test8a AS (a int, b int)
+;
+----------
+[CREATE_TABLE|SELECT] -- WITH NO DATA, passes.
+CREATE TABLE selinto_schema.tbl_nodata1 (a) AS
+  SELECT generate_series(1,3) WITH NO DATA
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE rf_tbl_abcd_pk ALTER COLUMN c SET NOT NULL
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] alter table p2 drop column name
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "public"."trigger_parted_p2_2"
+    ADD CONSTRAINT "trigger_parted_p2_2_pkey" PRIMARY KEY ("a")
+;
+----------
+[DROP_INDEX] drop index tricky_expr_comp_key_index
+;
+----------
+[ADMIN_TABLE] ANALYZE public.prt2_m_p1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_char_octet_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+    AS
+$$SELECT
+  CASE WHEN $1 IN (25, 1042, 1043) /* text, char, varchar */
+       THEN CASE WHEN $2 = -1 /* default typmod */
+                 THEN CAST(2^30 AS integer)
+                 ELSE information_schema._pg_char_max_length($1, $2) *
+                      pg_catalog.pg_encoding_max_length((SELECT encoding FROM pg_catalog.pg_database WHERE datname = pg_catalog.current_database()))
+            END
+       ELSE null
+  END$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."gtest26" (
+    "a" integer NOT NULL,
+    "b" integer GENERATED ALWAYS AS (("a" * 2)) STORED
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE fk11 PARTITION OF fk1 FOR VALUES IN (1)
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_30332 RENAME TO reind_con_toast
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION handle_get_twice()
+RETURNS pg_catalog.void STRICT
+AS 'MODULE_PATHNAME' LANGUAGE C
+;
+----------
+[CREATE_TABLE] -- list partitioning on array type column
+CREATE TABLE arrlp (a int[]) PARTITION BY LIST (a)
+;
+----------
+[CREATE_TABLE] -- Base table with event trigger, used in a regression test involving
+-- extension upgrades.
+CREATE TABLE t (id text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE t2 (name TEXT, n INTEGER)
+;
+----------
+[ALTER_LIBRARY] -- test reporting of errors in extension scripts
+alter extension test_ext7 update to '2.1bad'
+;
+----------
+[CREATE_PROG_OBJ] create function strictf(bool, bool) returns bool
+language plpgsql as $$begin return $1 and not $2; end$$ strict
+;
+----------
+[DROP_PUB_SUB] DROP PUBLICATION tap_pub_rep_full
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW constraint_column_usage AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(tblschema AS sql_identifier) AS table_schema,
+           CAST(tblname AS sql_identifier) AS table_name,
+           CAST(colname AS sql_identifier) AS column_name,
+           CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(cstrschema AS sql_identifier) AS constraint_schema,
+           CAST(cstrname AS sql_identifier) AS constraint_name
+
+    FROM (
+        /* check constraints */
+        SELECT DISTINCT nr.nspname, r.relname, r.relowner, a.attname, nc.nspname, c.conname
+          FROM pg_namespace nr, pg_class r, pg_attribute a, pg_depend d, pg_namespace nc, pg_constraint c
+          WHERE nr.oid = r.relnamespace
+            AND r.oid = a.attrelid
+            AND d.refclassid = 'pg_catalog.pg_class'::regclass
+            AND d.refobjid = r.oid
+            AND d.refobjsubid = a.attnum
+            AND d.classid = 'pg_catalog.pg_constraint'::regclass
+            AND d.objid = c.oid
+            AND c.connamespace = nc.oid
+            AND c.contype = 'c'
+            AND r.relkind IN ('r', 'p')
+            AND NOT a.attisdropped
+
+        UNION ALL
+
+        /* not-null constraints */
+        SELECT DISTINCT nr.nspname, r.relname, r.relowner, a.attname, nc.nspname, c.conname
+          FROM pg_namespace nr, pg_class r, pg_attribute a, pg_namespace nc, pg_constraint c
+          WHERE nr.oid = r.relnamespace
+            AND r.oid = a.attrelid
+            AND r.oid = c.conrelid
+            AND a.attnum = c.conkey[1]
+            AND c.connamespace = nc.oid
+            AND c.contype = 'n'
+            AND r.relkind in ('r', 'p')
+            AND not a.attisdropped
+
+        UNION ALL
+
+        /* unique/primary key/foreign key constraints */
+        SELECT nr.nspname, r.relname, r.relowner, a.attname, nc.nspname, c.conname
+          FROM pg_namespace nr, pg_class r, pg_attribute a, pg_namespace nc,
+               pg_constraint c
+          WHERE nr.oid = r.relnamespace
+            AND r.oid = a.attrelid
+            AND nc.oid = c.connamespace
+            AND r.oid = CASE c.contype WHEN 'f' THEN c.confrelid ELSE c.conrelid END
+            AND a.attnum = ANY (CASE c.contype WHEN 'f' THEN c.confkey ELSE c.conkey END)
+            AND NOT a.attisdropped
+            AND c.contype IN ('p', 'u', 'f')
+            AND r.relkind IN ('r', 'p')
+
+      ) AS x (tblschema, tblname, tblowner, colname, cstrschema, cstrname)
+
+    WHERE pg_has_role(x.tblowner, 'USAGE')
+;
+----------
+[CREATE_TABLE] CREATE TABLE list_parted (
+	a int
+) PARTITION BY LIST (a)
+;
+----------
+[CREATE_TYPE] CREATE TYPE public.digit AS ENUM (
+    '0',
+    '1',
+    '2',
+    '3',
+    '4',
+    '5',
+    '6',
+    '7',
+    '8',
+    '9'
+)
+;
+----------
+[CREATE_TABLE] create table c1 () inherits (p1)
+;
+----------
+[CREATE_TABLE] -- trying to specify list for range partitioned table
+CREATE TABLE fail_part PARTITION OF range_parted FOR VALUES IN ('a')
+;
+----------
+[DROP_TYPE] drop domain domaintext
+;
+----------
+[ADD_INDEX] CREATE INDEX test_gist_idx_inc ON test_gist
+  USING gist (p) INCLUDE (t, i)
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION getrngfunc5(int)
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION tap_sub_A_B CONNECTION 'port=11381 host=/tmp/C6o4PTAnCK dbname=postgres' PUBLICATION tap_pub_A
+;
+----------
+[CREATE_TABLE] create table foo (f1 int, f2 int)
+;
+----------
+[CREATE_PROG_OBJ] create function tg_pslot_bu() returns trigger as '
+begin
+    if new.slotname != old.slotname then
+        delete from PSlot where slotname = old.slotname;
+	insert into PSlot (
+		    slotname,
+		    pfname,
+		    slotlink,
+		    backlink
+		) values (
+		    new.slotname,
+		    new.pfname,
+		    new.slotlink,
+		    new.backlink
+		);
+        return null;
+    end if;
+    return new;
+end;
+' language plpgsql
+;
+----------
+[CREATE_POLICY] /*
+ * text search configuration for swedish language
+ *
+ * Copyright (c) 2007-2023, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * swedish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY swedish_stem
+	(TEMPLATE = snowball, Language = swedish , StopWords=swedish)
+;
+----------
+[CREATE_TYPE] CREATE TYPE casttesttype
+;
+----------
+[BLOCK] do $$
+declare r1 record;
+        r2 r1%type;
+begin
+  r2 := row(1,2);
+  raise notice 'r2 = %', r2;
+  r2 := row(3,4,5);
+  raise notice 'r2 = %', r2;
+end$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."array_op_test" (
+    "seqno" integer,
+    "i" integer[],
+    "t" "text"[]
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE AGGREGATE "public"."myaggn08a"("anyelement") (
+    SFUNC = "public"."tf2p",
+    STYPE = integer[],
+    INITCOND = '{}',
+    FINALFUNC = "public"."ffnp"
+)
+;
+----------
+[DROP_TABLE] DROP TABLE mcv_lists_partial
+;
+----------
+[CREATE_TABLE] CREATE TABLE dump_test.ordering_table (id int primary key, data int)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW routine_sequence_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS specific_catalog,
+           CAST(np.nspname AS sql_identifier) AS specific_schema,
+           CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier) AS specific_name,
+           CAST(current_database() AS sql_identifier) AS routine_catalog,
+           CAST(np.nspname AS sql_identifier) AS routine_schema,
+           CAST(p.proname AS sql_identifier) AS routine_name,
+           CAST(current_database() AS sql_identifier) AS sequence_catalog,
+           CAST(ns.nspname AS sql_identifier) AS sequence_schema,
+           CAST(s.relname AS sql_identifier) AS sequence_name
+
+    FROM pg_namespace np, pg_proc p, pg_depend d,
+         pg_class s, pg_namespace ns
+
+    WHERE np.oid = p.pronamespace
+          AND p.oid = d.objid
+          AND d.classid = 'pg_catalog.pg_proc'::regclass
+          AND d.refobjid = s.oid
+          AND d.refclassid = 'pg_catalog.pg_class'::regclass
+          AND s.relnamespace = ns.oid
+          AND s.relkind = 'S'
+          AND pg_has_role(s.relowner, 'USAGE')
+;
+----------
+[CREATE_TABLE] CREATE TABLE testpub_rf_tbl4 (g text)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE "fkpart5"."fk"
+    ADD CONSTRAINT "fk_a_fkey" FOREIGN KEY ("a") REFERENCES "fkpart5"."pk"("a")
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_bit_picksplit(internal, internal) PARALLEL SAFE
+;
+----------
+[CREATE_PROG_OBJ] create function testpolym(a int, out a int) returns int as $$ select $1;$$ language sql
+;
+----------
+[BLOCK] -- unrecognized object types
+DO $$
+DECLARE
+	objtype text;
+BEGIN
+	FOR objtype IN VALUES ('toast table'), ('index column'), ('sequence column'),
+		('toast table column'), ('view column'), ('materialized view column')
+	LOOP
+		BEGIN
+			PERFORM pg_get_object_address(objtype, '{one}', '{}');
+		EXCEPTION WHEN invalid_parameter_value THEN
+			RAISE WARNING 'error for %: %', objtype, sqlerrm;
+		END;
+	END LOOP;
+END;
+$$
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_12.pg_temp_26654_2
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION avals(hstore)
+RETURNS text[]
+AS '$libdir/hstore','hstore_avals'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] -- WITH LOCAL/CASCADED CHECK OPTION
+
+CREATE TABLE base_tbl (a int)
+;
+----------
+[CREATE_TABLE] CREATE TABLE tab2 (a int, gen1 int GENERATED ALWAYS AS (a * 2) STORED)
+;
+----------
+[ADMIN_TABLE] VACUUM pg_catalog.pg_opfamily
+;

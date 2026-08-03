@@ -1,0 +1,343 @@
+select bitmap_has_any(to_bitmap(1), to_bitmap(2)) as res;
+select bitmap_has_any(bitmap_from_string('1,2,3'), to_bitmap(1)) as res;
+select bitmap_max(bitmap_empty()) res1,bitmap_max(NULL) res2;
+select bitmap_to_string(bitmap_or(to_bitmap(1), to_bitmap(1)));
+select bitmap_to_string(bitmap_or(to_bitmap(1), to_bitmap(2), to_bitmap(10), to_bitmap(0), NULL)) as res;
+select bitmap_to_string(bitmap_or(to_bitmap(1), to_bitmap(2), to_bitmap(10), to_bitmap(0), bitmap_empty())) as res;
+select bitmap_to_string(bitmap_or(to_bitmap(10), bitmap_from_string('1,2'), bitmap_from_string('1,2,3,4,5'))) as res;
+select bitmap_xor_count(bitmap_from_string('1,2,3'), bitmap_from_string('4,5,6')) as res;
+select bitmap_xor_count(bitmap_from_string('2,3'), bitmap_from_string('1,2,3,4'), bitmap_from_string('3,4,5'), bitmap_empty()) res;
+-- second的精度超过六位会四舍五入取六位精度
+SELECT MAKETIME(12, 7, 56.1234567);
+-- 月份部分超出范围[1, 12]
+SELECT PERIOD_ADD(202513, 1);
+-- ERROR 1105 (HY000): errCode = 2, detailMessage = (127.0.0.1)[INVALID_ARGUMENT]Period function got invalid period: 202513
+
+-- period 超出BIGINT范围
+SELECT PERIOD_ADD(-1, 1);
+-- ERROR 1105 (HY000): errCode = 2, detailMessage = (127.0.0.1)[INVALID_ARGUMENT]Period function got invalid period: -1
+;
+SELECT QUARTER_FLOOR("2023-07-13 22:28:18", 2, "2022-01-01 00:00:00"), QUARTER_FLOOR("2023-07-13 22:28:18", 4, "2022-01-01 00:00:00");
+-- 占位符为 %Y, %y, %m, %d, %c, %e时，返回对应位数的 0
+SELECT fmt, TIME_FORMAT('12:13:14.123456', fmt) AS res FROM test_format;
+-- 其他占位符(`%D`, `%j`, `%M`, `%u`, `%U`, `%v`, `%V`, `%w`, `%W`, `%x`, `%X`)返回 NULL
+SELECT TIME_FORMAT('11:22:33', '%h:%i:%s, %j');
+-- 任一参数为 NULL 则返回 NULL
+SELECT TIME_FORMAT('12:34:56', NULL);
+--- 假设当前地区时间为东八区 2025-10-27 10:55:35
+SELECT UTC_DATE(), UTC_DATE() + 0;
+--- 假设当前地区时间为东八区 2025-10-27 14:39:01
+SELECT UTC_TIME(), UTC_TIME() + 1, UTC_TIME(6), UTC_TIME(6) + 1;
+---当前地区时间为东八区 2025-10-27 14:43:21
+SELECT UTC_TIMESTAMP(), UTC_TIMESTAMP() + 0, UTC_TIMESTAMP(5), UTC_TIMESTAMP(5) + 0;
+-- vb (VarBinary) 和 vc (VarChar) 插入时使用了相同的字符串.
+SELECT * FROM mysql_catalog.binary_test.binary_test;
+-- 该函数输出有符号 64 位整形
+SELECT
+    mmhash3_64_v2,
+    mmhash3_u64_v2,
+    i64_to_ui64 = mmhash3_u64_v2 AS is_equal
+FROM (
+    SELECT
+        murmur_hash3_64_v2('1013199993_1756808272') AS mmhash3_64_v2,
+        murmur_hash3_u64_v2('1013199993_1756808272') AS mmhash3_u64_v2,
+        CAST(murmur_hash3_64_v2('1013199993_1756808272') AS LARGEINT) & 18446744073709551615 AS i64_to_ui64
+) t;
+-- 该函数输出无符号 64 位整形
+SELECT
+    mmhash3_64_v2,
+    mmhash3_u64_v2,
+    i64_to_ui64 = mmhash3_u64_v2 AS is_equal
+FROM (
+    SELECT
+        murmur_hash3_64_v2('1013199993_1756808272') AS mmhash3_64_v2,
+        murmur_hash3_u64_v2('1013199993_1756808272') AS mmhash3_u64_v2,
+        CAST(murmur_hash3_64_v2('1013199993_1756808272') AS LARGEINT) & 18446744073709551615 AS i64_to_ui64
+) t;
+select HLL_CARDINALITY(HLL_HASH('abc'));
+select json_type('{"key1": 1234.44}', '$.key1');
+select json_type('{"key1": true}', '$.key1');
+-- SQL NULL 作为输入返回 SQL NULL
+SELECT to_json(null);
+-- 数组内的 NULL 值转换为 JSON null 值
+SELECT to_json(array(12,34,null));
+-- 可以先转换成 string 再去执行 to_json
+SELECT to_json(cast(makedate(2025,5) as string));
+select atan(cast('nan' as double), 1.0);
+select atan(-1.0, cast('inf' as double));
+select atan(cast('-inf' as double), cast('inf' as double));
+select e();
+-- match_phrase 查询：
+SELECT * FROM es_table 
+WHERE ESQUERY(k4, '{
+    "match_phrase": {
+       "k4": "doris on es"
+    }
+}');
+-- geo_shape 查询：
+SELECT * FROM es_table 
+WHERE ESQUERY(k4, '{
+  "geo_shape": {
+     "location": {
+        "shape": {
+           "type": "envelope",
+           "coordinates": [
+              [13, 53],
+              [14, 52]
+           ]
+        },
+        "relation": "within"
+     }
+  }
+}');
+SELECT k1, k7 FROM baseall WHERE k1 IN (1,2,3) ORDER BY FIELD(k1,2,1,3);
+SELECT
+  department,
+  CASE 
+    WHEN GROUPING_ID(department, level) = 0 THEN level
+    WHEN GROUPING_ID(department, level) = 1 THEN CONCAT('Total: ', department)
+    WHEN GROUPING_ID(department, level) = 3 THEN 'Total: Company'
+    ELSE 'Unknown'
+  END AS 'Job Title',
+  COUNT(uid) AS 'Employee Count'
+FROM employee 
+GROUP BY ROLLUP(department, level)
+ORDER BY GROUPING_ID(department, level) ASC;
+SELECT
+  department,
+  CASE 
+    WHEN GROUPING_ID(department, level) = 0 THEN level
+    WHEN GROUPING_ID(department, level) = 1 THEN CONCAT('Total: ', department)
+    WHEN GROUPING_ID(department, level) = 3 THEN 'Total: Company'
+    ELSE 'Unknown'
+  END AS 'Job Title',
+  COUNT(uid)
+FROM employee 
+GROUP BY ROLLUP(department, level)
+HAVING `Job Title` IN ('Senior');
+-- 计算赤道上经度相差 1 度的两个点之间的距离
+SELECT ST_DISTANCE(ST_GeometryFromText('POINT(0 0)'), ST_GeometryFromText('POINT(1 0)'));
+-- 计算点到线的最短距离
+SELECT ST_DISTANCE(ST_GeometryFromText('POINT(2 2)'), ST_GeometryFromText('LINESTRING(0 0, 10 0)'));
+-- 圆与多边形相交，圆心在外但圆包含了多边形的一部分边界
+SELECT ST_DISTANCE(
+    ST_GeometryFromText('POLYGON ((-0.00045 -0.00045, 0.00045 -0.00045, 0.00045 0.00045, -0.00045 0.00045, -0.00045 -0.00045))'),
+    ST_Circle(0.0006, 0, 50)
+);
+-- 无效的 WKT 字符串
+SELECT ST_DISTANCE(ST_GeometryFromText('NOT_A_GEOMETRY'), ST_GeometryFromText('POINT(1 1)'));
+-- POINT 样例
+SELECT ST_AsText(ST_GeometryFromText("POINT (1 1)"));
+-- POINT 不合法样例(端点过多)
+SELECT ST_AsText(ST_GeometryFromText("POINT (1 1, 2 2)"));
+-- LINESTRING 样例
+SELECT ST_AsText(ST_GeometryFromText("LINESTRING (1 1, 2 2)"));
+-- LINESTRING 不合法样例(端点过少)
+SELECT ST_AsText(ST_GeometryFromText("LINESTRING (1 1)"));
+-- POLYGON 样例
+SELECT ST_AsText(ST_GeometryFromText("POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"));
+-- POLYGON 不合法样例(首尾不闭合)
+SELECT ST_AsText(ST_GeometryFromText("POLYGON ((0 0, 1 0, 1 1, 0 1))"));
+-- POLYGON 不合法样例(端点过少)
+SELECT ST_AsText(ST_GeometryFromText("POLYGON ((0 0, 1 0, 0 0))"));
+-- MULTIPOLYGON 样例
+SELECT ST_AsText(ST_GeometryFromText("MULTIPOLYGON (((0 0, 1 0, 1 1, 0 1, 0 0)), ((2 2, 3 2, 3 3, 2 3, 2 2)))"));
+-- MULTIPOLYGON 样例(仅有有限个离散点接触)
+SELECT ST_AsText(ST_GeometryFromText("MULTIPOLYGON (((0 0, 10 0, 10 10, 0 10, 0 0), (4 4, 6 4, 6 6, 4 6, 4 4)), ((4 5, 5 4, 6 5, 5 6, 4 5)))"));
+-- 输入 NULL
+SELECT ST_AsText(ST_GeometryFromText(NULL));
+------------------------------------------------------------------------------------------
+[SELECT] select bitmap_has_any(to_bitmap(1), to_bitmap(2)) as res;
+----------
+[SELECT] select bitmap_has_any(bitmap_from_string('1,2,3'), to_bitmap(1)) as res;
+----------
+[SELECT] select bitmap_max(bitmap_empty()) res1,bitmap_max(NULL) res2;
+----------
+[SELECT] select bitmap_to_string(bitmap_or(to_bitmap(1), to_bitmap(1)));
+----------
+[SELECT] select bitmap_to_string(bitmap_or(to_bitmap(1), to_bitmap(2), to_bitmap(10), to_bitmap(0), NULL)) as res;
+----------
+[SELECT] select bitmap_to_string(bitmap_or(to_bitmap(1), to_bitmap(2), to_bitmap(10), to_bitmap(0), bitmap_empty())) as res;
+----------
+[SELECT] select bitmap_to_string(bitmap_or(to_bitmap(10), bitmap_from_string('1,2'), bitmap_from_string('1,2,3,4,5'))) as res;
+----------
+[SELECT] select bitmap_xor_count(bitmap_from_string('1,2,3'), bitmap_from_string('4,5,6')) as res;
+----------
+[SELECT] select bitmap_xor_count(bitmap_from_string('2,3'), bitmap_from_string('1,2,3,4'), bitmap_from_string('3,4,5'), bitmap_empty()) res;
+----------
+[SELECT] -- second的精度超过六位会四舍五入取六位精度
+SELECT MAKETIME(12, 7, 56.1234567);
+----------
+[SELECT] -- 月份部分超出范围[1, 12]
+SELECT PERIOD_ADD(202513, 1);
+----------
+[SELECT] -- period 超出BIGINT范围
+SELECT PERIOD_ADD(-1, 1);
+----------
+[SELECT] SELECT QUARTER_FLOOR("2023-07-13 22:28:18", 2, "2022-01-01 00:00:00"), QUARTER_FLOOR("2023-07-13 22:28:18", 4, "2022-01-01 00:00:00");
+----------
+[SELECT] -- 占位符为 %Y, %y, %m, %d, %c, %e时，返回对应位数的 0
+SELECT fmt, TIME_FORMAT('12:13:14.123456', fmt) AS res FROM test_format;
+----------
+[SELECT] -- 其他占位符(`%D`, `%j`, `%M`, `%u`, `%U`, `%v`, `%V`, `%w`, `%W`, `%x`, `%X`)返回 NULL
+SELECT TIME_FORMAT('11:22:33', '%h:%i:%s, %j');
+----------
+[SELECT] -- 任一参数为 NULL 则返回 NULL
+SELECT TIME_FORMAT('12:34:56', NULL);
+----------
+[SELECT] --- 假设当前地区时间为东八区 2025-10-27 10:55:35
+SELECT UTC_DATE(), UTC_DATE() + 0;
+----------
+[SELECT] --- 假设当前地区时间为东八区 2025-10-27 14:39:01
+SELECT UTC_TIME(), UTC_TIME() + 1, UTC_TIME(6), UTC_TIME(6) + 1;
+----------
+[SELECT] ---当前地区时间为东八区 2025-10-27 14:43:21
+SELECT UTC_TIMESTAMP(), UTC_TIMESTAMP() + 0, UTC_TIMESTAMP(5), UTC_TIMESTAMP(5) + 0;
+----------
+[SELECT] -- vb (VarBinary) 和 vc (VarChar) 插入时使用了相同的字符串.
+SELECT * FROM mysql_catalog.binary_test.binary_test;
+----------
+[SELECT] -- 该函数输出有符号 64 位整形
+SELECT
+    mmhash3_64_v2,
+    mmhash3_u64_v2,
+    i64_to_ui64 = mmhash3_u64_v2 AS is_equal
+FROM (
+    SELECT
+        murmur_hash3_64_v2('1013199993_1756808272') AS mmhash3_64_v2,
+        murmur_hash3_u64_v2('1013199993_1756808272') AS mmhash3_u64_v2,
+        CAST(murmur_hash3_64_v2('1013199993_1756808272') AS LARGEINT) & 18446744073709551615 AS i64_to_ui64
+) t;
+----------
+[SELECT] -- 该函数输出无符号 64 位整形
+SELECT
+    mmhash3_64_v2,
+    mmhash3_u64_v2,
+    i64_to_ui64 = mmhash3_u64_v2 AS is_equal
+FROM (
+    SELECT
+        murmur_hash3_64_v2('1013199993_1756808272') AS mmhash3_64_v2,
+        murmur_hash3_u64_v2('1013199993_1756808272') AS mmhash3_u64_v2,
+        CAST(murmur_hash3_64_v2('1013199993_1756808272') AS LARGEINT) & 18446744073709551615 AS i64_to_ui64
+) t;
+----------
+[SELECT] select HLL_CARDINALITY(HLL_HASH('abc'));
+----------
+[SELECT] select json_type('{"key1": 1234.44}', '$.key1');
+----------
+[SELECT] select json_type('{"key1": true}', '$.key1');
+----------
+[SELECT] -- SQL NULL 作为输入返回 SQL NULL
+SELECT to_json(null);
+----------
+[SELECT] -- 数组内的 NULL 值转换为 JSON null 值
+SELECT to_json(array(12,34,null));
+----------
+[SELECT] -- 可以先转换成 string 再去执行 to_json
+SELECT to_json(cast(makedate(2025,5) as string));
+----------
+[SELECT] select atan(cast('nan' as double), 1.0);
+----------
+[SELECT] select atan(-1.0, cast('inf' as double));
+----------
+[SELECT] select atan(cast('-inf' as double), cast('inf' as double));
+----------
+[SELECT] select e();
+----------
+[SELECT] -- match_phrase 查询：
+SELECT * FROM es_table 
+WHERE ESQUERY(k4, '{
+    "match_phrase": {
+       "k4": "doris on es"
+    }
+}');
+----------
+[SELECT] -- geo_shape 查询：
+SELECT * FROM es_table 
+WHERE ESQUERY(k4, '{
+  "geo_shape": {
+     "location": {
+        "shape": {
+           "type": "envelope",
+           "coordinates": [
+              [13, 53],
+              [14, 52]
+           ]
+        },
+        "relation": "within"
+     }
+  }
+}');
+----------
+[SELECT] SELECT k1, k7 FROM baseall WHERE k1 IN (1,2,3) ORDER BY FIELD(k1,2,1,3);
+----------
+[SELECT] SELECT
+  department,
+  CASE 
+    WHEN GROUPING_ID(department, level) = 0 THEN level
+    WHEN GROUPING_ID(department, level) = 1 THEN CONCAT('Total: ', department)
+    WHEN GROUPING_ID(department, level) = 3 THEN 'Total: Company'
+    ELSE 'Unknown'
+  END AS 'Job Title',
+  COUNT(uid) AS 'Employee Count'
+FROM employee 
+GROUP BY ROLLUP(department, level)
+ORDER BY GROUPING_ID(department, level) ASC;
+----------
+[SELECT] SELECT
+  department,
+  CASE 
+    WHEN GROUPING_ID(department, level) = 0 THEN level
+    WHEN GROUPING_ID(department, level) = 1 THEN CONCAT('Total: ', department)
+    WHEN GROUPING_ID(department, level) = 3 THEN 'Total: Company'
+    ELSE 'Unknown'
+  END AS 'Job Title',
+  COUNT(uid)
+FROM employee 
+GROUP BY ROLLUP(department, level)
+HAVING `Job Title` IN ('Senior');
+----------
+[SELECT] -- 计算赤道上经度相差 1 度的两个点之间的距离
+SELECT ST_DISTANCE(ST_GeometryFromText('POINT(0 0)'), ST_GeometryFromText('POINT(1 0)'));
+----------
+[SELECT] -- 计算点到线的最短距离
+SELECT ST_DISTANCE(ST_GeometryFromText('POINT(2 2)'), ST_GeometryFromText('LINESTRING(0 0, 10 0)'));
+----------
+[SELECT] -- 圆与多边形相交，圆心在外但圆包含了多边形的一部分边界
+SELECT ST_DISTANCE(
+    ST_GeometryFromText('POLYGON ((-0.00045 -0.00045, 0.00045 -0.00045, 0.00045 0.00045, -0.00045 0.00045, -0.00045 -0.00045))'),
+    ST_Circle(0.0006, 0, 50)
+);
+----------
+[SELECT] -- 无效的 WKT 字符串
+SELECT ST_DISTANCE(ST_GeometryFromText('NOT_A_GEOMETRY'), ST_GeometryFromText('POINT(1 1)'));
+----------
+[SELECT] -- POINT 样例
+SELECT ST_AsText(ST_GeometryFromText("POINT (1 1)"));
+----------
+[SELECT] -- POINT 不合法样例(端点过多)
+SELECT ST_AsText(ST_GeometryFromText("POINT (1 1, 2 2)"));
+----------
+[SELECT] -- LINESTRING 样例
+SELECT ST_AsText(ST_GeometryFromText("LINESTRING (1 1, 2 2)"));
+----------
+[SELECT] -- LINESTRING 不合法样例(端点过少)
+SELECT ST_AsText(ST_GeometryFromText("LINESTRING (1 1)"));
+----------
+[SELECT] -- POLYGON 样例
+SELECT ST_AsText(ST_GeometryFromText("POLYGON ((0 0, 1 0, 1 1, 0 1, 0 0))"));
+----------
+[SELECT] -- POLYGON 不合法样例(首尾不闭合)
+SELECT ST_AsText(ST_GeometryFromText("POLYGON ((0 0, 1 0, 1 1, 0 1))"));
+----------
+[SELECT] -- POLYGON 不合法样例(端点过少)
+SELECT ST_AsText(ST_GeometryFromText("POLYGON ((0 0, 1 0, 0 0))"));
+----------
+[SELECT] -- MULTIPOLYGON 样例
+SELECT ST_AsText(ST_GeometryFromText("MULTIPOLYGON (((0 0, 1 0, 1 1, 0 1, 0 0)), ((2 2, 3 2, 3 3, 2 3, 2 2)))"));
+----------
+[SELECT] -- MULTIPOLYGON 样例(仅有有限个离散点接触)
+SELECT ST_AsText(ST_GeometryFromText("MULTIPOLYGON (((0 0, 10 0, 10 10, 0 10, 0 0), (4 4, 6 4, 6 6, 4 6, 4 4)), ((4 5, 5 4, 6 5, 5 6, 4 5)))"));
+----------
+[SELECT] -- 输入 NULL
+SELECT ST_AsText(ST_GeometryFromText(NULL));

@@ -1,0 +1,366 @@
+SELECT xmlserialize(CONTENT  'text node<foo>    <bar></bar>   </foo>' AS text INDENT)
+;
+-- Ensure consecutive NULLs are properly treated as distinct from each other
+select array_agg(distinct val)
+from (select null as val from generate_series(1, 2))
+;
+SELECT JSON_ARRAY('a',  NULL, 'b' NULL   ON NULL RETURNING jsonb)
+;
+SELECT JSON_OBJECTAGG(k: v RETURNING jsonb) FROM (VALUES ('a', 1), ('b', 2)) AS t(k,v)
+;
+SELECT xmlserialize(CONTENT  '<?xml version="1.0" encoding="UTF-8"?><foo><bar><val>73</val></bar></foo>' AS text INDENT)
+;
+-- IS JSON predicate
+SELECT NULL IS JSON
+;
+SELECT JSON_OBJECT('a': '1', 'b': NULL, 'c': 2 ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+EXPLAIN (COSTS OFF)
+SELECT * FROM onek t1, lateral (SELECT * FROM onek t2 WHERE t2.ten IN (values (t1.ten), (1)))
+;
+SELECT JSON_OBJECT(RETURNING text FORMAT JSON ENCODING UTF8)
+;
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i))
+;
+-- indent singly-rooted xml with mixed contents
+SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val><val x="y">text node<val>73</val></val></bar></foo>' AS text INDENT)
+;
+select bool_or(conflicting) from
+		  (select conflicting from pg_replication_slots
+			where slot_type = 'logical')
+;
+SELECT test_slru_page_truncate(0x1234500000020)
+;
+SELECT JSON_OBJECT('foo': NULL::json FORMAT JSON ENCODING UTF8)
+;
+SELECT JSON_ARRAY('a', NULL, 'b' NULL ON NULL RETURNING jsonb)
+;
+explain (costs off)
+SELECT proname, proargtypes, pronamespace
+   FROM pg_proc
+   WHERE (proname, pronamespace) < ('abs', 1_000_000)
+ORDER BY proname DESC, proargtypes DESC, pronamespace DESC LIMIT 1
+;
+SELECT	JSON_OBJECTAGG('key': 1) IS NULL,
+		JSON_OBJECTAGG('key': 1 RETURNING jsonb) IS NULL
+WHERE FALSE
+;
+SELECT JSON_OBJECT('foo': NULL::int FORMAT JSON ENCODING UTF8)
+;
+SELECT JSON_OBJECT(ARRAY[1,2,3]: 'aaa')
+;
+-- Test JSON_ARRAY deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+SELECT JSON_ARRAY(RETURNING text FORMAT JSON)
+;
+-- and check we get the expected results
+select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+SELECT XMLSERIALIZE(CONTENT XMLPARSE(CONTENT 'abc<foo>bar</foo>') AS text NO INDENT) AS serialized_xml
+;
+SELECT	JSON_ARRAYAGG(NULL),
+		JSON_ARRAYAGG(NULL RETURNING jsonb)
+FROM generate_series(1, 5)
+;
+--SELECT JSON_OBJECT(KEY 'a' VALUE 2::text);
+SELECT JSON_OBJECT(1::text: 2)
+;
+SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+SELECT COUNT(*) FROM (SELECT DISTINCT name FROM road)
+;
+SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (NULL), (2)) AS t(i)
+;
+-- indent null
+SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': volatile_one() RETURNING text) FORMAT JSON)
+;
+--SELECT JSON_OBJECT(1::text VALUE 2);
+--SELECT JSON_OBJECT(KEY 1::text VALUE 2);
+SELECT JSON_OBJECT(json '[1]': 123)
+;
+SELECT test_slru_page_sync(0x1234500000030)
+;
+--
+-- Similar to the previous test case, but this time it's a backwards scan
+-- using a < RowCompare.  Must use the <= strategy (and not the < strategy).
+--
+explain (costs off)
+SELECT proname, proargtypes, pronamespace
+   FROM pg_proc
+   WHERE (proname, pronamespace) < ('abs', 1_000_000)
+ORDER BY proname DESC, proargtypes DESC, pronamespace DESC LIMIT 1
+;
+SELECT JSON_OBJECT(RETURNING json FORMAT JSON)
+;
+select json_array ( returning jsonb format json )
+;
+SELECT ctid FROM (
+		SELECT ctid FROM corruption_test
+			WHERE (ctid::text::point)[0] != 0
+			ORDER BY random() LIMIT 5)
+		ORDER BY ctid ASC
+;
+-- indent non singly-rooted xml with mixed contents
+SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+-- JSON_ARRAYAGG()
+SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL)
+;
+SELECT bytea '\x00' IS JSON
+;
+-- Reading page in buffer for read-only
+SELECT test_slru_page_readonly(0x1234500000020)
+;
+-- Test JSON_OBJECTAGG deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+SELECT JSON_OBJECTAGG(mod(i,100): (i)::text FORMAT JSON WITH UNIQUE)
+FROM generate_series(0, 199) i
+;
+SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v ABSENT ON NULL)
+OVER (ORDER BY k RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)
+FROM (VALUES (1,1), (1,null), (2,2)) a(k,v)
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECT('foo' : '1' FORMAT JSON, 'bar' : 'baz' RETURNING json)
+;
+SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v WITH UNIQUE KEYS) OVER (ORDER BY k)
+FROM (VALUES (1,1), (2,2)) a(k,v)
+;
+SELECT JSON_OBJECT(1: 1, '2': NULL, '3': 1, 4: NULL, '5': 'a' ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+-- Ensure there is no problem if cheapest_startup_path is NULL
+explain (costs off)
+select * from tenk1 t1
+left join lateral
+  (select t1.tenthous from tenk2 t2 union all (values(1)))
+on true limit 1
+;
+SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+-- 'no indent' = not using 'no indent'
+SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text) = xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text NO INDENT)
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT xmlserialize(CONTENT  'text node<foo>    <bar></bar>   </foo>' AS text INDENT)
+;
+----------
+[SELECT] -- Ensure consecutive NULLs are properly treated as distinct from each other
+select array_agg(distinct val)
+from (select null as val from generate_series(1, 2))
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a',  NULL, 'b' NULL   ON NULL RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v RETURNING jsonb) FROM (VALUES ('a', 1), ('b', 2)) AS t(k,v)
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '<?xml version="1.0" encoding="UTF-8"?><foo><bar><val>73</val></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] -- IS JSON predicate
+SELECT NULL IS JSON
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': '1', 'b': NULL, 'c': 2 ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF)
+SELECT * FROM onek t1, lateral (SELECT * FROM onek t2 WHERE t2.ten IN (values (t1.ten), (1)))
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING text FORMAT JSON ENCODING UTF8)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i))
+;
+----------
+[SELECT] -- indent singly-rooted xml with mixed contents
+SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val><val x="y">text node<val>73</val></val></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] select bool_or(conflicting) from
+		  (select conflicting from pg_replication_slots
+			where slot_type = 'logical')
+;
+----------
+[SELECT] SELECT test_slru_page_truncate(0x1234500000020)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('foo': NULL::json FORMAT JSON ENCODING UTF8)
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a', NULL, 'b' NULL ON NULL RETURNING jsonb)
+;
+----------
+[PERFORMANCE] explain (costs off)
+SELECT proname, proargtypes, pronamespace
+   FROM pg_proc
+   WHERE (proname, pronamespace) < ('abs', 1_000_000)
+ORDER BY proname DESC, proargtypes DESC, pronamespace DESC LIMIT 1
+;
+----------
+[SELECT] SELECT	JSON_OBJECTAGG('key': 1) IS NULL,
+		JSON_OBJECTAGG('key': 1 RETURNING jsonb) IS NULL
+WHERE FALSE
+;
+----------
+[SELECT] SELECT JSON_OBJECT('foo': NULL::int FORMAT JSON ENCODING UTF8)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(ARRAY[1,2,3]: 'aaa')
+;
+----------
+[PERFORMANCE] -- Test JSON_ARRAY deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING text FORMAT JSON)
+;
+----------
+[SELECT] -- and check we get the expected results
+select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+----------
+[SELECT] SELECT XMLSERIALIZE(CONTENT XMLPARSE(CONTENT 'abc<foo>bar</foo>') AS text NO INDENT) AS serialized_xml
+;
+----------
+[SELECT] SELECT	JSON_ARRAYAGG(NULL),
+		JSON_ARRAYAGG(NULL RETURNING jsonb)
+FROM generate_series(1, 5)
+;
+----------
+[SELECT] --SELECT JSON_OBJECT(KEY 'a' VALUE 2::text);
+SELECT JSON_OBJECT(1::text: 2)
+;
+----------
+[SELECT] SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+----------
+[SELECT] SELECT COUNT(*) FROM (SELECT DISTINCT name FROM road)
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (NULL), (2)) AS t(i)
+;
+----------
+[SELECT] -- indent null
+SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': volatile_one() RETURNING text) FORMAT JSON)
+;
+----------
+[SELECT] --SELECT JSON_OBJECT(1::text VALUE 2);
+--SELECT JSON_OBJECT(KEY 1::text VALUE 2);
+SELECT JSON_OBJECT(json '[1]': 123)
+;
+----------
+[SELECT] SELECT test_slru_page_sync(0x1234500000030)
+;
+----------
+[PERFORMANCE] --
+-- Similar to the previous test case, but this time it's a backwards scan
+-- using a < RowCompare.  Must use the <= strategy (and not the < strategy).
+--
+explain (costs off)
+SELECT proname, proargtypes, pronamespace
+   FROM pg_proc
+   WHERE (proname, pronamespace) < ('abs', 1_000_000)
+ORDER BY proname DESC, proargtypes DESC, pronamespace DESC LIMIT 1
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING json FORMAT JSON)
+;
+----------
+[SELECT] select json_array ( returning jsonb format json )
+;
+----------
+[SELECT] SELECT ctid FROM (
+		SELECT ctid FROM corruption_test
+			WHERE (ctid::text::point)[0] != 0
+			ORDER BY random() LIMIT 5)
+		ORDER BY ctid ASC
+;
+----------
+[SELECT] -- indent non singly-rooted xml with mixed contents
+SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] -- JSON_ARRAYAGG()
+SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL)
+;
+----------
+[SELECT] SELECT bytea '\x00' IS JSON
+;
+----------
+[SELECT] -- Reading page in buffer for read-only
+SELECT test_slru_page_readonly(0x1234500000020)
+;
+----------
+[PERFORMANCE] -- Test JSON_OBJECTAGG deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(mod(i,100): (i)::text FORMAT JSON WITH UNIQUE)
+FROM generate_series(0, 199) i
+;
+----------
+[SELECT] SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v ABSENT ON NULL)
+OVER (ORDER BY k RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)
+FROM (VALUES (1,1), (1,null), (2,2)) a(k,v)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECT('foo' : '1' FORMAT JSON, 'bar' : 'baz' RETURNING json)
+;
+----------
+[SELECT] SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v WITH UNIQUE KEYS) OVER (ORDER BY k)
+FROM (VALUES (1,1), (2,2)) a(k,v)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1: 1, '2': NULL, '3': 1, 4: NULL, '5': 'a' ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+----------
+[PERFORMANCE] -- Ensure there is no problem if cheapest_startup_path is NULL
+explain (costs off)
+select * from tenk1 t1
+left join lateral
+  (select t1.tenthous from tenk2 t2 union all (values(1)))
+on true limit 1
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] -- 'no indent' = not using 'no indent'
+SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text) = xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text NO INDENT)
+;

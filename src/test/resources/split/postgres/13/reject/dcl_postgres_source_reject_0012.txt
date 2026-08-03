@@ -1,0 +1,66 @@
+-- Grant and then revoke privileges on the non-existent custom GUC.  Check that
+-- a do-nothing entry is not left in the catalogs after the revoke.
+GRANT ALL ON PARAMETER none.such TO regress_host_resource_admin
+;
+REVOKE SET ON PARAMETER maintenance_work_mem FROM PUBLIC
+;
+prepare foom as merge into target t using (select 1 as sid) s on (t.tid = s.sid) when matched then update set balance = 1
+;
+-- Creating privileges on an existent custom GUC should create precisely the
+-- right privileges, not overly conservative ones.
+GRANT SET ON PARAMETER test_oat_hooks.user_var2 TO regress_role_joe
+;
+-- Granting multiple privileges on a parameter should be reported correctly to
+-- the OAT hook, but beware that WITH GRANT OPTION is not represented.
+GRANT SET, ALTER SYSTEM ON PARAMETER none.such TO regress_role_joe
+;
+GRANT SET ON PARAMETER zero_damaged_pages TO regress_host_resource_admin
+;
+REVOKE SET ON PARAMETER auto_explain.log_format FROM regress_user1
+;
+-- GRANT SET creates an entry:
+GRANT SET ON PARAMETER enable_material TO PUBLIC
+;
+-- Revoke privileges not yet granted
+REVOKE SET, ALTER SYSTEM ON PARAMETER work_mem FROM regress_host_resource_admin
+;
+ALTER SUBSCRIPTION regress_testsub SKIP (lsn = '0/12345')
+;
+------------------------------------------------------------------------------------------
+[GRANT] -- Grant and then revoke privileges on the non-existent custom GUC.  Check that
+-- a do-nothing entry is not left in the catalogs after the revoke.
+GRANT ALL ON PARAMETER none.such TO regress_host_resource_admin
+;
+----------
+[REVOKE] REVOKE SET ON PARAMETER maintenance_work_mem FROM PUBLIC
+;
+----------
+[UNSAFE] prepare foom as merge into target t using (select 1 as sid) s on (t.tid = s.sid) when matched then update set balance = 1
+;
+----------
+[GRANT] -- Creating privileges on an existent custom GUC should create precisely the
+-- right privileges, not overly conservative ones.
+GRANT SET ON PARAMETER test_oat_hooks.user_var2 TO regress_role_joe
+;
+----------
+[GRANT] -- Granting multiple privileges on a parameter should be reported correctly to
+-- the OAT hook, but beware that WITH GRANT OPTION is not represented.
+GRANT SET, ALTER SYSTEM ON PARAMETER none.such TO regress_role_joe
+;
+----------
+[GRANT] GRANT SET ON PARAMETER zero_damaged_pages TO regress_host_resource_admin
+;
+----------
+[REVOKE] REVOKE SET ON PARAMETER auto_explain.log_format FROM regress_user1
+;
+----------
+[GRANT] -- GRANT SET creates an entry:
+GRANT SET ON PARAMETER enable_material TO PUBLIC
+;
+----------
+[REVOKE] -- Revoke privileges not yet granted
+REVOKE SET, ALTER SYSTEM ON PARAMETER work_mem FROM regress_host_resource_admin
+;
+----------
+[ADMIN_PUB_SUB] ALTER SUBSCRIPTION regress_testsub SKIP (lsn = '0/12345')
+;

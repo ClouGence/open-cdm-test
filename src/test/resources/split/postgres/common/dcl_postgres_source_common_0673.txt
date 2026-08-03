@@ -1,0 +1,76 @@
+/*
+ * Test concurrent abort with toast data. When streaming the second insertion, we
+ * detect that the subtransaction was aborted, and reset the transaction while having
+ * the TOAST changes in memory, resulting in deallocating both decoded changes and
+ * TOAST reconstruction data. Memory usage counters must be updated correctly.
+ *
+ * Set debug_logical_replication_streaming to 'immediate' to disable the transaction
+ * status check happening before streaming the second insertion, so we can detect a
+ * concurrent abort while streaming.
+ */
+SET debug_logical_replication_streaming = immediate
+;
+EXECUTE dumpTableAttach('36772')
+;
+copy rem2 from stdin
+;
+-- make sure dependencies are dropped and reported
+-- and make sure that transactional behavior is correct on rollback
+-- incidentally leaving some interesting materialized views for pg_dump testing
+BEGIN
+;
+EXECUTE dumpFunc('16642')
+;
+set enable_sort = false
+;
+DROP USER regress_unpriv_user
+;
+LOCK TABLE public.big5_inputs IN ACCESS SHARE MODE
+;
+EXECUTE dumpAgg('34724')
+;
+ALTER SEQUENCE public.insert_seq OWNER TO zyc
+;
+------------------------------------------------------------------------------------------
+[SESSION_SETTING_WRITE] /*
+ * Test concurrent abort with toast data. When streaming the second insertion, we
+ * detect that the subtransaction was aborted, and reset the transaction while having
+ * the TOAST changes in memory, resulting in deallocating both decoded changes and
+ * TOAST reconstruction data. Memory usage counters must be updated correctly.
+ *
+ * Set debug_logical_replication_streaming to 'immediate' to disable the transaction
+ * status check happening before streaming the second insertion, so we can detect a
+ * concurrent abort while streaming.
+ */
+SET debug_logical_replication_streaming = immediate
+;
+----------
+[UNSAFE] EXECUTE dumpTableAttach('36772')
+;
+----------
+[DATA_IMPORT] copy rem2 from stdin
+;
+----------
+[TRANSACTION] -- make sure dependencies are dropped and reported
+-- and make sure that transactional behavior is correct on rollback
+-- incidentally leaving some interesting materialized views for pg_dump testing
+BEGIN
+;
+----------
+[UNSAFE] EXECUTE dumpFunc('16642')
+;
+----------
+[SESSION_SETTING_WRITE] set enable_sort = false
+;
+----------
+[DROP_USER] DROP USER regress_unpriv_user
+;
+----------
+[SESSION_LOCK] LOCK TABLE public.big5_inputs IN ACCESS SHARE MODE
+;
+----------
+[UNSAFE] EXECUTE dumpAgg('34724')
+;
+----------
+[TRANSFER_PRIVILEGE] ALTER SEQUENCE public.insert_seq OWNER TO zyc
+;

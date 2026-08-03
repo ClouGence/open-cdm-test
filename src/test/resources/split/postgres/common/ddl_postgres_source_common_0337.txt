@@ -1,0 +1,560 @@
+CREATE OPERATOR FAMILY split_operator_probe.int_hash_family USING hash
+;
+CREATE FUNCTION g_int_penalty(internal,internal,internal)
+RETURNS internal
+AS '$libdir/_int'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+CREATE TABLE "public"."gtest24nn" (
+    "a" integer,
+    "b" "public"."gtestdomainnn" GENERATED ALWAYS AS (("a" * 2)) STORED
+)
+;
+ALTER TEXT SEARCH CONFIGURATION "public"."thesaurus_tst"
+    ADD MAPPING FOR "hword_numpart" WITH "simple"
+;
+drop table inserttest2
+;
+create function subxact_rollback_semantics() returns int as $$
+declare x int;
+begin
+  x := 1;
+  insert into foo values(x);
+  begin
+    x := x + 1;
+    insert into foo values(x);
+    raise exception 'inner';
+  exception
+    when others then
+      x := x * 10;
+  end;
+  insert into foo values(x);
+  return x;
+end$$ language plpgsql
+;
+-- check any TEMP-ness
+CREATE TEMP TABLE temp_parted (a int) PARTITION BY LIST (a)
+;
+CREATE RULE "rtest_emp_upd" AS
+    ON UPDATE TO "public"."rtest_emp"
+   WHERE ("new"."salary" <> "old"."salary") DO  INSERT INTO "public"."rtest_emplog" ("ename", "who", "action", "newsal", "oldsal")
+  VALUES ("new"."ename", CURRENT_USER, 'honored'::"bpchar", "new"."salary", "old"."salary")
+;
+CREATE TABLESPACE ts1 LOCATION '/tmp/g7oKaLtFLO'
+;
+create view rtest_vview2 as select a, b from rtest_view1 where v
+;
+-- error, not found
+DROP FUNCTION functest_b_2
+;
+VACUUM (TRUNCATE FALSE) information_schema.sql_features
+;
+/*
+ * text search configuration for basque language
+ *
+ * Copyright (c) 2007-2023, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * basque and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY basque_stem
+	(TEMPLATE = snowball, Language = basque )
+;
+DO $d$
+    BEGIN
+        EXECUTE $$CREATE SERVER loopback FOREIGN DATA WRAPPER postgres_fdw
+            OPTIONS (dbname '$$||current_database()||$$',
+                     port '$$||current_setting('port')||$$'
+            )$$;
+        EXECUTE $$CREATE SERVER loopback2 FOREIGN DATA WRAPPER postgres_fdw
+            OPTIONS (dbname '$$||current_database()||$$',
+                     port '$$||current_setting('port')||$$'
+            )$$;
+    END;
+$d$
+;
+create rule t1_upd_1 as on update to t1
+	where old.a >= 0 and old.a < 10
+	do instead
+	update t1_1 set a = new.a where a = old.a
+;
+CREATE TABLE mvtest_foo_data AS SELECT i,
+  i+1 AS tid,
+  md5(random()::text) AS mv,
+  md5(random()::text) AS newdata,
+  md5(random()::text) AS newdata2,
+  md5(random()::text) AS diff
+  FROM generate_series(1, 10) i
+;
+-- check the ability to use multiple MCV lists
+CREATE TABLE mcv_lists_multi (
+	a INTEGER,
+	b INTEGER,
+	c INTEGER,
+	d INTEGER
+)
+WITH (autovacuum_enabled = off)
+;
+CREATE UNIQUE INDEX "hslot_name" ON "public"."hslot" USING "btree" ("slotname")
+;
+create temp table t2 (x int, y int, z int, primary key (x, y))
+;
+CREATE VIEW "public"."my_property_normal" WITH ("security_barrier"='true') AS
+ SELECT "cid",
+    "name",
+    "tel",
+    "passwd"
+   FROM "public"."customer"
+  WHERE ("name" = CURRENT_USER)
+;
+CREATE UNLOGGED TABLE tab_seq_unlogged3 (a int GENERATED ALWAYS AS IDENTITY)
+;
+CREATE SCHEMA "fkpart3"
+;
+CREATE COLLATION test3 (lc_collate = 'en_US.utf8')
+;
+CREATE TEMP TABLE t2 (ab text primary key)
+;
+-- test SP-GiST index that's been built incrementally
+create table test_range_spgist(ir int4range)
+;
+VACUUM (DISABLE_PAGE_SKIPPING) information_schema.sql_sizing_profiles
+;
+ANALYZE public.inh_test
+;
+drop function anyctest(a anyelement, b anyarray,
+                       c anycompatible, d anycompatible)
+;
+CREATE OR REPLACE VIEW mysecview1
+       AS SELECT * FROM tbl1 WHERE a = 256
+;
+create temp table nt1 (
+  id int primary key,
+  a1 boolean,
+  a2 boolean
+)
+;
+ALTER TABLE pk2 ALTER a SET NOT NULL
+;
+CREATE TABLE subxids (subx integer, val integer)
+;
+CREATE FUNCTION isbn_in(cstring)
+	RETURNS isbn
+	AS '$libdir/isn'
+	LANGUAGE C
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+DO $$
+DECLARE
+    objtype text;
+    names   text[];
+    args    text[];
+BEGIN
+    FOR objtype IN VALUES
+        ('table'), ('index'), ('sequence'), ('view'),
+        ('materialized view'), ('foreign table'),
+        ('table column'), ('foreign table column'),
+        ('aggregate'), ('function'), ('procedure'), ('type'), ('cast'),
+        ('table constraint'), ('domain constraint'), ('conversion'), ('default value'),
+        ('operator'), ('operator class'), ('operator family'), ('rule'), ('trigger'),
+        ('text search parser'), ('text search dictionary'),
+        ('text search template'), ('text search configuration'),
+        ('policy'), ('user mapping'), ('default acl'), ('transform'),
+        ('operator of access method'), ('function of access method'),
+        ('publication namespace'), ('publication relation')
+    LOOP
+        FOR names IN VALUES ('{eins}'), ('{addr_nsp, zwei}'), ('{eins, zwei, drei}')
+        LOOP
+            FOR args IN VALUES ('{}'), ('{integer}')
+            LOOP
+                BEGIN
+                    PERFORM pg_get_object_address(objtype, names, args);
+                EXCEPTION WHEN OTHERS THEN
+                    RAISE WARNING 'error for %,%,%: %', objtype, names, args, sqlerrm;
+                END;
+            END LOOP;
+        END LOOP;
+    END LOOP;
+END;
+$$
+;
+ALTER TABLE pg_temp_4.pg_temp_37852_2 ADD COLUMN newdata pg_temp_4.pg_temp_37852
+;
+create temp table parttbl (a integer primary key) partition by range (a)
+;
+create table at_partitioned(id int, name varchar(64), unique (id, name))
+  partition by hash(id)
+;
+CREATE TABLE queue (
+	id	int		PRIMARY KEY,
+	data			text	NOT NULL,
+	status			text	NOT NULL
+  )
+;
+drop view part_abc_view
+;
+ALTER TABLE pg_temp_14.pg_temp_26781_2 ADD COLUMN newdata pg_temp_14.pg_temp_26781
+;
+CREATE FUNCTION distance_chebyshev(cube, cube)
+RETURNS float8
+AS '$libdir/cube'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.a ? (@.datetime("HH:MI TZH") < $.datetime("YY-MM-DD HH:MI"))'))
+;
+--
+-- heap_page_items()
+--
+CREATE FUNCTION heap_page_items(IN page bytea,
+    OUT lp smallint,
+    OUT lp_off smallint,
+    OUT lp_flags smallint,
+    OUT lp_len smallint,
+    OUT t_xmin xid,
+    OUT t_xmax xid,
+    OUT t_field3 int4,
+    OUT t_ctid tid,
+    OUT t_infomask2 integer,
+    OUT t_infomask integer,
+    OUT t_hoff smallint,
+    OUT t_bits text,
+    OUT t_oid oid,
+    OUT t_data bytea)
+RETURNS SETOF record
+AS '$libdir/pageinspect', 'heap_page_items'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+ALTER EXTENSION postgres_fdw ADD TEXT SEARCH CONFIGURATION public.custom_search
+;
+create table pktable2 (a int, b int, c int, d int, e int, primary key (d, e))
+;
+CREATE TABLE itest7d (a int not null)
+;
+drop domain insert_nnarray
+;
+-- BUFFER_USAGE_LIMIT option
+VACUUM (BUFFER_USAGE_LIMIT '512 kB') vac_option_tab
+;
+CREATE UNIQUE INDEX ON groupby_collation_t (a COLLATE "C")
+;
+-- fail, requires cascade
+
+drop domain intdom1 cascade
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE OPERATOR FAMILY split_operator_probe.int_hash_family USING hash
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION g_int_penalty(internal,internal,internal)
+RETURNS internal
+AS '$libdir/_int'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."gtest24nn" (
+    "a" integer,
+    "b" "public"."gtestdomainnn" GENERATED ALWAYS AS (("a" * 2)) STORED
+)
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION "public"."thesaurus_tst"
+    ADD MAPPING FOR "hword_numpart" WITH "simple"
+;
+----------
+[DROP_TABLE] drop table inserttest2
+;
+----------
+[CREATE_PROG_OBJ] create function subxact_rollback_semantics() returns int as $$
+declare x int;
+begin
+  x := 1;
+  insert into foo values(x);
+  begin
+    x := x + 1;
+    insert into foo values(x);
+    raise exception 'inner';
+  exception
+    when others then
+      x := x * 10;
+  end;
+  insert into foo values(x);
+  return x;
+end$$ language plpgsql
+;
+----------
+[CREATE_TABLE] -- check any TEMP-ness
+CREATE TEMP TABLE temp_parted (a int) PARTITION BY LIST (a)
+;
+----------
+[CREATE_POLICY] CREATE RULE "rtest_emp_upd" AS
+    ON UPDATE TO "public"."rtest_emp"
+   WHERE ("new"."salary" <> "old"."salary") DO  INSERT INTO "public"."rtest_emplog" ("ename", "who", "action", "newsal", "oldsal")
+  VALUES ("new"."ename", CURRENT_USER, 'honored'::"bpchar", "new"."salary", "old"."salary")
+;
+----------
+[CREATE_TABLESPACE] CREATE TABLESPACE ts1 LOCATION '/tmp/g7oKaLtFLO'
+;
+----------
+[CREATE_VIEW(SELECT)] create view rtest_vview2 as select a, b from rtest_view1 where v
+;
+----------
+[DROP_PROG_OBJ] -- error, not found
+DROP FUNCTION functest_b_2
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) information_schema.sql_features
+;
+----------
+[CREATE_POLICY] /*
+ * text search configuration for basque language
+ *
+ * Copyright (c) 2007-2023, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * basque and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY basque_stem
+	(TEMPLATE = snowball, Language = basque )
+;
+----------
+[BLOCK] DO $d$
+    BEGIN
+        EXECUTE $$CREATE SERVER loopback FOREIGN DATA WRAPPER postgres_fdw
+            OPTIONS (dbname '$$||current_database()||$$',
+                     port '$$||current_setting('port')||$$'
+            )$$;
+        EXECUTE $$CREATE SERVER loopback2 FOREIGN DATA WRAPPER postgres_fdw
+            OPTIONS (dbname '$$||current_database()||$$',
+                     port '$$||current_setting('port')||$$'
+            )$$;
+    END;
+$d$
+;
+----------
+[CREATE_POLICY] create rule t1_upd_1 as on update to t1
+	where old.a >= 0 and old.a < 10
+	do instead
+	update t1_1 set a = new.a where a = old.a
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE mvtest_foo_data AS SELECT i,
+  i+1 AS tid,
+  md5(random()::text) AS mv,
+  md5(random()::text) AS newdata,
+  md5(random()::text) AS newdata2,
+  md5(random()::text) AS diff
+  FROM generate_series(1, 10) i
+;
+----------
+[CREATE_TABLE] -- check the ability to use multiple MCV lists
+CREATE TABLE mcv_lists_multi (
+	a INTEGER,
+	b INTEGER,
+	c INTEGER,
+	d INTEGER
+)
+WITH (autovacuum_enabled = off)
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX "hslot_name" ON "public"."hslot" USING "btree" ("slotname")
+;
+----------
+[CREATE_TABLE] create temp table t2 (x int, y int, z int, primary key (x, y))
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."my_property_normal" WITH ("security_barrier"='true') AS
+ SELECT "cid",
+    "name",
+    "tel",
+    "passwd"
+   FROM "public"."customer"
+  WHERE ("name" = CURRENT_USER)
+;
+----------
+[CREATE_TABLE] CREATE UNLOGGED TABLE tab_seq_unlogged3 (a int GENERATED ALWAYS AS IDENTITY)
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA "fkpart3"
+;
+----------
+[CREATE_POLICY] CREATE COLLATION test3 (lc_collate = 'en_US.utf8')
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE t2 (ab text primary key)
+;
+----------
+[CREATE_TABLE] -- test SP-GiST index that's been built incrementally
+create table test_range_spgist(ir int4range)
+;
+----------
+[ADMIN_TABLE] VACUUM (DISABLE_PAGE_SKIPPING) information_schema.sql_sizing_profiles
+;
+----------
+[ADMIN_TABLE] ANALYZE public.inh_test
+;
+----------
+[DROP_PROG_OBJ] drop function anyctest(a anyelement, b anyarray,
+                       c anycompatible, d anycompatible)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE OR REPLACE VIEW mysecview1
+       AS SELECT * FROM tbl1 WHERE a = 256
+;
+----------
+[CREATE_TABLE] create temp table nt1 (
+  id int primary key,
+  a1 boolean,
+  a2 boolean
+)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE pk2 ALTER a SET NOT NULL
+;
+----------
+[CREATE_TABLE] CREATE TABLE subxids (subx integer, val integer)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isbn_in(cstring)
+	RETURNS isbn
+	AS '$libdir/isn'
+	LANGUAGE C
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[BLOCK] DO $$
+DECLARE
+    objtype text;
+    names   text[];
+    args    text[];
+BEGIN
+    FOR objtype IN VALUES
+        ('table'), ('index'), ('sequence'), ('view'),
+        ('materialized view'), ('foreign table'),
+        ('table column'), ('foreign table column'),
+        ('aggregate'), ('function'), ('procedure'), ('type'), ('cast'),
+        ('table constraint'), ('domain constraint'), ('conversion'), ('default value'),
+        ('operator'), ('operator class'), ('operator family'), ('rule'), ('trigger'),
+        ('text search parser'), ('text search dictionary'),
+        ('text search template'), ('text search configuration'),
+        ('policy'), ('user mapping'), ('default acl'), ('transform'),
+        ('operator of access method'), ('function of access method'),
+        ('publication namespace'), ('publication relation')
+    LOOP
+        FOR names IN VALUES ('{eins}'), ('{addr_nsp, zwei}'), ('{eins, zwei, drei}')
+        LOOP
+            FOR args IN VALUES ('{}'), ('{integer}')
+            LOOP
+                BEGIN
+                    PERFORM pg_get_object_address(objtype, names, args);
+                EXCEPTION WHEN OTHERS THEN
+                    RAISE WARNING 'error for %,%,%: %', objtype, names, args, sqlerrm;
+                END;
+            END LOOP;
+        END LOOP;
+    END LOOP;
+END;
+$$
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE pg_temp_4.pg_temp_37852_2 ADD COLUMN newdata pg_temp_4.pg_temp_37852
+;
+----------
+[CREATE_TABLE] create temp table parttbl (a integer primary key) partition by range (a)
+;
+----------
+[CREATE_TABLE] create table at_partitioned(id int, name varchar(64), unique (id, name))
+  partition by hash(id)
+;
+----------
+[CREATE_TABLE] CREATE TABLE queue (
+	id	int		PRIMARY KEY,
+	data			text	NOT NULL,
+	status			text	NOT NULL
+  )
+;
+----------
+[DROP_VIEW] drop view part_abc_view
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE pg_temp_14.pg_temp_26781_2 ADD COLUMN newdata pg_temp_14.pg_temp_26781
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION distance_chebyshev(cube, cube)
+RETURNS float8
+AS '$libdir/cube'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.a ? (@.datetime("HH:MI TZH") < $.datetime("YY-MM-DD HH:MI"))'))
+;
+----------
+[CREATE_PROG_OBJ] --
+-- heap_page_items()
+--
+CREATE FUNCTION heap_page_items(IN page bytea,
+    OUT lp smallint,
+    OUT lp_off smallint,
+    OUT lp_flags smallint,
+    OUT lp_len smallint,
+    OUT t_xmin xid,
+    OUT t_xmax xid,
+    OUT t_field3 int4,
+    OUT t_ctid tid,
+    OUT t_infomask2 integer,
+    OUT t_infomask integer,
+    OUT t_hoff smallint,
+    OUT t_bits text,
+    OUT t_oid oid,
+    OUT t_data bytea)
+RETURNS SETOF record
+AS '$libdir/pageinspect', 'heap_page_items'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+----------
+[ALTER_LIBRARY] ALTER EXTENSION postgres_fdw ADD TEXT SEARCH CONFIGURATION public.custom_search
+;
+----------
+[CREATE_TABLE] create table pktable2 (a int, b int, c int, d int, e int, primary key (d, e))
+;
+----------
+[CREATE_TABLE] CREATE TABLE itest7d (a int not null)
+;
+----------
+[DROP_TYPE] drop domain insert_nnarray
+;
+----------
+[ADMIN_TABLE] -- BUFFER_USAGE_LIMIT option
+VACUUM (BUFFER_USAGE_LIMIT '512 kB') vac_option_tab
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX ON groupby_collation_t (a COLLATE "C")
+;
+----------
+[DROP_TYPE] -- fail, requires cascade
+
+drop domain intdom1 cascade
+;

@@ -1,0 +1,1105 @@
+CREATE JOB multi_table_sync
+ON STREAMING
+FROM MYSQL (
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-j-8.0.31.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "test",
+        "include_tables" = "user_info,order_info",
+        "offset" = "initial"
+)
+TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"
+)
+;
+CREATE JOB mysql_db_sync
+ON STREAMING
+FROM MYSQL (
+    "jdbc_url"       = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url"     = "mysql-connector-java-8.0.25.jar",
+    "driver_class"   = "com.mysql.cj.jdbc.Driver",
+    "user"           = "root",
+    "password"       = "123456",
+    "database"       = "test",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- set to 1 in single-BE deployments
+);
+CREATE JOB mysql_students_sync
+ON STREAMING
+DO
+INSERT INTO doris_db.students
+SELECT * FROM cdc_stream(
+    "type"         = "mysql",
+    "jdbc_url"     = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url"   = "mysql-connector-java-8.0.25.jar",
+    "driver_class" = "com.mysql.cj.jdbc.Driver",
+    "user"         = "root",
+    "password"     = "123456",
+    "database"     = "test",
+    "table"        = "students",
+    "offset"       = "initial"
+);
+CREATE JOB pg_db_sync
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url"       = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url"     = "postgresql-42.5.1.jar",
+    "driver_class"   = "org.postgresql.Driver",
+    "user"           = "postgres",
+    "password"       = "postgres",
+    "database"       = "postgres",
+    "schema"         = "public",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- set to 1 in single-BE deployments
+);
+CREATE JOB pg_students_sync
+ON STREAMING
+DO
+INSERT INTO doris_db.students
+SELECT * FROM cdc_stream(
+    "type"         = "postgres",
+    "jdbc_url"     = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url"   = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user"         = "postgres",
+    "password"     = "postgres",
+    "database"     = "postgres",
+    "schema"       = "public",
+    "table"        = "students",
+    "offset"       = "initial"
+);
+CREATE JOB multi_table_sync
+ON STREAMING
+FROM MYSQL (
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-java-8.0.25.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "test",
+        "include_tables" = "user_info,order_info",
+        "offset" = "initial"
+)
+TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"  -- Set to 1 for single-BE deployment
+)
+;
+CREATE JOB mysql_single_sync
+ON STREAMING
+DO
+INSERT INTO db1.tbl1
+SELECT * FROM cdc_stream(
+    "type" = "mysql",
+    "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url" = "mysql-connector-java-8.0.25.jar",
+    "driver_class" = "com.mysql.cj.jdbc.Driver",
+    "user" = "root",
+    "password" = "123456",
+    "database" = "source_db",
+    "table" = "source_table",
+    "offset" = "initial"
+)
+;
+CREATE JOB mysql_cdc_with_delete
+ON STREAMING
+DO
+INSERT INTO db1.target_table (id, value, __DORIS_DELETE_SIGN__)
+SELECT id, value, __DORIS_DELETE_SIGN__
+FROM cdc_stream(
+    "type" = "mysql",
+    "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url" = "mysql-connector-java-8.0.25.jar",
+    "driver_class" = "com.mysql.cj.jdbc.Driver",
+    "user" = "root",
+    "password" = "123456",
+    "database" = "source_db",
+    "table" = "source_table",
+    "offset" = "initial",
+    "include_delete_sign" = "true"
+);
+CREATE JOB test_postgres_job
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "include_tables" = "test_tbls",
+    "offset" = "latest"
+)
+TO DATABASE target_test_db (
+  "table.create.properties.replication_num" = "1"  -- Set to 1 for single-BE deployments
+)
+;
+CREATE JOB pg_single_sync
+ON STREAMING
+DO
+INSERT INTO db1.tbl1
+SELECT * FROM cdc_stream(
+    "type" = "postgres",
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "table" = "source_table",
+    "offset" = "initial"
+)
+;
+CREATE JOB pg_cdc_with_delete
+ON STREAMING
+DO
+INSERT INTO db1.target_table (id, value, __DORIS_DELETE_SIGN__)
+SELECT id, value, __DORIS_DELETE_SIGN__
+FROM cdc_stream(
+    "type" = "postgres",
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "schema" = "public",
+    "table" = "source_table",
+    "offset" = "initial",
+    "include_delete_sign" = "true"
+);
+CREATE JOB my_job 
+ON STREAMING
+DO 
+INSERT INTO db1.tbl1 
+select * from S3(
+    "uri" = "s3://bucket/*.csv",
+    "s3.access_key" = "<s3_access_key>",
+    "s3.secret_key" = "<s3_secret_key>",
+    "s3.region" = "<s3_region>",
+    "s3.endpoint" = "<s3_endpoint>",
+    "format" = "<format>"
+)
+;
+CREATE JOB mysql_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  );
+CREATE JOB pg_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "postgres",
+      "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+      "driver_url" = "postgresql-42.5.1.jar",
+      "driver_class" = "org.postgresql.Driver",
+      "user" = "postgres",
+      "password" = "postgres",
+      "database" = "postgres",
+      "schema" = "public",
+      "table" = "source_table",
+      "offset" = "initial"
+  );
+CREATE JOB mysql_cdc_transform_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table (id, name, age)
+  SELECT id, name, cast(age as INT) as age
+  FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  );
+CREATE JOB mysql_cdc_delete_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table (id, name, __DORIS_DELETE_SIGN__)
+  SELECT id, name, __DORIS_DELETE_SIGN__
+  FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial",
+      "include_delete_sign" = "true"
+  );
+CREATE JOB my_job
+PROPERTIES (
+    "max_interval" = "30",
+    "session.insert_max_filter_ratio" = "0.5"
+)
+ON STREAMING
+DO
+INSERT INTO db1.tbl1
+SELECT * FROM S3(
+    "uri" = "s3://bucket/s3/demo/*.csv",
+    "format" = "csv",
+    "column_separator" = ",",
+    "s3.endpoint" = "https://s3.ap-southeast-1.amazonaws.com",
+    "s3.region" = "ap-southeast-1",
+    "s3.access_key" = "",
+    "s3.secret_key" = ""
+);
+CREATE JOB my_job
+    ON STREAMING
+    DO 
+    INSERT INTO db1.`tbl1`
+    SELECT * FROM S3
+    (
+        "uri" = "s3://bucket/s3/demo/*.csv",
+        "format" = "csv",
+        "column_separator" = ",",
+        "s3.endpoint" = "https://s3.ap-southeast-1.amazonaws.com",
+        "s3.region" = "ap-southeast-1",
+        "s3.access_key" = "",
+        "s3.secret_key" = ""
+    );
+CREATE JOB mysql_cdc_job
+    ON STREAMING
+    DO
+    INSERT INTO db1.target_table
+    SELECT * FROM cdc_stream(
+        "type" = "mysql",
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-java-8.0.25.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "source_db",
+        "table" = "source_table",
+        "offset" = "initial"
+    );
+CREATE JOB pg_cdc_job
+    ON STREAMING
+    DO
+    INSERT INTO db1.target_table
+    SELECT * FROM cdc_stream(
+        "type" = "postgres",
+        "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+        "driver_url" = "postgresql-42.5.1.jar",
+        "driver_class" = "org.postgresql.Driver",
+        "user" = "postgres",
+        "password" = "postgres",
+        "database" = "postgres",
+        "schema" = "public",
+        "table" = "source_table",
+        "offset" = "initial"
+    );
+CREATE JOB multi_table_sync
+    ON STREAMING
+    FROM MYSQL (
+            "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+            "driver_url" = "mysql-connector-java-8.0.25.jar",
+            "driver_class" = "com.mysql.cj.jdbc.Driver",
+            "user" = "root",
+            "password" = "123456",
+            "database" = "test",
+            "include_tables" = "user_info,order_info",
+            "offset" = "initial"
+    )
+    TO DATABASE target_test_db (
+        "table.create.properties.replication_num" = "1"
+    )
+;
+CREATE JOB test_postgres_job
+    ON STREAMING
+    FROM POSTGRES (
+        "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+        "driver_url" = "postgresql-42.5.1.jar",
+        "driver_class" = "org.postgresql.Driver",
+        "user" = "postgres",
+        "password" = "postgres",
+        "database" = "postgres",
+        "schema" = "public",
+        "include_tables" = "test_tbls", 
+        "offset" = "latest"
+    )
+    TO DATABASE target_test_db (
+        "table.create.properties.replication_num" = "1"
+    )
+;
+CREATE JOB mysql_db_sync
+ON STREAMING
+FROM MYSQL (
+    "jdbc_url"       = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url"     = "mysql-connector-java-8.0.25.jar",
+    "driver_class"   = "com.mysql.cj.jdbc.Driver",
+    "user"           = "root",
+    "password"       = "123456",
+    "database"       = "test",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- 单 BE 部署时设置为 1
+);
+CREATE JOB pg_db_sync
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url"       = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url"     = "postgresql-42.5.1.jar",
+    "driver_class"   = "org.postgresql.Driver",
+    "user"           = "postgres",
+    "password"       = "postgres",
+    "database"       = "postgres",
+    "schema"         = "public",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- 单 BE 部署时设置为 1
+);
+CREATE JOB multi_table_sync
+ON STREAMING
+FROM MYSQL (
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-java-8.0.25.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "test",
+        "include_tables" = "user_info,order_info",
+        "offset" = "initial"
+)
+TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"  -- 单 BE 部署时需要设置为 1
+)
+;
+CREATE JOB test_postgres_job
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "include_tables" = "test_tbls",
+    "offset" = "latest"
+)
+TO DATABASE target_test_db (
+  "table.create.properties.replication_num" = "1"  -- 单BE部署时需要设置为1
+)
+;
+CREATE JOB mysql_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  )
+;
+CREATE JOB pg_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "postgres",
+      "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+      "driver_url" = "postgresql-42.5.1.jar",
+      "driver_class" = "org.postgresql.Driver",
+      "user" = "postgres",
+      "password" = "postgres",
+      "database" = "postgres",
+      "schema" = "public",
+      "table" = "source_table",
+      "offset" = "initial"
+  )
+;
+CREATE JOB mysql_cdc_transform_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table (id, name, age)
+  SELECT id, name, cast(age as INT) as age
+  FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  )
+;
+CREATE JOB test_postgres_job
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.0.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "include_tables" = "test_tbls",
+    "offset" = "latest"
+)
+TO DATABASE target_test_db (
+  "table.create.properties.replication_num" = "1"
+)
+;
+CREATE JOB my_job
+    ON STREAMING
+    DO 
+    INSERT INTO db1.`tbl1`
+    SELECT * FROM S3
+    (
+        "uri" = "s3://bucket/s3/demo/*.csv",
+        "format" = "csv",
+        "column_separator" = ",",
+        "s3.endpoint" = "s3.ap-southeast-1.amazonaws.com",
+        "s3.region" = "ap-southeast-1",
+        "s3.access_key" = "",
+        "s3.secret_key" = ""
+    );
+CREATE JOB multi_table_sync
+    ON STREAMING
+    FROM MYSQL (
+            "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+            "driver_url" = "mysql-connector-j-8.0.31.jar",
+            "driver_class" = "com.mysql.cj.jdbc.Driver",
+            "user" = "root",
+            "password" = "123456",
+            "database" = "test",
+            "include_tables" = "user_info,order_info",
+            "offset" = "initial"
+    )
+    TO DATABASE target_test_db (
+        "table.create.properties.replication_num" = "1"
+    )
+;
+CREATE JOB test_postgres_job
+    ON STREAMING
+    FROM POSTGRES (
+        "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+        "driver_url" = "postgresql-42.5.0.jar",
+        "driver_class" = "org.postgresql.Driver",
+        "user" = "postgres",
+        "password" = "postgres",
+        "database" = "postgres",
+        "schema" = "public",
+        "include_tables" = "test_tbls", 
+        "offset" = "latest"
+    )
+    TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"
+    )
+;
+CREATE JOB mysql_incremental_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "latest"
+  )
+;
+------------------------------------------------------------------------------------------
+[CREATE_JOB] CREATE JOB multi_table_sync
+ON STREAMING
+FROM MYSQL (
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-j-8.0.31.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "test",
+        "include_tables" = "user_info,order_info",
+        "offset" = "initial"
+)
+TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"
+)
+----------
+[CREATE_JOB] CREATE JOB mysql_db_sync
+ON STREAMING
+FROM MYSQL (
+    "jdbc_url"       = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url"     = "mysql-connector-java-8.0.25.jar",
+    "driver_class"   = "com.mysql.cj.jdbc.Driver",
+    "user"           = "root",
+    "password"       = "123456",
+    "database"       = "test",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- set to 1 in single-BE deployments
+);
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB mysql_students_sync
+ON STREAMING
+DO
+INSERT INTO doris_db.students
+SELECT * FROM cdc_stream(
+    "type"         = "mysql",
+    "jdbc_url"     = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url"   = "mysql-connector-java-8.0.25.jar",
+    "driver_class" = "com.mysql.cj.jdbc.Driver",
+    "user"         = "root",
+    "password"     = "123456",
+    "database"     = "test",
+    "table"        = "students",
+    "offset"       = "initial"
+);
+----------
+[CREATE_JOB] CREATE JOB pg_db_sync
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url"       = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url"     = "postgresql-42.5.1.jar",
+    "driver_class"   = "org.postgresql.Driver",
+    "user"           = "postgres",
+    "password"       = "postgres",
+    "database"       = "postgres",
+    "schema"         = "public",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- set to 1 in single-BE deployments
+);
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB pg_students_sync
+ON STREAMING
+DO
+INSERT INTO doris_db.students
+SELECT * FROM cdc_stream(
+    "type"         = "postgres",
+    "jdbc_url"     = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url"   = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user"         = "postgres",
+    "password"     = "postgres",
+    "database"     = "postgres",
+    "schema"       = "public",
+    "table"        = "students",
+    "offset"       = "initial"
+);
+----------
+[CREATE_JOB] CREATE JOB multi_table_sync
+ON STREAMING
+FROM MYSQL (
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-java-8.0.25.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "test",
+        "include_tables" = "user_info,order_info",
+        "offset" = "initial"
+)
+TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"  -- Set to 1 for single-BE deployment
+)
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB mysql_single_sync
+ON STREAMING
+DO
+INSERT INTO db1.tbl1
+SELECT * FROM cdc_stream(
+    "type" = "mysql",
+    "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url" = "mysql-connector-java-8.0.25.jar",
+    "driver_class" = "com.mysql.cj.jdbc.Driver",
+    "user" = "root",
+    "password" = "123456",
+    "database" = "source_db",
+    "table" = "source_table",
+    "offset" = "initial"
+)
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB mysql_cdc_with_delete
+ON STREAMING
+DO
+INSERT INTO db1.target_table (id, value, __DORIS_DELETE_SIGN__)
+SELECT id, value, __DORIS_DELETE_SIGN__
+FROM cdc_stream(
+    "type" = "mysql",
+    "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url" = "mysql-connector-java-8.0.25.jar",
+    "driver_class" = "com.mysql.cj.jdbc.Driver",
+    "user" = "root",
+    "password" = "123456",
+    "database" = "source_db",
+    "table" = "source_table",
+    "offset" = "initial",
+    "include_delete_sign" = "true"
+);
+----------
+[CREATE_JOB] CREATE JOB test_postgres_job
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "include_tables" = "test_tbls",
+    "offset" = "latest"
+)
+TO DATABASE target_test_db (
+  "table.create.properties.replication_num" = "1"  -- Set to 1 for single-BE deployments
+)
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB pg_single_sync
+ON STREAMING
+DO
+INSERT INTO db1.tbl1
+SELECT * FROM cdc_stream(
+    "type" = "postgres",
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "table" = "source_table",
+    "offset" = "initial"
+)
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB pg_cdc_with_delete
+ON STREAMING
+DO
+INSERT INTO db1.target_table (id, value, __DORIS_DELETE_SIGN__)
+SELECT id, value, __DORIS_DELETE_SIGN__
+FROM cdc_stream(
+    "type" = "postgres",
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "schema" = "public",
+    "table" = "source_table",
+    "offset" = "initial",
+    "include_delete_sign" = "true"
+);
+----------
+[CREATE_JOB(INSERT,SELECT,DATA_IMPORT)] CREATE JOB my_job 
+ON STREAMING
+DO 
+INSERT INTO db1.tbl1 
+select * from S3(
+    "uri" = "s3://bucket/*.csv",
+    "s3.access_key" = "<s3_access_key>",
+    "s3.secret_key" = "<s3_secret_key>",
+    "s3.region" = "<s3_region>",
+    "s3.endpoint" = "<s3_endpoint>",
+    "format" = "<format>"
+)
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB mysql_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  );
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB pg_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "postgres",
+      "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+      "driver_url" = "postgresql-42.5.1.jar",
+      "driver_class" = "org.postgresql.Driver",
+      "user" = "postgres",
+      "password" = "postgres",
+      "database" = "postgres",
+      "schema" = "public",
+      "table" = "source_table",
+      "offset" = "initial"
+  );
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB mysql_cdc_transform_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table (id, name, age)
+  SELECT id, name, cast(age as INT) as age
+  FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  );
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB mysql_cdc_delete_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table (id, name, __DORIS_DELETE_SIGN__)
+  SELECT id, name, __DORIS_DELETE_SIGN__
+  FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial",
+      "include_delete_sign" = "true"
+  );
+----------
+[CREATE_JOB(INSERT,SELECT,DATA_IMPORT)] CREATE JOB my_job
+PROPERTIES (
+    "max_interval" = "30",
+    "session.insert_max_filter_ratio" = "0.5"
+)
+ON STREAMING
+DO
+INSERT INTO db1.tbl1
+SELECT * FROM S3(
+    "uri" = "s3://bucket/s3/demo/*.csv",
+    "format" = "csv",
+    "column_separator" = ",",
+    "s3.endpoint" = "https://s3.ap-southeast-1.amazonaws.com",
+    "s3.region" = "ap-southeast-1",
+    "s3.access_key" = "",
+    "s3.secret_key" = ""
+);
+----------
+[CREATE_JOB(INSERT,SELECT,DATA_IMPORT)] CREATE JOB my_job
+    ON STREAMING
+    DO 
+    INSERT INTO db1.`tbl1`
+    SELECT * FROM S3
+    (
+        "uri" = "s3://bucket/s3/demo/*.csv",
+        "format" = "csv",
+        "column_separator" = ",",
+        "s3.endpoint" = "https://s3.ap-southeast-1.amazonaws.com",
+        "s3.region" = "ap-southeast-1",
+        "s3.access_key" = "",
+        "s3.secret_key" = ""
+    );
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB mysql_cdc_job
+    ON STREAMING
+    DO
+    INSERT INTO db1.target_table
+    SELECT * FROM cdc_stream(
+        "type" = "mysql",
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-java-8.0.25.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "source_db",
+        "table" = "source_table",
+        "offset" = "initial"
+    );
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB pg_cdc_job
+    ON STREAMING
+    DO
+    INSERT INTO db1.target_table
+    SELECT * FROM cdc_stream(
+        "type" = "postgres",
+        "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+        "driver_url" = "postgresql-42.5.1.jar",
+        "driver_class" = "org.postgresql.Driver",
+        "user" = "postgres",
+        "password" = "postgres",
+        "database" = "postgres",
+        "schema" = "public",
+        "table" = "source_table",
+        "offset" = "initial"
+    );
+----------
+[CREATE_JOB] CREATE JOB multi_table_sync
+    ON STREAMING
+    FROM MYSQL (
+            "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+            "driver_url" = "mysql-connector-java-8.0.25.jar",
+            "driver_class" = "com.mysql.cj.jdbc.Driver",
+            "user" = "root",
+            "password" = "123456",
+            "database" = "test",
+            "include_tables" = "user_info,order_info",
+            "offset" = "initial"
+    )
+    TO DATABASE target_test_db (
+        "table.create.properties.replication_num" = "1"
+    )
+----------
+[CREATE_JOB] CREATE JOB test_postgres_job
+    ON STREAMING
+    FROM POSTGRES (
+        "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+        "driver_url" = "postgresql-42.5.1.jar",
+        "driver_class" = "org.postgresql.Driver",
+        "user" = "postgres",
+        "password" = "postgres",
+        "database" = "postgres",
+        "schema" = "public",
+        "include_tables" = "test_tbls", 
+        "offset" = "latest"
+    )
+    TO DATABASE target_test_db (
+        "table.create.properties.replication_num" = "1"
+    )
+----------
+[CREATE_JOB] CREATE JOB mysql_db_sync
+ON STREAMING
+FROM MYSQL (
+    "jdbc_url"       = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url"     = "mysql-connector-java-8.0.25.jar",
+    "driver_class"   = "com.mysql.cj.jdbc.Driver",
+    "user"           = "root",
+    "password"       = "123456",
+    "database"       = "test",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- 单 BE 部署时设置为 1
+);
+----------
+[CREATE_JOB] CREATE JOB pg_db_sync
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url"       = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url"     = "postgresql-42.5.1.jar",
+    "driver_class"   = "org.postgresql.Driver",
+    "user"           = "postgres",
+    "password"       = "postgres",
+    "database"       = "postgres",
+    "schema"         = "public",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- 单 BE 部署时设置为 1
+);
+----------
+[CREATE_JOB] CREATE JOB multi_table_sync
+ON STREAMING
+FROM MYSQL (
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-java-8.0.25.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "test",
+        "include_tables" = "user_info,order_info",
+        "offset" = "initial"
+)
+TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"  -- 单 BE 部署时需要设置为 1
+)
+----------
+[CREATE_JOB] CREATE JOB test_postgres_job
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "include_tables" = "test_tbls",
+    "offset" = "latest"
+)
+TO DATABASE target_test_db (
+  "table.create.properties.replication_num" = "1"  -- 单BE部署时需要设置为1
+)
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB mysql_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  )
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB pg_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "postgres",
+      "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+      "driver_url" = "postgresql-42.5.1.jar",
+      "driver_class" = "org.postgresql.Driver",
+      "user" = "postgres",
+      "password" = "postgres",
+      "database" = "postgres",
+      "schema" = "public",
+      "table" = "source_table",
+      "offset" = "initial"
+  )
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB mysql_cdc_transform_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table (id, name, age)
+  SELECT id, name, cast(age as INT) as age
+  FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  )
+----------
+[CREATE_JOB] CREATE JOB test_postgres_job
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.0.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "include_tables" = "test_tbls",
+    "offset" = "latest"
+)
+TO DATABASE target_test_db (
+  "table.create.properties.replication_num" = "1"
+)
+----------
+[CREATE_JOB(INSERT,SELECT,DATA_IMPORT)] CREATE JOB my_job
+    ON STREAMING
+    DO 
+    INSERT INTO db1.`tbl1`
+    SELECT * FROM S3
+    (
+        "uri" = "s3://bucket/s3/demo/*.csv",
+        "format" = "csv",
+        "column_separator" = ",",
+        "s3.endpoint" = "s3.ap-southeast-1.amazonaws.com",
+        "s3.region" = "ap-southeast-1",
+        "s3.access_key" = "",
+        "s3.secret_key" = ""
+    );
+----------
+[CREATE_JOB] CREATE JOB multi_table_sync
+    ON STREAMING
+    FROM MYSQL (
+            "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+            "driver_url" = "mysql-connector-j-8.0.31.jar",
+            "driver_class" = "com.mysql.cj.jdbc.Driver",
+            "user" = "root",
+            "password" = "123456",
+            "database" = "test",
+            "include_tables" = "user_info,order_info",
+            "offset" = "initial"
+    )
+    TO DATABASE target_test_db (
+        "table.create.properties.replication_num" = "1"
+    )
+----------
+[CREATE_JOB] CREATE JOB test_postgres_job
+    ON STREAMING
+    FROM POSTGRES (
+        "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+        "driver_url" = "postgresql-42.5.0.jar",
+        "driver_class" = "org.postgresql.Driver",
+        "user" = "postgres",
+        "password" = "postgres",
+        "database" = "postgres",
+        "schema" = "public",
+        "include_tables" = "test_tbls", 
+        "offset" = "latest"
+    )
+    TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"
+    )
+----------
+[CREATE_JOB(INSERT,SELECT)] CREATE JOB mysql_incremental_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "latest"
+  )

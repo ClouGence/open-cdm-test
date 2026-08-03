@@ -1,0 +1,408 @@
+CREATE OR REPLACE FUNCTION polygon(circle)
+ RETURNS polygon
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN polygon(12, $1)
+;
+-- alter publication drop schema
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test2
+;
+ALTER PUBLICATION testpub_tbl9 ADD TABLE public.testpub_tbl7(a)
+;
+CREATE OR REPLACE FUNCTION translate( citext, citext, text ) RETURNS TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.translate( pg_catalog.translate( $1::text, pg_catalog.lower($2::text), $3), pg_catalog.upper($2::text), $3)
+;
+ALTER PUBLICATION split_pub_cols ADD TABLE split_fdw_repl.accounts_extra WHERE (amount >= 10)
+;
+CREATE FUNCTION _pg_numeric_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE $1
+         WHEN 21 /*int2*/ THEN 16
+         WHEN 23 /*int4*/ THEN 32
+         WHEN 20 /*int8*/ THEN 64
+         WHEN 1700 /*numeric*/ THEN
+              CASE WHEN $2 = -1
+                   THEN null
+                   ELSE (($2 - 4) >> 16) & 0xFFFF
+                   END
+         WHEN 700 /*float4*/ THEN 24 /*FLT_MANT_DIG*/
+         WHEN 701 /*float8*/ THEN 53 /*DBL_MANT_DIG*/
+         ELSE null
+  END
+;
+ALTER TABLE range_parted2 DETACH PARTITION part_rp CONCURRENTLY
+;
+ALTER PUBLICATION pub8 ADD TABLE test_part_c_1 (a)
+;
+CREATE OR REPLACE FUNCTION
+  pg_freespace(rel regclass, blkno OUT bigint, avail OUT int2)
+RETURNS SETOF RECORD
+LANGUAGE SQL PARALLEL SAFE
+BEGIN ATOMIC
+  SELECT blkno, pg_freespace($1, blkno) AS avail
+  FROM generate_series('0'::bigint, pg_relation_size($1) / current_setting('block_size'::text)::bigint - '1'::bigint) AS blkno;
+END
+;
+ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    -- these are bogus, but it's safe as long as we don't use the type:
+    analyze = ts_typanalyze,
+    subscript = raw_array_subscript_handler
+)
+;
+ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl5 (a, a)
+;
+-- ok - conditional expressions are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl5 WHERE (a IS DOCUMENT)
+;
+CREATE OR REPLACE FUNCTION bit_length(bit)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN length($1)
+;
+/* Given an index's OID and an underlying-table column number, return the
+ * column's position in the index (NULL if not there) */
+CREATE FUNCTION _pg_index_position(oid, smallint) RETURNS int
+    LANGUAGE sql STRICT STABLE
+BEGIN ATOMIC
+SELECT (ss.a).n FROM
+  (SELECT information_schema._pg_expandarray(indkey) AS a
+   FROM pg_catalog.pg_index WHERE indexrelid = $1) ss
+  WHERE (ss.a).x = $2;
+END
+;
+CREATE FUNCTION functest_S_xx(x anyarray) RETURNS anyelement
+    LANGUAGE SQL
+    RETURN x[1]
+;
+DROP DATABASE IF EXISTS split_db_probe WITH (FORCE)
+;
+-- should be able to drop schema from 'FOR TABLE' publication
+ALTER PUBLICATION testpub_fortable DROP TABLES IN SCHEMA pub_test
+;
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA non_existent_schema
+;
+CREATE PUBLICATION testpub7 FOR TABLE testpub_rf_tbl6 WHERE (y > 100)
+;
+CREATE PUBLICATION pub1 for table t1(c1, c2, c3)
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (a)
+;
+CREATE PUBLICATION tap_pub_4a FOR TABLE tab_rowfilter_4 WHERE (c % 2 = 0)
+;
+CREATE PUBLICATION testpub2_forschema FOR TABLES IN SCHEMA pub_test1, pub_test2, pub_test3
+;
+ALTER PUBLICATION tap_pub_3 ADD TABLE tab_rowfilter_less_10k WHERE (a < 6000)
+;
+CREATE PUBLICATION pub3 FOR TABLE tab5 (a, b)
+;
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, e)
+;
+-- Firstly, test using the option publish='insert' because the row filter
+-- validation of referenced columns is less strict than for delete/update.
+CREATE PUBLICATION testpub5 FOR TABLE testpub_rf_tbl1, testpub_rf_tbl2 WHERE (c <> 'test' AND d < 5) WITH (publish = 'insert')
+;
+CREATE PUBLICATION tap_pub_viaroot_2 FOR TABLE tab_rowfilter_viaroot_part_1 WHERE (a < 15) WITH (publish_via_partition_root)
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_nopk (d)
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (c)
+;
+CREATE PUBLICATION tap_pub_inherits FOR TABLE tab_rowfilter_inherited WHERE (a > 15)
+;
+CREATE VIEW limit_thousand_v_4 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST (5::bigint) ROWS WITH TIES
+;
+-- should be able to add schema to 'FOR TABLE' publication
+ALTER PUBLICATION testpub_fortable ADD TABLES IN SCHEMA pub_test
+;
+CREATE PUBLICATION pub4 FOR TABLE t_1 (a), t_2 (b)
+	  WITH (PUBLISH_VIA_PARTITION_ROOT)
+;
+CREATE PUBLICATION pub_mix_3 FOR TABLE test_mix_2 (a, b, c)
+;
+CREATE PUBLICATION testpubpart_forschema FOR TABLES IN SCHEMA pub_testpart1
+;
+-- doesn't work for the default partition
+ALTER TABLE range_parted2 DETACH PARTITION part_rpd CONCURRENTLY
+;
+ALTER PUBLICATION split_pub18_schema DROP TABLES IN SCHEMA split_pub18_b
+;
+CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+/* contrib/earthdistance/earthdistance--1.1--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via ALTER EXTENSION
+
+
+CREATE OR REPLACE FUNCTION earth() RETURNS float8
+LANGUAGE SQL IMMUTABLE PARALLEL SAFE
+RETURN '6378168'::float8
+;
+create function fipshash(bytea)
+    returns text
+    strict immutable parallel safe leakproof
+    return substr(encode(sha256($1), 'hex'), 1, 32)
+;
+CREATE VIEW is_json_view AS
+SELECT '1' IS JSON AS "any", ('1' || i) IS JSON SCALAR AS "scalar", '[]' IS NOT JSON ARRAY AS "array", '{}' IS JSON OBJECT WITH UNIQUE AS "object" FROM generate_series(1, 3) i
+;
+-- ok - can use row filter for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk WHERE (b > 99)
+;
+CREATE INDEX trgm_idx ON public.test_trgm USING gist (t gist_trgm_ops (siglen='2024'))
+;
+-- ok - immutable built-in functions are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl4 WHERE (length(g) < 6)
+;
+ALTER PUBLICATION testpub_tbl9 SET TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+ALTER PUBLICATION pub3 ADD TABLES IN SCHEMA dump_test
+;
+CREATE INDEX wowidx ON test_tsvector USING gist (a tsvector_ops(siglen=484))
+;
+ALTER PUBLICATION testpub_col_list ADD TABLE testpub_tbl8 (a, b)
+;
+CREATE PUBLICATION tap_pub_5b FOR TABLE tab_rowfilter_partition WHERE (a > 10)
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION polygon(circle)
+ RETURNS polygon
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN polygon(12, $1)
+;
+----------
+[ALTER_PUB_SUB] -- alter publication drop schema
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test2
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_tbl9 ADD TABLE public.testpub_tbl7(a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION translate( citext, citext, text ) RETURNS TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.translate( pg_catalog.translate( $1::text, pg_catalog.lower($2::text), $3), pg_catalog.upper($2::text), $3)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION split_pub_cols ADD TABLE split_fdw_repl.accounts_extra WHERE (amount >= 10)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_numeric_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE $1
+         WHEN 21 /*int2*/ THEN 16
+         WHEN 23 /*int4*/ THEN 32
+         WHEN 20 /*int8*/ THEN 64
+         WHEN 1700 /*numeric*/ THEN
+              CASE WHEN $2 = -1
+                   THEN null
+                   ELSE (($2 - 4) >> 16) & 0xFFFF
+                   END
+         WHEN 700 /*float4*/ THEN 24 /*FLT_MANT_DIG*/
+         WHEN 701 /*float8*/ THEN 53 /*DBL_MANT_DIG*/
+         ELSE null
+  END
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE range_parted2 DETACH PARTITION part_rp CONCURRENTLY
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub8 ADD TABLE test_part_c_1 (a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION
+  pg_freespace(rel regclass, blkno OUT bigint, avail OUT int2)
+RETURNS SETOF RECORD
+LANGUAGE SQL PARALLEL SAFE
+BEGIN ATOMIC
+  SELECT blkno, pg_freespace($1, blkno) AS avail
+  FROM generate_series('0'::bigint, pg_relation_size($1) / current_setting('block_size'::text)::bigint - '1'::bigint) AS blkno;
+END
+;
+----------
+[ALTER_TYPE] ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    -- these are bogus, but it's safe as long as we don't use the type:
+    analyze = ts_typanalyze,
+    subscript = raw_array_subscript_handler
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl5 (a, a)
+;
+----------
+[ALTER_PUB_SUB] -- ok - conditional expressions are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl5 WHERE (a IS DOCUMENT)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION bit_length(bit)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN length($1)
+;
+----------
+[CREATE_PROG_OBJ] /* Given an index's OID and an underlying-table column number, return the
+ * column's position in the index (NULL if not there) */
+CREATE FUNCTION _pg_index_position(oid, smallint) RETURNS int
+    LANGUAGE sql STRICT STABLE
+BEGIN ATOMIC
+SELECT (ss.a).n FROM
+  (SELECT information_schema._pg_expandarray(indkey) AS a
+   FROM pg_catalog.pg_index WHERE indexrelid = $1) ss
+  WHERE (ss.a).x = $2;
+END
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_xx(x anyarray) RETURNS anyelement
+    LANGUAGE SQL
+    RETURN x[1]
+;
+----------
+[DROP_CATALOG] DROP DATABASE IF EXISTS split_db_probe WITH (FORCE)
+;
+----------
+[ALTER_PUB_SUB] -- should be able to drop schema from 'FOR TABLE' publication
+ALTER PUBLICATION testpub_fortable DROP TABLES IN SCHEMA pub_test
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA non_existent_schema
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub7 FOR TABLE testpub_rf_tbl6 WHERE (y > 100)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub1 for table t1(c1, c2, c3)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (a)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_4a FOR TABLE tab_rowfilter_4 WHERE (c % 2 = 0)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub2_forschema FOR TABLES IN SCHEMA pub_test1, pub_test2, pub_test3
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION tap_pub_3 ADD TABLE tab_rowfilter_less_10k WHERE (a < 6000)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub3 FOR TABLE tab5 (a, b)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, e)
+;
+----------
+[CREATE_PUB_SUB] -- Firstly, test using the option publish='insert' because the row filter
+-- validation of referenced columns is less strict than for delete/update.
+CREATE PUBLICATION testpub5 FOR TABLE testpub_rf_tbl1, testpub_rf_tbl2 WHERE (c <> 'test' AND d < 5) WITH (publish = 'insert')
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_viaroot_2 FOR TABLE tab_rowfilter_viaroot_part_1 WHERE (a < 15) WITH (publish_via_partition_root)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_nopk (d)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (c)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_inherits FOR TABLE tab_rowfilter_inherited WHERE (a > 15)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW limit_thousand_v_4 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST (5::bigint) ROWS WITH TIES
+;
+----------
+[ALTER_PUB_SUB] -- should be able to add schema to 'FOR TABLE' publication
+ALTER PUBLICATION testpub_fortable ADD TABLES IN SCHEMA pub_test
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub4 FOR TABLE t_1 (a), t_2 (b)
+	  WITH (PUBLISH_VIA_PARTITION_ROOT)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_mix_3 FOR TABLE test_mix_2 (a, b, c)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpubpart_forschema FOR TABLES IN SCHEMA pub_testpart1
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- doesn't work for the default partition
+ALTER TABLE range_parted2 DETACH PARTITION part_rpd CONCURRENTLY
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION split_pub18_schema DROP TABLES IN SCHEMA split_pub18_b
+;
+----------
+[CREATE_VIEW(SELECT,QUERY_LOCK)] CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+----------
+[CREATE_PROG_OBJ] /* contrib/earthdistance/earthdistance--1.1--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via ALTER EXTENSION
+
+
+CREATE OR REPLACE FUNCTION earth() RETURNS float8
+LANGUAGE SQL IMMUTABLE PARALLEL SAFE
+RETURN '6378168'::float8
+;
+----------
+[CREATE_PROG_OBJ] create function fipshash(bytea)
+    returns text
+    strict immutable parallel safe leakproof
+    return substr(encode(sha256($1), 'hex'), 1, 32)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW is_json_view AS
+SELECT '1' IS JSON AS "any", ('1' || i) IS JSON SCALAR AS "scalar", '[]' IS NOT JSON ARRAY AS "array", '{}' IS JSON OBJECT WITH UNIQUE AS "object" FROM generate_series(1, 3) i
+;
+----------
+[ALTER_PUB_SUB] -- ok - can use row filter for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk WHERE (b > 99)
+;
+----------
+[ADD_INDEX] CREATE INDEX trgm_idx ON public.test_trgm USING gist (t gist_trgm_ops (siglen='2024'))
+;
+----------
+[ALTER_PUB_SUB] -- ok - immutable built-in functions are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl4 WHERE (length(g) < 6)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_tbl9 SET TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub3 ADD TABLES IN SCHEMA dump_test
+;
+----------
+[ADD_INDEX] CREATE INDEX wowidx ON test_tsvector USING gist (a tsvector_ops(siglen=484))
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_col_list ADD TABLE testpub_tbl8 (a, b)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_5b FOR TABLE tab_rowfilter_partition WHERE (a > 10)
+;

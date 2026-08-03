@@ -1,0 +1,452 @@
+CREATE VIEW view_table_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS view_catalog,
+           CAST(nv.nspname AS sql_identifier) AS view_schema,
+           CAST(v.relname AS sql_identifier) AS view_name,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nt.nspname AS sql_identifier) AS table_schema,
+           CAST(t.relname AS sql_identifier) AS table_name
+
+    FROM pg_namespace nv, pg_class v, pg_depend dv,
+         pg_depend dt, pg_class t, pg_namespace nt
+
+    WHERE nv.oid = v.relnamespace
+          AND v.relkind = 'v'
+          AND v.oid = dv.refobjid
+          AND dv.refclassid = 'pg_catalog.pg_class'::regclass
+          AND dv.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dv.deptype = 'i'
+          AND dv.objid = dt.objid
+          AND dv.refobjid <> dt.refobjid
+          AND dt.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dt.refclassid = 'pg_catalog.pg_class'::regclass
+          AND dt.refobjid = t.oid
+          AND t.relnamespace = nt.oid
+          AND t.relkind IN ('r', 'v', 'f', 'p')
+          AND pg_has_role(t.relowner, 'USAGE')
+;
+CREATE TEMP TABLE PKTABLE (ptest1 int primary key)
+;
+CREATE TABLE statute (statute_cite text NOT NULL, eff_date date NOT NULL, exp_date date, CONSTRAINT statute_pkey PRIMARY KEY (statute_cite, eff_date))
+;
+-- Constraint definitions
+
+CREATE TABLE IF NOT EXISTS fkey_table (
+    id           INT NOT NULL DEFAULT nextval('fkey_table_seq'::REGCLASS),
+    datatype_id  INT NOT NULL REFERENCES datatype_table(id),
+    big_id       BIGINT NOT NULL,
+    sometext     TEXT COLLATE "POSIX",
+    check_col_1  INT NOT NULL CHECK(check_col_1 < 10),
+    check_col_2  INT NOT NULL,
+    PRIMARY KEY  (id),
+    CONSTRAINT fkey_big_id
+      FOREIGN KEY (big_id)
+      REFERENCES datatype_table(id_big),
+    EXCLUDE USING btree (check_col_2 WITH =)
+)
+;
+CREATE FUNCTION unbounded_syntax_test1b(x int) RETURNS TABLE (a int, b int, c int)
+LANGUAGE SQL
+AS $$
+  SELECT sum(unique1) over (rows between x preceding and x following),
+         unique1, four
+  FROM tenk1 WHERE unique1 < 10;
+$$
+;
+analyze patest2
+;
+drop table child
+;
+CREATE POLICY a_temp_pol ON a_temp_tbl USING (f2 > 0)
+;
+DROP TABLE mintab
+;
+create schema if not exists abc authorization current_user
+;
+ALTER TABLE fd_pt1 DROP COLUMN c7
+;
+ANALYZE public.prt1_e_p1
+;
+CREATE FUNCTION ltree_in(cstring)
+RETURNS ltree
+AS '$libdir/ltree'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+-- check node I/O via view creation and usage, also deparsing logic
+
+create view agg_view1 as
+  select aggfns(a,b,c)
+    from (values (1,3,'foo'),(0,null,null),(2,2,'bar'),(3,1,'baz')) v(a,b,c)
+;
+CREATE FUNCTION isnge(issn, issn)
+	RETURNS boolean
+	AS 'int8ge'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+create cast (integer as date) with function sql_to_date(integer) as assignment
+;
+VACUUM (PARALLEL 0) pg_catalog.pg_trigger
+;
+ALTER INDEX "public"."covidxpart_a_b_idx" ATTACH PARTITION "public"."covidxpart1_a_b_idx"
+;
+CREATE INDEX int2idx ON int2tmp USING gist ( a )
+;
+create index ���������index2 on ��������� using btree(�����)
+;
+-- ON CONFLICT using system attributes in RETURNING, testing both the
+-- inserting and updating paths. See bug report at:
+-- https://www.postgresql.org/message-id/73436355-6432-49B1-92ED-1FE4F7E7E100%40finefun.com.au
+CREATE FUNCTION xid_current() RETURNS xid LANGUAGE SQL AS $$SELECT (txid_current() % ((1::int8<<32)))::text::xid;$$
+;
+CREATE TABLE attmp6 () INHERITS (attmp3)
+;
+VACUUM (SKIP_DATABASE_STATS, SKIP_LOCKED) pg_catalog.pg_index
+;
+CREATE FUNCTION g_intbig_penalty(internal,internal,internal)
+RETURNS internal
+AS '$libdir/_int'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+-- partitionwise join with fractional paths
+CREATE TABLE fract_t (id BIGINT, PRIMARY KEY (id)) PARTITION BY RANGE (id)
+;
+-- should fail
+CREATE TEMP TABLE mytab (foo widget(42,13))
+;
+CREATE DOMAIN testdomain_i AS int COLLATE "POSIX"
+;
+CREATE INDEX hash_f8_index ON hash_f8_heap USING hash (random float8_ops) WITH (fillfactor=60)
+;
+-- get farther and error about empty table
+drop table test_partitioned
+;
+VACUUM (SKIP_DATABASE_STATS, FREEZE) pg_catalog.pg_trigger
+;
+ALTER TABLE fd_pt2 ATTACH PARTITION fd_pt2_1 FOR VALUES IN (1)
+;
+ALTER TABLE pg_toast.pg_toast_30456 RENAME TO reind_con_toast
+;
+do $$
+declare x record not null := row(42);
+begin
+  raise notice 'x = %', x;
+  x := row(null);  -- ok
+  raise notice 'x = %', x;
+  x := null;  -- fail
+end$$
+;
+/*
+ * 6.60
+ * SQL_PARTS table
+ */
+
+CREATE TABLE sql_parts (
+    feature_id      character_data,
+    feature_name    character_data,
+    is_supported    yes_or_no,
+    is_verified_by  character_data,
+    comments        character_data
+)
+;
+alter table header_copytest drop column b
+;
+VACUUM (DISABLE_PAGE_SKIPPING) pg_catalog.pg_type
+;
+-- Bug #18657: JsonValueExpr.raw_expr was not initialized in ExecInitExprRec()
+-- causing the Aggrefs contained in it to also not be initialized, which led
+-- to a crash in ExecBuildAggTrans() as mentioned in the bug report:
+-- https://postgr.es/m/18657-1b90ccce2b16bdb8@postgresql.org
+CREATE FUNCTION volatile_one() RETURNS int AS $$ BEGIN RETURN 1; END; $$ LANGUAGE plpgsql VOLATILE
+;
+create function p2text(p2) returns text as 'select $1.f1' language sql
+;
+ALTER TABLE list_parted ATTACH PARTITION child FOR VALUES IN (1)
+;
+do $$ declare a int[];
+begin a := f1, f1 from onecol; raise notice 'a = %', a; end$$
+;
+CREATE TABLE "public"."pagg_tab_para_p3" (
+    "x" integer,
+    "y" integer
+)
+WITH ("parallel_workers"='0')
+;
+CREATE OPERATOR FAMILY alt_opf4 USING btree
+;
+create index on sk(a)
+;
+ALTER PUBLICATION testpub2 ADD TABLE testpub_tbl1
+;
+CREATE TABLE part_p1 PARTITION OF list_parted FOR VALUES IN ('1')
+;
+create or replace function bogus_int8_text_eq(int8, text) returns boolean
+language sql as 'select $2 = $1::text'
+;
+CREATE TABLE serialTest2 (f1 text, f2 serial, f3 smallserial, f4 serial2,
+  f5 bigserial, f6 serial8)
+;
+CREATE FUNCTION "public"."bleat"(integer) RETURNS integer
+    LANGUAGE "plpgsql"
+    AS $_$
+begin
+  raise notice 'bleat %', $1;
+  return $1;
+end$_$
+;
+CREATE TABLE dump_test.regress_pg_dump_table_am_0() USING heap
+;
+create table ab_a3_b1 partition of ab_a3 for values in (1)
+;
+------------------------------------------------------------------------------------------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW view_table_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS view_catalog,
+           CAST(nv.nspname AS sql_identifier) AS view_schema,
+           CAST(v.relname AS sql_identifier) AS view_name,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nt.nspname AS sql_identifier) AS table_schema,
+           CAST(t.relname AS sql_identifier) AS table_name
+
+    FROM pg_namespace nv, pg_class v, pg_depend dv,
+         pg_depend dt, pg_class t, pg_namespace nt
+
+    WHERE nv.oid = v.relnamespace
+          AND v.relkind = 'v'
+          AND v.oid = dv.refobjid
+          AND dv.refclassid = 'pg_catalog.pg_class'::regclass
+          AND dv.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dv.deptype = 'i'
+          AND dv.objid = dt.objid
+          AND dv.refobjid <> dt.refobjid
+          AND dt.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dt.refclassid = 'pg_catalog.pg_class'::regclass
+          AND dt.refobjid = t.oid
+          AND t.relnamespace = nt.oid
+          AND t.relkind IN ('r', 'v', 'f', 'p')
+          AND pg_has_role(t.relowner, 'USAGE')
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE PKTABLE (ptest1 int primary key)
+;
+----------
+[CREATE_TABLE] CREATE TABLE statute (statute_cite text NOT NULL, eff_date date NOT NULL, exp_date date, CONSTRAINT statute_pkey PRIMARY KEY (statute_cite, eff_date))
+;
+----------
+[CREATE_TABLE] -- Constraint definitions
+
+CREATE TABLE IF NOT EXISTS fkey_table (
+    id           INT NOT NULL DEFAULT nextval('fkey_table_seq'::REGCLASS),
+    datatype_id  INT NOT NULL REFERENCES datatype_table(id),
+    big_id       BIGINT NOT NULL,
+    sometext     TEXT COLLATE "POSIX",
+    check_col_1  INT NOT NULL CHECK(check_col_1 < 10),
+    check_col_2  INT NOT NULL,
+    PRIMARY KEY  (id),
+    CONSTRAINT fkey_big_id
+      FOREIGN KEY (big_id)
+      REFERENCES datatype_table(id_big),
+    EXCLUDE USING btree (check_col_2 WITH =)
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION unbounded_syntax_test1b(x int) RETURNS TABLE (a int, b int, c int)
+LANGUAGE SQL
+AS $$
+  SELECT sum(unique1) over (rows between x preceding and x following),
+         unique1, four
+  FROM tenk1 WHERE unique1 < 10;
+$$
+;
+----------
+[ADMIN_TABLE] analyze patest2
+;
+----------
+[DROP_TABLE] drop table child
+;
+----------
+[CREATE_POLICY] CREATE POLICY a_temp_pol ON a_temp_tbl USING (f2 > 0)
+;
+----------
+[DROP_TABLE] DROP TABLE mintab
+;
+----------
+[CREATE_SCHEMA] create schema if not exists abc authorization current_user
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE fd_pt1 DROP COLUMN c7
+;
+----------
+[ADMIN_TABLE] ANALYZE public.prt1_e_p1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ltree_in(cstring)
+RETURNS ltree
+AS '$libdir/ltree'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[CREATE_VIEW(SELECT)] -- check node I/O via view creation and usage, also deparsing logic
+
+create view agg_view1 as
+  select aggfns(a,b,c)
+    from (values (1,3,'foo'),(0,null,null),(2,2,'bar'),(3,1,'baz')) v(a,b,c)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isnge(issn, issn)
+	RETURNS boolean
+	AS 'int8ge'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[CREATE_PROG_OBJ] create cast (integer as date) with function sql_to_date(integer) as assignment
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 0) pg_catalog.pg_trigger
+;
+----------
+[ALTER_INDEX] ALTER INDEX "public"."covidxpart_a_b_idx" ATTACH PARTITION "public"."covidxpart1_a_b_idx"
+;
+----------
+[ADD_INDEX] CREATE INDEX int2idx ON int2tmp USING gist ( a )
+;
+----------
+[ADD_INDEX] create index ���������index2 on ��������� using btree(�����)
+;
+----------
+[CREATE_PROG_OBJ] -- ON CONFLICT using system attributes in RETURNING, testing both the
+-- inserting and updating paths. See bug report at:
+-- https://www.postgresql.org/message-id/73436355-6432-49B1-92ED-1FE4F7E7E100%40finefun.com.au
+CREATE FUNCTION xid_current() RETURNS xid LANGUAGE SQL AS $$SELECT (txid_current() % ((1::int8<<32)))::text::xid;$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE attmp6 () INHERITS (attmp3)
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, SKIP_LOCKED) pg_catalog.pg_index
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION g_intbig_penalty(internal,internal,internal)
+RETURNS internal
+AS '$libdir/_int'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] -- partitionwise join with fractional paths
+CREATE TABLE fract_t (id BIGINT, PRIMARY KEY (id)) PARTITION BY RANGE (id)
+;
+----------
+[CREATE_TABLE] -- should fail
+CREATE TEMP TABLE mytab (foo widget(42,13))
+;
+----------
+[CREATE_TYPE] CREATE DOMAIN testdomain_i AS int COLLATE "POSIX"
+;
+----------
+[ADD_INDEX] CREATE INDEX hash_f8_index ON hash_f8_heap USING hash (random float8_ops) WITH (fillfactor=60)
+;
+----------
+[DROP_TABLE] -- get farther and error about empty table
+drop table test_partitioned
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, FREEZE) pg_catalog.pg_trigger
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE fd_pt2 ATTACH PARTITION fd_pt2_1 FOR VALUES IN (1)
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_30456 RENAME TO reind_con_toast
+;
+----------
+[BLOCK] do $$
+declare x record not null := row(42);
+begin
+  raise notice 'x = %', x;
+  x := row(null);  -- ok
+  raise notice 'x = %', x;
+  x := null;  -- fail
+end$$
+;
+----------
+[CREATE_TABLE] /*
+ * 6.60
+ * SQL_PARTS table
+ */
+
+CREATE TABLE sql_parts (
+    feature_id      character_data,
+    feature_name    character_data,
+    is_supported    yes_or_no,
+    is_verified_by  character_data,
+    comments        character_data
+)
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] alter table header_copytest drop column b
+;
+----------
+[ADMIN_TABLE] VACUUM (DISABLE_PAGE_SKIPPING) pg_catalog.pg_type
+;
+----------
+[CREATE_PROG_OBJ] -- Bug #18657: JsonValueExpr.raw_expr was not initialized in ExecInitExprRec()
+-- causing the Aggrefs contained in it to also not be initialized, which led
+-- to a crash in ExecBuildAggTrans() as mentioned in the bug report:
+-- https://postgr.es/m/18657-1b90ccce2b16bdb8@postgresql.org
+CREATE FUNCTION volatile_one() RETURNS int AS $$ BEGIN RETURN 1; END; $$ LANGUAGE plpgsql VOLATILE
+;
+----------
+[CREATE_PROG_OBJ] create function p2text(p2) returns text as 'select $1.f1' language sql
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE list_parted ATTACH PARTITION child FOR VALUES IN (1)
+;
+----------
+[BLOCK] do $$ declare a int[];
+begin a := f1, f1 from onecol; raise notice 'a = %', a; end$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."pagg_tab_para_p3" (
+    "x" integer,
+    "y" integer
+)
+WITH ("parallel_workers"='0')
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR FAMILY alt_opf4 USING btree
+;
+----------
+[ADD_INDEX] create index on sk(a)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub2 ADD TABLE testpub_tbl1
+;
+----------
+[CREATE_TABLE] CREATE TABLE part_p1 PARTITION OF list_parted FOR VALUES IN ('1')
+;
+----------
+[CREATE_PROG_OBJ] create or replace function bogus_int8_text_eq(int8, text) returns boolean
+language sql as 'select $2 = $1::text'
+;
+----------
+[CREATE_TABLE] CREATE TABLE serialTest2 (f1 text, f2 serial, f3 smallserial, f4 serial2,
+  f5 bigserial, f6 serial8)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."bleat"(integer) RETURNS integer
+    LANGUAGE "plpgsql"
+    AS $_$
+begin
+  raise notice 'bleat %', $1;
+  return $1;
+end$_$
+;
+----------
+[CREATE_TABLE] CREATE TABLE dump_test.regress_pg_dump_table_am_0() USING heap
+;
+----------
+[CREATE_TABLE] create table ab_a3_b1 partition of ab_a3 for values in (1)
+;

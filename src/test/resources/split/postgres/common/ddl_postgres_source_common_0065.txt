@@ -1,0 +1,540 @@
+create or replace function explain_analyze_inc_sort_nodes_verify_invariants(query text)
+returns bool language plpgsql
+as
+$$
+declare
+  node jsonb;
+  group_stats jsonb;
+  group_key text;
+  space_key text;
+begin
+  for node in select * from jsonb_array_elements(explain_analyze_inc_sort_nodes(query)) t loop
+    for group_key in select unnest(array['Full-sort Groups', 'Pre-sorted Groups']::text[]) t loop
+      group_stats := node->group_key;
+      for space_key in select unnest(array['Sort Space Memory', 'Sort Space Disk']::text[]) t loop
+        if (group_stats->space_key->'Peak Sort Space Used')::bigint < (group_stats->space_key->'Peak Sort Space Used')::bigint then
+          raise exception '% has invalid max space < average space', group_key;
+        end if;
+      end loop;
+    end loop;
+  end loop;
+  return true;
+end;
+$$
+;
+create or replace function doubledecrement(p1 pos_int) returns pos_int as $$
+declare v pos_int := 1;
+begin
+    v := p1 - 1;
+    return v - 1;
+end$$ language plpgsql
+;
+VACUUM pg_catalog.pg_am
+;
+do $$
+begin
+  raise notice 'foo';
+  raise exception 'bar';
+end $$
+;
+drop table parted_referenced, parted_trigger, unparted_trigger
+;
+CREATE TRIGGER "tg_chkbacklink" BEFORE INSERT OR UPDATE ON "public"."pslot" FOR EACH ROW EXECUTE FUNCTION "public"."tg_chkbacklink"()
+;
+CREATE FUNCTION priv_testfunc5b(a priv_testdomain1) RETURNS int LANGUAGE SQL AS $$ SELECT $1 $$
+;
+CREATE SEQUENCE "public"."sequence_test14"
+    AS integer
+    START WITH 32767
+    INCREMENT BY -1
+    NO MINVALUE
+    MAXVALUE 2147483647
+    CACHE 1
+;
+CREATE UNLOGGED TABLE "public"."itest18" (
+    "a" integer NOT NULL,
+    "b" "text"
+)
+;
+ALTER TABLE regtest_table_part SET TABLESPACE pg_default
+;
+CREATE FUNCTION ri_child() RETURNS TRIGGER LANGUAGE PLPGSQL AS $body$
+ BEGIN
+  PERFORM TRUE FROM parent WHERE parent_id = NEW.parent_id;
+  IF NOT FOUND THEN
+    RAISE SQLSTATE '23503' USING MESSAGE = 'parent row missing';
+  END IF;
+  RETURN NEW;
+ END;
+ $body$
+;
+CREATE FUNCTION _pg_interval_type(typid oid, mod int4) RETURNS text
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+    AS
+$$SELECT
+  CASE WHEN $1 IN (1186) /* interval */
+           THEN pg_catalog.upper(substring(pg_catalog.format_type($1, $2) from 'interval[()0-9]* #"%#"' for '#'))
+       ELSE null
+  END$$
+;
+ALTER FUNCTION gbt_macad_penalty(internal, internal, internal) PARALLEL SAFE
+;
+create rule rtest_sys_upd as on update to rtest_system do also (
+	update rtest_interface set sysname = new.sysname
+		where sysname = old.sysname;
+	update rtest_admin set sysname = new.sysname
+		where sysname = old.sysname
+	)
+;
+ALTER INDEX pg_toast.pg_toast_30578_index RENAME TO reind_con_toast_idx
+;
+VACUUM (INDEX_CLEANUP FALSE) pg_catalog.pg_shdepend
+;
+CREATE TABLE test_prepared_savepoint (a int)
+;
+-- Can't merge a NO INHERIT constraint with a normal one
+create table inh_parent (a int not null)
+;
+CREATE OPERATOR <= (
+	PROCEDURE = isnle,
+	LEFTARG = ismn13,
+	RIGHTARG = ismn,
+	COMMUTATOR = >=,
+	NEGATOR = >,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+/*
+ * text search configuration for finnish language
+ *
+ * Copyright (c) 2007-2024, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * finnish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY finnish_stem
+	(TEMPLATE = snowball, Language = finnish , StopWords=finnish)
+;
+VACUUM brintest
+;
+create table parted_1_1 partition of parted_1 for values in (1)
+;
+CREATE FUNCTION isnlt(ean13, issn13)
+	RETURNS boolean
+	AS 'int8lt'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+ALTER TABLE ONLY "fkpart6"."pk12"
+    ADD CONSTRAINT "pk12_pkey" PRIMARY KEY ("a")
+;
+alter type insenum add value 'i10' before 'L2'
+;
+DROP PROCEDURE nonexistent()
+;
+ALTER INDEX pg_toast.pg_toast_27915_index RENAME TO reind_con_toast_idx
+;
+CREATE FUNCTION autoprewarm_dump_now()
+RETURNS pg_catalog.int8 STRICT
+AS '$libdir/pg_prewarm', 'autoprewarm_dump_now'
+LANGUAGE C
+;
+VACUUM (SKIP_DATABASE_STATS) pg_catalog.pg_attrdef
+;
+create table stable_qual_pruning2 partition of stable_qual_pruning
+  for values from ('2000-02-01') to ('2000-03-01')
+;
+-- to be failed
+ALTER TABLE inhts RENAME aa TO aaa
+;
+VACUUM (DISABLE_PAGE_SKIPPING, SKIP_DATABASE_STATS) pg_catalog.pg_shdescription
+;
+-- Generic extended statistics support
+
+--
+-- Note: tables for which we check estimated row counts should be created
+-- with autovacuum_enabled = off, so that we don't have unstable results
+-- from auto-analyze happening when we didn't expect it.
+--
+
+-- check the number of estimated/actual rows in the top node
+create function check_estimated_rows(text) returns table (estimated int, actual int)
+language plpgsql as
+$$
+declare
+    ln text;
+    tmp text[];
+    first_row bool := true;
+begin
+    for ln in
+        execute format('explain analyze %s', $1)
+    loop
+        if first_row then
+            first_row := false;
+            tmp := regexp_match(ln, 'rows=(\d*) .* rows=(\d*)');
+            return query select tmp[1]::int, tmp[2]::int;
+        end if;
+    end loop;
+end;
+$$
+;
+drop function polyf(a anyelement, b anyarray,
+                    c anycompatible, d anycompatible)
+;
+create table inserttesta (f1 int, f2 insert_pos_ints)
+;
+CREATE UNIQUE INDEX "mvtest_tvmm_pred" ON "public"."mvtest_tvmm" USING "btree" ("grandtot") WHERE ("grandtot" < (0)::numeric)
+;
+CREATE FUNCTION file_fdw_handler()
+RETURNS fdw_handler
+AS '$libdir/file_fdw'
+LANGUAGE C STRICT
+;
+ALTER INDEX pg_toast.pg_toast_28467_index RENAME TO reind_con_toast_idx
+;
+CREATE TABLE itest_child PARTITION OF itest_parent (
+    f3 WITH OPTIONS GENERATED ALWAYS AS IDENTITY
+) FOR VALUES FROM ('2016-07-01') TO ('2016-08-01')
+;
+CREATE TABLE split_pub18_a.accounts (
+    id integer PRIMARY KEY,
+    owner_name text NOT NULL,
+    amount integer NOT NULL,
+    owner_upper text GENERATED ALWAYS AS (upper(owner_name)) STORED
+)
+;
+CREATE TABLE "generated_stored_tests"."gtest1_y" (
+    "a" integer CONSTRAINT "gtest1_a_not_null" NOT NULL,
+    "b" integer GENERATED ALWAYS AS (("x" + 1)) STORED,
+    "x" integer
+)
+;
+DROP TABLE pktable, fktable
+;
+ALTER TABLE fk_r DROP CONSTRAINT fk_r_p_id_p_jd_fkey_1
+;
+ALTER TABLE ONLY parted_no_parts ALTER a SET NOT NULL
+;
+create table hs1 (col1 integer primary key)
+;
+-- Fails because no longer existent:
+DROP SEQUENCE t1_f1_seq
+;
+drop rule "_RETURN" on rules_fooview
+;
+ANALYZE public.equipment_r
+;
+CREATE INDEX foo_idx ON foo(f)
+;
+vacuum analyze pgbench_branches
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] create or replace function explain_analyze_inc_sort_nodes_verify_invariants(query text)
+returns bool language plpgsql
+as
+$$
+declare
+  node jsonb;
+  group_stats jsonb;
+  group_key text;
+  space_key text;
+begin
+  for node in select * from jsonb_array_elements(explain_analyze_inc_sort_nodes(query)) t loop
+    for group_key in select unnest(array['Full-sort Groups', 'Pre-sorted Groups']::text[]) t loop
+      group_stats := node->group_key;
+      for space_key in select unnest(array['Sort Space Memory', 'Sort Space Disk']::text[]) t loop
+        if (group_stats->space_key->'Peak Sort Space Used')::bigint < (group_stats->space_key->'Peak Sort Space Used')::bigint then
+          raise exception '% has invalid max space < average space', group_key;
+        end if;
+      end loop;
+    end loop;
+  end loop;
+  return true;
+end;
+$$
+;
+----------
+[CREATE_PROG_OBJ] create or replace function doubledecrement(p1 pos_int) returns pos_int as $$
+declare v pos_int := 1;
+begin
+    v := p1 - 1;
+    return v - 1;
+end$$ language plpgsql
+;
+----------
+[ADMIN_TABLE] VACUUM pg_catalog.pg_am
+;
+----------
+[BLOCK] do $$
+begin
+  raise notice 'foo';
+  raise exception 'bar';
+end $$
+;
+----------
+[DROP_TABLE] drop table parted_referenced, parted_trigger, unparted_trigger
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER "tg_chkbacklink" BEFORE INSERT OR UPDATE ON "public"."pslot" FOR EACH ROW EXECUTE FUNCTION "public"."tg_chkbacklink"()
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION priv_testfunc5b(a priv_testdomain1) RETURNS int LANGUAGE SQL AS $$ SELECT $1 $$
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE "public"."sequence_test14"
+    AS integer
+    START WITH 32767
+    INCREMENT BY -1
+    NO MINVALUE
+    MAXVALUE 2147483647
+    CACHE 1
+;
+----------
+[CREATE_TABLE] CREATE UNLOGGED TABLE "public"."itest18" (
+    "a" integer NOT NULL,
+    "b" "text"
+)
+;
+----------
+[ALTER_TABLE] ALTER TABLE regtest_table_part SET TABLESPACE pg_default
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ri_child() RETURNS TRIGGER LANGUAGE PLPGSQL AS $body$
+ BEGIN
+  PERFORM TRUE FROM parent WHERE parent_id = NEW.parent_id;
+  IF NOT FOUND THEN
+    RAISE SQLSTATE '23503' USING MESSAGE = 'parent row missing';
+  END IF;
+  RETURN NEW;
+ END;
+ $body$
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_interval_type(typid oid, mod int4) RETURNS text
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+    AS
+$$SELECT
+  CASE WHEN $1 IN (1186) /* interval */
+           THEN pg_catalog.upper(substring(pg_catalog.format_type($1, $2) from 'interval[()0-9]* #"%#"' for '#'))
+       ELSE null
+  END$$
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_macad_penalty(internal, internal, internal) PARALLEL SAFE
+;
+----------
+[CREATE_POLICY] create rule rtest_sys_upd as on update to rtest_system do also (
+	update rtest_interface set sysname = new.sysname
+		where sysname = old.sysname;
+	update rtest_admin set sysname = new.sysname
+		where sysname = old.sysname
+	)
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_30578_index RENAME TO reind_con_toast_idx
+;
+----------
+[ADMIN_TABLE] VACUUM (INDEX_CLEANUP FALSE) pg_catalog.pg_shdepend
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_prepared_savepoint (a int)
+;
+----------
+[CREATE_TABLE] -- Can't merge a NO INHERIT constraint with a normal one
+create table inh_parent (a int not null)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR <= (
+	PROCEDURE = isnle,
+	LEFTARG = ismn13,
+	RIGHTARG = ismn,
+	COMMUTATOR = >=,
+	NEGATOR = >,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+----------
+[CREATE_POLICY] /*
+ * text search configuration for finnish language
+ *
+ * Copyright (c) 2007-2024, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * finnish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY finnish_stem
+	(TEMPLATE = snowball, Language = finnish , StopWords=finnish)
+;
+----------
+[ADMIN_TABLE] VACUUM brintest
+;
+----------
+[CREATE_TABLE] create table parted_1_1 partition of parted_1 for values in (1)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isnlt(ean13, issn13)
+	RETURNS boolean
+	AS 'int8lt'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "fkpart6"."pk12"
+    ADD CONSTRAINT "pk12_pkey" PRIMARY KEY ("a")
+;
+----------
+[ALTER_TYPE] alter type insenum add value 'i10' before 'L2'
+;
+----------
+[DROP_PROG_OBJ] DROP PROCEDURE nonexistent()
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_27915_index RENAME TO reind_con_toast_idx
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION autoprewarm_dump_now()
+RETURNS pg_catalog.int8 STRICT
+AS '$libdir/pg_prewarm', 'autoprewarm_dump_now'
+LANGUAGE C
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS) pg_catalog.pg_attrdef
+;
+----------
+[CREATE_TABLE] create table stable_qual_pruning2 partition of stable_qual_pruning
+  for values from ('2000-02-01') to ('2000-03-01')
+;
+----------
+[RENAME_COLUMN] -- to be failed
+ALTER TABLE inhts RENAME aa TO aaa
+;
+----------
+[ADMIN_TABLE] VACUUM (DISABLE_PAGE_SKIPPING, SKIP_DATABASE_STATS) pg_catalog.pg_shdescription
+;
+----------
+[CREATE_PROG_OBJ] -- Generic extended statistics support
+
+--
+-- Note: tables for which we check estimated row counts should be created
+-- with autovacuum_enabled = off, so that we don't have unstable results
+-- from auto-analyze happening when we didn't expect it.
+--
+
+-- check the number of estimated/actual rows in the top node
+create function check_estimated_rows(text) returns table (estimated int, actual int)
+language plpgsql as
+$$
+declare
+    ln text;
+    tmp text[];
+    first_row bool := true;
+begin
+    for ln in
+        execute format('explain analyze %s', $1)
+    loop
+        if first_row then
+            first_row := false;
+            tmp := regexp_match(ln, 'rows=(\d*) .* rows=(\d*)');
+            return query select tmp[1]::int, tmp[2]::int;
+        end if;
+    end loop;
+end;
+$$
+;
+----------
+[DROP_PROG_OBJ] drop function polyf(a anyelement, b anyarray,
+                    c anycompatible, d anycompatible)
+;
+----------
+[CREATE_TABLE] create table inserttesta (f1 int, f2 insert_pos_ints)
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX "mvtest_tvmm_pred" ON "public"."mvtest_tvmm" USING "btree" ("grandtot") WHERE ("grandtot" < (0)::numeric)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION file_fdw_handler()
+RETURNS fdw_handler
+AS '$libdir/file_fdw'
+LANGUAGE C STRICT
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_28467_index RENAME TO reind_con_toast_idx
+;
+----------
+[CREATE_TABLE] CREATE TABLE itest_child PARTITION OF itest_parent (
+    f3 WITH OPTIONS GENERATED ALWAYS AS IDENTITY
+) FOR VALUES FROM ('2016-07-01') TO ('2016-08-01')
+;
+----------
+[CREATE_TABLE] CREATE TABLE split_pub18_a.accounts (
+    id integer PRIMARY KEY,
+    owner_name text NOT NULL,
+    amount integer NOT NULL,
+    owner_upper text GENERATED ALWAYS AS (upper(owner_name)) STORED
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "generated_stored_tests"."gtest1_y" (
+    "a" integer CONSTRAINT "gtest1_a_not_null" NOT NULL,
+    "b" integer GENERATED ALWAYS AS (("x" + 1)) STORED,
+    "x" integer
+)
+;
+----------
+[DROP_TABLE] DROP TABLE pktable, fktable
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] ALTER TABLE fk_r DROP CONSTRAINT fk_r_p_id_p_jd_fkey_1
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE ONLY parted_no_parts ALTER a SET NOT NULL
+;
+----------
+[CREATE_TABLE] create table hs1 (col1 integer primary key)
+;
+----------
+[DROP_SEQUENCE] -- Fails because no longer existent:
+DROP SEQUENCE t1_f1_seq
+;
+----------
+[DROP_POLICY] drop rule "_RETURN" on rules_fooview
+;
+----------
+[ADMIN_TABLE] ANALYZE public.equipment_r
+;
+----------
+[ADD_INDEX] CREATE INDEX foo_idx ON foo(f)
+;
+----------
+[ADMIN_TABLE] vacuum analyze pgbench_branches
+;

@@ -1,0 +1,64 @@
+-- check that a rolled back drop function stats leaves stats alive
+BEGIN
+;
+GRANT SELECT ON pg_backend_memory_contexts TO pg_read_all_stats
+;
+EXECUTE dumpFunc('36105')
+;
+LOCK TABLE ONLY split_session_ext.parent IN ACCESS SHARE MODE NOWAIT
+;
+COPY testnull FROM stdin WITH NULL AS E'\\0'
+;
+LOCK TABLE public.part2_self_fk IN ACCESS SHARE MODE
+;
+-- We want to use bitmapscans. With default settings, the planner currently
+-- chooses a bitmap scan for the queries below anyway, but let's make sure.
+set enable_indexscan=false
+;
+-- ===================================================================
+-- test connection invalidation cases
+-- ===================================================================
+-- This test case is for closing the connection in pgfdw_xact_callback
+BEGIN
+;
+ALTER TABLE testtab4 OWNER TO SESSION_USER
+;
+CREATE USER MAPPING FOR public SERVER t1
+;
+------------------------------------------------------------------------------------------
+[TRANSACTION] -- check that a rolled back drop function stats leaves stats alive
+BEGIN
+;
+----------
+[GRANT] GRANT SELECT ON pg_backend_memory_contexts TO pg_read_all_stats
+;
+----------
+[UNSAFE] EXECUTE dumpFunc('36105')
+;
+----------
+[SESSION_LOCK] LOCK TABLE ONLY split_session_ext.parent IN ACCESS SHARE MODE NOWAIT
+;
+----------
+[DATA_IMPORT] COPY testnull FROM stdin WITH NULL AS E'\\0'
+;
+----------
+[SESSION_LOCK] LOCK TABLE public.part2_self_fk IN ACCESS SHARE MODE
+;
+----------
+[SESSION_SETTING_WRITE] -- We want to use bitmapscans. With default settings, the planner currently
+-- chooses a bitmap scan for the queries below anyway, but let's make sure.
+set enable_indexscan=false
+;
+----------
+[TRANSACTION] -- ===================================================================
+-- test connection invalidation cases
+-- ===================================================================
+-- This test case is for closing the connection in pgfdw_xact_callback
+BEGIN
+;
+----------
+[TRANSFER_PRIVILEGE] ALTER TABLE testtab4 OWNER TO SESSION_USER
+;
+----------
+[GRANT] CREATE USER MAPPING FOR public SERVER t1
+;

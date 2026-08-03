@@ -1,0 +1,436 @@
+SELECT * FROM JSON_TABLE('{"a": [{"b": "1"}, {"b": "2"}]}', '$' COLUMNS (b json path '$.a[*].b' ERROR ON ERROR))
+;
+SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING json)
+;
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING numeric error on error)
+;
+SELECT JSON_VALUE(jsonb '"03:04 2015-02-01"', '$.datetime("HH24:MI YYYY-MM-DD")' RETURNING date) AS value_date
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int PATH 'lax $.a' DEFAULT 1 ON EMPTY DEFAULT 2 ON ERROR)) jt
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' EMPTY OBJECT ON EMPTY)
+;
+-- Only allow EMPTY and ERROR for ON ERROR
+SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') DEFAULT 1 ON ERROR)
+;
+VALUES (TIMESTAMP '1978-07-07 19:38' AT LOCAL)
+;
+SELECT JSON_QUERY(jsonb 'null', '$Xyz' PASSING 1 AS "Xyz")
+;
+-- Test timestamptz passing and output
+SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+SELECT JSON_QUERY(jsonb 'null', '$"Xyz"' PASSING 1 AS "Xyz")
+;
+SELECT JSON_VALUE(jsonb '"\"aaa\""', '$' RETURNING jsonb)
+;
+-- ArrayCoerceExpr
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::oid[]::int[] ON ERROR)
+;
+select json_serialize ( '{ "a" : 1 } ' returning jsonb )
+;
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING timestamptz)
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int8 EXISTS PATH '$.a'))
+;
+-- Test PASSING and RETURNING date/time types
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+SELECT * FROM unnest((JSON_QUERY(jsonb '{"jsa":  [{"a": 1, "b": ["foo"]}, {"a": 2, "c": {}}, 123]}', '$' RETURNING sqljsonb_rec)).jsa)
+;
+SELECT JSON_VALUE(jsonb 'true', '$' RETURNING bool)
+;
+-- test QUOTES behavior.
+SELECT JSON_QUERY(jsonb'{"rec": "{1,2,3}"}', '$.rec' returning int[] omit quotes)
+;
+-- RETURNING FORMAT not allowed
+
+-- RETUGNING pseudo-types not allowed
+SELECT JSON_VALUE(jsonb '["1"]', '$[*]' RETURNING record)
+;
+SELECT JSON_QUERY(js, '$'  RETURNING int DEFAULT b + 1 ON ERROR) FROM test_jsonb_mutability
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON EMPTY NULL ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1', 'lax $.a' NULL ON EMPTY DEFAULT '2' ON ERROR)
+;
+SELECT JSON_QUERY(jsonb 'null', '$Xyz' PASSING 1 AS Xyz)
+;
+SELECT TIMESTAMP '2001-02-16 20:38:40' AT LOCAL AS timestamp_at_local,
+       TIMESTAMP WITH TIME ZONE '2001-02-16 20:38:40-05' AT LOCAL AS timestamptz_at_local,
+       TIME WITH TIME ZONE '20:38:40-05' AT LOCAL AS timetz_at_local
+;
+-- TABLE-level ERROR ON ERROR is not propagated to columns
+SELECT *
+FROM
+	(VALUES ('1'), ('"err"')) vals(js)
+		LEFT OUTER JOIN
+	JSON_TABLE(vals.js::jsonb, '$' COLUMNS (a int PATH '$' ERROR ON ERROR)) jt
+		ON true
+;
+SELECT JSON('{"a": 1, "a": 2}' WITHOUT UNIQUE KEYS)
+;
+SELECT JSON_QUERY(jsonb '{}', '$.missing' EMPTY ARRAY ON EMPTY) AS empty_array_on_empty
+;
+SELECT JSON_VALUE(jsonb '{"a": 123}', '$' || '.' || 'b' DEFAULT 'foo' ON EMPTY)
+;
+SELECT
+	JSON_QUERY(js, '$') AS "unspec",
+	JSON_QUERY(js, '$' WITHOUT WRAPPER) AS "without",
+	JSON_QUERY(js, '$' WITH CONDITIONAL WRAPPER) AS "with cond",
+	JSON_QUERY(js, '$' WITH UNCONDITIONAL ARRAY WRAPPER) AS "with uncond",
+	JSON_QUERY(js, '$' WITH ARRAY WRAPPER) AS "with"
+FROM
+	(VALUES
+		(jsonb 'null'),
+		('12.3'),
+		('true'),
+		('"aaa"'),
+		('[1, null, "2"]'),
+		('{"a": 1, "b": [2]}')
+	) foo(js)
+;
+SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2 DEFAULT 1 ON ERROR)
+;
+-- RETURNING tries to return its own output
+WITH RECURSIVE t(action, a) AS (
+	MERGE INTO y USING (VALUES (11)) v(a) ON y.a = v.a
+		WHEN NOT MATCHED THEN INSERT VALUES (v.a)
+		RETURNING merge_action(), (SELECT a FROM t)
+)
+SELECT * FROM t
+;
+SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+SELECT JSON_VALUE(jsonb '[" "]', '$[*]' RETURNING int ERROR ON ERROR)
+;
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::text COLLATE "C" ON ERROR)
+;
+SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$'
+	COLUMNS (
+		NESTED PATH '$' AS a
+		COLUMNS (
+			b int
+		),
+		NESTED PATH '$'
+		COLUMNS (
+			NESTED PATH '$' AS a
+			COLUMNS (
+				c int
+			)
+		)
+	)
+) jt
+;
+SELECT * FROM JSON_TABLE(
+  jsonb '{"favorites":[{"kind":"comedy","films":[{"title":"Bananas","director":"Woody Allen"},{"title":"The Dinner Game","director":"Francis Veber"}]},{"kind":"horror","films":[{"title":"Psycho","director":"Alfred Hitchcock"}]}]}',
+  '$.favorites[*]'
+  COLUMNS (
+    id FOR ORDINALITY,
+    kind text PATH '$.kind',
+    title jsonb PATH '$.films[*].title' WITH WRAPPER,
+    director jsonb PATH '$.films[*].director' WITH WRAPPER
+  )
+) AS jt
+;
+-- But KEEP QUOTES (the default) is fine
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text FORMAT JSON PATH '$' WITH WRAPPER KEEP QUOTES))
+;
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int omit quotes true on error))
+;
+SELECT JSON_VALUE(jsonb '"1.23"', '$' RETURNING numeric)
+;
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+-- Other miscellaneous checks
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			aaa int, -- "aaa" has implicit path '$."aaa"'
+			aaa1 int PATH '$.aaa',
+			js2 json PATH '$',
+			jsb2w jsonb PATH '$' WITH WRAPPER,
+			jsb2q jsonb PATH '$' OMIT QUOTES,
+			ia int[] PATH '$',
+			ta text[] PATH '$',
+			jba jsonb[] PATH '$'
+		)
+	) jt
+	ON true
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$.a' RETURNING char(2) OMIT QUOTES DEFAULT '"bb"'::jsonb ON EMPTY)
+;
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int2 omit quotes error on error)
+;
+-- Test ON ERROR / EMPTY value validity for the function; all fail.
+SELECT JSON_EXISTS(jsonb '1', '$' DEFAULT 1 ON ERROR)
+;
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' WITHOUT WRAPPER OMIT QUOTES))
+;
+SELECT JSON_VALUE(jsonb 'null', '$a' PASSING point ' (1, 2 )' AS a RETURNING point ERROR ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING jsonb)
+;
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			exists1 bool EXISTS PATH '$.aaa',
+			exists2 int EXISTS PATH '$.aaa',
+			exists3 int EXISTS PATH 'strict $.aaa' UNKNOWN ON ERROR,
+			exists4 text EXISTS PATH 'strict $.aaa' FALSE ON ERROR
+		)
+	) jt
+	ON true
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT * FROM JSON_TABLE('{"a": [{"b": "1"}, {"b": "2"}]}', '$' COLUMNS (b json path '$.a[*].b' ERROR ON ERROR))
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING json)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING numeric error on error)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"03:04 2015-02-01"', '$.datetime("HH24:MI YYYY-MM-DD")' RETURNING date) AS value_date
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int PATH 'lax $.a' DEFAULT 1 ON EMPTY DEFAULT 2 ON ERROR)) jt
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' EMPTY OBJECT ON EMPTY)
+;
+----------
+[SELECT] -- Only allow EMPTY and ERROR for ON ERROR
+SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') DEFAULT 1 ON ERROR)
+;
+----------
+[SELECT] VALUES (TIMESTAMP '1978-07-07 19:38' AT LOCAL)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$Xyz' PASSING 1 AS "Xyz")
+;
+----------
+[SELECT] -- Test timestamptz passing and output
+SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$"Xyz"' PASSING 1 AS "Xyz")
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"\"aaa\""', '$' RETURNING jsonb)
+;
+----------
+[SELECT] -- ArrayCoerceExpr
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::oid[]::int[] ON ERROR)
+;
+----------
+[SELECT] select json_serialize ( '{ "a" : 1 } ' returning jsonb )
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING timestamptz)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int8 EXISTS PATH '$.a'))
+;
+----------
+[SELECT] -- Test PASSING and RETURNING date/time types
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+----------
+[SELECT] SELECT * FROM unnest((JSON_QUERY(jsonb '{"jsa":  [{"a": 1, "b": ["foo"]}, {"a": 2, "c": {}}, 123]}', '$' RETURNING sqljsonb_rec)).jsa)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'true', '$' RETURNING bool)
+;
+----------
+[SELECT] -- test QUOTES behavior.
+SELECT JSON_QUERY(jsonb'{"rec": "{1,2,3}"}', '$.rec' returning int[] omit quotes)
+;
+----------
+[SELECT] -- RETURNING FORMAT not allowed
+
+-- RETUGNING pseudo-types not allowed
+SELECT JSON_VALUE(jsonb '["1"]', '$[*]' RETURNING record)
+;
+----------
+[SELECT] SELECT JSON_QUERY(js, '$'  RETURNING int DEFAULT b + 1 ON ERROR) FROM test_jsonb_mutability
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON EMPTY NULL ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'lax $.a' NULL ON EMPTY DEFAULT '2' ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$Xyz' PASSING 1 AS Xyz)
+;
+----------
+[SELECT] SELECT TIMESTAMP '2001-02-16 20:38:40' AT LOCAL AS timestamp_at_local,
+       TIMESTAMP WITH TIME ZONE '2001-02-16 20:38:40-05' AT LOCAL AS timestamptz_at_local,
+       TIME WITH TIME ZONE '20:38:40-05' AT LOCAL AS timetz_at_local
+;
+----------
+[SELECT] -- TABLE-level ERROR ON ERROR is not propagated to columns
+SELECT *
+FROM
+	(VALUES ('1'), ('"err"')) vals(js)
+		LEFT OUTER JOIN
+	JSON_TABLE(vals.js::jsonb, '$' COLUMNS (a int PATH '$' ERROR ON ERROR)) jt
+		ON true
+;
+----------
+[SELECT] SELECT JSON('{"a": 1, "a": 2}' WITHOUT UNIQUE KEYS)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '{}', '$.missing' EMPTY ARRAY ON EMPTY) AS empty_array_on_empty
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '{"a": 123}', '$' || '.' || 'b' DEFAULT 'foo' ON EMPTY)
+;
+----------
+[SELECT] SELECT
+	JSON_QUERY(js, '$') AS "unspec",
+	JSON_QUERY(js, '$' WITHOUT WRAPPER) AS "without",
+	JSON_QUERY(js, '$' WITH CONDITIONAL WRAPPER) AS "with cond",
+	JSON_QUERY(js, '$' WITH UNCONDITIONAL ARRAY WRAPPER) AS "with uncond",
+	JSON_QUERY(js, '$' WITH ARRAY WRAPPER) AS "with"
+FROM
+	(VALUES
+		(jsonb 'null'),
+		('12.3'),
+		('true'),
+		('"aaa"'),
+		('[1, null, "2"]'),
+		('{"a": 1, "b": [2]}')
+	) foo(js)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2 DEFAULT 1 ON ERROR)
+;
+----------
+[SELECT|MERGE] -- RETURNING tries to return its own output
+WITH RECURSIVE t(action, a) AS (
+	MERGE INTO y USING (VALUES (11)) v(a) ON y.a = v.a
+		WHEN NOT MATCHED THEN INSERT VALUES (v.a)
+		RETURNING merge_action(), (SELECT a FROM t)
+)
+SELECT * FROM t
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '[" "]', '$[*]' RETURNING int ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::text COLLATE "C" ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$'
+	COLUMNS (
+		NESTED PATH '$' AS a
+		COLUMNS (
+			b int
+		),
+		NESTED PATH '$'
+		COLUMNS (
+			NESTED PATH '$' AS a
+			COLUMNS (
+				c int
+			)
+		)
+	)
+) jt
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+  jsonb '{"favorites":[{"kind":"comedy","films":[{"title":"Bananas","director":"Woody Allen"},{"title":"The Dinner Game","director":"Francis Veber"}]},{"kind":"horror","films":[{"title":"Psycho","director":"Alfred Hitchcock"}]}]}',
+  '$.favorites[*]'
+  COLUMNS (
+    id FOR ORDINALITY,
+    kind text PATH '$.kind',
+    title jsonb PATH '$.films[*].title' WITH WRAPPER,
+    director jsonb PATH '$.films[*].director' WITH WRAPPER
+  )
+) AS jt
+;
+----------
+[SELECT] -- But KEEP QUOTES (the default) is fine
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text FORMAT JSON PATH '$' WITH WRAPPER KEEP QUOTES))
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int omit quotes true on error))
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"1.23"', '$' RETURNING numeric)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts)
+;
+----------
+[SELECT] -- Other miscellaneous checks
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			aaa int, -- "aaa" has implicit path '$."aaa"'
+			aaa1 int PATH '$.aaa',
+			js2 json PATH '$',
+			jsb2w jsonb PATH '$' WITH WRAPPER,
+			jsb2q jsonb PATH '$' OMIT QUOTES,
+			ia int[] PATH '$',
+			ta text[] PATH '$',
+			jba jsonb[] PATH '$'
+		)
+	) jt
+	ON true
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$.a' RETURNING char(2) OMIT QUOTES DEFAULT '"bb"'::jsonb ON EMPTY)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int2 omit quotes error on error)
+;
+----------
+[SELECT] -- Test ON ERROR / EMPTY value validity for the function; all fail.
+SELECT JSON_EXISTS(jsonb '1', '$' DEFAULT 1 ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' WITHOUT WRAPPER OMIT QUOTES))
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$a' PASSING point ' (1, 2 )' AS a RETURNING point ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING jsonb)
+;
+----------
+[SELECT] SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			exists1 bool EXISTS PATH '$.aaa',
+			exists2 int EXISTS PATH '$.aaa',
+			exists3 int EXISTS PATH 'strict $.aaa' UNKNOWN ON ERROR,
+			exists4 text EXISTS PATH 'strict $.aaa' FALSE ON ERROR
+		)
+	) jt
+	ON true
+;

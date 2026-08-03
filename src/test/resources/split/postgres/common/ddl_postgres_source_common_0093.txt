@@ -1,0 +1,542 @@
+create function trigtest() returns trigger as $$
+begin
+	raise notice '% % % %', TG_RELNAME, TG_OP, TG_WHEN, TG_LEVEL;
+	return new;
+end;$$ language plpgsql
+;
+CREATE FUNCTION postgres_fdw_disconnect_all ()
+RETURNS bool
+AS '$libdir/postgres_fdw'
+LANGUAGE C STRICT PARALLEL RESTRICTED
+;
+ALTER TABLE pg_toast.pg_toast_30669 RENAME TO reind_con_toast
+;
+-- DO UPDATE with a WHERE clause
+CREATE RULE hat_upsert AS ON INSERT TO hats
+    DO INSTEAD
+    INSERT INTO hat_data VALUES (
+           NEW.hat_name,
+           NEW.hat_color)
+        ON CONFLICT (hat_name)
+        DO UPDATE
+           SET hat_name = hat_data.hat_name, hat_color = excluded.hat_color
+           WHERE excluded.hat_color <>  'forbidden' AND hat_data.* != excluded.*
+        RETURNING *
+;
+CREATE UNIQUE INDEX tbl_idx_unique ON tbl using btree(c1, c2) INCLUDE (c3,c4)
+;
+CREATE TABLE tr_sub (id serial primary key, path text)
+;
+-- it's okay to re-use a cursor variable name, even when bound
+
+do $$
+declare cnt int := 0;
+  c1 cursor for select * from forc_test;
+begin
+  for r1 in c1 loop
+    declare c1 cursor for select * from forc_test;
+    begin
+      for r2 in c1 loop
+        cnt := cnt + 1;
+      end loop;
+    end;
+  end loop;
+  raise notice 'cnt = %', cnt;
+end $$
+;
+CREATE TABLE idxpart1 PARTITION OF idxpart FOR VALUES FROM (MINVALUE) TO (MAXVALUE)
+;
+--
+-- Test the LOCK statement
+--
+
+-- Setup
+CREATE SCHEMA lock_schema1
+;
+VACUUM (SKIP_DATABASE_STATS, FREEZE) pg_catalog.pg_partitioned_table
+;
+create trigger part_ins_trig
+	before insert on parted_copytest_a2
+	for each row
+	execute procedure part_ins_func()
+;
+--
+-- hash_page_items()
+--
+CREATE FUNCTION hash_page_items(IN page bytea,
+	OUT itemoffset int4,
+	OUT ctid tid,
+	OUT data int8)
+RETURNS SETOF record
+AS '$libdir/pageinspect', 'hash_page_items'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+ALTER FUNCTION gbt_float8_penalty(internal, internal, internal) PARALLEL SAFE
+;
+drop index loct1_idx
+;
+ALTER TEXT SEARCH CONFIGURATION yiddish ADD MAPPING
+    FOR asciiword, hword_asciipart, asciihword
+	WITH yiddish_stem
+;
+CREATE FUNCTION equipment_named_ambiguous_1c(hobby hobbies_r)
+   RETURNS setof equipment_r
+   AS 'select * from equipment_r where hobby = hobby.name'
+   LANGUAGE SQL
+;
+CREATE TABLE gtest_part_key (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS (f2 * 2) STORED) PARTITION BY RANGE ((gtest_part_key is not null))
+;
+create table defer_trig (id integer)
+;
+create function polyf(a anyelement, b anyarray,
+                      c anycompatible, d anycompatible,
+                      OUT x anyarray, OUT y anycompatiblearray)
+as $$
+  select a || b, array[c, d]
+$$ language sql
+;
+CREATE TABLE gtest_child3 PARTITION OF gtest_parent FOR VALUES FROM ('2016-09-01') TO ('2016-10-01')
+;
+VACUUM (INDEX_CLEANUP FALSE) information_schema.sql_parts
+;
+CREATE VIEW temp_view_test.v3_temp AS SELECT * FROM temp_table
+;
+create or replace function sc_test() returns setof integer as $$
+declare
+  c refcursor;
+  x integer;
+begin
+  open c scroll for execute 'select f1 from int4_tbl';
+  fetch last from c into x;
+  while found loop
+    return next x;
+    move backward 2 from c;
+    fetch relative -1 from c into x;
+  end loop;
+  close c;
+end;
+$$ language plpgsql
+;
+CREATE TABLE part_bogus_expr_fail PARTITION OF range_parted
+  FOR VALUES FROM (generate_series(1, 3)) TO ('2019-01-01')
+;
+ALTER TABLE prt1_adv ATTACH PARTITION prt1_adv_p3 FOR VALUES FROM (300) TO (400)
+;
+CREATE SUBSCRIPTION testsub1 CONNECTION 'port=13399 host=/tmp/QGH4Hh755I dbname=postgres' PUBLICATION testpub1
+;
+CREATE FUNCTION my_gen_series(int, int) RETURNS SETOF integer
+  LANGUAGE internal STRICT IMMUTABLE PARALLEL SAFE
+  AS $$generate_series_int4$$
+  SUPPORT test_support_func
+;
+/*
+ * 6.79
+ * VIEW_PERIOD_USAGE
+ */
+
+-- feature not supported
+
+
+/*
+ * 6.80
+ * VIEW_ROUTINE_USAGE
+ */
+
+CREATE VIEW view_routine_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nv.nspname AS sql_identifier) AS table_schema,
+           CAST(v.relname AS sql_identifier) AS table_name,
+           CAST(current_database() AS sql_identifier) AS specific_catalog,
+           CAST(np.nspname AS sql_identifier) AS specific_schema,
+           CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier) AS specific_name
+
+    FROM pg_namespace nv, pg_class v, pg_depend dv,
+         pg_depend dp, pg_proc p, pg_namespace np
+
+    WHERE nv.oid = v.relnamespace
+          AND v.relkind = 'v'
+          AND v.oid = dv.refobjid
+          AND dv.refclassid = 'pg_catalog.pg_class'::regclass
+          AND dv.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dv.deptype = 'i'
+          AND dv.objid = dp.objid
+          AND dp.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dp.refclassid = 'pg_catalog.pg_proc'::regclass
+          AND dp.refobjid = p.oid
+          AND p.pronamespace = np.oid
+          AND pg_has_role(p.proowner, 'USAGE')
+;
+CREATE FUNCTION split_obj_priv.mood_rank(split_obj_priv.cast_mood)
+RETURNS integer
+LANGUAGE SQL
+IMMUTABLE
+AS $$ SELECT array_position(ARRAY['sad','ok','happy'], $1::text) $$
+;
+CREATE VIEW mysecview5 WITH (security_barrier=100)	-- Error
+       AS SELECT * FROM tbl1 WHERE a > 100
+;
+CREATE VIEW vw_getrngfunc AS SELECT * FROM getrngfunc9(1) WITH ORDINALITY AS t1(a,b,c,o)
+;
+CALL test_proc7(b::int, a, b)
+;
+--
+-- Test case to catch problems with multiply nested sub-SELECTs not getting
+-- recalculated properly.  Per bug report from Didier Moens.
+--
+
+CREATE TABLE orderstest (
+    approver_ref integer,
+    po_ref integer,
+    ordercanceled boolean
+)
+;
+-- alice can't do this: she doesn't own inh_child
+alter table inh_parent alter a drop not null
+;
+-- Test CLUSTER with external tuplesorting
+
+create table clstr_4 as select * from tenk1
+;
+CREATE FUNCTION alt_func1(int) RETURNS int LANGUAGE sql
+  AS 'SELECT $1 + 1'
+;
+create trigger tg_chkbacklink before insert or update
+    on WSlot for each row execute procedure tg_chkbacklink()
+;
+drop domain mydomain cascade
+;
+CREATE FUNCTION skeys(hstore)
+RETURNS setof text
+AS '$libdir/hstore','hstore_skeys'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+CREATE TABLE pagg_tab_p1 (LIKE pagg_tab)
+;
+ALTER TABLESPACE split_ts_space RENAME TO split_ts_space_renamed
+;
+CREATE TABLE testschema.part_4 PARTITION OF testschema.part FOR VALUES IN (4)
+  TABLESPACE pg_default
+;
+ANALYZE pg_temp_11.pg_temp_41070_2
+;
+CREATE INDEX sro_idx ON sro_tab ((sro_ifun(a) + sro_ifun(0)))
+	WHERE sro_ifun(a + 10) > sro_ifun(10)
+;
+CREATE FUNCTION test_resowner_many(
+   nkinds       pg_catalog.int4,
+   nremember_bl pg_catalog.int4,
+   nforget_bl   pg_catalog.int4,
+   nremember_al pg_catalog.int4,
+   nforget_al   pg_catalog.int4
+)
+	RETURNS pg_catalog.void
+	AS '$libdir/test_resowner' LANGUAGE C
+;
+ANALYZE pg_temp_14.pg_temp_27052
+;
+create function pg_temp.mysin(float8) returns float8 language plpgsql
+as 'begin return sin($1); end'
+;
+CREATE INDEX bt_txt_index ON bt_txt_heap USING btree (seqno text_ops)
+;
+VACUUM (TRUNCATE FALSE) pg_catalog.pg_transform
+;
+CREATE INDEX mvtest_aa ON mvtest_bb (grandtot)
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] create function trigtest() returns trigger as $$
+begin
+	raise notice '% % % %', TG_RELNAME, TG_OP, TG_WHEN, TG_LEVEL;
+	return new;
+end;$$ language plpgsql
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION postgres_fdw_disconnect_all ()
+RETURNS bool
+AS '$libdir/postgres_fdw'
+LANGUAGE C STRICT PARALLEL RESTRICTED
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_30669 RENAME TO reind_con_toast
+;
+----------
+[CREATE_POLICY] -- DO UPDATE with a WHERE clause
+CREATE RULE hat_upsert AS ON INSERT TO hats
+    DO INSTEAD
+    INSERT INTO hat_data VALUES (
+           NEW.hat_name,
+           NEW.hat_color)
+        ON CONFLICT (hat_name)
+        DO UPDATE
+           SET hat_name = hat_data.hat_name, hat_color = excluded.hat_color
+           WHERE excluded.hat_color <>  'forbidden' AND hat_data.* != excluded.*
+        RETURNING *
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX tbl_idx_unique ON tbl using btree(c1, c2) INCLUDE (c3,c4)
+;
+----------
+[CREATE_TABLE] CREATE TABLE tr_sub (id serial primary key, path text)
+;
+----------
+[BLOCK] -- it's okay to re-use a cursor variable name, even when bound
+
+do $$
+declare cnt int := 0;
+  c1 cursor for select * from forc_test;
+begin
+  for r1 in c1 loop
+    declare c1 cursor for select * from forc_test;
+    begin
+      for r2 in c1 loop
+        cnt := cnt + 1;
+      end loop;
+    end;
+  end loop;
+  raise notice 'cnt = %', cnt;
+end $$
+;
+----------
+[CREATE_TABLE] CREATE TABLE idxpart1 PARTITION OF idxpart FOR VALUES FROM (MINVALUE) TO (MAXVALUE)
+;
+----------
+[CREATE_SCHEMA] --
+-- Test the LOCK statement
+--
+
+-- Setup
+CREATE SCHEMA lock_schema1
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, FREEZE) pg_catalog.pg_partitioned_table
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger part_ins_trig
+	before insert on parted_copytest_a2
+	for each row
+	execute procedure part_ins_func()
+;
+----------
+[CREATE_PROG_OBJ] --
+-- hash_page_items()
+--
+CREATE FUNCTION hash_page_items(IN page bytea,
+	OUT itemoffset int4,
+	OUT ctid tid,
+	OUT data int8)
+RETURNS SETOF record
+AS '$libdir/pageinspect', 'hash_page_items'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_float8_penalty(internal, internal, internal) PARALLEL SAFE
+;
+----------
+[DROP_INDEX] drop index loct1_idx
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION yiddish ADD MAPPING
+    FOR asciiword, hword_asciipart, asciihword
+	WITH yiddish_stem
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION equipment_named_ambiguous_1c(hobby hobbies_r)
+   RETURNS setof equipment_r
+   AS 'select * from equipment_r where hobby = hobby.name'
+   LANGUAGE SQL
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_part_key (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS (f2 * 2) STORED) PARTITION BY RANGE ((gtest_part_key is not null))
+;
+----------
+[CREATE_TABLE] create table defer_trig (id integer)
+;
+----------
+[CREATE_PROG_OBJ] create function polyf(a anyelement, b anyarray,
+                      c anycompatible, d anycompatible,
+                      OUT x anyarray, OUT y anycompatiblearray)
+as $$
+  select a || b, array[c, d]
+$$ language sql
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_child3 PARTITION OF gtest_parent FOR VALUES FROM ('2016-09-01') TO ('2016-10-01')
+;
+----------
+[ADMIN_TABLE] VACUUM (INDEX_CLEANUP FALSE) information_schema.sql_parts
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW temp_view_test.v3_temp AS SELECT * FROM temp_table
+;
+----------
+[CREATE_PROG_OBJ] create or replace function sc_test() returns setof integer as $$
+declare
+  c refcursor;
+  x integer;
+begin
+  open c scroll for execute 'select f1 from int4_tbl';
+  fetch last from c into x;
+  while found loop
+    return next x;
+    move backward 2 from c;
+    fetch relative -1 from c into x;
+  end loop;
+  close c;
+end;
+$$ language plpgsql
+;
+----------
+[CREATE_TABLE] CREATE TABLE part_bogus_expr_fail PARTITION OF range_parted
+  FOR VALUES FROM (generate_series(1, 3)) TO ('2019-01-01')
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE prt1_adv ATTACH PARTITION prt1_adv_p3 FOR VALUES FROM (300) TO (400)
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION testsub1 CONNECTION 'port=13399 host=/tmp/QGH4Hh755I dbname=postgres' PUBLICATION testpub1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION my_gen_series(int, int) RETURNS SETOF integer
+  LANGUAGE internal STRICT IMMUTABLE PARALLEL SAFE
+  AS $$generate_series_int4$$
+  SUPPORT test_support_func
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 6.79
+ * VIEW_PERIOD_USAGE
+ */
+
+-- feature not supported
+
+
+/*
+ * 6.80
+ * VIEW_ROUTINE_USAGE
+ */
+
+CREATE VIEW view_routine_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nv.nspname AS sql_identifier) AS table_schema,
+           CAST(v.relname AS sql_identifier) AS table_name,
+           CAST(current_database() AS sql_identifier) AS specific_catalog,
+           CAST(np.nspname AS sql_identifier) AS specific_schema,
+           CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier) AS specific_name
+
+    FROM pg_namespace nv, pg_class v, pg_depend dv,
+         pg_depend dp, pg_proc p, pg_namespace np
+
+    WHERE nv.oid = v.relnamespace
+          AND v.relkind = 'v'
+          AND v.oid = dv.refobjid
+          AND dv.refclassid = 'pg_catalog.pg_class'::regclass
+          AND dv.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dv.deptype = 'i'
+          AND dv.objid = dp.objid
+          AND dp.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dp.refclassid = 'pg_catalog.pg_proc'::regclass
+          AND dp.refobjid = p.oid
+          AND p.pronamespace = np.oid
+          AND pg_has_role(p.proowner, 'USAGE')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION split_obj_priv.mood_rank(split_obj_priv.cast_mood)
+RETURNS integer
+LANGUAGE SQL
+IMMUTABLE
+AS $$ SELECT array_position(ARRAY['sad','ok','happy'], $1::text) $$
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW mysecview5 WITH (security_barrier=100)	-- Error
+       AS SELECT * FROM tbl1 WHERE a > 100
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW vw_getrngfunc AS SELECT * FROM getrngfunc9(1) WITH ORDINALITY AS t1(a,b,c,o)
+;
+----------
+[CALL_PROG_OBJ] CALL test_proc7(b::int, a, b)
+;
+----------
+[CREATE_TABLE] --
+-- Test case to catch problems with multiply nested sub-SELECTs not getting
+-- recalculated properly.  Per bug report from Didier Moens.
+--
+
+CREATE TABLE orderstest (
+    approver_ref integer,
+    po_ref integer,
+    ordercanceled boolean
+)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] -- alice can't do this: she doesn't own inh_child
+alter table inh_parent alter a drop not null
+;
+----------
+[CREATE_TABLE|SELECT] -- Test CLUSTER with external tuplesorting
+
+create table clstr_4 as select * from tenk1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION alt_func1(int) RETURNS int LANGUAGE sql
+  AS 'SELECT $1 + 1'
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger tg_chkbacklink before insert or update
+    on WSlot for each row execute procedure tg_chkbacklink()
+;
+----------
+[DROP_TYPE] drop domain mydomain cascade
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION skeys(hstore)
+RETURNS setof text
+AS '$libdir/hstore','hstore_skeys'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] CREATE TABLE pagg_tab_p1 (LIKE pagg_tab)
+;
+----------
+[RENAME_TABLESPACE] ALTER TABLESPACE split_ts_space RENAME TO split_ts_space_renamed
+;
+----------
+[CREATE_TABLE] CREATE TABLE testschema.part_4 PARTITION OF testschema.part FOR VALUES IN (4)
+  TABLESPACE pg_default
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_11.pg_temp_41070_2
+;
+----------
+[ADD_INDEX] CREATE INDEX sro_idx ON sro_tab ((sro_ifun(a) + sro_ifun(0)))
+	WHERE sro_ifun(a + 10) > sro_ifun(10)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION test_resowner_many(
+   nkinds       pg_catalog.int4,
+   nremember_bl pg_catalog.int4,
+   nforget_bl   pg_catalog.int4,
+   nremember_al pg_catalog.int4,
+   nforget_al   pg_catalog.int4
+)
+	RETURNS pg_catalog.void
+	AS '$libdir/test_resowner' LANGUAGE C
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_14.pg_temp_27052
+;
+----------
+[CREATE_PROG_OBJ] create function pg_temp.mysin(float8) returns float8 language plpgsql
+as 'begin return sin($1); end'
+;
+----------
+[ADD_INDEX] CREATE INDEX bt_txt_index ON bt_txt_heap USING btree (seqno text_ops)
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) pg_catalog.pg_transform
+;
+----------
+[ADD_INDEX] CREATE INDEX mvtest_aa ON mvtest_bb (grandtot)
+;

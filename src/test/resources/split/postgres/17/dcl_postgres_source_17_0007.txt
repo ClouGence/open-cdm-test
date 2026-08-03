@@ -1,0 +1,98 @@
+COPY (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) TO stdout
+;
+-- fails
+REVOKE ALL PRIVILEGES ON PARAMETER
+	none.such, another.bogus,
+	test_oat_hooks.user_var1, test_oat_hooks.super_var1,
+	test_oat_hooks.user_var2, test_oat_hooks.super_var2
+	FROM regress_role_joe
+;
+GRANT SET, ALTER SYSTEM ON PARAMETER none.such TO regress_role_joe
+;
+COPY (
+    MERGE INTO sq_target t
+    USING sq_source s
+    ON tid = sid
+    WHEN MATCHED AND tid >= 2 THEN
+        UPDATE SET balance = t.balance + delta
+    WHEN NOT MATCHED THEN
+        INSERT (balance, tid) VALUES (balance + delta, sid)
+    WHEN MATCHED AND tid < 2 THEN
+        DELETE
+    RETURNING merge_action(), t.*
+) TO stdout
+;
+REVOKE ALL ON PARAMETER "none.such" FROM PUBLIC
+;
+-- system catalog, fail
+REINDEX (TABLESPACE pg_global) TABLE pg_authid
+;
+GRANT SET, ALTER SYSTEM ON PARAMETER
+    autovacuum_work_mem, hash_mem_multiplier, max_stack_depth,
+    shared_buffers, temp_file_limit, work_mem
+TO regress_host_resource_admin
+;
+-- notice
+REINDEX (CONCURRENTLY) TABLE concur_reindex_tab
+;
+create statistics on b, c from stts_t2
+;
+DROP USER MAPPING FOR CURRENT_ROLE SERVER sv3
+;
+------------------------------------------------------------------------------------------
+[DATA_EXPORT|MERGE] COPY (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) TO stdout
+;
+----------
+[REVOKE] -- fails
+REVOKE ALL PRIVILEGES ON PARAMETER
+	none.such, another.bogus,
+	test_oat_hooks.user_var1, test_oat_hooks.super_var1,
+	test_oat_hooks.user_var2, test_oat_hooks.super_var2
+	FROM regress_role_joe
+;
+----------
+[GRANT] GRANT SET, ALTER SYSTEM ON PARAMETER none.such TO regress_role_joe
+;
+----------
+[DATA_EXPORT|MERGE] COPY (
+    MERGE INTO sq_target t
+    USING sq_source s
+    ON tid = sid
+    WHEN MATCHED AND tid >= 2 THEN
+        UPDATE SET balance = t.balance + delta
+    WHEN NOT MATCHED THEN
+        INSERT (balance, tid) VALUES (balance + delta, sid)
+    WHEN MATCHED AND tid < 2 THEN
+        DELETE
+    RETURNING merge_action(), t.*
+) TO stdout
+;
+----------
+[REVOKE] REVOKE ALL ON PARAMETER "none.such" FROM PUBLIC
+;
+----------
+[ADMIN] -- system catalog, fail
+REINDEX (TABLESPACE pg_global) TABLE pg_authid
+;
+----------
+[GRANT] GRANT SET, ALTER SYSTEM ON PARAMETER
+    autovacuum_work_mem, hash_mem_multiplier, max_stack_depth,
+    shared_buffers, temp_file_limit, work_mem
+TO regress_host_resource_admin
+;
+----------
+[ADMIN] -- notice
+REINDEX (CONCURRENTLY) TABLE concur_reindex_tab
+;
+----------
+[ADMIN_PERFORMANCE] create statistics on b, c from stts_t2
+;
+----------
+[REVOKE] DROP USER MAPPING FOR CURRENT_ROLE SERVER sv3
+;

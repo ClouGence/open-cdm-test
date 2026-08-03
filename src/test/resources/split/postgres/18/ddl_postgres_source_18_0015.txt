@@ -1,0 +1,550 @@
+CREATE FUNCTION merge_sf_test()
+ RETURNS void
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN MATCHED
+   AND (s.a + t.id) = 42
+   THEN UPDATE SET data = repeat(t.data, s.a) || s.b, id = length(s.b)
+WHEN NOT MATCHED
+   AND (s.b IS NOT NULL)
+   THEN INSERT (data, id)
+   VALUES (s.b, s.a)
+WHEN MATCHED
+   AND length(s.b || t.data) > 10
+   THEN UPDATE SET data = s.b
+WHEN MATCHED
+   AND s.a > 200
+   THEN UPDATE SET filling[s.a] = t.id
+WHEN MATCHED
+   AND s.a > 100
+   THEN DELETE
+WHEN MATCHED
+   THEN DO NOTHING
+WHEN NOT MATCHED
+   AND s.a > 200
+   THEN INSERT DEFAULT VALUES
+WHEN NOT MATCHED
+   AND s.a > 100
+   THEN INSERT (id, data) OVERRIDING USER VALUE
+   VALUES (s.a, DEFAULT)
+WHEN NOT MATCHED
+   AND s.a > 0
+   THEN INSERT
+   VALUES (s.a, s.b, DEFAULT)
+WHEN NOT MATCHED
+   THEN INSERT (filling[1], id)
+   VALUES (s.a, s.a);
+END
+;
+ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+-- test ruleutils
+CREATE VIEW limit_thousand_v_1 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST 5 ROWS WITH TIES OFFSET 10
+;
+-- Test constraints
+
+CREATE TABLE test_jsonb_constraints (
+	js text,
+	i int,
+	x jsonb DEFAULT JSON_QUERY(jsonb '[1,2]', '$[*]' WITH WRAPPER)
+	CONSTRAINT test_jsonb_constraint1
+		CHECK (js IS JSON)
+	CONSTRAINT test_jsonb_constraint2
+		CHECK (JSON_EXISTS(js::jsonb, '$.a' PASSING i + 5 AS int, i::text AS "TXT", array[1,2,3] as arr))
+	CONSTRAINT test_jsonb_constraint3
+		CHECK (JSON_VALUE(js::jsonb, '$.a' RETURNING int DEFAULT '12' ON EMPTY ERROR ON ERROR) > i)
+	CONSTRAINT test_jsonb_constraint4
+		CHECK (JSON_QUERY(js::jsonb, '$.a' WITH CONDITIONAL WRAPPER EMPTY OBJECT ON ERROR) = jsonb '[10]')
+	CONSTRAINT test_jsonb_constraint5
+		CHECK (JSON_QUERY(js::jsonb, '$.a' RETURNING char(5) OMIT QUOTES EMPTY ARRAY ON EMPTY) >  'a' COLLATE "C")
+)
+;
+ALTER PUBLICATION testpub_fortable ADD TABLES IN SCHEMA pub_test
+;
+CREATE TABLE gtest_err_3 (a int PRIMARY KEY, b int GENERATED ALWAYS AS (c * 2) VIRTUAL)
+;
+-- ... but be sure that the immutability test is accurate
+CREATE TABLE gtest2 (a int, b text GENERATED ALWAYS AS (a || ' sec') VIRTUAL)
+;
+CREATE TABLE "generated_virtual_tests"."gtest20c" (
+    "a" integer,
+    "b" integer GENERATED ALWAYS AS (("a" * 2)),
+    CONSTRAINT "whole_row_check" CHECK (("gtest20c".* IS NOT NULL))
+)
+;
+ALTER TABLE split_alter18.current_table ALTER CONSTRAINT current_table_fk ENFORCED
+;
+alter table p1 add constraint inh_check_constraint5 check (f1 < 10) not enforced
+;
+CREATE UNIQUE INDEX cwi_a_nnd ON cwi_test (a) NULLS NOT DISTINCT
+;
+ALTER TABLE "public"."renamecolumn"
+    ADD CONSTRAINT "renamecolumn_x_check" CHECK (("x" > 0)) NOT ENFORCED
+;
+-- should fail:
+ALTER TABLE temporal_fk_rng2rng
+  ADD CONSTRAINT temporal_fk_rng2rng_fk
+  FOREIGN KEY (parent_id, PERIOD valid_at)
+  REFERENCES temporal_rng
+;
+CREATE VIEW "public"."limit_thousand_v_4" AS
+ SELECT "onek"."thousand"
+   FROM "public"."onek"
+  WHERE ("onek"."thousand" < 995)
+  ORDER BY "onek"."thousand"
+ FETCH FIRST ((5)::bigint) ROWS WITH TIES
+;
+CREATE FUNCTION _pg_datetime_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1082) /* date */
+           THEN 0
+       WHEN $1 IN (1083, 1114, 1184, 1266) /* time, timestamp, same + tz */
+           THEN CASE WHEN $2 < 0 THEN 6 ELSE $2 END
+       WHEN $1 IN (1186) /* interval */
+           THEN CASE WHEN $2 < 0 OR $2 & 0xFFFF = 0xFFFF THEN 6 ELSE $2 & 0xFFFF END
+       ELSE null
+  END
+;
+CREATE PROCEDURE ptest8(x text)
+BEGIN ATOMIC
+END
+;
+CREATE PUBLICATION testpub5 FOR TABLE testpub_rf_tbl1, testpub_rf_tbl2 WHERE (c <> 'test' AND d < 5) WITH (publish = 'insert')
+;
+--
+-- FK between partitioned tables: ranges
+--
+
+CREATE TABLE temporal_partitioned_rng (
+  id int4range,
+  valid_at daterange,
+  name text,
+  CONSTRAINT temporal_paritioned_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+) PARTITION BY LIST (id)
+;
+CREATE TABLE temporal_rng (
+  id INTEGER,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 (b)
+;
+CREATE TABLE temporal_rng2 (
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+) INHERITS (temporal_rng)
+;
+-- pg_column_toast_chunk_id
+CREATE TABLE test_chunk_id (a TEXT, b TEXT STORAGE EXTERNAL)
+;
+CREATE OR REPLACE FUNCTION "overlaps"(time, interval,
+  time, time)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;
+CREATE TABLE temporal_rng (
+  id int4range,
+  valid_at TEXT,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+ALTER TYPE cube SET ( RECEIVE = cube_recv, SEND = cube_send )
+;
+-- various prohibited constructs
+CREATE TABLE gtest_err_7a (a int PRIMARY KEY, b int GENERATED ALWAYS AS (avg(a)) VIRTUAL)
+;
+-- test MERGE
+CREATE TABLE gtestm (
+  id int PRIMARY KEY,
+  f1 int,
+  f2 int,
+  f3 int GENERATED ALWAYS AS (f1 * 2) VIRTUAL,
+  f4 int GENERATED ALWAYS AS (f2 * 2) VIRTUAL
+)
+;
+ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION default
+;
+-- test minmax-multi specific index options
+-- number of values must be >= 16
+CREATE INDEX brinidx_multi ON brintest_multi USING brin (
+	int8col int8_minmax_multi_ops(values_per_range = 7)
+)
+;
+CREATE TABLE temporal_fk_rng2rng (
+  id integer,
+  valid_at daterange,
+  parent_id integer,
+  CONSTRAINT temporal_fk_rng2rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng (id, PERIOD valid_at)
+)
+;
+ALTER TABLE temporal_rng ADD CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+;
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test2
+;
+CREATE TABLE cminh(f1 TEXT COMPRESSION lz4) INHERITS(cmdata)
+;
+ALTER PUBLICATION "dump_pub_all" ADD TABLE ONLY "pubme"."t1" WHERE (("c" < 0))
+;
+CREATE PUBLICATION split_pub18_schema FOR TABLES IN SCHEMA split_pub18_b, CURRENT_SCHEMA WITH (publish = 'insert')
+;
+-- this should work
+alter table renameColumn add column x int check (x > 0) not enforced
+;
+CREATE PUBLICATION split_pub_cols FOR TABLE split_fdw_repl.accounts (id, owner_name) WHERE (amount > 0) WITH (publish = 'insert, update', publish_via_partition_root = true)
+;
+CREATE TABLE gtest1_y (b int GENERATED ALWAYS AS (x + 1) VIRTUAL) INHERITS (gtest1, gtesty)
+;
+ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    analyze = array_typanalyze  
+)
+;
+ALTER TABLE notnull_tbl1 ADD CONSTRAINT nn_parent NOT NULL a not valid
+;
+-- Test JSON_TABLE() deparsing -- don't emit default ON ERROR behavior
+CREATE VIEW json_table_view8 AS SELECT * from JSON_TABLE('"a"', '$' COLUMNS (a text PATH '$') EMPTY ON ERROR)
+;
+ALTER TABLE "public"."constr_parent2"
+    ADD CONSTRAINT "constr_parent2_a_not_null" NOT NULL "a" NOT VALID
+;
+-- should be able to create publication with schema and table of the same
+-- schema
+CREATE PUBLICATION testpub_for_tbl_schema FOR TABLES IN SCHEMA pub_test, TABLE pub_test.testpub_nopk
+;
+-- fail - publication WHERE clause must be boolean
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (1234)
+;
+CREATE TABLE ext_stats_test1 (x int, y int, z int GENERATED ALWAYS AS (x+y) VIRTUAL, w xid)
+;
+CREATE PUBLICATION testpub6 FOR TABLE rf_tbl_abcd_pk WHERE (a > 99)
+;
+CREATE PUBLICATION tap_pub_schema FOR TABLES IN SCHEMA sch1
+;
+-- NOT NULL NO INHERIT is not possible on partitioned tables
+CREATE TABLE ATACC1 (a int NOT NULL NO INHERIT) PARTITION BY LIST (a)
+;
+CREATE TABLE temporal_fk_rng2rng (
+  id int4range,
+  valid_at int4range,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_rng2rng_pk2 PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk2 FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng (id, PERIOD valid_at)
+)
+;
+ALTER PUBLICATION "dump_pub_nsp_2ct" ADD TABLES IN SCHEMA "pubme2"
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE FUNCTION merge_sf_test()
+ RETURNS void
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN MATCHED
+   AND (s.a + t.id) = 42
+   THEN UPDATE SET data = repeat(t.data, s.a) || s.b, id = length(s.b)
+WHEN NOT MATCHED
+   AND (s.b IS NOT NULL)
+   THEN INSERT (data, id)
+   VALUES (s.b, s.a)
+WHEN MATCHED
+   AND length(s.b || t.data) > 10
+   THEN UPDATE SET data = s.b
+WHEN MATCHED
+   AND s.a > 200
+   THEN UPDATE SET filling[s.a] = t.id
+WHEN MATCHED
+   AND s.a > 100
+   THEN DELETE
+WHEN MATCHED
+   THEN DO NOTHING
+WHEN NOT MATCHED
+   AND s.a > 200
+   THEN INSERT DEFAULT VALUES
+WHEN NOT MATCHED
+   AND s.a > 100
+   THEN INSERT (id, data) OVERRIDING USER VALUE
+   VALUES (s.a, DEFAULT)
+WHEN NOT MATCHED
+   AND s.a > 0
+   THEN INSERT
+   VALUES (s.a, s.b, DEFAULT)
+WHEN NOT MATCHED
+   THEN INSERT (filling[1], id)
+   VALUES (s.a, s.a);
+END
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+----------
+[CREATE_VIEW(SELECT)] -- test ruleutils
+CREATE VIEW limit_thousand_v_1 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST 5 ROWS WITH TIES OFFSET 10
+;
+----------
+[CREATE_TABLE] -- Test constraints
+
+CREATE TABLE test_jsonb_constraints (
+	js text,
+	i int,
+	x jsonb DEFAULT JSON_QUERY(jsonb '[1,2]', '$[*]' WITH WRAPPER)
+	CONSTRAINT test_jsonb_constraint1
+		CHECK (js IS JSON)
+	CONSTRAINT test_jsonb_constraint2
+		CHECK (JSON_EXISTS(js::jsonb, '$.a' PASSING i + 5 AS int, i::text AS "TXT", array[1,2,3] as arr))
+	CONSTRAINT test_jsonb_constraint3
+		CHECK (JSON_VALUE(js::jsonb, '$.a' RETURNING int DEFAULT '12' ON EMPTY ERROR ON ERROR) > i)
+	CONSTRAINT test_jsonb_constraint4
+		CHECK (JSON_QUERY(js::jsonb, '$.a' WITH CONDITIONAL WRAPPER EMPTY OBJECT ON ERROR) = jsonb '[10]')
+	CONSTRAINT test_jsonb_constraint5
+		CHECK (JSON_QUERY(js::jsonb, '$.a' RETURNING char(5) OMIT QUOTES EMPTY ARRAY ON EMPTY) >  'a' COLLATE "C")
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLES IN SCHEMA pub_test
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_err_3 (a int PRIMARY KEY, b int GENERATED ALWAYS AS (c * 2) VIRTUAL)
+;
+----------
+[CREATE_TABLE] -- ... but be sure that the immutability test is accurate
+CREATE TABLE gtest2 (a int, b text GENERATED ALWAYS AS (a || ' sec') VIRTUAL)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "generated_virtual_tests"."gtest20c" (
+    "a" integer,
+    "b" integer GENERATED ALWAYS AS (("a" * 2)),
+    CONSTRAINT "whole_row_check" CHECK (("gtest20c".* IS NOT NULL))
+)
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] ALTER TABLE split_alter18.current_table ALTER CONSTRAINT current_table_fk ENFORCED
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table p1 add constraint inh_check_constraint5 check (f1 < 10) not enforced
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX cwi_a_nnd ON cwi_test (a) NULLS NOT DISTINCT
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE "public"."renamecolumn"
+    ADD CONSTRAINT "renamecolumn_x_check" CHECK (("x" > 0)) NOT ENFORCED
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] -- should fail:
+ALTER TABLE temporal_fk_rng2rng
+  ADD CONSTRAINT temporal_fk_rng2rng_fk
+  FOREIGN KEY (parent_id, PERIOD valid_at)
+  REFERENCES temporal_rng
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."limit_thousand_v_4" AS
+ SELECT "onek"."thousand"
+   FROM "public"."onek"
+  WHERE ("onek"."thousand" < 995)
+  ORDER BY "onek"."thousand"
+ FETCH FIRST ((5)::bigint) ROWS WITH TIES
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_datetime_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1082) /* date */
+           THEN 0
+       WHEN $1 IN (1083, 1114, 1184, 1266) /* time, timestamp, same + tz */
+           THEN CASE WHEN $2 < 0 THEN 6 ELSE $2 END
+       WHEN $1 IN (1186) /* interval */
+           THEN CASE WHEN $2 < 0 OR $2 & 0xFFFF = 0xFFFF THEN 6 ELSE $2 & 0xFFFF END
+       ELSE null
+  END
+;
+----------
+[CREATE_PROG_OBJ] CREATE PROCEDURE ptest8(x text)
+BEGIN ATOMIC
+END
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub5 FOR TABLE testpub_rf_tbl1, testpub_rf_tbl2 WHERE (c <> 'test' AND d < 5) WITH (publish = 'insert')
+;
+----------
+[CREATE_TABLE] --
+-- FK between partitioned tables: ranges
+--
+
+CREATE TABLE temporal_partitioned_rng (
+  id int4range,
+  valid_at daterange,
+  name text,
+  CONSTRAINT temporal_paritioned_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+) PARTITION BY LIST (id)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_rng (
+  id INTEGER,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 (b)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_rng2 (
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+) INHERITS (temporal_rng)
+;
+----------
+[CREATE_TABLE] -- pg_column_toast_chunk_id
+CREATE TABLE test_chunk_id (a TEXT, b TEXT STORAGE EXTERNAL)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "overlaps"(time, interval,
+  time, time)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_rng (
+  id int4range,
+  valid_at TEXT,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[ALTER_TYPE] ALTER TYPE cube SET ( RECEIVE = cube_recv, SEND = cube_send )
+;
+----------
+[CREATE_TABLE] -- various prohibited constructs
+CREATE TABLE gtest_err_7a (a int PRIMARY KEY, b int GENERATED ALWAYS AS (avg(a)) VIRTUAL)
+;
+----------
+[CREATE_TABLE] -- test MERGE
+CREATE TABLE gtestm (
+  id int PRIMARY KEY,
+  f1 int,
+  f2 int,
+  f3 int GENERATED ALWAYS AS (f1 * 2) VIRTUAL,
+  f4 int GENERATED ALWAYS AS (f2 * 2) VIRTUAL
+)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION default
+;
+----------
+[ADD_INDEX] -- test minmax-multi specific index options
+-- number of values must be >= 16
+CREATE INDEX brinidx_multi ON brintest_multi USING brin (
+	int8col int8_minmax_multi_ops(values_per_range = 7)
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_fk_rng2rng (
+  id integer,
+  valid_at daterange,
+  parent_id integer,
+  CONSTRAINT temporal_fk_rng2rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng (id, PERIOD valid_at)
+)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE temporal_rng ADD CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test2
+;
+----------
+[CREATE_TABLE] CREATE TABLE cminh(f1 TEXT COMPRESSION lz4) INHERITS(cmdata)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_all" ADD TABLE ONLY "pubme"."t1" WHERE (("c" < 0))
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION split_pub18_schema FOR TABLES IN SCHEMA split_pub18_b, CURRENT_SCHEMA WITH (publish = 'insert')
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] -- this should work
+alter table renameColumn add column x int check (x > 0) not enforced
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION split_pub_cols FOR TABLE split_fdw_repl.accounts (id, owner_name) WHERE (amount > 0) WITH (publish = 'insert, update', publish_via_partition_root = true)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest1_y (b int GENERATED ALWAYS AS (x + 1) VIRTUAL) INHERITS (gtest1, gtesty)
+;
+----------
+[ALTER_TYPE] ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    analyze = array_typanalyze  
+)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE notnull_tbl1 ADD CONSTRAINT nn_parent NOT NULL a not valid
+;
+----------
+[CREATE_VIEW(SELECT)] -- Test JSON_TABLE() deparsing -- don't emit default ON ERROR behavior
+CREATE VIEW json_table_view8 AS SELECT * from JSON_TABLE('"a"', '$' COLUMNS (a text PATH '$') EMPTY ON ERROR)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE "public"."constr_parent2"
+    ADD CONSTRAINT "constr_parent2_a_not_null" NOT NULL "a" NOT VALID
+;
+----------
+[CREATE_PUB_SUB] -- should be able to create publication with schema and table of the same
+-- schema
+CREATE PUBLICATION testpub_for_tbl_schema FOR TABLES IN SCHEMA pub_test, TABLE pub_test.testpub_nopk
+;
+----------
+[ALTER_PUB_SUB] -- fail - publication WHERE clause must be boolean
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (1234)
+;
+----------
+[CREATE_TABLE] CREATE TABLE ext_stats_test1 (x int, y int, z int GENERATED ALWAYS AS (x+y) VIRTUAL, w xid)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub6 FOR TABLE rf_tbl_abcd_pk WHERE (a > 99)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_schema FOR TABLES IN SCHEMA sch1
+;
+----------
+[CREATE_TABLE] -- NOT NULL NO INHERIT is not possible on partitioned tables
+CREATE TABLE ATACC1 (a int NOT NULL NO INHERIT) PARTITION BY LIST (a)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_fk_rng2rng (
+  id int4range,
+  valid_at int4range,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_rng2rng_pk2 PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk2 FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng (id, PERIOD valid_at)
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_nsp_2ct" ADD TABLES IN SCHEMA "pubme2"
+;

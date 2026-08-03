@@ -1,0 +1,500 @@
+CREATE PROCEDURE outer_p (f1 int)
+AS $$
+BEGIN
+  RAISE NOTICE 'outer_p(%)', f1;
+  CALL inner_p(f(f1));
+END
+$$ LANGUAGE plpgsql
+;
+VACUUM (INDEX_CLEANUP FALSE) pg_catalog.pg_namespace
+;
+CREATE FUNCTION dup (anyelement) RETURNS anyelement
+    AS 'select $1' LANGUAGE sql
+;
+drop operator family my_op_family using btree
+;
+CREATE FUNCTION test_mblen_func(text, text, text, int) RETURNS int
+    AS '/src/src/test/regress/regress.so' LANGUAGE C STRICT
+;
+-- obsolete:
+CREATE OPERATOR @ (
+	LEFTARG = seg,
+	RIGHTARG = seg,
+	PROCEDURE = seg_contains,
+	COMMUTATOR = '~',
+	RESTRICT = contsel,
+	JOIN = contjoinsel
+)
+;
+ALTER TABLE "S 1"."T 0" RENAME TO "T 1"
+;
+CREATE TABLE testpub_tbl8_1 (a int, b text, c text)
+;
+CREATE TABLE gist_idx_tbl (p point)
+;
+-- check that regular and deferrable AR triggers on the PK tables
+-- still work as expected
+CREATE FUNCTION fkpart11.print_row () RETURNS TRIGGER LANGUAGE plpgsql AS $$
+  BEGIN
+    RAISE NOTICE 'TABLE: %, OP: %, OLD: %, NEW: %', TG_RELNAME, TG_OP, OLD, NEW;
+    RETURN NULL;
+  END;
+$$
+;
+create or replace function sc_test() returns setof integer as $$
+declare
+  c refcursor;
+  x integer;
+begin
+  open c scroll for execute 'select f1 from int4_tbl';
+  fetch last from c into x;
+  while found loop
+    return next x;
+    fetch relative -2 from c into x;
+  end loop;
+  close c;
+end;
+$$ language plpgsql
+;
+DROP TABLE pg_temp_10.pg_temp_26444_2, pg_temp_10.pg_temp_26444
+;
+ANALYZE (SKIP_LOCKED) pg_catalog.pg_operator
+;
+CREATE TABLE tab2 (a int primary key, b int)
+;
+CREATE FUNCTION int_custom_typanalyze_false(internal)
+RETURNS boolean
+AS '$libdir/test_custom_types'
+LANGUAGE C STRICT
+;
+create table inh_child3() inherits(inh_child1, inh_child2)
+;
+CREATE TABLE tt5 (x int, y numeric(8,2), z int)
+;
+/*
+ * 6.63
+ * TABLE_METHOD_PRIVILEGES view
+ */
+
+-- feature not supported
+
+
+/*
+ * 6.64
+ * TABLE_PRIVILEGES view
+ */
+
+CREATE VIEW table_privileges AS
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+           CAST(c.prtype AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(grantee.oid, c.relowner, 'USAGE')
+                  OR c.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable,
+           CAST(CASE WHEN c.prtype = 'SELECT' THEN 'YES' ELSE 'NO' END AS yes_or_no) AS with_hierarchy
+
+    FROM (
+            SELECT oid, relname, relnamespace, relkind, relowner, (aclexplode(coalesce(relacl, acldefault('r', relowner)))).* FROM pg_class
+         ) AS c (oid, relname, relnamespace, relkind, relowner, grantor, grantee, prtype, grantable),
+         pg_namespace nc,
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE c.relnamespace = nc.oid
+          AND c.relkind IN ('r', 'v', 'f', 'p')
+          AND c.grantee = grantee.oid
+          AND c.grantor = u_grantor.oid
+          AND c.prtype IN ('INSERT', 'SELECT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+;
+DROP TABLE functest1 CASCADE
+;
+CREATE OPERATOR FAMILY alt_opf1 USING hash
+;
+CREATE TRIGGER after_upd_stmt_trig AFTER UPDATE ON main_table
+EXECUTE PROCEDURE trigger_func('after_upd_stmt')
+;
+CREATE TABLE fk_partitioned_fk_3 (a int, b int) PARTITION BY RANGE (a, b)
+;
+CREATE TABLE mcv_lists (
+    filler1 TEXT,
+    filler2 NUMERIC,
+    a INT,
+    b VARCHAR,
+    filler3 DATE,
+    c INT,
+    d TEXT
+)
+;
+ALTER INDEX pg_toast.pg_toast_27767_index RENAME TO reind_con_toast_idx
+;
+create table inh_child1 () inherits (inh_parent1, inh_parent2)
+;
+ALTER EXTENSION pg_walinspect UPDATE TO '1.1'
+;
+-- temp tables should go away by themselves, need not drop them.
+
+-- test check constraint adding
+
+create table atacc1 ( test int )
+;
+alter table idxpart1 drop column drop_1
+;
+create table parent (a text, b int) partition by list (a)
+;
+CREATE TABLESPACE ts1 LOCATION '/tmp/N7dvMJWWG8'
+;
+CREATE VIEW rw_view1 AS SELECT b AS bb, c AS cc, a AS aa FROM base_tbl
+;
+CREATE TABLE int4tbl (i int4)
+;
+-- reserved tablespace name
+CREATE TABLESPACE pg_foo LOCATION '/no/such/location'
+;
+ALTER FUNCTION gbt_float4_compress(internal) PARALLEL SAFE
+;
+drop operator public.=^(int, int)
+;
+-- Shared catalog
+VACUUM pg_catalog.pg_authid
+;
+CREATE SCHEMA IF NOT EXISTS newschema4 AUTHORIZATION regress_testrolx
+;
+CREATE FUNCTION read_rel_block_ll(
+    rel regclass,
+    blockno int,
+    nblocks int DEFAULT 1,
+    wait_complete bool DEFAULT true,
+    batchmode_enter bool DEFAULT false,
+    smgrreleaseall bool DEFAULT false,
+    batchmode_exit bool DEFAULT false,
+    zero_on_error bool DEFAULT false)
+RETURNS pg_catalog.void STRICT
+AS 'MODULE_PATHNAME' LANGUAGE C
+;
+CREATE TABLE "generated_virtual_tests"."gtest10a" (
+    "a" integer NOT NULL,
+    "........pg.dropped.2........" INTEGER /* dummy */
+)
+;
+-- Test column-level triggers
+DROP TRIGGER after_upd_row_trig ON main_table
+;
+ALTER TABLE ONLY "fkpart3"."pk1"
+    ADD CONSTRAINT "pk1_pkey" PRIMARY KEY ("a")
+;
+CALL ptest7(least('a', 'b'), 'a')
+;
+CREATE TABLE "public"."notnull_child_upg" (
+    "a" integer CONSTRAINT "nn" NOT NULL
+)
+;
+ALTER TABLE pg_temp_18.pg_temp_27287_2 ADD COLUMN newdata pg_temp_18.pg_temp_27287
+;
+create aggregate my_sum(int4)
+(
+   stype = avg_state,
+   sfunc = avg_transfn,
+   finalfunc = sum_finalfn
+)
+;
+DROP TABLE IF EXISTS split_table_idx.base_inherit
+;
+CREATE FUNCTION _int_overlap_sel(internal, oid, internal, integer)
+RETURNS float8
+AS '$libdir/_int'
+LANGUAGE C STRICT STABLE PARALLEL SAFE
+;
+CREATE TABLE pagg_tab_ml_p2_s1 PARTITION OF pagg_tab_ml_p2 FOR VALUES IN ('0000', '0001')
+;
+alter table c1 drop column name
+;
+VACUUM (PARALLEL 0) pg_catalog.pg_amproc
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE PROCEDURE outer_p (f1 int)
+AS $$
+BEGIN
+  RAISE NOTICE 'outer_p(%)', f1;
+  CALL inner_p(f(f1));
+END
+$$ LANGUAGE plpgsql
+;
+----------
+[ADMIN_TABLE] VACUUM (INDEX_CLEANUP FALSE) pg_catalog.pg_namespace
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION dup (anyelement) RETURNS anyelement
+    AS 'select $1' LANGUAGE sql
+;
+----------
+[DROP_PROG_OBJ] drop operator family my_op_family using btree
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION test_mblen_func(text, text, text, int) RETURNS int
+    AS '/src/src/test/regress/regress.so' LANGUAGE C STRICT
+;
+----------
+[CREATE_PROG_OBJ] -- obsolete:
+CREATE OPERATOR @ (
+	LEFTARG = seg,
+	RIGHTARG = seg,
+	PROCEDURE = seg_contains,
+	COMMUTATOR = '~',
+	RESTRICT = contsel,
+	JOIN = contjoinsel
+)
+;
+----------
+[RENAME_TABLE] ALTER TABLE "S 1"."T 0" RENAME TO "T 1"
+;
+----------
+[CREATE_TABLE] CREATE TABLE testpub_tbl8_1 (a int, b text, c text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gist_idx_tbl (p point)
+;
+----------
+[CREATE_PROG_OBJ] -- check that regular and deferrable AR triggers on the PK tables
+-- still work as expected
+CREATE FUNCTION fkpart11.print_row () RETURNS TRIGGER LANGUAGE plpgsql AS $$
+  BEGIN
+    RAISE NOTICE 'TABLE: %, OP: %, OLD: %, NEW: %', TG_RELNAME, TG_OP, OLD, NEW;
+    RETURN NULL;
+  END;
+$$
+;
+----------
+[CREATE_PROG_OBJ] create or replace function sc_test() returns setof integer as $$
+declare
+  c refcursor;
+  x integer;
+begin
+  open c scroll for execute 'select f1 from int4_tbl';
+  fetch last from c into x;
+  while found loop
+    return next x;
+    fetch relative -2 from c into x;
+  end loop;
+  close c;
+end;
+$$ language plpgsql
+;
+----------
+[DROP_TABLE] DROP TABLE pg_temp_10.pg_temp_26444_2, pg_temp_10.pg_temp_26444
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) pg_catalog.pg_operator
+;
+----------
+[CREATE_TABLE] CREATE TABLE tab2 (a int primary key, b int)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION int_custom_typanalyze_false(internal)
+RETURNS boolean
+AS '$libdir/test_custom_types'
+LANGUAGE C STRICT
+;
+----------
+[CREATE_TABLE] create table inh_child3() inherits(inh_child1, inh_child2)
+;
+----------
+[CREATE_TABLE] CREATE TABLE tt5 (x int, y numeric(8,2), z int)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 6.63
+ * TABLE_METHOD_PRIVILEGES view
+ */
+
+-- feature not supported
+
+
+/*
+ * 6.64
+ * TABLE_PRIVILEGES view
+ */
+
+CREATE VIEW table_privileges AS
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+           CAST(c.prtype AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(grantee.oid, c.relowner, 'USAGE')
+                  OR c.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable,
+           CAST(CASE WHEN c.prtype = 'SELECT' THEN 'YES' ELSE 'NO' END AS yes_or_no) AS with_hierarchy
+
+    FROM (
+            SELECT oid, relname, relnamespace, relkind, relowner, (aclexplode(coalesce(relacl, acldefault('r', relowner)))).* FROM pg_class
+         ) AS c (oid, relname, relnamespace, relkind, relowner, grantor, grantee, prtype, grantable),
+         pg_namespace nc,
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE c.relnamespace = nc.oid
+          AND c.relkind IN ('r', 'v', 'f', 'p')
+          AND c.grantee = grantee.oid
+          AND c.grantor = u_grantor.oid
+          AND c.prtype IN ('INSERT', 'SELECT', 'UPDATE', 'DELETE', 'TRUNCATE', 'REFERENCES', 'TRIGGER')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+;
+----------
+[DROP_TABLE] DROP TABLE functest1 CASCADE
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR FAMILY alt_opf1 USING hash
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER after_upd_stmt_trig AFTER UPDATE ON main_table
+EXECUTE PROCEDURE trigger_func('after_upd_stmt')
+;
+----------
+[CREATE_TABLE] CREATE TABLE fk_partitioned_fk_3 (a int, b int) PARTITION BY RANGE (a, b)
+;
+----------
+[CREATE_TABLE] CREATE TABLE mcv_lists (
+    filler1 TEXT,
+    filler2 NUMERIC,
+    a INT,
+    b VARCHAR,
+    filler3 DATE,
+    c INT,
+    d TEXT
+)
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_27767_index RENAME TO reind_con_toast_idx
+;
+----------
+[CREATE_TABLE] create table inh_child1 () inherits (inh_parent1, inh_parent2)
+;
+----------
+[ALTER_LIBRARY] ALTER EXTENSION pg_walinspect UPDATE TO '1.1'
+;
+----------
+[CREATE_TABLE] -- temp tables should go away by themselves, need not drop them.
+
+-- test check constraint adding
+
+create table atacc1 ( test int )
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] alter table idxpart1 drop column drop_1
+;
+----------
+[CREATE_TABLE] create table parent (a text, b int) partition by list (a)
+;
+----------
+[CREATE_TABLESPACE] CREATE TABLESPACE ts1 LOCATION '/tmp/N7dvMJWWG8'
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW rw_view1 AS SELECT b AS bb, c AS cc, a AS aa FROM base_tbl
+;
+----------
+[CREATE_TABLE] CREATE TABLE int4tbl (i int4)
+;
+----------
+[CREATE_TABLESPACE] -- reserved tablespace name
+CREATE TABLESPACE pg_foo LOCATION '/no/such/location'
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_float4_compress(internal) PARALLEL SAFE
+;
+----------
+[DROP_PROG_OBJ] drop operator public.=^(int, int)
+;
+----------
+[ADMIN_TABLE] -- Shared catalog
+VACUUM pg_catalog.pg_authid
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA IF NOT EXISTS newschema4 AUTHORIZATION regress_testrolx
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION read_rel_block_ll(
+    rel regclass,
+    blockno int,
+    nblocks int DEFAULT 1,
+    wait_complete bool DEFAULT true,
+    batchmode_enter bool DEFAULT false,
+    smgrreleaseall bool DEFAULT false,
+    batchmode_exit bool DEFAULT false,
+    zero_on_error bool DEFAULT false)
+RETURNS pg_catalog.void STRICT
+AS 'MODULE_PATHNAME' LANGUAGE C
+;
+----------
+[CREATE_TABLE] CREATE TABLE "generated_virtual_tests"."gtest10a" (
+    "a" integer NOT NULL,
+    "........pg.dropped.2........" INTEGER /* dummy */
+)
+;
+----------
+[DROP_TRIGGER] -- Test column-level triggers
+DROP TRIGGER after_upd_row_trig ON main_table
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "fkpart3"."pk1"
+    ADD CONSTRAINT "pk1_pkey" PRIMARY KEY ("a")
+;
+----------
+[CALL_PROG_OBJ] CALL ptest7(least('a', 'b'), 'a')
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."notnull_child_upg" (
+    "a" integer CONSTRAINT "nn" NOT NULL
+)
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE pg_temp_18.pg_temp_27287_2 ADD COLUMN newdata pg_temp_18.pg_temp_27287
+;
+----------
+[CREATE_PROG_OBJ] create aggregate my_sum(int4)
+(
+   stype = avg_state,
+   sfunc = avg_transfn,
+   finalfunc = sum_finalfn
+)
+;
+----------
+[DROP_TABLE] DROP TABLE IF EXISTS split_table_idx.base_inherit
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _int_overlap_sel(internal, oid, internal, integer)
+RETURNS float8
+AS '$libdir/_int'
+LANGUAGE C STRICT STABLE PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] CREATE TABLE pagg_tab_ml_p2_s1 PARTITION OF pagg_tab_ml_p2 FOR VALUES IN ('0000', '0001')
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] alter table c1 drop column name
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 0) pg_catalog.pg_amproc
+;

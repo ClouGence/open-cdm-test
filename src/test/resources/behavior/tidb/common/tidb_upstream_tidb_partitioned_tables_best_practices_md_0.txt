@@ -1,0 +1,319 @@
+[insert__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_000]
+sql:
+INSERT INTO fa_new SELECT * FROM fa;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:18) /test/1/catalog1/schema1/fa_new/",
+      "action" : "INSERT",
+      "target" : "Table(1:33~1:35) /test/1/catalog1/schema1/fa/"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_001]
+sql:
+SELECT * FROM server_info WHERE `serial_no` = ?;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/server_info/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_002]
+sql:
+CREATE TABLE employees (
+  id INT NOT NULL,
+  fname VARCHAR(30),
+  lname VARCHAR(30),
+  hired DATE NOT NULL DEFAULT '1970-01-01',
+  separated DATE DEFAULT '9999-12-31',
+  job_code INT,
+  store_id INT,
+  PRIMARY KEY (`id`,`hired`) NONCLUSTERED,
+  KEY `idx_employees_on_store_id` (`store_id`)
+) SHARD_ROW_ID_BITS = 2 PRE_SPLIT_REGIONS = 2
+PARTITION BY RANGE ( YEAR(hired) ) (
+  PARTITION p0 VALUES LESS THAN (1991),
+  PARTITION p1 VALUES LESS THAN (1996),
+  PARTITION p2 VALUES LESS THAN (2001),
+  PARTITION p3 VALUES LESS THAN (2006)
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(10:6~10:33) /test/1/catalog1/schema1/idx_employees_on_store_id/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:22) /test/1/catalog1/schema1/employees/"
+    },
+    {
+      "subject": "Constraint(9:2~9:41) /test/1/catalog1/schema1/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Function(12:21~12:25) /test/1/catalog1/schema1/YEAR/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:13~1:22) /test/1/catalog1/schema1/employees/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[session_variable_rw__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_003]
+sql:
+SET @@global.tidb_ddl_REORGANIZE_batch_size = 4096;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:4~1:43) /test/1/tidb_ddl_REORGANIZE_batch_size/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[session_variable_rw__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_004]
+sql:
+SET @@global.tidb_ddl_REORGANIZE_worker_cnt = 16;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:4~1:43) /test/1/tidb_ddl_REORGANIZE_worker_cnt/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_005]
+sql:
+CREATE TABLE `fa_new` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `account_id` bigint(20) NOT NULL,
+  `sid` bigint(20) DEFAULT NULL,
+  `user_id` bigint NOT NULL,
+  `date` int NOT NULL,
+  PRIMARY KEY (`id`,`date`) /*T![clustered_index] CLUSTERED */,
+  KEY `index_fa_on_sid` (`sid`),
+  KEY `index_fa_on_account_id` (`account_id`),
+  KEY `index_fa_on_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(8:6~8:23) /test/1/catalog1/schema1/index_fa_on_sid/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:21) /test/1/catalog1/schema1/fa_new/"
+    },
+    {
+      "subject": "Index(9:6~9:30) /test/1/catalog1/schema1/index_fa_on_account_id/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:21) /test/1/catalog1/schema1/fa_new/"
+    },
+    {
+      "subject": "Index(10:6~10:27) /test/1/catalog1/schema1/index_fa_on_user_id/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:21) /test/1/catalog1/schema1/fa_new/"
+    },
+    {
+      "subject": "Constraint(7:2~7:59) /test/1/catalog1/schema1/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Table(1:13~1:21) /test/1/catalog1/schema1/fa_new/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_006]
+sql:
+SELECT MIN(id), MAX(id) FROM employees;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:10) /test/1/catalog1/schema1/MIN/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:16~1:19) /test/1/catalog1/schema1/MAX/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:29~1:38) /test/1/catalog1/schema1/employees/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[session_variable_rw__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_007]
+sql:
+SET tidb_enable_mutation_checker = OFF;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:0~1:38) /test/1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[session_variable_rw__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_008]
+sql:
+SET tidb_mem_quota_query = 0;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:0~1:28) /test/1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[alter_table__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_009]
+sql:
+-- Table level
+ALTER TABLE employees ATTRIBUTES 'merge_option=deny';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:21) /test/1/catalog1/schema1/employees/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_010]
+sql:
+CREATE TABLE server_info (
+  id bigint NOT NULL AUTO_INCREMENT,
+  serial_no varchar(100) DEFAULT NULL,
+  device_name varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  device_type varchar(50) DEFAULT NULL,
+  modified_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id) /*T![clustered_index] CLUSTERED */,
+  KEY idx_serial_no (serial_no),
+  KEY idx_modified_ts (modified_ts)
+) /*T![auto_id_cache] AUTO_ID_CACHE=1 */
+PARTITION BY KEY (id) PARTITIONS 16;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(8:6~8:19) /test/1/catalog1/schema1/idx_serial_no/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:24) /test/1/catalog1/schema1/server_info/"
+    },
+    {
+      "subject": "Index(9:6~9:21) /test/1/catalog1/schema1/idx_modified_ts/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:24) /test/1/catalog1/schema1/server_info/"
+    },
+    {
+      "subject": "Function(6:41~6:58) /test/1/catalog1/schema1/CURRENT_TIMESTAMP/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Constraint(7:2~7:50) /test/1/catalog1/schema1/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Table(1:13~1:24) /test/1/catalog1/schema1/server_info/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[alter_table__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_011]
+sql:
+ALTER TABLE A DROP PARTITION A_2024363;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:13) /test/1/catalog1/schema1/A/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[alter_table__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_012]
+sql:
+-- Partition level
+ALTER TABLE employees PARTITION `p3` ATTRIBUTES 'merge_option=deny';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:21) /test/1/catalog1/schema1/employees/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[alter_table__common_tidb_upstream_tidb_partitioned_tables_best_practices_md_0_013]
+sql:
+ALTER TABLE fa REMOVE PARTITIONING;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/fa/",
+      "action" : "ALTER"
+    }
+  ]
+}

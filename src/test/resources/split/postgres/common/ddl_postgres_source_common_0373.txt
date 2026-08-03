@@ -1,0 +1,756 @@
+--
+-- RULES
+-- From Jan's original setup_ruletest.sql and run_ruletest.sql
+-- - thomas 1998-09-13
+--
+
+--
+-- Tables and rules for the view test
+--
+create table rtest_t1 (a int4, b int4)
+;
+CREATE TRIGGER gtest1 BEFORE DELETE OR UPDATE ON gtest26
+  FOR EACH ROW
+  WHEN (OLD.b < 0)  
+  EXECUTE PROCEDURE gtest_trigger_func()
+;
+create index idxpart_gin on idxpart using gin(c)
+;
+CREATE TABLE PKTABLE ( ptest1 int, ptest2 int, ptest3 int, ptest4 text, UNIQUE(ptest1, ptest2, ptest3) )
+;
+create function int8alias1eq(int8, int8alias1) returns bool
+  strict immutable language internal as 'int8eq'
+;
+CREATE TABLE FKTABLE ( ftest1 int, ftest2 int )
+;
+ANALYZE tenk1
+;
+CREATE TYPE test_ext_type
+;
+CREATE TABLE quad_box_tbl (id int, b box)
+;
+CREATE OR REPLACE FUNCTION test_slru_page_writeall() RETURNS VOID
+  AS '$libdir/test_slru', 'test_slru_page_writeall' LANGUAGE C
+;
+CREATE TRIGGER rw_view1_trig
+  INSTEAD OF INSERT OR UPDATE OR DELETE ON rw_view1
+  FOR EACH ROW EXECUTE PROCEDURE rw_view1_trig_fn()
+;
+ALTER OPERATOR FAMILY gin_trgm_ops USING gin ADD
+        OPERATOR        9       %>> (text, text)
+;
+ALTER TABLE ONLY "fkpart5"."pk3" ATTACH PARTITION "fkpart5"."pk31" FOR VALUES IN (31)
+;
+ANALYZE public.itest14
+;
+-- Tests for multi-level partitioned tables
+CREATE TABLE alpha (a double precision, b int, c text) PARTITION BY RANGE (a)
+;
+CREATE TABLE moneyp (
+	a money
+) PARTITION BY LIST (a)
+;
+CREATE SCHEMA test_ns_schema_2
+       CREATE VIEW abc_view AS SELECT a FROM abc
+;
+create trigger tg_backlink_a after insert or update or delete
+    on PSlot for each row execute procedure tg_backlink_a('PS')
+;
+CREATE OR REPLACE TEMP VIEW v_window AS
+	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following
+	exclude ties) as sum_rows FROM generate_series(1, 10) i
+;
+CREATE VIEW temporal2 AS SELECT * FROM t1 INNER JOIN tt ON t1.num = tt.num2
+;
+ALTER TABLE ONLY "public"."mlparted_def1" DROP COLUMN "........pg.dropped.4........"
+;
+drop table parted
+;
+create index on idxpart2 (abs(b))
+;
+CREATE TABLE "public"."point_table" (
+    "a" "point",
+    "b" integer
+)
+;
+CREATE TABLE "public"."test_tablesample" (
+    "id" integer,
+    "name" "text"
+)
+WITH ("fillfactor"='10')
+;
+CREATE INDEX idx_test_is_flag ON tab_with_flag (is_flag)
+;
+-- fail
+ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT
+;
+/* not run by default because it requires tr_TR system locale
+-- to_char
+
+SET lc_time TO 'tr_TR';
+SELECT to_char(date '2010-04-01', 'DD TMMON YYYY');
+SELECT to_char(date '2010-04-01', 'DD TMMON YYYY' COLLATE "tr-x-icu");
+*/
+
+
+-- backwards parsing
+
+CREATE VIEW collview1 AS SELECT * FROM collate_test1 WHERE b COLLATE "C" >= 'bbc'
+;
+-- Operators for int_custom, for btree operator class
+CREATE OPERATOR = (
+  LEFTARG = int_custom,
+  RIGHTARG = int_custom,
+  FUNCTION = int_custom_eq,
+  COMMUTATOR = =,
+  NEGATOR = <>,
+  RESTRICT = eqsel,
+  JOIN = eqjoinsel,
+  HASHES,
+  MERGES
+)
+;
+DO $x$
+DECLARE
+	r record;
+	r2 record;
+	cond text;
+	idx_ctids tid[];
+	ss_ctids tid[];
+	count int;
+	plan_ok bool;
+	plan_line text;
+BEGIN
+	FOR r IN SELECT colname, oper, typ, value[ordinality], matches[ordinality] FROM brinopers, unnest(op) WITH ORDINALITY AS oper LOOP
+
+		-- prepare the condition
+		IF r.value IS NULL THEN
+			cond := format('%I %s %L', r.colname, r.oper, r.value);
+		ELSE
+			cond := format('%I %s %L::%s', r.colname, r.oper, r.value, r.typ);
+		END IF;
+
+		-- run the query using the brin index
+		SET enable_seqscan = 0;
+		SET enable_bitmapscan = 1;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Bitmap Heap Scan on brintest%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get bitmap indexscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest WHERE %s $y$, cond)
+			INTO idx_ctids;
+
+		-- run the query using a seqscan
+		SET enable_seqscan = 1;
+		SET enable_bitmapscan = 0;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Seq Scan on brintest%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get seqscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest WHERE %s $y$, cond)
+			INTO ss_ctids;
+
+		-- make sure both return the same results
+		count := array_length(idx_ctids, 1);
+
+		IF NOT (count = array_length(ss_ctids, 1) AND
+				idx_ctids @> ss_ctids AND
+				idx_ctids <@ ss_ctids) THEN
+			-- report the results of each scan to make the differences obvious
+			RAISE WARNING 'something not right in %: count %', r, count;
+			SET enable_seqscan = 1;
+			SET enable_bitmapscan = 0;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest WHERE ' || cond LOOP
+				RAISE NOTICE 'seqscan: %', r2;
+			END LOOP;
+
+			SET enable_seqscan = 0;
+			SET enable_bitmapscan = 1;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest WHERE ' || cond LOOP
+				RAISE NOTICE 'bitmapscan: %', r2;
+			END LOOP;
+		END IF;
+
+		-- make sure we found expected number of matches
+		IF count != r.matches THEN RAISE WARNING 'unexpected number of results % for %', count, r; END IF;
+	END LOOP;
+END;
+$x$
+;
+ALTER OPERATOR split_operator_probe.=== (integer, integer) SET (RESTRICT = NONE, JOIN = NONE)
+;
+CREATE TABLE t (a int) TABLESPACE dropme_ts2
+;
+CREATE TABLE ndistinct (
+    filler1 TEXT,
+    filler2 NUMERIC,
+    a INT,
+    b INT,
+    filler3 DATE,
+    c INT,
+    d INT
+)
+;
+ALTER TABLE ONLY "public"."mlparted" DROP COLUMN "........pg.dropped.7........"
+;
+/*
+ * text search configuration for italian language
+ *
+ * Copyright (c) 2007-2020, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * italian and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY italian_stem
+	(TEMPLATE = snowball, Language = italian , StopWords=italian)
+;
+CREATE FUNCTION ltxtq_recv(internal)
+RETURNS ltxtquery
+AS '$libdir/ltree'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+VACUUM (FREEZE) pg_catalog.pg_pltemplate
+;
+create function qqq_trig() returns trigger as $$
+begin
+if tg_op in ('INSERT', 'UPDATE') then
+    raise notice '% % %', tg_when, tg_op, new.id;
+    return new;
+else
+    raise notice '% % %', tg_when, tg_op, old.id;
+    return old;
+end if;
+end
+$$ language plpgsql
+;
+DROP TABLE dummy_seclabel_tbl1, dummy_seclabel_tbl2
+;
+CREATE INDEX CONCURRENTLY mcic_two_pkey ON mcic_two (id)
+		WHERE unlck()
+;
+create table mc3p2 partition of mc3p
+  for values from (2, minvalue, minvalue) to (3, maxvalue, maxvalue)
+;
+CREATE TABLE fail_part_col_not_found PARTITION OF parted FOR VALUES IN ('c') PARTITION BY RANGE (c)
+;
+create function depth_b_tf() returns trigger
+  language plpgsql as $$
+begin
+  raise notice '%: depth = %', tg_name, pg_trigger_depth();
+  begin
+    execute 'insert into depth_c values (' || new.id::text || ')';
+  exception
+    when sqlstate 'U9999' then
+      raise notice 'SQLSTATE = U9999: depth = %', pg_trigger_depth();
+  end;
+  raise notice '%: depth = %', tg_name, pg_trigger_depth();
+  if new.id = 1 then
+    execute 'insert into depth_c values (' || new.id::text || ')';
+  end if;
+  return new;
+end;
+$$
+;
+CREATE FOREIGN TABLE "x 6" (
+  c1 integer OPTIONS (column_name 'c1'),
+  c2 integer OPTIONS (column_name 'c2')
+) SERVER loopback
+OPTIONS (schema_name 'import_source', table_name 'x 6')
+;
+CREATE SUBSCRIPTION admin_sub CONNECTION 'port=16820 host=/tmp/ekP6Yh8edH dbname=postgres' PUBLICATION alice WITH (password_required=false)
+;
+CREATE OR REPLACE VIEW viewtest AS
+	SELECT * FROM viewtest_tbl WHERE a > 10
+;
+VACUUM (SKIP_DATABASE_STATS, PARALLEL 2) pg_catalog.pg_description
+;
+CREATE TABLE datatype_table (
+    id             SERIAL,
+    id_big         BIGSERIAL,
+    is_small       SMALLSERIAL,
+    v_bytea        BYTEA,
+    v_smallint     SMALLINT,
+    v_int          INT,
+    v_bigint       BIGINT,
+    v_char         CHAR(1),
+    v_varchar      VARCHAR(10),
+    v_text         TEXT,
+    v_bool         BOOLEAN,
+    v_inet         INET,
+    v_cidr         CIDR,
+    v_macaddr      MACADDR,
+    v_numeric      NUMERIC(1,0),
+    v_real         REAL,
+    v_float        FLOAT(1),
+    v_float8       FLOAT8,
+    v_money        MONEY,
+    v_tsquery      TSQUERY,
+    v_tsvector     TSVECTOR,
+    v_date         DATE,
+    v_time         TIME,
+    v_time_tz      TIME WITH TIME ZONE,
+    v_timestamp    TIMESTAMP,
+    v_timestamp_tz TIMESTAMP WITH TIME ZONE,
+    v_interval     INTERVAL,
+    v_bit          BIT,
+    v_bit4         BIT(4),
+    v_varbit       VARBIT,
+    v_varbit4      VARBIT(4),
+    v_box          BOX,
+    v_circle       CIRCLE,
+    v_lseg         LSEG,
+    v_path         PATH,
+    v_point        POINT,
+    v_polygon      POLYGON,
+    v_json         JSON,
+    v_xml          XML,
+    v_uuid         UUID,
+    v_txid_snapshot txid_snapshot,
+    v_enum         ENUM_TEST,
+    v_postal_code  japanese_postal_code,
+    v_int2range    int2range,
+    PRIMARY KEY (id),
+    UNIQUE (id_big)
+)
+;
+CREATE FUNCTION
+  pg_freespace(rel regclass, blkno OUT bigint, avail OUT int2)
+RETURNS SETOF RECORD
+AS $$
+  SELECT blkno, pg_freespace($1, blkno) AS avail
+  FROM generate_series(0, pg_relation_size($1) / current_setting('block_size')::bigint - 1) AS blkno;
+$$
+LANGUAGE SQL PARALLEL SAFE
+;
+CREATE FUNCTION buffer_create_toy(rel regclass, blockno int4)
+RETURNS pg_catalog.int4 STRICT
+AS '$libdir/test_aio' LANGUAGE C
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] --
+-- RULES
+-- From Jan's original setup_ruletest.sql and run_ruletest.sql
+-- - thomas 1998-09-13
+--
+
+--
+-- Tables and rules for the view test
+--
+create table rtest_t1 (a int4, b int4)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER gtest1 BEFORE DELETE OR UPDATE ON gtest26
+  FOR EACH ROW
+  WHEN (OLD.b < 0)  
+  EXECUTE PROCEDURE gtest_trigger_func()
+;
+----------
+[ADD_INDEX] create index idxpart_gin on idxpart using gin(c)
+;
+----------
+[CREATE_TABLE] CREATE TABLE PKTABLE ( ptest1 int, ptest2 int, ptest3 int, ptest4 text, UNIQUE(ptest1, ptest2, ptest3) )
+;
+----------
+[CREATE_PROG_OBJ] create function int8alias1eq(int8, int8alias1) returns bool
+  strict immutable language internal as 'int8eq'
+;
+----------
+[CREATE_TABLE] CREATE TABLE FKTABLE ( ftest1 int, ftest2 int )
+;
+----------
+[ADMIN_TABLE] ANALYZE tenk1
+;
+----------
+[CREATE_TYPE] CREATE TYPE test_ext_type
+;
+----------
+[CREATE_TABLE] CREATE TABLE quad_box_tbl (id int, b box)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION test_slru_page_writeall() RETURNS VOID
+  AS '$libdir/test_slru', 'test_slru_page_writeall' LANGUAGE C
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER rw_view1_trig
+  INSTEAD OF INSERT OR UPDATE OR DELETE ON rw_view1
+  FOR EACH ROW EXECUTE PROCEDURE rw_view1_trig_fn()
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY gin_trgm_ops USING gin ADD
+        OPERATOR        9       %>> (text, text)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "fkpart5"."pk3" ATTACH PARTITION "fkpart5"."pk31" FOR VALUES IN (31)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.itest14
+;
+----------
+[CREATE_TABLE] -- Tests for multi-level partitioned tables
+CREATE TABLE alpha (a double precision, b int, c text) PARTITION BY RANGE (a)
+;
+----------
+[CREATE_TABLE] CREATE TABLE moneyp (
+	a money
+) PARTITION BY LIST (a)
+;
+----------
+[CREATE_SCHEMA(SELECT)] CREATE SCHEMA test_ns_schema_2
+       CREATE VIEW abc_view AS SELECT a FROM abc
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger tg_backlink_a after insert or update or delete
+    on PSlot for each row execute procedure tg_backlink_a('PS')
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE OR REPLACE TEMP VIEW v_window AS
+	SELECT i, sum(i) over (order by i rows between 1 preceding and 1 following
+	exclude ties) as sum_rows FROM generate_series(1, 10) i
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW temporal2 AS SELECT * FROM t1 INNER JOIN tt ON t1.num = tt.num2
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE ONLY "public"."mlparted_def1" DROP COLUMN "........pg.dropped.4........"
+;
+----------
+[DROP_TABLE] drop table parted
+;
+----------
+[ADD_INDEX] create index on idxpart2 (abs(b))
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."point_table" (
+    "a" "point",
+    "b" integer
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."test_tablesample" (
+    "id" integer,
+    "name" "text"
+)
+WITH ("fillfactor"='10')
+;
+----------
+[ADD_INDEX] CREATE INDEX idx_test_is_flag ON tab_with_flag (is_flag)
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] -- fail
+ALTER TABLE articles DROP CONSTRAINT articles_pkey RESTRICT
+;
+----------
+[CREATE_VIEW(SELECT)] /* not run by default because it requires tr_TR system locale
+-- to_char
+
+SET lc_time TO 'tr_TR';
+SELECT to_char(date '2010-04-01', 'DD TMMON YYYY');
+SELECT to_char(date '2010-04-01', 'DD TMMON YYYY' COLLATE "tr-x-icu");
+*/
+
+
+-- backwards parsing
+
+CREATE VIEW collview1 AS SELECT * FROM collate_test1 WHERE b COLLATE "C" >= 'bbc'
+;
+----------
+[CREATE_PROG_OBJ] -- Operators for int_custom, for btree operator class
+CREATE OPERATOR = (
+  LEFTARG = int_custom,
+  RIGHTARG = int_custom,
+  FUNCTION = int_custom_eq,
+  COMMUTATOR = =,
+  NEGATOR = <>,
+  RESTRICT = eqsel,
+  JOIN = eqjoinsel,
+  HASHES,
+  MERGES
+)
+;
+----------
+[BLOCK] DO $x$
+DECLARE
+	r record;
+	r2 record;
+	cond text;
+	idx_ctids tid[];
+	ss_ctids tid[];
+	count int;
+	plan_ok bool;
+	plan_line text;
+BEGIN
+	FOR r IN SELECT colname, oper, typ, value[ordinality], matches[ordinality] FROM brinopers, unnest(op) WITH ORDINALITY AS oper LOOP
+
+		-- prepare the condition
+		IF r.value IS NULL THEN
+			cond := format('%I %s %L', r.colname, r.oper, r.value);
+		ELSE
+			cond := format('%I %s %L::%s', r.colname, r.oper, r.value, r.typ);
+		END IF;
+
+		-- run the query using the brin index
+		SET enable_seqscan = 0;
+		SET enable_bitmapscan = 1;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Bitmap Heap Scan on brintest%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get bitmap indexscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest WHERE %s $y$, cond)
+			INTO idx_ctids;
+
+		-- run the query using a seqscan
+		SET enable_seqscan = 1;
+		SET enable_bitmapscan = 0;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Seq Scan on brintest%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get seqscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest WHERE %s $y$, cond)
+			INTO ss_ctids;
+
+		-- make sure both return the same results
+		count := array_length(idx_ctids, 1);
+
+		IF NOT (count = array_length(ss_ctids, 1) AND
+				idx_ctids @> ss_ctids AND
+				idx_ctids <@ ss_ctids) THEN
+			-- report the results of each scan to make the differences obvious
+			RAISE WARNING 'something not right in %: count %', r, count;
+			SET enable_seqscan = 1;
+			SET enable_bitmapscan = 0;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest WHERE ' || cond LOOP
+				RAISE NOTICE 'seqscan: %', r2;
+			END LOOP;
+
+			SET enable_seqscan = 0;
+			SET enable_bitmapscan = 1;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest WHERE ' || cond LOOP
+				RAISE NOTICE 'bitmapscan: %', r2;
+			END LOOP;
+		END IF;
+
+		-- make sure we found expected number of matches
+		IF count != r.matches THEN RAISE WARNING 'unexpected number of results % for %', count, r; END IF;
+	END LOOP;
+END;
+$x$
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR split_operator_probe.=== (integer, integer) SET (RESTRICT = NONE, JOIN = NONE)
+;
+----------
+[CREATE_TABLE] CREATE TABLE t (a int) TABLESPACE dropme_ts2
+;
+----------
+[CREATE_TABLE] CREATE TABLE ndistinct (
+    filler1 TEXT,
+    filler2 NUMERIC,
+    a INT,
+    b INT,
+    filler3 DATE,
+    c INT,
+    d INT
+)
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE ONLY "public"."mlparted" DROP COLUMN "........pg.dropped.7........"
+;
+----------
+[CREATE_POLICY] /*
+ * text search configuration for italian language
+ *
+ * Copyright (c) 2007-2020, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * italian and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY italian_stem
+	(TEMPLATE = snowball, Language = italian , StopWords=italian)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ltxtq_recv(internal)
+RETURNS ltxtquery
+AS '$libdir/ltree'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[ADMIN_TABLE] VACUUM (FREEZE) pg_catalog.pg_pltemplate
+;
+----------
+[CREATE_PROG_OBJ] create function qqq_trig() returns trigger as $$
+begin
+if tg_op in ('INSERT', 'UPDATE') then
+    raise notice '% % %', tg_when, tg_op, new.id;
+    return new;
+else
+    raise notice '% % %', tg_when, tg_op, old.id;
+    return old;
+end if;
+end
+$$ language plpgsql
+;
+----------
+[DROP_TABLE] DROP TABLE dummy_seclabel_tbl1, dummy_seclabel_tbl2
+;
+----------
+[ADD_INDEX] CREATE INDEX CONCURRENTLY mcic_two_pkey ON mcic_two (id)
+		WHERE unlck()
+;
+----------
+[CREATE_TABLE] create table mc3p2 partition of mc3p
+  for values from (2, minvalue, minvalue) to (3, maxvalue, maxvalue)
+;
+----------
+[CREATE_TABLE] CREATE TABLE fail_part_col_not_found PARTITION OF parted FOR VALUES IN ('c') PARTITION BY RANGE (c)
+;
+----------
+[CREATE_PROG_OBJ] create function depth_b_tf() returns trigger
+  language plpgsql as $$
+begin
+  raise notice '%: depth = %', tg_name, pg_trigger_depth();
+  begin
+    execute 'insert into depth_c values (' || new.id::text || ')';
+  exception
+    when sqlstate 'U9999' then
+      raise notice 'SQLSTATE = U9999: depth = %', pg_trigger_depth();
+  end;
+  raise notice '%: depth = %', tg_name, pg_trigger_depth();
+  if new.id = 1 then
+    execute 'insert into depth_c values (' || new.id::text || ')';
+  end if;
+  return new;
+end;
+$$
+;
+----------
+[CREATE_TABLE] CREATE FOREIGN TABLE "x 6" (
+  c1 integer OPTIONS (column_name 'c1'),
+  c2 integer OPTIONS (column_name 'c2')
+) SERVER loopback
+OPTIONS (schema_name 'import_source', table_name 'x 6')
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION admin_sub CONNECTION 'port=16820 host=/tmp/ekP6Yh8edH dbname=postgres' PUBLICATION alice WITH (password_required=false)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE OR REPLACE VIEW viewtest AS
+	SELECT * FROM viewtest_tbl WHERE a > 10
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, PARALLEL 2) pg_catalog.pg_description
+;
+----------
+[CREATE_TABLE] CREATE TABLE datatype_table (
+    id             SERIAL,
+    id_big         BIGSERIAL,
+    is_small       SMALLSERIAL,
+    v_bytea        BYTEA,
+    v_smallint     SMALLINT,
+    v_int          INT,
+    v_bigint       BIGINT,
+    v_char         CHAR(1),
+    v_varchar      VARCHAR(10),
+    v_text         TEXT,
+    v_bool         BOOLEAN,
+    v_inet         INET,
+    v_cidr         CIDR,
+    v_macaddr      MACADDR,
+    v_numeric      NUMERIC(1,0),
+    v_real         REAL,
+    v_float        FLOAT(1),
+    v_float8       FLOAT8,
+    v_money        MONEY,
+    v_tsquery      TSQUERY,
+    v_tsvector     TSVECTOR,
+    v_date         DATE,
+    v_time         TIME,
+    v_time_tz      TIME WITH TIME ZONE,
+    v_timestamp    TIMESTAMP,
+    v_timestamp_tz TIMESTAMP WITH TIME ZONE,
+    v_interval     INTERVAL,
+    v_bit          BIT,
+    v_bit4         BIT(4),
+    v_varbit       VARBIT,
+    v_varbit4      VARBIT(4),
+    v_box          BOX,
+    v_circle       CIRCLE,
+    v_lseg         LSEG,
+    v_path         PATH,
+    v_point        POINT,
+    v_polygon      POLYGON,
+    v_json         JSON,
+    v_xml          XML,
+    v_uuid         UUID,
+    v_txid_snapshot txid_snapshot,
+    v_enum         ENUM_TEST,
+    v_postal_code  japanese_postal_code,
+    v_int2range    int2range,
+    PRIMARY KEY (id),
+    UNIQUE (id_big)
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION
+  pg_freespace(rel regclass, blkno OUT bigint, avail OUT int2)
+RETURNS SETOF RECORD
+AS $$
+  SELECT blkno, pg_freespace($1, blkno) AS avail
+  FROM generate_series(0, pg_relation_size($1) / current_setting('block_size')::bigint - 1) AS blkno;
+$$
+LANGUAGE SQL PARALLEL SAFE
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION buffer_create_toy(rel regclass, blockno int4)
+RETURNS pg_catalog.int4 STRICT
+AS '$libdir/test_aio' LANGUAGE C
+;

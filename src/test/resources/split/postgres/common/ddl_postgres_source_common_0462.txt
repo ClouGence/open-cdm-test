@@ -1,0 +1,696 @@
+CREATE TABLE "public"."gtest_tableoid" (
+    "a" integer NOT NULL,
+    "b" boolean GENERATED ALWAYS AS (("tableoid" = ('"public"."gtest_tableoid"'::"regclass")::"oid")) STORED,
+    "c" "regclass" GENERATED ALWAYS AS ("tableoid") STORED
+)
+;
+alter aggregate my_rank(VARIADIC "any" ORDER BY VARIADIC "any")
+  rename to test_rank
+;
+-- UNIQUE with USING INDEX (not possible):
+CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange
+)
+;
+CREATE TABLE trunc_a3 PARTITION OF trunc_a FOR VALUES FROM (20) TO (30)
+;
+CREATE MATERIALIZED VIEW mvtest_tvvm AS SELECT * FROM mvtest_tvv
+;
+/*
+ * text search configuration for irish language
+ *
+ * Copyright (c) 2007-2019, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * irish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY irish_stem
+	(TEMPLATE = snowball, Language = irish )
+;
+CREATE FUNCTION testns.foo() RETURNS int AS 'select 1' LANGUAGE sql
+;
+create table parallel_write as
+    select length(stringu1) from tenk1 group by length(stringu1)
+;
+ALTER TABLE ONLY notnull_tbl5 DROP CONSTRAINT ann
+;
+-- on another column
+create table parted_collate_must_match2 partition of parted_collate_must_match
+  (b collate "POSIX") for values from ('m') to ('z')
+;
+create table ab_a3_b2 partition of ab_a3 for values in (2)
+;
+CREATE FUNCTION trigfunc () RETURNS TRIGGER LANGUAGE plpgsql as $$ BEGIN RETURN NULL; END; $$
+;
+alter event trigger regress_event_trigger rename to regress_event_trigger2
+;
+CREATE TABLE pub_test.testpub_nopk (foo int, bar int)
+;
+ALTER TYPE test_type3 DROP ATTRIBUTE a, ADD ATTRIBUTE b int
+;
+create trigger tg_chkslotlink before insert or update
+    on PHone for each row execute procedure tg_chkslotlink()
+;
+ALTER TABLE trgfire ENABLE TRIGGER tg
+;
+CREATE TABLE concur_appclass_tab(i tsvector, j tsvector, k tsvector)
+;
+-- most variants of rules aren't allowed
+CREATE RULE y_rule AS ON INSERT TO y WHERE a=0 DO INSTEAD DELETE FROM y
+;
+ALTER TABLE partitioned DROP COLUMN a
+;
+do $$
+begin
+  assert 1=1;  -- should succeed
+end;
+$$
+;
+VACUUM ANALYZE part1, part2
+;
+CREATE FUNCTION inj_io_reopen_detach()
+RETURNS pg_catalog.void STRICT
+AS 'MODULE_PATHNAME' LANGUAGE C
+;
+-- Perform tests on the Memoize node.
+
+-- The cache hits/misses/evictions from the Memoize node can vary between
+-- machines.  Let's just replace the number with an 'N'.  In order to allow us
+-- to perform validation when the measure was zero, we replace a zero value
+-- with "Zero".  All other numbers are replaced with 'N'.
+create function explain_memoize(query text, hide_hitmiss bool) returns setof text
+language plpgsql as
+$$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off) %s',
+            query)
+    loop
+        if hide_hitmiss = true then
+                ln := regexp_replace(ln, 'Hits: 0', 'Hits: Zero');
+                ln := regexp_replace(ln, 'Hits: \d+', 'Hits: N');
+                ln := regexp_replace(ln, 'Misses: 0', 'Misses: Zero');
+                ln := regexp_replace(ln, 'Misses: \d+', 'Misses: N');
+        end if;
+        ln := regexp_replace(ln, 'Evictions: 0', 'Evictions: Zero');
+        ln := regexp_replace(ln, 'Evictions: \d+', 'Evictions: N');
+        ln := regexp_replace(ln, 'Memory Usage: \d+', 'Memory Usage: N');
+	ln := regexp_replace(ln, 'Heap Fetches: \d+', 'Heap Fetches: N');
+	ln := regexp_replace(ln, 'loops=\d+', 'loops=N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+CREATE INDEX ON brin_hot_3 USING brin (a) WITH (pages_per_range = 1)
+;
+DROP VIEW v2
+;
+CREATE UNLOGGED TABLE unlogged_hash_table (id int4)
+;
+create type complex as (r float8, i float8)
+;
+CREATE DOMAIN lo AS pg_catalog.oid
+;
+/*
+ * 5.21
+ * COLUMNS view
+ */
+
+CREATE VIEW columns AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+           CAST(a.attname AS sql_identifier) AS column_name,
+           CAST(a.attnum AS cardinal_number) AS ordinal_position,
+           CAST(CASE WHEN a.attgenerated = '' THEN pg_get_expr(ad.adbin, ad.adrelid) END AS character_data) AS column_default,
+           CAST(CASE WHEN a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) THEN 'NO' ELSE 'YES' END
+             AS yes_or_no)
+             AS is_nullable,
+
+           CAST(
+             CASE WHEN t.typtype = 'd' THEN
+               CASE WHEN bt.typelem <> 0 AND bt.typlen = -1 THEN 'ARRAY'
+                    WHEN nbt.nspname = 'pg_catalog' THEN format_type(t.typbasetype, null)
+                    ELSE 'USER-DEFINED' END
+             ELSE
+               CASE WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                    WHEN nt.nspname = 'pg_catalog' THEN format_type(a.atttypid, null)
+                    ELSE 'USER-DEFINED' END
+             END
+             AS character_data)
+             AS data_type,
+
+           CAST(
+             _pg_char_max_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_maximum_length,
+
+           CAST(
+             _pg_char_octet_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_octet_length,
+
+           CAST(
+             _pg_numeric_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision,
+
+           CAST(
+             _pg_numeric_precision_radix(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision_radix,
+
+           CAST(
+             _pg_numeric_scale(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_scale,
+
+           CAST(
+             _pg_datetime_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS datetime_precision,
+
+           CAST(
+             _pg_interval_type(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS character_data)
+             AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+
+           CAST(CASE WHEN t.typtype = 'd' THEN current_database() ELSE null END
+             AS sql_identifier) AS domain_catalog,
+           CAST(CASE WHEN t.typtype = 'd' THEN nt.nspname ELSE null END
+             AS sql_identifier) AS domain_schema,
+           CAST(CASE WHEN t.typtype = 'd' THEN t.typname ELSE null END
+             AS sql_identifier) AS domain_name,
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(coalesce(nbt.nspname, nt.nspname) AS sql_identifier) AS udt_schema,
+           CAST(coalesce(bt.typname, t.typname) AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(a.attnum AS sql_identifier) AS dtd_identifier,
+           CAST('NO' AS yes_or_no) AS is_self_referencing,
+
+           CAST(CASE WHEN a.attidentity IN ('a', 'd') THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_identity,
+           CAST(CASE a.attidentity WHEN 'a' THEN 'ALWAYS' WHEN 'd' THEN 'BY DEFAULT' END AS character_data) AS identity_generation,
+           CAST(seq.seqstart AS character_data) AS identity_start,
+           CAST(seq.seqincrement AS character_data) AS identity_increment,
+           CAST(seq.seqmax AS character_data) AS identity_maximum,
+           CAST(seq.seqmin AS character_data) AS identity_minimum,
+           CAST(CASE WHEN seq.seqcycle THEN 'YES' ELSE 'NO' END AS yes_or_no) AS identity_cycle,
+
+           CAST(CASE WHEN a.attgenerated <> '' THEN 'ALWAYS' ELSE 'NEVER' END AS character_data) AS is_generated,
+           CAST(CASE WHEN a.attgenerated <> '' THEN pg_get_expr(ad.adbin, ad.adrelid) END AS character_data) AS generation_expression,
+
+           CAST(CASE WHEN c.relkind IN ('r', 'p') OR
+                          (c.relkind IN ('v', 'f') AND
+                           pg_column_is_updatable(c.oid, a.attnum, false))
+                THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_updatable
+
+    FROM (pg_attribute a LEFT JOIN pg_attrdef ad ON attrelid = adrelid AND attnum = adnum)
+         JOIN (pg_class c JOIN pg_namespace nc ON (c.relnamespace = nc.oid)) ON a.attrelid = c.oid
+         JOIN (pg_type t JOIN pg_namespace nt ON (t.typnamespace = nt.oid)) ON a.atttypid = t.oid
+         LEFT JOIN (pg_type bt JOIN pg_namespace nbt ON (bt.typnamespace = nbt.oid))
+           ON (t.typtype = 'd' AND t.typbasetype = bt.oid)
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON a.attcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+         LEFT JOIN (pg_depend dep JOIN pg_sequence seq ON (dep.classid = 'pg_class'::regclass AND dep.objid = seq.seqrelid AND dep.deptype = 'i'))
+           ON (dep.refclassid = 'pg_class'::regclass AND dep.refobjid = c.oid AND dep.refobjsubid = a.attnum)
+
+    WHERE (NOT pg_is_other_temp_schema(nc.oid))
+
+          AND a.attnum > 0 AND NOT a.attisdropped
+          AND c.relkind IN ('r', 'v', 'f', 'p')
+
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_column_privilege(c.oid, a.attnum,
+                                       'SELECT, INSERT, UPDATE, REFERENCES'))
+;
+ALTER TABLE ONLY "public"."part1_self_fk"
+    ADD CONSTRAINT "part1_self_fk_pkey" PRIMARY KEY ("id")
+;
+VACUUM (INDEX_CLEANUP FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_statistic_ext
+;
+-- This however will work:
+DROP SEQUENCE myseq3
+;
+ANALYZE public.insert_tbl
+;
+drop procedure ptest10(int, int, int)
+;
+-- fail - can't add to for all tables publication
+ALTER PUBLICATION testpub_foralltables SET TABLE pub_test.testpub_nopk
+;
+ALTER TABLE ONLY "generated_virtual_tests"."gtest_parent" ATTACH PARTITION "generated_virtual_tests"."gtest_child" FOR VALUES FROM ('2016-07-01') TO ('2016-08-01')
+;
+CREATE FUNCTION similarity_op(text,text)
+RETURNS bool
+AS '$libdir/pg_trgm'
+LANGUAGE C STRICT STABLE PARALLEL SAFE
+;
+create table trigpart4 partition of trigpart for values from (3000) to (4000) partition by range (a)
+;
+drop function anyarray_anyrange_func(anyarray, anyrange)
+;
+CREATE INDEX gist_pvactst ON pvactst USING gist (p)
+;
+-- Use the minimum BUFFER_USAGE_LIMIT to cause reuses or evictions with the
+-- smallest table possible.
+VACUUM (PARALLEL 0, BUFFER_USAGE_LIMIT 128) test_io_vac_strategy
+;
+CREATE VIEW _pg_user_mappings AS
+    SELECT um.oid,
+           um.umoptions,
+           um.umuser,
+           CAST(COALESCE(u.rolname,'PUBLIC') AS sql_identifier ) AS authorization_identifier,
+           s.foreign_server_catalog,
+           s.foreign_server_name,
+           s.authorization_identifier AS srvowner
+    FROM pg_user_mapping um LEFT JOIN pg_authid u ON (u.oid = um.umuser),
+         _pg_foreign_servers s
+    WHERE s.oid = um.umserver
+;
+ALTER TABLE ONLY "generated_stored_tests"."gtest23q"
+    ADD CONSTRAINT "gtest23q_b_fkey" FOREIGN KEY ("b") REFERENCES "generated_stored_tests"."gtest23p"("y")
+;
+CREATE TABLE ctlb (bb TEXT) INHERITS (ctla)
+;
+DROP INDEX sro_idx
+;
+CREATE TABLE current_check_1 () INHERITS (current_check)
+;
+--
+-- Test Partition pruning for HASH partitioning
+--
+-- Use hand-rolled hash functions and operator classes to get predictable
+-- result on different machines.  See the definitions of
+-- part_test_int4_ops and part_test_text_ops in test_setup.sql.
+--
+
+create table hp (a int, b text, c int)
+  partition by hash (a part_test_int4_ops, b part_test_text_ops)
+;
+drop table more_derived
+;
+DROP VIEW tid_view_with_ctid
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] CREATE TABLE "public"."gtest_tableoid" (
+    "a" integer NOT NULL,
+    "b" boolean GENERATED ALWAYS AS (("tableoid" = ('"public"."gtest_tableoid"'::"regclass")::"oid")) STORED,
+    "c" "regclass" GENERATED ALWAYS AS ("tableoid") STORED
+)
+;
+----------
+[RENAME_PROG_OBJ] alter aggregate my_rank(VARIADIC "any" ORDER BY VARIADIC "any")
+  rename to test_rank
+;
+----------
+[CREATE_TABLE] -- UNIQUE with USING INDEX (not possible):
+CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE trunc_a3 PARTITION OF trunc_a FOR VALUES FROM (20) TO (30)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mvtest_tvvm AS SELECT * FROM mvtest_tvv
+;
+----------
+[CREATE_POLICY] /*
+ * text search configuration for irish language
+ *
+ * Copyright (c) 2007-2019, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * irish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY irish_stem
+	(TEMPLATE = snowball, Language = irish )
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION testns.foo() RETURNS int AS 'select 1' LANGUAGE sql
+;
+----------
+[CREATE_TABLE|SELECT] create table parallel_write as
+    select length(stringu1) from tenk1 group by length(stringu1)
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] ALTER TABLE ONLY notnull_tbl5 DROP CONSTRAINT ann
+;
+----------
+[CREATE_TABLE] -- on another column
+create table parted_collate_must_match2 partition of parted_collate_must_match
+  (b collate "POSIX") for values from ('m') to ('z')
+;
+----------
+[CREATE_TABLE] create table ab_a3_b2 partition of ab_a3 for values in (2)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION trigfunc () RETURNS TRIGGER LANGUAGE plpgsql as $$ BEGIN RETURN NULL; END; $$
+;
+----------
+[RENAME_TRIGGER] alter event trigger regress_event_trigger rename to regress_event_trigger2
+;
+----------
+[CREATE_TABLE] CREATE TABLE pub_test.testpub_nopk (foo int, bar int)
+;
+----------
+[ALTER_TYPE] ALTER TYPE test_type3 DROP ATTRIBUTE a, ADD ATTRIBUTE b int
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger tg_chkslotlink before insert or update
+    on PHone for each row execute procedure tg_chkslotlink()
+;
+----------
+[ALTER_TABLE] ALTER TABLE trgfire ENABLE TRIGGER tg
+;
+----------
+[CREATE_TABLE] CREATE TABLE concur_appclass_tab(i tsvector, j tsvector, k tsvector)
+;
+----------
+[CREATE_POLICY] -- most variants of rules aren't allowed
+CREATE RULE y_rule AS ON INSERT TO y WHERE a=0 DO INSTEAD DELETE FROM y
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE partitioned DROP COLUMN a
+;
+----------
+[BLOCK] do $$
+begin
+  assert 1=1;  -- should succeed
+end;
+$$
+;
+----------
+[ADMIN_TABLE] VACUUM ANALYZE part1, part2
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION inj_io_reopen_detach()
+RETURNS pg_catalog.void STRICT
+AS 'MODULE_PATHNAME' LANGUAGE C
+;
+----------
+[CREATE_PROG_OBJ] -- Perform tests on the Memoize node.
+
+-- The cache hits/misses/evictions from the Memoize node can vary between
+-- machines.  Let's just replace the number with an 'N'.  In order to allow us
+-- to perform validation when the measure was zero, we replace a zero value
+-- with "Zero".  All other numbers are replaced with 'N'.
+create function explain_memoize(query text, hide_hitmiss bool) returns setof text
+language plpgsql as
+$$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off) %s',
+            query)
+    loop
+        if hide_hitmiss = true then
+                ln := regexp_replace(ln, 'Hits: 0', 'Hits: Zero');
+                ln := regexp_replace(ln, 'Hits: \d+', 'Hits: N');
+                ln := regexp_replace(ln, 'Misses: 0', 'Misses: Zero');
+                ln := regexp_replace(ln, 'Misses: \d+', 'Misses: N');
+        end if;
+        ln := regexp_replace(ln, 'Evictions: 0', 'Evictions: Zero');
+        ln := regexp_replace(ln, 'Evictions: \d+', 'Evictions: N');
+        ln := regexp_replace(ln, 'Memory Usage: \d+', 'Memory Usage: N');
+	ln := regexp_replace(ln, 'Heap Fetches: \d+', 'Heap Fetches: N');
+	ln := regexp_replace(ln, 'loops=\d+', 'loops=N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+----------
+[ADD_INDEX] CREATE INDEX ON brin_hot_3 USING brin (a) WITH (pages_per_range = 1)
+;
+----------
+[DROP_VIEW] DROP VIEW v2
+;
+----------
+[CREATE_TABLE] CREATE UNLOGGED TABLE unlogged_hash_table (id int4)
+;
+----------
+[CREATE_TYPE] create type complex as (r float8, i float8)
+;
+----------
+[CREATE_TYPE] CREATE DOMAIN lo AS pg_catalog.oid
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 5.21
+ * COLUMNS view
+ */
+
+CREATE VIEW columns AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+           CAST(a.attname AS sql_identifier) AS column_name,
+           CAST(a.attnum AS cardinal_number) AS ordinal_position,
+           CAST(CASE WHEN a.attgenerated = '' THEN pg_get_expr(ad.adbin, ad.adrelid) END AS character_data) AS column_default,
+           CAST(CASE WHEN a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) THEN 'NO' ELSE 'YES' END
+             AS yes_or_no)
+             AS is_nullable,
+
+           CAST(
+             CASE WHEN t.typtype = 'd' THEN
+               CASE WHEN bt.typelem <> 0 AND bt.typlen = -1 THEN 'ARRAY'
+                    WHEN nbt.nspname = 'pg_catalog' THEN format_type(t.typbasetype, null)
+                    ELSE 'USER-DEFINED' END
+             ELSE
+               CASE WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                    WHEN nt.nspname = 'pg_catalog' THEN format_type(a.atttypid, null)
+                    ELSE 'USER-DEFINED' END
+             END
+             AS character_data)
+             AS data_type,
+
+           CAST(
+             _pg_char_max_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_maximum_length,
+
+           CAST(
+             _pg_char_octet_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_octet_length,
+
+           CAST(
+             _pg_numeric_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision,
+
+           CAST(
+             _pg_numeric_precision_radix(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision_radix,
+
+           CAST(
+             _pg_numeric_scale(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_scale,
+
+           CAST(
+             _pg_datetime_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS datetime_precision,
+
+           CAST(
+             _pg_interval_type(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS character_data)
+             AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+
+           CAST(CASE WHEN t.typtype = 'd' THEN current_database() ELSE null END
+             AS sql_identifier) AS domain_catalog,
+           CAST(CASE WHEN t.typtype = 'd' THEN nt.nspname ELSE null END
+             AS sql_identifier) AS domain_schema,
+           CAST(CASE WHEN t.typtype = 'd' THEN t.typname ELSE null END
+             AS sql_identifier) AS domain_name,
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(coalesce(nbt.nspname, nt.nspname) AS sql_identifier) AS udt_schema,
+           CAST(coalesce(bt.typname, t.typname) AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(a.attnum AS sql_identifier) AS dtd_identifier,
+           CAST('NO' AS yes_or_no) AS is_self_referencing,
+
+           CAST(CASE WHEN a.attidentity IN ('a', 'd') THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_identity,
+           CAST(CASE a.attidentity WHEN 'a' THEN 'ALWAYS' WHEN 'd' THEN 'BY DEFAULT' END AS character_data) AS identity_generation,
+           CAST(seq.seqstart AS character_data) AS identity_start,
+           CAST(seq.seqincrement AS character_data) AS identity_increment,
+           CAST(seq.seqmax AS character_data) AS identity_maximum,
+           CAST(seq.seqmin AS character_data) AS identity_minimum,
+           CAST(CASE WHEN seq.seqcycle THEN 'YES' ELSE 'NO' END AS yes_or_no) AS identity_cycle,
+
+           CAST(CASE WHEN a.attgenerated <> '' THEN 'ALWAYS' ELSE 'NEVER' END AS character_data) AS is_generated,
+           CAST(CASE WHEN a.attgenerated <> '' THEN pg_get_expr(ad.adbin, ad.adrelid) END AS character_data) AS generation_expression,
+
+           CAST(CASE WHEN c.relkind IN ('r', 'p') OR
+                          (c.relkind IN ('v', 'f') AND
+                           pg_column_is_updatable(c.oid, a.attnum, false))
+                THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_updatable
+
+    FROM (pg_attribute a LEFT JOIN pg_attrdef ad ON attrelid = adrelid AND attnum = adnum)
+         JOIN (pg_class c JOIN pg_namespace nc ON (c.relnamespace = nc.oid)) ON a.attrelid = c.oid
+         JOIN (pg_type t JOIN pg_namespace nt ON (t.typnamespace = nt.oid)) ON a.atttypid = t.oid
+         LEFT JOIN (pg_type bt JOIN pg_namespace nbt ON (bt.typnamespace = nbt.oid))
+           ON (t.typtype = 'd' AND t.typbasetype = bt.oid)
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON a.attcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+         LEFT JOIN (pg_depend dep JOIN pg_sequence seq ON (dep.classid = 'pg_class'::regclass AND dep.objid = seq.seqrelid AND dep.deptype = 'i'))
+           ON (dep.refclassid = 'pg_class'::regclass AND dep.refobjid = c.oid AND dep.refobjsubid = a.attnum)
+
+    WHERE (NOT pg_is_other_temp_schema(nc.oid))
+
+          AND a.attnum > 0 AND NOT a.attisdropped
+          AND c.relkind IN ('r', 'v', 'f', 'p')
+
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_column_privilege(c.oid, a.attnum,
+                                       'SELECT, INSERT, UPDATE, REFERENCES'))
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "public"."part1_self_fk"
+    ADD CONSTRAINT "part1_self_fk_pkey" PRIMARY KEY ("id")
+;
+----------
+[ADMIN_TABLE] VACUUM (INDEX_CLEANUP FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_statistic_ext
+;
+----------
+[DROP_SEQUENCE] -- This however will work:
+DROP SEQUENCE myseq3
+;
+----------
+[ADMIN_TABLE] ANALYZE public.insert_tbl
+;
+----------
+[DROP_PROG_OBJ] drop procedure ptest10(int, int, int)
+;
+----------
+[ALTER_PUB_SUB] -- fail - can't add to for all tables publication
+ALTER PUBLICATION testpub_foralltables SET TABLE pub_test.testpub_nopk
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "generated_virtual_tests"."gtest_parent" ATTACH PARTITION "generated_virtual_tests"."gtest_child" FOR VALUES FROM ('2016-07-01') TO ('2016-08-01')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION similarity_op(text,text)
+RETURNS bool
+AS '$libdir/pg_trgm'
+LANGUAGE C STRICT STABLE PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] create table trigpart4 partition of trigpart for values from (3000) to (4000) partition by range (a)
+;
+----------
+[DROP_PROG_OBJ] drop function anyarray_anyrange_func(anyarray, anyrange)
+;
+----------
+[ADD_INDEX] CREATE INDEX gist_pvactst ON pvactst USING gist (p)
+;
+----------
+[ADMIN_TABLE] -- Use the minimum BUFFER_USAGE_LIMIT to cause reuses or evictions with the
+-- smallest table possible.
+VACUUM (PARALLEL 0, BUFFER_USAGE_LIMIT 128) test_io_vac_strategy
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW _pg_user_mappings AS
+    SELECT um.oid,
+           um.umoptions,
+           um.umuser,
+           CAST(COALESCE(u.rolname,'PUBLIC') AS sql_identifier ) AS authorization_identifier,
+           s.foreign_server_catalog,
+           s.foreign_server_name,
+           s.authorization_identifier AS srvowner
+    FROM pg_user_mapping um LEFT JOIN pg_authid u ON (u.oid = um.umuser),
+         _pg_foreign_servers s
+    WHERE s.oid = um.umserver
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "generated_stored_tests"."gtest23q"
+    ADD CONSTRAINT "gtest23q_b_fkey" FOREIGN KEY ("b") REFERENCES "generated_stored_tests"."gtest23p"("y")
+;
+----------
+[CREATE_TABLE] CREATE TABLE ctlb (bb TEXT) INHERITS (ctla)
+;
+----------
+[DROP_INDEX] DROP INDEX sro_idx
+;
+----------
+[CREATE_TABLE] CREATE TABLE current_check_1 () INHERITS (current_check)
+;
+----------
+[CREATE_TABLE] --
+-- Test Partition pruning for HASH partitioning
+--
+-- Use hand-rolled hash functions and operator classes to get predictable
+-- result on different machines.  See the definitions of
+-- part_test_int4_ops and part_test_text_ops in test_setup.sql.
+--
+
+create table hp (a int, b text, c int)
+  partition by hash (a part_test_int4_ops, b part_test_text_ops)
+;
+----------
+[DROP_TABLE] drop table more_derived
+;
+----------
+[DROP_VIEW] DROP VIEW tid_view_with_ctid
+;

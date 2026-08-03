@@ -1,0 +1,421 @@
+SELECT t.trade_id, t.symbol, t.trade_time, t.price,
+       q.quote_id, q.quote_time, q.bid_price, q.ask_price
+FROM trades t
+ASOF LEFT JOIN quotes q
+    MATCH_CONDITION(t.trade_time >= q.quote_time)
+    ON t.symbol = q.symbol
+ORDER BY t.trade_id;
+SELECT t.trade_id, t.symbol, t.trade_time, t.price,
+       q.quote_id, q.quote_time, q.bid_price
+FROM trades t
+ASOF LEFT JOIN quotes q
+    MATCH_CONDITION(t.trade_time <= q.quote_time)
+    ON t.symbol = q.symbol
+ORDER BY t.trade_id;
+SELECT t.trade_id, t.symbol, t.trade_time, t.price,
+       q.quote_id, q.quote_time, q.bid_price
+FROM trades t
+ASOF INNER JOIN quotes q
+    MATCH_CONDITION(t.trade_time >= q.quote_time)
+    ON t.symbol = q.symbol
+ORDER BY t.trade_id;
+SELECT o.order_id, o.product_id, o.region, o.order_time,
+       p.price, p.effective_time
+FROM orders o
+ASOF LEFT JOIN prices p
+    MATCH_CONDITION(o.order_time >= p.effective_time)
+    ON o.product_id = p.product_id AND o.region = p.region
+ORDER BY o.order_id;
+SELECT l.id, l.ts, r.id AS rid, r.ts AS rts, r.data
+FROM left_table l
+ASOF LEFT JOIN right_table r
+    MATCH_CONDITION(l.ts >= r.ts + INTERVAL 1 HOUR)
+    ON l.grp = r.grp
+ORDER BY l.id;
+SELECT o.order_id, o.order_time,
+       p.price, p.effective_time AS price_time,
+       i.stock_level, i.snapshot_time AS inv_time
+FROM orders o
+ASOF LEFT JOIN prices p
+    MATCH_CONDITION(o.order_time >= p.effective_time)
+    ON o.product_id = p.product_id AND o.region = p.region
+ASOF LEFT JOIN inventory i
+    MATCH_CONDITION(o.order_time >= i.snapshot_time)
+    ON o.product_id = i.product_id AND o.region = i.region
+ORDER BY o.order_id;
+SELECT o.order_id, prod.product_name,
+       o.order_time, p.price
+FROM orders o
+INNER JOIN products prod ON o.product_id = prod.product_id
+ASOF LEFT JOIN prices p
+    MATCH_CONDITION(o.order_time >= p.effective_time)
+    ON o.product_id = p.product_id AND o.region = p.region
+ORDER BY o.order_id;
+SELECT t.symbol,
+       COUNT(*) AS trade_count,
+       AVG(q.bid_price) AS avg_bid
+FROM trades t
+ASOF LEFT JOIN quotes q
+    MATCH_CONDITION(t.trade_time >= q.quote_time)
+    ON t.symbol = q.symbol
+GROUP BY t.symbol
+ORDER BY t.symbol;
+SELECT o.order_id, o.order_time,
+       p_before.price AS price_before,
+       p_before.effective_time AS time_before,
+       p_after.price AS price_after,
+       p_after.effective_time AS time_after
+FROM orders o
+ASOF LEFT JOIN prices p_before
+    MATCH_CONDITION(o.order_time >= p_before.effective_time)
+    ON o.product_id = p_before.product_id AND o.region = p_before.region
+ASOF LEFT JOIN prices p_after
+    MATCH_CONDITION(o.order_time <= p_after.effective_time)
+    ON o.product_id = p_after.product_id AND o.region = p_after.region
+ORDER BY o.order_id;
+WITH left_events AS (
+    SELECT 1 AS event_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:06' AS DATETIME) AS event_time
+),
+right_events AS (
+    SELECT 1 AS right_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:00' AS DATETIME) AS ref_time
+    UNION ALL
+    SELECT 2 AS right_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:08' AS DATETIME) AS ref_time
+)
+SELECT l.event_id, l.event_time, r.right_id, r.ref_time
+FROM left_events l
+ASOF LEFT JOIN right_events r
+    MATCH_CONDITION(l.event_time >= r.ref_time)
+    ON l.symbol = r.symbol;
+WITH left_events AS (
+    SELECT 1 AS event_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:06' AS DATETIME) AS event_time
+),
+right_events AS (
+    SELECT 1 AS right_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:00' AS DATETIME) AS ref_time
+    UNION ALL
+    SELECT 2 AS right_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:08' AS DATETIME) AS ref_time
+)
+SELECT l.event_id, l.event_time, r.right_id, r.ref_time
+FROM left_events l
+ASOF LEFT JOIN right_events r
+    MATCH_CONDITION(l.event_time <= r.ref_time)
+    ON l.symbol = r.symbol;
+WITH left_events AS (
+    SELECT 1 AS event_id, 'AAPL' AS symbol,
+           CAST('2024-01-01 10:00:05 +00:00' AS TIMESTAMPTZ) AS event_time
+),
+right_events AS (
+    SELECT 1 AS right_id, 'AAPL' AS symbol,
+           CAST('2024-01-01 10:00:00 +00:00' AS TIMESTAMPTZ) AS ref_time, 'snapshot_a' AS tag
+    UNION ALL
+    SELECT 2 AS right_id, 'AAPL' AS symbol,
+           CAST('2024-01-01 10:00:00 +00:00' AS TIMESTAMPTZ) AS ref_time, 'snapshot_b' AS tag
+)
+SELECT l.event_id, r.right_id, r.ref_time, r.tag
+FROM left_events l
+ASOF LEFT JOIN right_events r
+    MATCH_CONDITION(l.event_time >= r.ref_time)
+    ON l.symbol = r.symbol;
+select "%a" like "a%_" ESCAPE "a";
+select cast('abc' as signed);
+SELECT TRY_CAST('abc' AS INT);
+-- Using the current time zone (assuming +08:00) to convert a time string without time zone information
+select cast("2020-01-01 00:00:00" as timestamptz);
+-- TIMESTAMPTZ supports microseconds
+select cast("2020-01-01 00:00:00.123456" as timestamptz(5));
+-- Using a time string with time zone information
+select cast("2020-01-01 00:00:00 +03:00" as timestamptz);
+-- Converting TIMESTAMPTZ to DATETIME (with time zone conversion based on current time zone)
+select cast(cast("2020-01-01 00:00:00 +03:00" as timestamptz) as datetime);
+-- Converting DATETIME to TIMESTAMPTZ
+select cast(cast('2023-01-02 01:00:00' as datetime) as timestamptz);
+-- Using TIMESTAMPTZ in functions
+select HOUR(cast("2020-01-01 00:00:00 +03:00" as timestamptz));
+SELECT FROM_HEX(X'AB');
+SELECT sub_binary(x'61626331', 2);
+SELECT sub_binary(x'61626331', -2);
+SELECT sub_binary(x'61626331', 0);
+SELECT sub_binary(x'61626331', 5);
+SELECT sub_binary(x'61626331646566', 2, 2);
+SELECT to_base64_binary(x'12');
+SELECT to_base64_binary(x'234AAA');
+select true XOR false, true XOR true;
+select true XOR NULL, NULL XOR true, false XOR NULL, NULL XOR false, NULL XOR NULL;
+SELECT INSERT('🎉🎊🎈', 2, 1, '🎁');
+SELECT POSITION('bar' IN 'foobarbar'), POSITION('bar', 'foobarbar');
+SELECT POSITION('test' IN NULL), POSITION(NULL, 'test');
+SELECT POSITION('' IN 'hello'), POSITION('world' IN '');
+SELECT POSITION('World' IN 'Hello World'), POSITION('world' IN 'Hello World');
+SELECT POSITION('ḍḍumai' IN 'ṭṛì ḍḍumai hello'), POSITION('hello', 'ṭṛì ḍḍumai hello', 8);
+SELECT POSITION('@' IN 'user@domain.com'), POSITION('.', 'user@domain.com', 10);
+SELECT POSITION('123' IN '456123789'), POSITION('-', 'phone: 123-456-7890', 11);
+SELECT substring('foobarbar' FROM 4 FOR 3);
+SELECT substring('foobarbar' FROM 4);
+SELECT i.id, t.tag
+FROM items i, unnest(i.tags) AS t(tag)
+ORDER BY i.id, t.tag;
+SELECT i.id, t.ord, t.tag
+FROM items i, unnest(i.tags) WITH ORDINALITY AS t(tag, ord)
+ORDER BY i.id, t.ord;
+SELECT i.id, t.tag, i.name
+FROM items i
+INNER JOIN unnest(i.tags) AS t(tag) ON t.tag = i.name;
+SELECT i.id, t.tag, i.name
+FROM items i
+LEFT JOIN unnest(i.tags) AS t(tag) ON t.tag = i.name;
+SELECT * FROM articles WHERE content MATCH 'hello' USING ANALYZER standard;
+SELECT * FROM articles WHERE content MATCH 'hello' USING ANALYZER none;
+SELECT * FROM articles WHERE content MATCH 'Hello' USING ANALYZER chinese;
+-- Use the standard analyzer (tokenizes the text)
+SELECT * FROM articles WHERE content MATCH 'hello world' USING ANALYZER std_analyzer;
+
+-- Use the keyword analyzer (exact match, no tokenization)
+SELECT * FROM articles WHERE content MATCH 'hello world' USING ANALYZER kw_analyzer;
+
+-- Combined with MATCH_PHRASE
+SELECT * FROM articles WHERE content MATCH_PHRASE 'hello world' USING ANALYZER std_analyzer;
+
+-- Use built-in analyzers
+SELECT * FROM articles WHERE content MATCH 'hello' USING ANALYZER standard;
+SELECT * FROM articles WHERE content MATCH 'hello' USING ANALYZER none;
+select try_cast('abc' as int);
+-- 使用当前时区（假设为 +08:00）转换没有时区信息的时间字符串
+select cast("2020-01-01 00:00:00" as timestamptz);
+-- TIMESTAMPTZ 可以支持微秒
+select cast("2020-01-01 00:00:00.123456" as timestamptz(5));
+------------------------------------------------------------------------------------------
+[SELECT] SELECT t.trade_id, t.symbol, t.trade_time, t.price,
+       q.quote_id, q.quote_time, q.bid_price, q.ask_price
+FROM trades t
+ASOF LEFT JOIN quotes q
+    MATCH_CONDITION(t.trade_time >= q.quote_time)
+    ON t.symbol = q.symbol
+ORDER BY t.trade_id;
+----------
+[SELECT] SELECT t.trade_id, t.symbol, t.trade_time, t.price,
+       q.quote_id, q.quote_time, q.bid_price
+FROM trades t
+ASOF LEFT JOIN quotes q
+    MATCH_CONDITION(t.trade_time <= q.quote_time)
+    ON t.symbol = q.symbol
+ORDER BY t.trade_id;
+----------
+[SELECT] SELECT t.trade_id, t.symbol, t.trade_time, t.price,
+       q.quote_id, q.quote_time, q.bid_price
+FROM trades t
+ASOF INNER JOIN quotes q
+    MATCH_CONDITION(t.trade_time >= q.quote_time)
+    ON t.symbol = q.symbol
+ORDER BY t.trade_id;
+----------
+[SELECT] SELECT o.order_id, o.product_id, o.region, o.order_time,
+       p.price, p.effective_time
+FROM orders o
+ASOF LEFT JOIN prices p
+    MATCH_CONDITION(o.order_time >= p.effective_time)
+    ON o.product_id = p.product_id AND o.region = p.region
+ORDER BY o.order_id;
+----------
+[SELECT] SELECT l.id, l.ts, r.id AS rid, r.ts AS rts, r.data
+FROM left_table l
+ASOF LEFT JOIN right_table r
+    MATCH_CONDITION(l.ts >= r.ts + INTERVAL 1 HOUR)
+    ON l.grp = r.grp
+ORDER BY l.id;
+----------
+[SELECT] SELECT o.order_id, o.order_time,
+       p.price, p.effective_time AS price_time,
+       i.stock_level, i.snapshot_time AS inv_time
+FROM orders o
+ASOF LEFT JOIN prices p
+    MATCH_CONDITION(o.order_time >= p.effective_time)
+    ON o.product_id = p.product_id AND o.region = p.region
+ASOF LEFT JOIN inventory i
+    MATCH_CONDITION(o.order_time >= i.snapshot_time)
+    ON o.product_id = i.product_id AND o.region = i.region
+ORDER BY o.order_id;
+----------
+[SELECT] SELECT o.order_id, prod.product_name,
+       o.order_time, p.price
+FROM orders o
+INNER JOIN products prod ON o.product_id = prod.product_id
+ASOF LEFT JOIN prices p
+    MATCH_CONDITION(o.order_time >= p.effective_time)
+    ON o.product_id = p.product_id AND o.region = p.region
+ORDER BY o.order_id;
+----------
+[SELECT] SELECT t.symbol,
+       COUNT(*) AS trade_count,
+       AVG(q.bid_price) AS avg_bid
+FROM trades t
+ASOF LEFT JOIN quotes q
+    MATCH_CONDITION(t.trade_time >= q.quote_time)
+    ON t.symbol = q.symbol
+GROUP BY t.symbol
+ORDER BY t.symbol;
+----------
+[SELECT] SELECT o.order_id, o.order_time,
+       p_before.price AS price_before,
+       p_before.effective_time AS time_before,
+       p_after.price AS price_after,
+       p_after.effective_time AS time_after
+FROM orders o
+ASOF LEFT JOIN prices p_before
+    MATCH_CONDITION(o.order_time >= p_before.effective_time)
+    ON o.product_id = p_before.product_id AND o.region = p_before.region
+ASOF LEFT JOIN prices p_after
+    MATCH_CONDITION(o.order_time <= p_after.effective_time)
+    ON o.product_id = p_after.product_id AND o.region = p_after.region
+ORDER BY o.order_id;
+----------
+[SELECT] WITH left_events AS (
+    SELECT 1 AS event_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:06' AS DATETIME) AS event_time
+),
+right_events AS (
+    SELECT 1 AS right_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:00' AS DATETIME) AS ref_time
+    UNION ALL
+    SELECT 2 AS right_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:08' AS DATETIME) AS ref_time
+)
+SELECT l.event_id, l.event_time, r.right_id, r.ref_time
+FROM left_events l
+ASOF LEFT JOIN right_events r
+    MATCH_CONDITION(l.event_time >= r.ref_time)
+    ON l.symbol = r.symbol;
+----------
+[SELECT] WITH left_events AS (
+    SELECT 1 AS event_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:06' AS DATETIME) AS event_time
+),
+right_events AS (
+    SELECT 1 AS right_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:00' AS DATETIME) AS ref_time
+    UNION ALL
+    SELECT 2 AS right_id, 'AAPL' AS symbol, CAST('2024-01-01 10:00:08' AS DATETIME) AS ref_time
+)
+SELECT l.event_id, l.event_time, r.right_id, r.ref_time
+FROM left_events l
+ASOF LEFT JOIN right_events r
+    MATCH_CONDITION(l.event_time <= r.ref_time)
+    ON l.symbol = r.symbol;
+----------
+[SELECT] WITH left_events AS (
+    SELECT 1 AS event_id, 'AAPL' AS symbol,
+           CAST('2024-01-01 10:00:05 +00:00' AS TIMESTAMPTZ) AS event_time
+),
+right_events AS (
+    SELECT 1 AS right_id, 'AAPL' AS symbol,
+           CAST('2024-01-01 10:00:00 +00:00' AS TIMESTAMPTZ) AS ref_time, 'snapshot_a' AS tag
+    UNION ALL
+    SELECT 2 AS right_id, 'AAPL' AS symbol,
+           CAST('2024-01-01 10:00:00 +00:00' AS TIMESTAMPTZ) AS ref_time, 'snapshot_b' AS tag
+)
+SELECT l.event_id, r.right_id, r.ref_time, r.tag
+FROM left_events l
+ASOF LEFT JOIN right_events r
+    MATCH_CONDITION(l.event_time >= r.ref_time)
+    ON l.symbol = r.symbol;
+----------
+[SELECT] select "%a" like "a%_" ESCAPE "a";
+----------
+[SELECT] select cast('abc' as signed);
+----------
+[SELECT] SELECT TRY_CAST('abc' AS INT);
+----------
+[SELECT] -- Using the current time zone (assuming +08:00) to convert a time string without time zone information
+select cast("2020-01-01 00:00:00" as timestamptz);
+----------
+[SELECT] -- TIMESTAMPTZ supports microseconds
+select cast("2020-01-01 00:00:00.123456" as timestamptz(5));
+----------
+[SELECT] -- Using a time string with time zone information
+select cast("2020-01-01 00:00:00 +03:00" as timestamptz);
+----------
+[SELECT] -- Converting TIMESTAMPTZ to DATETIME (with time zone conversion based on current time zone)
+select cast(cast("2020-01-01 00:00:00 +03:00" as timestamptz) as datetime);
+----------
+[SELECT] -- Converting DATETIME to TIMESTAMPTZ
+select cast(cast('2023-01-02 01:00:00' as datetime) as timestamptz);
+----------
+[SELECT] -- Using TIMESTAMPTZ in functions
+select HOUR(cast("2020-01-01 00:00:00 +03:00" as timestamptz));
+----------
+[SELECT] SELECT FROM_HEX(X'AB');
+----------
+[SELECT] SELECT sub_binary(x'61626331', 2);
+----------
+[SELECT] SELECT sub_binary(x'61626331', -2);
+----------
+[SELECT] SELECT sub_binary(x'61626331', 0);
+----------
+[SELECT] SELECT sub_binary(x'61626331', 5);
+----------
+[SELECT] SELECT sub_binary(x'61626331646566', 2, 2);
+----------
+[SELECT] SELECT to_base64_binary(x'12');
+----------
+[SELECT] SELECT to_base64_binary(x'234AAA');
+----------
+[SELECT] select true XOR false, true XOR true;
+----------
+[SELECT] select true XOR NULL, NULL XOR true, false XOR NULL, NULL XOR false, NULL XOR NULL;
+----------
+[SELECT] SELECT INSERT('🎉🎊🎈', 2, 1, '🎁');
+----------
+[SELECT] SELECT POSITION('bar' IN 'foobarbar'), POSITION('bar', 'foobarbar');
+----------
+[SELECT] SELECT POSITION('test' IN NULL), POSITION(NULL, 'test');
+----------
+[SELECT] SELECT POSITION('' IN 'hello'), POSITION('world' IN '');
+----------
+[SELECT] SELECT POSITION('World' IN 'Hello World'), POSITION('world' IN 'Hello World');
+----------
+[SELECT] SELECT POSITION('ḍḍumai' IN 'ṭṛì ḍḍumai hello'), POSITION('hello', 'ṭṛì ḍḍumai hello', 8);
+----------
+[SELECT] SELECT POSITION('@' IN 'user@domain.com'), POSITION('.', 'user@domain.com', 10);
+----------
+[SELECT] SELECT POSITION('123' IN '456123789'), POSITION('-', 'phone: 123-456-7890', 11);
+----------
+[SELECT] SELECT substring('foobarbar' FROM 4 FOR 3);
+----------
+[SELECT] SELECT substring('foobarbar' FROM 4);
+----------
+[SELECT] SELECT i.id, t.tag
+FROM items i, unnest(i.tags) AS t(tag)
+ORDER BY i.id, t.tag;
+----------
+[SELECT] SELECT i.id, t.ord, t.tag
+FROM items i, unnest(i.tags) WITH ORDINALITY AS t(tag, ord)
+ORDER BY i.id, t.ord;
+----------
+[SELECT] SELECT i.id, t.tag, i.name
+FROM items i
+INNER JOIN unnest(i.tags) AS t(tag) ON t.tag = i.name;
+----------
+[SELECT] SELECT i.id, t.tag, i.name
+FROM items i
+LEFT JOIN unnest(i.tags) AS t(tag) ON t.tag = i.name;
+----------
+[SELECT] SELECT * FROM articles WHERE content MATCH 'hello' USING ANALYZER standard;
+----------
+[SELECT] SELECT * FROM articles WHERE content MATCH 'hello' USING ANALYZER none;
+----------
+[SELECT] SELECT * FROM articles WHERE content MATCH 'Hello' USING ANALYZER chinese;
+----------
+[SELECT] -- Use the standard analyzer (tokenizes the text)
+SELECT * FROM articles WHERE content MATCH 'hello world' USING ANALYZER std_analyzer;
+----------
+[SELECT] -- Use the keyword analyzer (exact match, no tokenization)
+SELECT * FROM articles WHERE content MATCH 'hello world' USING ANALYZER kw_analyzer;
+----------
+[SELECT] -- Combined with MATCH_PHRASE
+SELECT * FROM articles WHERE content MATCH_PHRASE 'hello world' USING ANALYZER std_analyzer;
+----------
+[SELECT] -- Use built-in analyzers
+SELECT * FROM articles WHERE content MATCH 'hello' USING ANALYZER standard;
+----------
+[SELECT] SELECT * FROM articles WHERE content MATCH 'hello' USING ANALYZER none;
+----------
+[SELECT] select try_cast('abc' as int);
+----------
+[SELECT] -- 使用当前时区（假设为 +08:00）转换没有时区信息的时间字符串
+select cast("2020-01-01 00:00:00" as timestamptz);
+----------
+[SELECT] -- TIMESTAMPTZ 可以支持微秒
+select cast("2020-01-01 00:00:00.123456" as timestamptz(5));

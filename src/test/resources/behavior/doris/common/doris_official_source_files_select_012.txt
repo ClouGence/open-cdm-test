@@ -1,0 +1,6440 @@
+[doris_official_source_files_select_012__select__0001]
+sql:
+SELECT
+  substr(r_reason_desc, 1, 20)
+, avg(ws_quantity)
+, avg(wr_refunded_cash)
+, avg(wr_fee)
+FROM
+  web_sales
+, web_returns
+, web_page
+, customer_demographics cd1
+, customer_demographics cd2
+, customer_address
+, date_dim
+, reason
+WHERE (ws_web_page_sk = wp_web_page_sk)
+   AND (ws_item_sk = wr_item_sk)
+   AND (ws_order_number = wr_order_number)
+   AND (ws_sold_date_sk = d_date_sk)
+   AND (d_year = 2000)
+   AND (cd1.cd_demo_sk = wr_refunded_cdemo_sk)
+   AND (cd2.cd_demo_sk = wr_returning_cdemo_sk)
+   AND (ca_address_sk = wr_refunded_addr_sk)
+   AND (r_reason_sk = wr_reason_sk)
+   AND (((cd1.cd_marital_status = 'M')
+         AND (cd1.cd_marital_status = cd2.cd_marital_status)
+         AND (cd1.cd_education_status = 'Advanced Degree')
+         AND (cd1.cd_education_status = cd2.cd_education_status)
+         AND (ws_sales_price BETWEEN CAST('100.00' AS DECIMAL(5,2)) AND CAST('150.00' AS DECIMAL(5,2))))
+      OR ((cd1.cd_marital_status = 'S')
+         AND (cd1.cd_marital_status = cd2.cd_marital_status)
+         AND (cd1.cd_education_status = 'College')
+         AND (cd1.cd_education_status = cd2.cd_education_status)
+         AND (ws_sales_price BETWEEN CAST('50.00' AS DECIMAL(5,2)) AND CAST('100.00' AS DECIMAL(5,2))))
+      OR ((cd1.cd_marital_status = 'W')
+         AND (cd1.cd_marital_status = cd2.cd_marital_status)
+         AND (cd1.cd_education_status = '2 yr Degree')
+         AND (cd1.cd_education_status = cd2.cd_education_status)
+         AND (ws_sales_price BETWEEN CAST('150.00' AS DECIMAL(5,2)) AND CAST('200.00' AS DECIMAL(5,2)))))
+   AND (((ca_country = 'United States')
+         AND (ca_state IN ('IN'      , 'OH'      , 'NJ'))
+         AND (ws_net_profit BETWEEN 100 AND 200))
+      OR ((ca_country = 'United States')
+         AND (ca_state IN ('WI'      , 'CT'      , 'KY'))
+         AND (ws_net_profit BETWEEN 150 AND 300))
+      OR ((ca_country = 'United States')
+         AND (ca_state IN ('LA'      , 'IA'      , 'AR'))
+         AND (ws_net_profit BETWEEN 50 AND 250)))
+GROUP BY r_reason_desc
+ORDER BY substr(r_reason_desc, 1, 20) ASC, avg(ws_quantity) ASC, avg(wr_refunded_cash) ASC, avg(wr_fee) ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:2~2:8) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:2~3:5) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:2~4:5) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:2~5:5) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:2~7:11) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:2~8:13) /test/1/catalog1/schema1/web_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:2~9:10) /test/1/catalog1/schema1/web_page/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:2~10:23) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:2~11:23) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:2~12:18) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:2~13:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(14:2~14:8) /test/1/catalog1/schema1/reason/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(49:9~49:15) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(49:43~49:46) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(49:65~49:68) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(49:92~49:95) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0002]
+sql:
+SELECT
+  sum(ws_net_paid) total_sum
+, i_category
+, i_class
+, (GROUPING (i_category) + GROUPING (i_class)) lochierarchy
+, rank() OVER (PARTITION BY (GROUPING (i_category) + GROUPING (i_class)), (CASE WHEN (GROUPING (i_class) = 0) THEN i_category END) ORDER BY sum(ws_net_paid) DESC) rank_within_parent
+FROM
+  web_sales
+, date_dim d1
+, item
+WHERE (d1.d_month_seq BETWEEN 1200 AND (1200 + 11))
+   AND (d1.d_date_sk = ws_sold_date_sk)
+   AND (i_item_sk = ws_item_sk)
+GROUP BY ROLLUP (i_category, i_class)
+ORDER BY lochierarchy DESC, (CASE WHEN (lochierarchy = 0) THEN i_category END) ASC, rank_within_parent ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:2~2:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:3~5:11) /test/1/catalog1/schema1/GROUPING/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:27~5:35) /test/1/catalog1/schema1/GROUPING/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:2~6:6) /test/1/catalog1/schema1/rank/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:29~6:37) /test/1/catalog1/schema1/GROUPING/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:53~6:61) /test/1/catalog1/schema1/GROUPING/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:86~6:94) /test/1/catalog1/schema1/GROUPING/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:140~6:143) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:2~8:11) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:2~9:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:2~10:6) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0003]
+sql:
+SELECT count(*)
+FROM
+  (
+(
+      SELECT DISTINCT
+        c_last_name
+      , c_first_name
+      , d_date
+      FROM
+        store_sales
+      , date_dim
+      , customer
+      WHERE (store_sales.ss_sold_date_sk = date_dim.d_date_sk)
+         AND (store_sales.ss_customer_sk = customer.c_customer_sk)
+         AND (d_month_seq BETWEEN 1200 AND (1200 + 11))
+   ) EXCEPT (
+      SELECT DISTINCT
+        c_last_name
+      , c_first_name
+      , d_date
+      FROM
+        catalog_sales
+      , date_dim
+      , customer
+      WHERE (catalog_sales.cs_sold_date_sk = date_dim.d_date_sk)
+         AND (catalog_sales.cs_bill_customer_sk = customer.c_customer_sk)
+         AND (d_month_seq BETWEEN 1200 AND (1200 + 11))
+   ) EXCEPT (
+      SELECT DISTINCT
+        c_last_name
+      , c_first_name
+      , d_date
+      FROM
+        web_sales
+      , date_dim
+      , customer
+      WHERE (web_sales.ws_sold_date_sk = date_dim.d_date_sk)
+         AND (web_sales.ws_bill_customer_sk = customer.c_customer_sk)
+         AND (d_month_seq BETWEEN 1200 AND (1200 + 11))
+   ) )  cool_cust
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(10:8~10:19) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:8~11:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:8~12:16) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(22:8~22:21) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(23:8~23:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(24:8~24:16) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(34:8~34:17) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(35:8~35:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(36:8~36:16) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0004]
+sql:
+SELECT *
+FROM
+  (
+   SELECT count(*) h8_30_to_9
+   FROM
+     store_sales
+   , household_demographics
+   , time_dim
+   , store
+   WHERE (ss_sold_time_sk = time_dim.t_time_sk)
+      AND (ss_hdemo_sk = household_demographics.hd_demo_sk)
+      AND (ss_store_sk = s_store_sk)
+      AND (time_dim.t_hour = 8)
+      AND (time_dim.t_minute >= 30)
+      AND (((household_demographics.hd_dep_count = 4)
+            AND (household_demographics.hd_vehicle_count <= (4 + 2)))
+         OR ((household_demographics.hd_dep_count = 2)
+            AND (household_demographics.hd_vehicle_count <= (2 + 2)))
+         OR ((household_demographics.hd_dep_count = 0)
+            AND (household_demographics.hd_vehicle_count <= (0 + 2))))
+      AND (store.s_store_name = 'ese')
+)  s1
+, (
+   SELECT count(*) h9_to_9_30
+   FROM
+     store_sales
+   , household_demographics
+   , time_dim
+   , store
+   WHERE (ss_sold_time_sk = time_dim.t_time_sk)
+      AND (ss_hdemo_sk = household_demographics.hd_demo_sk)
+      AND (ss_store_sk = s_store_sk)
+      AND (time_dim.t_hour = 9)
+      AND (time_dim.t_minute < 30)
+      AND (((household_demographics.hd_dep_count = 4)
+            AND (household_demographics.hd_vehicle_count <= (4 + 2)))
+         OR ((household_demographics.hd_dep_count = 2)
+            AND (household_demographics.hd_vehicle_count <= (2 + 2)))
+         OR ((household_demographics.hd_dep_count = 0)
+            AND (household_demographics.hd_vehicle_count <= (0 + 2))))
+      AND (store.s_store_name = 'ese')
+)  s2
+, (
+   SELECT count(*) h9_30_to_10
+   FROM
+     store_sales
+   , household_demographics
+   , time_dim
+   , store
+   WHERE (ss_sold_time_sk = time_dim.t_time_sk)
+      AND (ss_hdemo_sk = household_demographics.hd_demo_sk)
+      AND (ss_store_sk = s_store_sk)
+      AND (time_dim.t_hour = 9)
+      AND (time_dim.t_minute >= 30)
+      AND (((household_demographics.hd_dep_count = 4)
+            AND (household_demographics.hd_vehicle_count <= (4 + 2)))
+         OR ((household_demographics.hd_dep_count = 2)
+            AND (household_demographics.hd_vehicle_count <= (2 + 2)))
+         OR ((household_demographics.hd_dep_count = 0)
+            AND (household_demographics.hd_vehicle_count <= (0 + 2))))
+      AND (store.s_store_name = 'ese')
+)  s3
+, (
+   SELECT count(*) h10_to_10_30
+   FROM
+     store_sales
+   , household_demographics
+   , time_dim
+   , store
+   WHERE (ss_sold_time_sk = time_dim.t_time_sk)
+      AND (ss_hdemo_sk = household_demographics.hd_demo_sk)
+      AND (ss_store_sk = s_store_sk)
+      AND (time_dim.t_hour = 10)
+      AND (time_dim.t_minute < 30)
+      AND (((household_demographics.hd_dep_count = 4)
+            AND (household_demographics.hd_vehicle_count <= (4 + 2)))
+         OR ((household_demographics.hd_dep_count = 2)
+            AND (household_demographics.hd_vehicle_count <= (2 + 2)))
+         OR ((household_demographics.hd_dep_count = 0)
+            AND (household_demographics.hd_vehicle_count <= (0 + 2))))
+      AND (store.s_store_name = 'ese')
+)  s4
+, (
+   SELECT count(*) h10_30_to_11
+   FROM
+     store_sales
+   , household_demographics
+   , time_dim
+   , store
+   WHERE (ss_sold_time_sk = time_dim.t_time_sk)
+      AND (ss_hdemo_sk = household_demographics.hd_demo_sk)
+      AND (ss_store_sk = s_store_sk)
+      AND (time_dim.t_hour = 10)
+      AND (time_dim.t_minute >= 30)
+      AND (((household_demographics.hd_dep_count = 4)
+            AND (household_demographics.hd_vehicle_count <= (4 + 2)))
+         OR ((household_demographics.hd_dep_count = 2)
+            AND (household_demographics.hd_vehicle_count <= (2 + 2)))
+         OR ((household_demographics.hd_dep_count = 0)
+            AND (household_demographics.hd_vehicle_count <= (0 + 2))))
+      AND (store.s_store_name = 'ese')
+)  s5
+, (
+   SELECT count(*) h11_to_11_30
+   FROM
+     store_sales
+   , household_demographics
+   , time_dim
+   , store
+   WHERE (ss_sold_time_sk = time_dim.t_time_sk)
+      AND (ss_hdemo_sk = household_demographics.hd_demo_sk)
+      AND (ss_store_sk = s_store_sk)
+      AND (time_dim.t_hour = 11)
+      AND (time_dim.t_minute < 30)
+      AND (((household_demographics.hd_dep_count = 4)
+            AND (household_demographics.hd_vehicle_count <= (4 + 2)))
+         OR ((household_demographics.hd_dep_count = 2)
+            AND (household_demographics.hd_vehicle_count <= (2 + 2)))
+         OR ((household_demographics.hd_dep_count = 0)
+            AND (household_demographics.hd_vehicle_count <= (0 + 2))))
+      AND (store.s_store_name = 'ese')
+)  s6
+, (
+   SELECT count(*) h11_30_to_12
+   FROM
+     store_sales
+   , household_demographics
+   , time_dim
+   , store
+   WHERE (ss_sold_time_sk = time_dim.t_time_sk)
+      AND (ss_hdemo_sk = household_demographics.hd_demo_sk)
+      AND (ss_store_sk = s_store_sk)
+      AND (time_dim.t_hour = 11)
+      AND (time_dim.t_minute >= 30)
+      AND (((household_demographics.hd_dep_count = 4)
+            AND (household_demographics.hd_vehicle_count <= (4 + 2)))
+         OR ((household_demographics.hd_dep_count = 2)
+            AND (household_demographics.hd_vehicle_count <= (2 + 2)))
+         OR ((household_demographics.hd_dep_count = 0)
+            AND (household_demographics.hd_vehicle_count <= (0 + 2))))
+      AND (store.s_store_name = 'ese')
+)  s7
+, (
+   SELECT count(*) h12_to_12_30
+   FROM
+     store_sales
+   , household_demographics
+   , time_dim
+   , store
+   WHERE (ss_sold_time_sk = time_dim.t_time_sk)
+      AND (ss_hdemo_sk = household_demographics.hd_demo_sk)
+      AND (ss_store_sk = s_store_sk)
+      AND (time_dim.t_hour = 12)
+      AND (time_dim.t_minute < 30)
+      AND (((household_demographics.hd_dep_count = 4)
+            AND (household_demographics.hd_vehicle_count <= (4 + 2)))
+         OR ((household_demographics.hd_dep_count = 2)
+            AND (household_demographics.hd_vehicle_count <= (2 + 2)))
+         OR ((household_demographics.hd_dep_count = 0)
+            AND (household_demographics.hd_vehicle_count <= (0 + 2))))
+      AND (store.s_store_name = 'ese')
+)  s8
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:10~4:15) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:5~6:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:5~7:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:5~8:13) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:5~9:10) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(24:10~24:15) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(26:5~26:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(27:5~27:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(28:5~28:13) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:5~29:10) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(44:10~44:15) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(46:5~46:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(47:5~47:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(48:5~48:13) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(49:5~49:10) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(64:10~64:15) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(66:5~66:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(67:5~67:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(68:5~68:13) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(69:5~69:10) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(84:10~84:15) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(86:5~86:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(87:5~87:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(88:5~88:13) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(89:5~89:10) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(104:10~104:15) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(106:5~106:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(107:5~107:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(108:5~108:13) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(109:5~109:10) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(124:10~124:15) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(126:5~126:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(127:5~127:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(128:5~128:13) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(129:5~129:10) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(144:10~144:15) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(146:5~146:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(147:5~147:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(148:5~148:13) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(149:5~149:10) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0005]
+sql:
+SELECT *
+FROM
+  (
+   SELECT
+     i_category
+   , i_class
+   , i_brand
+   , s_store_name
+   , s_company_name
+   , d_moy
+   , sum(ss_sales_price) sum_sales
+   , avg(sum(ss_sales_price)) OVER (PARTITION BY i_category, i_brand, s_store_name, s_company_name) avg_monthly_sales
+   FROM
+     item
+   , store_sales
+   , date_dim
+   , store
+   WHERE (ss_item_sk = i_item_sk)
+      AND (ss_sold_date_sk = d_date_sk)
+      AND (ss_store_sk = s_store_sk)
+      AND (d_year IN (1999))
+      AND (((i_category IN ('Books'         , 'Electronics'         , 'Sports'))
+            AND (i_class IN ('computers'         , 'stereo'         , 'football')))
+         OR ((i_category IN ('Men'         , 'Jewelry'         , 'Women'))
+            AND (i_class IN ('shirts'         , 'birdal'         , 'dresses'))))
+   GROUP BY i_category, i_class, i_brand, s_store_name, s_company_name, d_moy
+)  tmp1
+WHERE ((CASE WHEN (avg_monthly_sales <> 0) THEN (abs((sum_sales - avg_monthly_sales)) / avg_monthly_sales) ELSE null END) > CAST('0.1' AS DECIMAL(2,1)))
+ORDER BY (sum_sales - avg_monthly_sales) ASC, s_store_name ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(11:5~11:8) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:5~12:8) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:9~12:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(14:5~14:9) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:5~15:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:5~16:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:5~17:10) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(28:49~28:52) /test/1/catalog1/schema1/abs/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0006]
+sql:
+SELECT (CAST(amc AS DECIMAL(15,4)) / CAST(pmc AS DECIMAL(15,4))) am_pm_ratio
+FROM
+  (
+   SELECT count(*) amc
+   FROM
+     web_sales
+   , household_demographics
+   , time_dim
+   , web_page
+   WHERE (ws_sold_time_sk = time_dim.t_time_sk)
+      AND (ws_ship_hdemo_sk = household_demographics.hd_demo_sk)
+      AND (ws_web_page_sk = web_page.wp_web_page_sk)
+      AND (time_dim.t_hour BETWEEN 8 AND (8 + 1))
+      AND (household_demographics.hd_dep_count = 6)
+      AND (web_page.wp_char_count BETWEEN 5000 AND 5200)
+)  at
+, (
+   SELECT count(*) pmc
+   FROM
+     web_sales
+   , household_demographics
+   , time_dim
+   , web_page
+   WHERE (ws_sold_time_sk = time_dim.t_time_sk)
+      AND (ws_ship_hdemo_sk = household_demographics.hd_demo_sk)
+      AND (ws_web_page_sk = web_page.wp_web_page_sk)
+      AND (time_dim.t_hour BETWEEN 19 AND (19 + 1))
+      AND (household_demographics.hd_dep_count = 6)
+      AND (web_page.wp_char_count BETWEEN 5000 AND 5200)
+)  pt
+ORDER BY am_pm_ratio ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:10~4:15) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:5~6:14) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:5~7:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:5~8:13) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:5~9:13) /test/1/catalog1/schema1/web_page/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(18:10~18:15) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(20:5~20:14) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(21:5~21:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(22:5~22:13) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(23:5~23:13) /test/1/catalog1/schema1/web_page/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0007]
+sql:
+SELECT
+  cc_call_center_id Call_Center
+, cc_name Call_Center_Name
+, cc_manager Manager
+, sum(cr_net_loss) Returns_Loss
+FROM
+  call_center
+, catalog_returns
+, date_dim
+, customer
+, customer_address
+, customer_demographics
+, household_demographics
+WHERE (cr_call_center_sk = cc_call_center_sk)
+   AND (cr_returned_date_sk = d_date_sk)
+   AND (cr_returning_customer_sk = c_customer_sk)
+   AND (cd_demo_sk = c_current_cdemo_sk)
+   AND (hd_demo_sk = c_current_hdemo_sk)
+   AND (ca_address_sk = c_current_addr_sk)
+   AND (d_year = 1998)
+   AND (d_moy = 11)
+   AND (((cd_marital_status = 'M')
+         AND (cd_education_status = 'Unknown'))
+      OR ((cd_marital_status = 'W')
+         AND (cd_education_status = 'Advanced Degree')))
+   AND (hd_buy_potential LIKE 'Unknown%')
+   AND (ca_gmt_offset = -7)
+GROUP BY cc_call_center_id, cc_name, cc_manager, cd_marital_status, cd_education_status
+ORDER BY sum(cr_net_loss) DESC
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:2~5:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:2~7:13) /test/1/catalog1/schema1/call_center/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:2~8:17) /test/1/catalog1/schema1/catalog_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:2~9:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:2~10:10) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:2~11:18) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:2~12:23) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:2~13:24) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(29:9~29:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0008]
+sql:
+SELECT sum(ws_ext_discount_amt) 'Excess Discount Amount'
+FROM
+  web_sales
+, item
+, date_dim
+WHERE (i_manufact_id = 350)
+   AND (i_item_sk = ws_item_sk)
+   AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+   AND (d_date_sk = ws_sold_date_sk)
+   AND (ws_ext_discount_amt > (
+      SELECT (CAST('1.3' AS DECIMAL(2,1)) * avg(ws_ext_discount_amt))
+      FROM
+        web_sales
+      , date_dim
+      WHERE (ws_item_sk = i_item_sk)
+         AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+         AND (d_date_sk = ws_sold_date_sk)
+   ))
+ORDER BY sum(ws_ext_discount_amt) ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:2~3:11) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:2~4:6) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:2~5:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(11:44~11:47) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:8~13:17) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(14:8~14:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(19:9~19:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0009]
+sql:
+SELECT
+  ss_customer_sk
+, sum(act_sales) sumsales
+FROM
+  (
+   SELECT
+     ss_item_sk
+   , ss_ticket_number
+   , ss_customer_sk
+   , (CASE WHEN (sr_return_quantity IS NOT NULL) THEN ((ss_quantity - sr_return_quantity) * ss_sales_price) ELSE (ss_quantity * ss_sales_price) END) act_sales
+   FROM
+     store_sales
+   LEFT JOIN store_returns ON (sr_item_sk = ss_item_sk)
+      AND (sr_ticket_number = ss_ticket_number)
+   , reason
+   WHERE (sr_reason_sk = r_reason_sk)
+      AND (r_reason_desc = 'reason 28')
+)  t
+GROUP BY ss_customer_sk
+ORDER BY sumsales ASC, ss_customer_sk ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:2~3:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(12:5~12:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:13~13:26) /test/1/catalog1/schema1/store_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:5~15:11) /test/1/catalog1/schema1/reason/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0010]
+sql:
+SELECT
+  count(DISTINCT ws_order_number) 'order count'
+, sum(ws_ext_ship_cost) 'total shipping cost'
+, sum(ws_net_profit) 'total net profit'
+FROM
+  web_sales ws1
+, date_dim
+, customer_address
+, web_site
+WHERE (d_date BETWEEN CAST('1999-2-01' AS DATE) AND (CAST('1999-2-01' AS DATE) + INTERVAL  '60' DAY))
+   AND (ws1.ws_ship_date_sk = d_date_sk)
+   AND (ws1.ws_ship_addr_sk = ca_address_sk)
+   AND (ca_state = 'IL')
+   AND (ws1.ws_web_site_sk = web_site_sk)
+   AND (web_company_name = 'pri')
+   AND (EXISTS (
+   SELECT *
+   FROM
+     web_sales ws2
+   WHERE (ws1.ws_order_number = ws2.ws_order_number)
+      AND (ws1.ws_warehouse_sk <> ws2.ws_warehouse_sk)
+))
+   AND (NOT (EXISTS (
+   SELECT *
+   FROM
+     web_returns wr1
+   WHERE (ws1.ws_order_number = wr1.wr_order_number)
+)))
+ORDER BY count(DISTINCT ws_order_number) ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:2~2:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:2~3:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:2~4:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:2~6:11) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:2~7:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:2~8:18) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:2~9:10) /test/1/catalog1/schema1/web_site/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(19:5~19:14) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(26:5~26:16) /test/1/catalog1/schema1/web_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(29:9~29:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0011]
+sql:
+WITH
+  ws_wh AS (
+   SELECT
+     ws1.ws_order_number
+   , ws1.ws_warehouse_sk wh1
+   , ws2.ws_warehouse_sk wh2
+   FROM
+     web_sales ws1
+   , web_sales ws2
+   WHERE (ws1.ws_order_number = ws2.ws_order_number)
+      AND (ws1.ws_warehouse_sk <> ws2.ws_warehouse_sk)
+)
+SELECT
+  count(DISTINCT ws_order_number) 'order count'
+, sum(ws_ext_ship_cost) 'total shipping cost'
+, sum(ws_net_profit) 'total net profit'
+FROM
+  web_sales ws1
+, date_dim
+, customer_address
+, web_site
+WHERE (CAST(d_date AS DATE) BETWEEN CAST('1999-2-01' AS DATE) AND (CAST('1999-2-01' AS DATE) + INTERVAL  '60' DAY))
+   AND (ws1.ws_ship_date_sk = d_date_sk)
+   AND (ws1.ws_ship_addr_sk = ca_address_sk)
+   AND (ca_state = 'IL')
+   AND (ws1.ws_web_site_sk = web_site_sk)
+   AND (web_company_name = 'pri')
+   AND (ws1.ws_order_number IN (
+   SELECT ws_order_number
+   FROM
+     ws_wh
+))
+   AND (ws1.ws_order_number IN (
+   SELECT wr_order_number
+   FROM
+     web_returns
+   , ws_wh
+   WHERE (wr_order_number = ws_wh.ws_order_number)
+))
+ORDER BY count(DISTINCT ws_order_number) ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(8:5~8:14) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:5~9:14) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(14:2~14:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(15:2~15:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(16:2~16:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(18:2~18:11) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(19:2~19:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(20:2~20:18) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(21:2~21:10) /test/1/catalog1/schema1/web_site/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(31:5~31:10) /test/1/catalog1/schema1/ws_wh/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(36:5~36:16) /test/1/catalog1/schema1/web_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(37:5~37:10) /test/1/catalog1/schema1/ws_wh/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(40:9~40:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0012]
+sql:
+SELECT count(*)
+FROM
+  store_sales
+, household_demographics
+, time_dim
+, store
+WHERE (ss_sold_time_sk = time_dim.t_time_sk)
+   AND (ss_hdemo_sk = household_demographics.hd_demo_sk)
+   AND (ss_store_sk = s_store_sk)
+   AND (time_dim.t_hour = 20)
+   AND (time_dim.t_minute >= 30)
+   AND (household_demographics.hd_dep_count = 7)
+   AND (store.s_store_name = 'ese')
+ORDER BY count(*) ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:2~3:13) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:2~4:24) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:2~5:10) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:2~6:7) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(14:9~14:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0013]
+sql:
+WITH
+  ssci AS (
+   SELECT
+     ss_customer_sk customer_sk
+   , ss_item_sk item_sk
+   FROM
+     store_sales
+   , date_dim
+   WHERE (ss_sold_date_sk = d_date_sk)
+      AND (d_month_seq BETWEEN 1200 AND (1200 + 11))
+   GROUP BY ss_customer_sk, ss_item_sk
+)
+, csci AS (
+   SELECT
+     cs_bill_customer_sk customer_sk
+   , cs_item_sk item_sk
+   FROM
+     catalog_sales
+   , date_dim
+   WHERE (cs_sold_date_sk = d_date_sk)
+      AND (d_month_seq BETWEEN 1200 AND (1200 + 11))
+   GROUP BY cs_bill_customer_sk, cs_item_sk
+)
+SELECT
+  sum((CASE WHEN (ssci.customer_sk IS NOT NULL)
+   AND (csci.customer_sk IS NULL) THEN 1 ELSE 0 END)) store_only
+, sum((CASE WHEN (ssci.customer_sk IS NULL)
+   AND (csci.customer_sk IS NOT NULL) THEN 1 ELSE 0 END)) catalog_only
+, sum((CASE WHEN (ssci.customer_sk IS NOT NULL)
+   AND (csci.customer_sk IS NOT NULL) THEN 1 ELSE 0 END)) store_and_catalog
+FROM
+  ssci
+FULL JOIN csci ON (ssci.customer_sk = csci.customer_sk)
+   AND (ssci.item_sk = csci.item_sk)
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(7:5~7:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:5~8:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:5~18:18) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(19:5~19:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(25:2~25:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(27:2~27:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(29:2~29:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(32:2~32:6) /test/1/catalog1/schema1/ssci/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(33:10~33:14) /test/1/catalog1/schema1/csci/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0014]
+sql:
+SELECT
+  i_item_id
+, i_item_desc
+, i_category
+, i_class
+, i_current_price
+, sum(ss_ext_sales_price) itemrevenue
+, ((sum(ss_ext_sales_price) * 100) / sum(sum(ss_ext_sales_price)) OVER (PARTITION BY i_class)) revenueratio
+FROM
+  store_sales
+, item
+, date_dim
+WHERE (ss_item_sk = i_item_sk)
+   AND (i_category IN ('Sports', 'Books', 'Home'))
+   AND (ss_sold_date_sk = d_date_sk)
+   AND (CAST(d_date AS DATE) BETWEEN CAST('1999-02-22' AS DATE) AND (CAST('1999-02-22' AS DATE) + INTERVAL  '30' DAY))
+GROUP BY i_item_id, i_item_desc, i_category, i_class, i_current_price
+ORDER BY i_category ASC, i_class ASC, i_item_id ASC, i_item_desc ASC, revenueratio ASC
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(7:2~7:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:4~8:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:37~8:40) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:41~8:44) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(10:2~10:13) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:2~11:6) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:2~12:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0015]
+sql:
+SELECT
+  substr(w_warehouse_name, 1, 20)
+, sm_type
+, cc_name
+, sum((CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) <= 30) THEN 1 ELSE 0 END)) '30 days'
+, sum((CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) > 30)
+   AND ((cs_ship_date_sk - cs_sold_date_sk) <= 60) THEN 1 ELSE 0 END)) '31-60 days'
+, sum((CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) > 60)
+   AND ((cs_ship_date_sk - cs_sold_date_sk) <= 90) THEN 1 ELSE 0 END)) '61-90 days'
+, sum((CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) > 90)
+   AND ((cs_ship_date_sk - cs_sold_date_sk) <= 120) THEN 1 ELSE 0 END)) '91-120 days'
+, sum((CASE WHEN ((cs_ship_date_sk - cs_sold_date_sk) > 120) THEN 1 ELSE 0 END)) '>120 days'
+FROM
+  catalog_sales
+, warehouse
+, ship_mode
+, call_center
+, date_dim
+WHERE (d_month_seq BETWEEN 1200 AND (1200 + 11))
+   AND (cs_ship_date_sk = d_date_sk)
+   AND (cs_warehouse_sk = w_warehouse_sk)
+   AND (cs_ship_mode_sk = sm_ship_mode_sk)
+   AND (cs_call_center_sk = cc_call_center_sk)
+GROUP BY substr(w_warehouse_name, 1, 20), sm_type, cc_name
+ORDER BY substr(w_warehouse_name, 1, 20) ASC, sm_type ASC, cc_name ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:2~2:8) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:2~5:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:2~6:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:2~8:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:2~10:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:2~12:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(14:2~14:15) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:2~15:11) /test/1/catalog1/schema1/warehouse/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:2~16:11) /test/1/catalog1/schema1/ship_mode/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:2~17:13) /test/1/catalog1/schema1/call_center/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:2~18:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(24:9~24:15) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(25:9~25:15) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0016]
+sql:
+SELECT * FROM articles_uk WHERE title MATCH_ANY 'Database' OR body MATCH_ANY 'Database' ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0017]
+sql:
+SELECT COUNT(*) FROM articles_uk WHERE title MATCH_ANY 'database' OR body MATCH_ANY 'database';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:32) /test/1/catalog1/schema1/articles_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0018]
+sql:
+SELECT * FROM articles_uk WHERE title MATCH_ANY 'Tutorial' OR body MATCH_ANY 'Tutorial' ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0019]
+sql:
+SELECT * FROM articles_uk WHERE title MATCH_ANY 'MySQL' OR body MATCH_ANY 'MySQL' ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0020]
+sql:
+SELECT * FROM articles_uk WHERE (title MATCH_ANY 'MySQL' AND NOT title MATCH_ANY 'YourSQL') 
+                            OR (body MATCH_ANY 'MySQL' AND NOT body MATCH_ANY 'YourSQL') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0021]
+sql:
+SELECT * FROM articles_uk WHERE title MATCH_ANY 'DBMS Security' OR body MATCH_ANY 'DBMS Security' ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0022]
+sql:
+SELECT * FROM articles_uk WHERE title MATCH_ALL 'MySQL YourSQL' OR body MATCH_ALL 'MySQL YourSQL' ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0023]
+sql:
+SELECT * FROM articles_uk WHERE (title MATCH_ANY 'MySQL' OR body MATCH_ANY 'MySQL') 
+                            AND NOT (title MATCH_ANY 'Well stands' OR body MATCH_ANY 'Well stands') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0024]
+sql:
+SELECT * FROM articles_uk WHERE (title MATCH_ANY 'YourSQL' OR body MATCH_ANY 'YourSQL') 
+                            OR ((title MATCH_ANY 'MySQL' OR body MATCH_ANY 'MySQL') 
+                                AND NOT (title MATCH_ANY 'Tricks Security' OR body MATCH_ANY 'Tricks Security')) ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0025]
+sql:
+SELECT * FROM articles_uk WHERE ((title MATCH_ANY 'MySQL' OR body MATCH_ANY 'MySQL') 
+                                AND NOT (title MATCH_ANY 'Tricks Security' OR body MATCH_ANY 'Tricks Security'))
+                           AND NOT (title MATCH_ANY 'YourSQL' OR body MATCH_ANY 'YourSQL') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0026]
+sql:
+-- match phrase, NOT SUPPORT:
+-- SELECT * FROM articles_uk WHERE title MATCH_PHRASE 'following database' OR body MATCH_PHRASE 'following database';
+SELECT * FROM articles_dk WHERE title MATCH_ANY 'Database' OR body MATCH_ANY 'Database' ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:14~3:25) /test/1/catalog1/schema1/articles_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0027]
+sql:
+SELECT COUNT(*) FROM articles_dk WHERE title MATCH_ANY 'database' OR body MATCH_ANY 'database';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:32) /test/1/catalog1/schema1/articles_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0028]
+sql:
+SELECT * FROM articles_dk WHERE title MATCH_ANY 'Tutorial' OR body MATCH_ANY 'Tutorial' ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0029]
+sql:
+SELECT * FROM articles_dk WHERE title MATCH_ANY 'MySQL' OR body MATCH_ANY 'MySQL' ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0030]
+sql:
+SELECT * FROM articles_dk WHERE (title MATCH_ANY 'MySQL' AND NOT title MATCH_ANY 'YourSQL') 
+                            OR (body MATCH_ANY 'MySQL' AND NOT body MATCH_ANY 'YourSQL') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0031]
+sql:
+SELECT * FROM articles_dk WHERE title MATCH_ANY 'DBMS Security' OR body MATCH_ANY 'DBMS Security' ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0032]
+sql:
+SELECT * FROM articles_dk WHERE title MATCH_ALL 'MySQL YourSQL' OR body MATCH_ALL 'MySQL YourSQL' ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0033]
+sql:
+SELECT * FROM articles_dk WHERE (title MATCH_ANY 'MySQL' OR body MATCH_ANY 'MySQL') 
+                            AND NOT (title MATCH_ANY 'Well stands' OR body MATCH_ANY 'Well stands') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0034]
+sql:
+SELECT * FROM articles_dk WHERE (title MATCH_ANY 'YourSQL' OR body MATCH_ANY 'YourSQL') 
+                            OR ((title MATCH_ANY 'MySQL' OR body MATCH_ANY 'MySQL') 
+                                AND NOT (title MATCH_ANY 'Tricks Security' OR body MATCH_ANY 'Tricks Security')) ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0035]
+sql:
+SELECT * FROM articles_dk WHERE ((title MATCH_ANY 'MySQL' OR body MATCH_ANY 'MySQL') 
+                                AND NOT (title MATCH_ANY 'Tricks Security' OR body MATCH_ANY 'Tricks Security'))
+                           AND NOT (title MATCH_ANY 'YourSQL' OR body MATCH_ANY 'YourSQL') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/articles_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0036]
+sql:
+-- match phrase, NOT SUPPORT:
+-- SELECT * FROM articles_dk WHERE title MATCH_PHRASE 'following database' OR body MATCH_PHRASE 'following database';
+SELECT * FROM fulltext_t1_uk WHERE a MATCH_ANY 'collections' OR b MATCH_ANY 'collections' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:14~3:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0037]
+sql:
+SELECT * FROM fulltext_t1_uk WHERE a MATCH_ANY 'indexes' OR b MATCH_ANY 'indexes' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0038]
+sql:
+SELECT * FROM fulltext_t1_uk WHERE a MATCH_ANY 'indexes collections' OR b MATCH_ANY 'indexes collections' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0039]
+sql:
+SELECT * FROM fulltext_t1_uk WHERE a MATCH_ANY 'only' OR b MATCH_ANY 'only' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0040]
+sql:
+SELECT * FROM fulltext_t1_uk WHERE (a MATCH_ANY 'support' OR b MATCH_ANY 'support')
+                    AND NOT (a MATCH_ANY 'collections' OR b MATCH_ANY 'collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0041]
+sql:
+SELECT * FROM fulltext_t1_uk WHERE a MATCH_ANY 'support  collections' OR b MATCH_ANY 'support  collections' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0042]
+sql:
+SELECT * FROM fulltext_t1_uk WHERE (a MATCH_ANY 'support collections' OR b MATCH_ANY 'support collections') 
+                    AND (a MATCH_ANY 'collections' OR b MATCH_ANY 'collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0043]
+sql:
+SELECT * FROM fulltext_t1_uk WHERE a MATCH_ALL 'support collections' OR b MATCH_ALL 'support collections' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0044]
+sql:
+SELECT * FROM fulltext_t1_uk WHERE a MATCH_ANY 'search' OR b MATCH_ANY 'search' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0045]
+sql:
+SELECT * FROM fulltext_t1_uk WHERE (a MATCH_ANY 'search' OR b MATCH_ANY 'search') 
+                    AND (a MATCH_ANY 'support vector' OR b MATCH_ANY 'support vector') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0046]
+sql:
+SELECT * FROM fulltext_t1_uk WHERE (a MATCH_ANY 'search' OR b MATCH_ANY 'search') 
+                    AND NOT (a MATCH_ANY 'support vector' OR b MATCH_ANY 'support vector') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0047]
+sql:
+SELECT * FROM fulltext_t1_uk WHERE a MATCH_ANY '"space model' OR b MATCH_ANY '"space model' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0048]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE a MATCH_ANY 'collections' OR b MATCH_ANY 'collections' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0049]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE a MATCH_ANY 'indexes' OR b MATCH_ANY 'indexes' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0050]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE a MATCH_ANY 'indexes collections' OR b MATCH_ANY 'indexes collections' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0051]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE a MATCH_ANY 'only' OR b MATCH_ANY 'only' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0052]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE (a MATCH_ANY 'support' OR b MATCH_ANY 'support')
+                    AND NOT (a MATCH_ANY 'collections' OR b MATCH_ANY 'collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0053]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE a MATCH_ANY 'support  collections' OR b MATCH_ANY 'support  collections' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0054]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE (a MATCH_ANY 'support collections' OR b MATCH_ANY 'support collections') 
+                    AND (a MATCH_ANY 'collections' OR b MATCH_ANY 'collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0055]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE a MATCH_ALL 'support collections' OR b MATCH_ALL 'support collections' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0056]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE a MATCH_ANY 'search' OR b MATCH_ANY 'search' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0057]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE (a MATCH_ANY 'search' OR b MATCH_ANY 'search') 
+                    AND (a MATCH_ANY 'support vector' OR b MATCH_ANY 'support vector') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0058]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE (a MATCH_ANY 'search' OR b MATCH_ANY 'search') 
+                    AND NOT (a MATCH_ANY 'support vector' OR b MATCH_ANY 'support vector') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0059]
+sql:
+SELECT * FROM fulltext_t1_dk WHERE a MATCH_ANY '"space model' OR b MATCH_ANY '"space model' ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:28) /test/1/catalog1/schema1/fulltext_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0060]
+sql:
+SELECT COUNT(*) FROM large_records_t1_uk;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0061]
+sql:
+SELECT FTS_DOC_ID FROM large_records_t1_uk WHERE a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49' order by FTS_DOC_ID;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:23~1:42) /test/1/catalog1/schema1/large_records_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0062]
+sql:
+SELECT COUNT(*) from large_records_t1_uk
+        WHERE (a MATCH_ANY 'row5col2word49' OR b MATCH_ANY 'row5col2word49')
+        AND (a MATCH_ANY 'row5col1word49' OR b MATCH_ANY 'row5col1word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0063]
+sql:
+SELECT COUNT(*) from large_records_t1_uk
+        WHERE a MATCH_ANY 'row5col2word49' OR  b MATCH_ANY 'row5col2word49';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0064]
+sql:
+SELECT COUNT(*) from large_records_t1_uk
+        WHERE (a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49')
+        AND (a MATCH_ANY 'row35col1word49 row35col2word40' OR b MATCH_ANY 'row35col1word49 row35col2word40');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0065]
+sql:
+SELECT COUNT(*) from large_records_t1_uk
+        WHERE (a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49')
+        AND NOT (a MATCH_ANY 'row45col2word49' OR b MATCH_ANY 'row45col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0066]
+sql:
+SELECT COUNT(*) from large_records_t1_uk
+        WHERE a MATCH_ANY 'row5col2word49' OR  b MATCH_ANY 'row5col2word40';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0067]
+sql:
+SELECT COUNT(*) from large_records_t1_uk
+        WHERE a MATCH_ANY 'row35col2word49' OR  b MATCH_ANY 'row35col2word49';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0068]
+sql:
+SELECT COUNT(*) from large_records_t1_uk
+        WHERE a MATCH_ANY 'ROW35col2WORD49' OR  b MATCH_ANY 'ROW35col2WORD49';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0069]
+sql:
+SELECT a,b FROM large_records_t1_uk
+        WHERE (a MATCH_ANY 'row5col2word49' OR b MATCH_ANY 'row5col2word49')
+        AND (a MATCH_ANY 'row5col1word49' OR b MATCH_ANY 'row5col1word49') ORDER BY a,b;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:16~1:35) /test/1/catalog1/schema1/large_records_t1_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0070]
+sql:
+SELECT COUNT(*) FROM large_records_t1_dk;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0071]
+sql:
+SELECT FTS_DOC_ID FROM large_records_t1_dk WHERE a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49' order by FTS_DOC_ID;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:23~1:42) /test/1/catalog1/schema1/large_records_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0072]
+sql:
+SELECT COUNT(*) from large_records_t1_dk
+        WHERE (a MATCH_ANY 'row5col2word49' OR b MATCH_ANY 'row5col2word49')
+        AND (a MATCH_ANY 'row5col1word49' OR b MATCH_ANY 'row5col1word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0073]
+sql:
+SELECT COUNT(*) from large_records_t1_dk
+        WHERE a MATCH_ANY 'row5col2word49' OR  b MATCH_ANY 'row5col2word49';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0074]
+sql:
+SELECT COUNT(*) from large_records_t1_dk
+        WHERE (a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49')
+        AND (a MATCH_ANY 'row35col1word49 row35col2word40' OR b MATCH_ANY 'row35col1word49 row35col2word40');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0075]
+sql:
+SELECT COUNT(*) from large_records_t1_dk
+        WHERE (a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49')
+        AND NOT (a MATCH_ANY 'row45col2word49' OR b MATCH_ANY 'row45col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0076]
+sql:
+SELECT COUNT(*) from large_records_t1_dk
+        WHERE a MATCH_ANY 'row5col2word49' OR  b MATCH_ANY 'row5col2word40';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0077]
+sql:
+SELECT COUNT(*) from large_records_t1_dk
+        WHERE a MATCH_ANY 'row35col2word49' OR  b MATCH_ANY 'row35col2word49';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0078]
+sql:
+SELECT COUNT(*) from large_records_t1_dk
+        WHERE a MATCH_ANY 'ROW35col2WORD49' OR  b MATCH_ANY 'ROW35col2WORD49';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0079]
+sql:
+SELECT a,b FROM large_records_t1_dk
+        WHERE (a MATCH_ANY 'row5col2word49' OR b MATCH_ANY 'row5col2word49')
+        AND (a MATCH_ANY 'row5col1word49' OR b MATCH_ANY 'row5col1word49') ORDER BY a,b;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:16~1:35) /test/1/catalog1/schema1/large_records_t1_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0080]
+sql:
+SELECT COUNT(*) FROM large_records_t2_uk;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0081]
+sql:
+SELECT FTS_DOC_ID FROM large_records_t2_uk WHERE b like '%row300col2word30%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:23~1:42) /test/1/catalog1/schema1/large_records_t2_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0082]
+sql:
+SELECT FTS_DOC_ID FROM large_records_t2_uk WHERE a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:23~1:42) /test/1/catalog1/schema1/large_records_t2_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0083]
+sql:
+SELECT COUNT(*) FROM large_records_t2_uk 
+    WHERE (a MATCH_ANY 'row5col2word49' OR b MATCH_ANY 'row5col2word49')
+    AND (a MATCH_ANY 'row5col1word49' OR b MATCH_ANY 'row5col1word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0084]
+sql:
+SELECT COUNT(*) from large_records_t2_uk 
+    WHERE (a MATCH_ANY 'row5col2word49' OR b MATCH_ANY 'row5col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0085]
+sql:
+SELECT COUNT(*) from large_records_t2_uk 
+    WHERE (a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49')
+    AND (a MATCH_ANY 'row35col1word49 row35col2word40' OR b MATCH_ANY 'row35col1word49 row35col2word40');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0086]
+sql:
+SELECT COUNT(*) from large_records_t2_uk 
+    WHERE (a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49')
+    AND NOT (a MATCH_ANY 'row45col2word49' OR b MATCH_ANY 'row45col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0087]
+sql:
+SELECT COUNT(*) from large_records_t2_uk 
+    WHERE a MATCH_ANY 'row5col2word49 row5col2word40' OR b MATCH_ANY 'row5col2word49 row5col2word40';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0088]
+sql:
+SELECT COUNT(*) from large_records_t2_uk 
+    WHERE a MATCH_ALL 'ROW35col2WORD49' OR b MATCH_ALL 'ROW35col2WORD49';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0089]
+sql:
+SELECT COUNT(*) FROM large_records_t2_dk;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0090]
+sql:
+SELECT FTS_DOC_ID FROM large_records_t2_dk WHERE b like '%row300col2word30%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:23~1:42) /test/1/catalog1/schema1/large_records_t2_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0091]
+sql:
+SELECT FTS_DOC_ID FROM large_records_t2_dk WHERE a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:23~1:42) /test/1/catalog1/schema1/large_records_t2_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0092]
+sql:
+SELECT COUNT(*) FROM large_records_t2_dk 
+    WHERE (a MATCH_ANY 'row5col2word49' OR b MATCH_ANY 'row5col2word49')
+    AND (a MATCH_ANY 'row5col1word49' OR b MATCH_ANY 'row5col1word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0093]
+sql:
+SELECT COUNT(*) from large_records_t2_dk 
+    WHERE (a MATCH_ANY 'row5col2word49' OR b MATCH_ANY 'row5col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0094]
+sql:
+SELECT COUNT(*) from large_records_t2_dk 
+    WHERE (a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49')
+    AND (a MATCH_ANY 'row35col1word49 row35col2word40' OR b MATCH_ANY 'row35col1word49 row35col2word40');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0095]
+sql:
+SELECT COUNT(*) from large_records_t2_dk 
+    WHERE (a MATCH_ANY 'row35col2word49' OR b MATCH_ANY 'row35col2word49')
+    AND NOT (a MATCH_ANY 'row45col2word49' OR b MATCH_ANY 'row45col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0096]
+sql:
+SELECT COUNT(*) from large_records_t2_dk 
+    WHERE a MATCH_ANY 'row5col2word49 row5col2word40' OR b MATCH_ANY 'row5col2word49 row5col2word40';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0097]
+sql:
+SELECT COUNT(*) from large_records_t2_dk 
+    WHERE a MATCH_ALL 'ROW35col2WORD49' OR b MATCH_ALL 'ROW35col2WORD49';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t2_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0098]
+sql:
+SELECT COUNT(*) FROM large_records_t3_uk;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0099]
+sql:
+SELECT COUNT(*) from large_records_t3_uk WHERE b like '%samerowword%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0100]
+sql:
+SELECT COUNT(*) FROM large_records_t3_uk WHERE a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0101]
+sql:
+SELECT COUNT(*) from large_records_t3_uk 
+    WHERE (a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword')
+    AND (a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0102]
+sql:
+SELECT COUNT(*) from large_records_t3_uk 
+    WHERE (a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword')
+    AND NOT (a MATCH_ANY 'row45col2word49' OR b MATCH_ANY 'row45col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0103]
+sql:
+SELECT COUNT(*) from large_records_t3_uk 
+    WHERE (a MATCH_ANY 'sameroww' OR b MATCH_ANY 'sameroww');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0104]
+sql:
+SELECT COUNT(*) FROM large_records_t3_dk;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0105]
+sql:
+SELECT COUNT(*) from large_records_t3_dk WHERE b like '%samerowword%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0106]
+sql:
+SELECT COUNT(*) FROM large_records_t3_dk WHERE a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0107]
+sql:
+SELECT COUNT(*) from large_records_t3_dk 
+    WHERE (a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword')
+    AND (a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0108]
+sql:
+SELECT COUNT(*) from large_records_t3_dk 
+    WHERE (a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword')
+    AND NOT (a MATCH_ANY 'row45col2word49' OR b MATCH_ANY 'row45col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0109]
+sql:
+SELECT COUNT(*) from large_records_t3_dk 
+    WHERE (a MATCH_ANY 'sameroww' OR b MATCH_ANY 'sameroww');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t3_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0110]
+sql:
+SELECT COUNT(*) FROM large_records_t4_uk;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0111]
+sql:
+SELECT COUNT(*) FROM large_records_t4_uk WHERE a like '%samerowword%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0112]
+sql:
+SELECT COUNT(*) FROM large_records_t4_uk WHERE a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0113]
+sql:
+SELECT COUNT(*) FROM large_records_t4_uk 
+    WHERE (a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword')
+    AND (a MATCH_ANY '1050' OR b MATCH_ANY '1050');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0114]
+sql:
+SELECT COUNT(*) FROM large_records_t4_uk 
+    WHERE (a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword')
+    AND NOT (a MATCH_ANY '1050' OR b MATCH_ANY '1050');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0115]
+sql:
+SELECT COUNT(*) FROM large_records_t4_uk WHERE a MATCH_ANY '2001' OR b MATCH_ANY '2001';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0116]
+sql:
+SELECT COUNT(*) FROM large_records_t4_dk;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0117]
+sql:
+SELECT COUNT(*) FROM large_records_t4_dk WHERE a like '%samerowword%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0118]
+sql:
+SELECT COUNT(*) FROM large_records_t4_dk WHERE a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0119]
+sql:
+SELECT COUNT(*) FROM large_records_t4_dk 
+    WHERE (a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword')
+    AND (a MATCH_ANY '1050' OR b MATCH_ANY '1050');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0120]
+sql:
+SELECT COUNT(*) FROM large_records_t4_dk 
+    WHERE (a MATCH_ANY 'samerowword' OR b MATCH_ANY 'samerowword')
+    AND NOT (a MATCH_ANY '1050' OR b MATCH_ANY '1050');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0121]
+sql:
+SELECT COUNT(*) FROM large_records_t4_dk WHERE a MATCH_ANY '2001' OR b MATCH_ANY '2001';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:21~1:40) /test/1/catalog1/schema1/large_records_t4_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0122]
+sql:
+select * from join_t1_uk right join join_t2_uk on venue_id = entity_id 
+        where name match_any 'aberdeen' and dt = '2003-05-23 19:30:00';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:24) /test/1/catalog1/schema1/join_t1_uk/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:36~1:46) /test/1/catalog1/schema1/join_t2_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0123]
+sql:
+select * from join_t1_uk right join join_t2_uk on venue_id = entity_id 
+        where name match_any 'aberdeen' and dt = '2003-05-23 19:30:00';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:24) /test/1/catalog1/schema1/join_t1_uk/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:36~1:46) /test/1/catalog1/schema1/join_t2_uk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0124]
+sql:
+select * from join_t1_dk right join join_t2_dk on venue_id = entity_id 
+        where name match_any 'aberdeen' and dt = '2003-05-23 19:30:00';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:24) /test/1/catalog1/schema1/join_t1_dk/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:36~1:46) /test/1/catalog1/schema1/join_t2_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0125]
+sql:
+select * from join_t1_dk right join join_t2_dk on venue_id = entity_id 
+        where name match_any 'aberdeen' and dt = '2003-05-23 19:30:00';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:24) /test/1/catalog1/schema1/join_t1_dk/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:36~1:46) /test/1/catalog1/schema1/join_t2_dk/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0126]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_uk_array WHERE array_contains(title, 'Database') OR array_contains(body, 'Database') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:86~1:100) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:123~1:137) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0127]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM articles_uk_array WHERE array_contains(title, 'database') OR array_contains(body, 'database');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:86) /test/1/catalog1/schema1/articles_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:93~1:107) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:130~1:144) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0128]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_uk_array WHERE array_contains(title, 'Tutorial') OR array_contains(body, 'Tutorial') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:86~1:100) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:123~1:137) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0129]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_uk_array WHERE array_contains(title, 'MySQL') OR array_contains(body, 'MySQL') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:86~1:100) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:120~1:134) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0130]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_uk_array WHERE (array_contains(title, 'MySQL') AND NOT array_contains(title, 'YourSQL'))
+                            OR (array_contains(body, 'MySQL') AND NOT array_contains(body, 'YourSQL')) ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:87~1:101) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:126~1:140) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:32~2:46) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:70~2:84) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0131]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_uk_array WHERE array_contains(title, 'DBMS Security') OR array_contains(body, 'DBMS Security') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:86~1:100) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:128~1:142) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0132]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_uk_array WHERE array_contains(title, 'MySQL YourSQL') OR array_contains(body, 'MySQL YourSQL') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:86~1:100) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:128~1:142) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0133]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_uk_array WHERE (array_contains(title, 'MySQL') OR array_contains(body, 'MySQL'))
+                            AND NOT (array_contains(title, 'Well stands') OR array_contains(body, 'Well stands')) ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:87~1:101) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:121~1:135) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:37~2:51) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:77~2:91) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0134]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_uk_array WHERE (array_contains(title, 'YourSQL') OR array_contains(body, 'YourSQL'))
+                            OR ((array_contains(title, 'MySQL') OR array_contains(body, 'MySQL'))
+                                AND NOT (array_contains(title, 'Tricks Security') OR array_contains(body, 'Tricks Security'))) ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:87~1:101) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:123~1:137) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:33~2:47) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:67~2:81) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:41~3:55) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:85~3:99) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0135]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_uk_array WHERE ((array_contains(title, 'MySQL') OR array_contains(body, 'MySQL'))
+                                AND NOT (array_contains(title, 'Tricks Security') OR array_contains(body, 'Tricks Security')))
+                           AND NOT (array_contains(title, 'YourSQL') OR array_contains(body, 'YourSQL')) ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:88~1:102) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:122~1:136) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:41~2:55) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:85~2:99) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:36~3:50) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:72~3:86) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0136]
+sql:
+-- match phrase, NOT SUPPORT:
+-- SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_uk_array WHERE title MATCH_PHRASE 'following database' OR body MATCH_PHRASE 'following database';
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_dk_array WHERE array_contains(title, 'Database') OR array_contains(body, 'Database') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:62~3:79) /test/1/catalog1/schema1/articles_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(3:86~3:100) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:123~3:137) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0137]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM articles_dk_array WHERE array_contains(title, 'database') OR array_contains(body, 'database');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:86) /test/1/catalog1/schema1/articles_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:93~1:107) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:130~1:144) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0138]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_dk_array WHERE array_contains(title, 'Tutorial') OR array_contains(body, 'Tutorial') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:86~1:100) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:123~1:137) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0139]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_dk_array WHERE array_contains(title, 'MySQL') OR array_contains(body, 'MySQL') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:86~1:100) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:120~1:134) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0140]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_dk_array WHERE (array_contains(title, 'MySQL') AND NOT array_contains(title, 'YourSQL'))
+                            OR (array_contains(body, 'MySQL') AND NOT array_contains(body, 'YourSQL')) ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:87~1:101) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:126~1:140) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:32~2:46) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:70~2:84) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0141]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_dk_array WHERE array_contains(title, 'DBMS Security') OR array_contains(body, 'DBMS Security') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:86~1:100) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:128~1:142) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0142]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_dk_array WHERE array_contains(title, 'MySQL YourSQL') OR array_contains(body, 'MySQL YourSQL') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:86~1:100) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:128~1:142) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0143]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_dk_array WHERE (array_contains(title, 'MySQL') OR array_contains(body, 'MySQL'))
+                            AND NOT (array_contains(title, 'Well stands') OR array_contains(body, 'Well stands')) ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:87~1:101) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:121~1:135) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:37~2:51) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:77~2:91) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0144]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_dk_array WHERE (array_contains(title, 'YourSQL') OR array_contains(body, 'YourSQL'))
+                            OR ((array_contains(title, 'MySQL') OR array_contains(body, 'MySQL'))
+                                AND NOT (array_contains(title, 'Tricks Security') OR array_contains(body, 'Tricks Security'))) ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:87~1:101) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:123~1:137) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:33~2:47) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:67~2:81) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:41~3:55) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:85~3:99) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0145]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_dk_array WHERE ((array_contains(title, 'MySQL') OR array_contains(body, 'MySQL'))
+                                AND NOT (array_contains(title, 'Tricks Security') OR array_contains(body, 'Tricks Security')))
+                           AND NOT (array_contains(title, 'YourSQL') OR array_contains(body, 'YourSQL')) ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:79) /test/1/catalog1/schema1/articles_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:88~1:102) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:122~1:136) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:41~2:55) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:85~2:99) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:36~3:50) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:72~3:86) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0146]
+sql:
+-- match phrase, NOT SUPPORT:
+-- SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM articles_dk_array WHERE title MATCH_PHRASE 'following database' OR body MATCH_PHRASE 'following database';
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE a MATCH_ANY 'collections' OR array_contains(b, 'collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:62~3:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(3:118~3:132) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0147]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE a MATCH_ANY 'indexes' OR array_contains(b, 'indexes') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:114~1:128) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0148]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE a MATCH_ANY 'indexes collections' OR array_contains(b, 'indexes collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:126~1:140) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0149]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE a MATCH_ANY 'only' OR array_contains(b, 'only') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:111~1:125) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0150]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE (a MATCH_ANY 'support' OR array_contains(b, 'support'))
+                    AND NOT (a MATCH_ANY 'collections' OR array_contains(b, 'collections')) ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:115~1:129) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:58~2:72) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0151]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE a MATCH_ANY 'support  collections' OR array_contains(b, 'support  collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:127~1:141) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0152]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE (a MATCH_ANY 'support collections' OR array_contains(b, 'support collections'))
+                    AND (a MATCH_ANY 'collections' OR array_contains(b, 'collections')) ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:127~1:141) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:54~2:68) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0153]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE a MATCH_ALL 'support collections' OR array_contains(b, 'support collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:126~1:140) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0154]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE a MATCH_ANY 'search' OR array_contains(b, 'search') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:113~1:127) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0155]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE (a MATCH_ANY 'search' OR array_contains(b, 'search'))
+                    AND (a MATCH_ANY 'support vector' OR array_contains(b, 'support vector')) ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:114~1:128) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:57~2:71) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0156]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE (a MATCH_ANY 'search' OR array_contains(b, 'search'))
+                    AND NOT (a MATCH_ANY 'support vector' OR array_contains(b, 'support vector')) ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:114~1:128) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:61~2:75) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0157]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_uk_array WHERE a MATCH_ANY '"space model' OR array_contains(b, '"space model') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:119~1:133) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0158]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE a MATCH_ANY 'collections' OR array_contains(b, 'collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:118~1:132) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0159]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE a MATCH_ANY 'indexes' OR array_contains(b, 'indexes') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:114~1:128) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0160]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE a MATCH_ANY 'indexes collections' OR array_contains(b, 'indexes collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:126~1:140) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0161]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE a MATCH_ANY 'only' OR array_contains(b, 'only') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:111~1:125) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0162]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE (a MATCH_ANY 'support' OR array_contains(b, 'support'))
+                    AND NOT (a MATCH_ANY 'collections' OR array_contains(b, 'collections')) ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:115~1:129) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:58~2:72) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0163]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE a MATCH_ANY 'support  collections' OR array_contains(b, 'support  collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:127~1:141) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0164]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE (a MATCH_ANY 'support collections' OR array_contains(b, 'support collections'))
+                    AND (a MATCH_ANY 'collections' OR array_contains(b, 'collections')) ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:127~1:141) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:54~2:68) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0165]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE a MATCH_ALL 'support collections' OR array_contains(b, 'support collections') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:126~1:140) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0166]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE a MATCH_ANY 'search' OR array_contains(b, 'search') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:113~1:127) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0167]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE (a MATCH_ANY 'search' OR array_contains(b, 'search'))
+                    AND (a MATCH_ANY 'support vector' OR array_contains(b, 'support vector')) ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:114~1:128) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:57~2:71) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0168]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE (a MATCH_ANY 'search' OR array_contains(b, 'search'))
+                    AND NOT (a MATCH_ANY 'support vector' OR array_contains(b, 'support vector')) ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:114~1:128) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:61~2:75) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0169]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ * FROM fulltext_t1_dk_array WHERE a MATCH_ANY '"space model' OR array_contains(b, '"space model') ORDER BY a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:62~1:82) /test/1/catalog1/schema1/fulltext_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:119~1:133) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0170]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_uk_array;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_uk_array/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0171]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ FTS_DOC_ID FROM large_records_t1_uk_array WHERE a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49') order by FTS_DOC_ID;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:71~1:96) /test/1/catalog1/schema1/large_records_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:136~1:150) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0172]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_uk_array
+        WHERE (a MATCH_ANY 'row5col2word49' OR array_contains(b, 'row5col2word49'))
+        AND (a MATCH_ANY 'row5col1word49' OR array_contains(b, 'row5col1word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:47~2:61) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:45~3:59) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0173]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_uk_array
+        WHERE a MATCH_ANY 'row5col2word49' OR  array_contains(b, 'row5col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:47~2:61) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0174]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_uk_array
+        WHERE (a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49'))
+        AND (a MATCH_ANY 'row35col1word49 row35col2word40' OR array_contains(b, 'row35col1word49 row35col2word40'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:48~2:62) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:62~3:76) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0175]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_uk_array
+        WHERE (a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49'))
+        AND NOT (a MATCH_ANY 'row45col2word49' OR array_contains(b, 'row45col2word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:48~2:62) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:50~3:64) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0176]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_uk_array
+        WHERE a MATCH_ANY 'row5col2word49' OR  array_contains(b, 'row5col2word40');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:47~2:61) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0177]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_uk_array
+        WHERE a MATCH_ANY 'row35col2word49' OR  array_contains(b, 'row35col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:48~2:62) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0178]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_uk_array
+        WHERE a MATCH_ANY 'ROW35col2WORD49' OR  array_contains(b, 'ROW35col2WORD49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:48~2:62) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0179]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ a,b FROM large_records_t1_uk_array
+        WHERE (a MATCH_ANY 'row5col2word49' OR array_contains(b, 'row5col2word49'))
+        AND (a MATCH_ANY 'row5col1word49' OR array_contains(b, 'row5col1word49')) ORDER BY FTS_DOC_ID;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:64~1:89) /test/1/catalog1/schema1/large_records_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:47~2:61) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:45~3:59) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0180]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_dk_array;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_dk_array/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0181]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ FTS_DOC_ID FROM large_records_t1_dk_array WHERE a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49') order by FTS_DOC_ID;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:71~1:96) /test/1/catalog1/schema1/large_records_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:136~1:150) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0182]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_dk_array
+        WHERE (a MATCH_ANY 'row5col2word49' OR array_contains(b, 'row5col2word49'))
+        AND (a MATCH_ANY 'row5col1word49' OR array_contains(b, 'row5col1word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:47~2:61) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:45~3:59) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0183]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_dk_array
+        WHERE a MATCH_ANY 'row5col2word49' OR  array_contains(b, 'row5col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:47~2:61) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0184]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_dk_array
+        WHERE (a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49'))
+        AND (a MATCH_ANY 'row35col1word49 row35col2word40' OR array_contains(b, 'row35col1word49 row35col2word40'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:48~2:62) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:62~3:76) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0185]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_dk_array
+        WHERE (a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49'))
+        AND NOT (a MATCH_ANY 'row45col2word49' OR array_contains(b, 'row45col2word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:48~2:62) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:50~3:64) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0186]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_dk_array
+        WHERE a MATCH_ANY 'row5col2word49' OR  array_contains(b, 'row5col2word40');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:47~2:61) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0187]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_dk_array
+        WHERE a MATCH_ANY 'row35col2word49' OR  array_contains(b, 'row35col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:48~2:62) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0188]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t1_dk_array
+        WHERE a MATCH_ANY 'ROW35col2WORD49' OR  array_contains(b, 'ROW35col2WORD49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:48~2:62) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0189]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ a,b FROM large_records_t1_dk_array
+        WHERE (a MATCH_ANY 'row5col2word49' OR array_contains(b, 'row5col2word49'))
+        AND (a MATCH_ANY 'row5col1word49' OR array_contains(b, 'row5col1word49')) ORDER BY FTS_DOC_ID;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:64~1:89) /test/1/catalog1/schema1/large_records_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:47~2:61) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:45~3:59) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0190]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_uk_array;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_uk_array/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0191]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ FTS_DOC_ID FROM large_records_t2_uk_array WHERE array_contains(b, 'row30col2word30');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:71~1:96) /test/1/catalog1/schema1/large_records_t2_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:103~1:117) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0192]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ FTS_DOC_ID FROM large_records_t2_uk_array WHERE a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:71~1:96) /test/1/catalog1/schema1/large_records_t2_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:136~1:150) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0193]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_uk_array
+    WHERE (a MATCH_ANY 'row5col2word49' OR array_contains(b, 'row5col2word49'))
+    AND (a MATCH_ANY 'row5col1word49' OR array_contains(b, 'row5col1word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:43~2:57) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:41~3:55) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0194]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_uk_array
+    WHERE (a MATCH_ANY 'row5col2word49' OR array_contains(b, 'row5col2word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:43~2:57) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0195]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_uk_array
+    WHERE (a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49'))
+    AND (a MATCH_ANY 'row35col1word49 row35col2word40' OR array_contains(b, 'row35col1word49 row35col2word40'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:44~2:58) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:58~3:72) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0196]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_uk_array
+    WHERE (a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49'))
+    AND NOT (a MATCH_ANY 'row45col2word49' OR array_contains(b, 'row45col2word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:44~2:58) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:46~3:60) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0197]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_uk_array
+    WHERE a MATCH_ANY 'row5col2word49 row5col2word40' OR array_contains(b, 'row5col2word49 row5col2word40');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:57~2:71) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0198]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_uk_array
+    WHERE a MATCH_ALL 'ROW35col2WORD49' OR array_contains(b, 'ROW35col2WORD49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:43~2:57) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0199]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_dk_array;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_dk_array/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0200]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ FTS_DOC_ID FROM large_records_t2_dk_array WHERE array_contains(b, 'row30col2word30');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:71~1:96) /test/1/catalog1/schema1/large_records_t2_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:103~1:117) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0201]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ FTS_DOC_ID FROM large_records_t2_dk_array WHERE a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:71~1:96) /test/1/catalog1/schema1/large_records_t2_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:136~1:150) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0202]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_dk_array
+    WHERE (a MATCH_ANY 'row5col2word49' OR array_contains(b, 'row5col2word49'))
+    AND (a MATCH_ANY 'row5col1word49' OR array_contains(b, 'row5col1word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:43~2:57) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:41~3:55) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0203]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_dk_array
+    WHERE (a MATCH_ANY 'row5col2word49' OR array_contains(b, 'row5col2word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:43~2:57) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0204]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_dk_array
+    WHERE (a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49'))
+    AND (a MATCH_ANY 'row35col1word49 row35col2word40' OR array_contains(b, 'row35col1word49 row35col2word40'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:44~2:58) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:58~3:72) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0205]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_dk_array
+    WHERE (a MATCH_ANY 'row35col2word49' OR array_contains(b, 'row35col2word49'))
+    AND NOT (a MATCH_ANY 'row45col2word49' OR array_contains(b, 'row45col2word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:44~2:58) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:46~3:60) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0206]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_dk_array
+    WHERE a MATCH_ANY 'row5col2word49 row5col2word40' OR array_contains(b, 'row5col2word49 row5col2word40');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:57~2:71) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0207]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t2_dk_array
+    WHERE a MATCH_ALL 'ROW35col2WORD49' OR array_contains(b, 'ROW35col2WORD49');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t2_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:43~2:57) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0208]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_uk_array;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_uk_array/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0209]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_uk_array WHERE array_contains(b, 'samerowword');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:101~1:115) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0210]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_uk_array WHERE a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:130~1:144) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0211]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_uk_array
+    WHERE (a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword'))
+    AND (a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:40~2:54) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:38~3:52) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0212]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_uk_array
+    WHERE (a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword'))
+    AND NOT (a MATCH_ANY 'row45col2word49' OR array_contains(b, 'row45col2word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:40~2:54) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:46~3:60) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0213]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_uk_array
+    WHERE (a MATCH_ANY 'sameroww' OR array_contains(b, 'sameroww'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:37~2:51) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0214]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_dk_array;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_dk_array/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0215]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_dk_array WHERE array_contains(b, 'samerowword');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:101~1:115) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0216]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_dk_array WHERE a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:130~1:144) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0217]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_dk_array
+    WHERE (a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword'))
+    AND (a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:40~2:54) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:38~3:52) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0218]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_dk_array
+    WHERE (a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword'))
+    AND NOT (a MATCH_ANY 'row45col2word49' OR array_contains(b, 'row45col2word49'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:40~2:54) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:46~3:60) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0219]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t3_dk_array
+    WHERE (a MATCH_ANY 'sameroww' OR array_contains(b, 'sameroww'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t3_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:37~2:51) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0220]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_uk_array;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_uk_array/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0221]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_uk_array WHERE array_contains(b, 'samerowword');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:101~1:115) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0222]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_uk_array WHERE a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:130~1:144) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0223]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_uk_array
+    WHERE (a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword'))
+    AND (a MATCH_ANY '1050' OR array_contains(b, '1050'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:40~2:54) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:31~3:45) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0224]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_uk_array
+    WHERE (a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword'))
+    AND NOT (a MATCH_ANY '1050' OR array_contains(b, '1050'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:40~2:54) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:35~3:49) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0225]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_uk_array WHERE a MATCH_ANY '2001' OR array_contains(b, '2001');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:123~1:137) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0226]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_dk_array;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_dk_array/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0227]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_dk_array WHERE array_contains(b, 'samerowword');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:101~1:115) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0228]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_dk_array WHERE a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:130~1:144) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0229]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_dk_array
+    WHERE (a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword'))
+    AND (a MATCH_ANY '1050' OR array_contains(b, '1050'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:40~2:54) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:31~3:45) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0230]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_dk_array
+    WHERE (a MATCH_ANY 'samerowword' OR array_contains(b, 'samerowword'))
+    AND NOT (a MATCH_ANY '1050' OR array_contains(b, '1050'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:40~2:54) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:35~3:49) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0231]
+sql:
+SELECT/*+SET_VAR(enable_segment_limit_pushdown=true)*/ COUNT(*) FROM large_records_t4_dk_array WHERE a MATCH_ANY '2001' OR array_contains(b, '2001');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:55~1:60) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:94) /test/1/catalog1/schema1/large_records_t4_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:123~1:137) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0232]
+sql:
+select * FROM join_t1_uk_array right join join_t2_uk_array on venue_id = entity_id
+        where array_contains(name, 'aberdeen') and dt = '2003-05-23 19:30:00';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:30) /test/1/catalog1/schema1/join_t1_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:42~1:58) /test/1/catalog1/schema1/join_t2_uk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:14~2:28) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0233]
+sql:
+select * FROM join_t1_dk_array right join join_t2_dk_array on venue_id = entity_id 
+        where array_contains(name, 'aberdeen') and dt = '2003-05-23 19:30:00';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:30) /test/1/catalog1/schema1/join_t1_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:42~1:58) /test/1/catalog1/schema1/join_t2_dk_array/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:14~2:28) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0234]
+sql:
+SELECT round(avg(st_distance_sphere(longitude_1, latitude_1, longitude_2, latitude_2))) FROM opensky;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/round/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:13~1:16) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:17~1:35) /test/1/catalog1/schema1/st_distance_sphere/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:93~1:100) /test/1/catalog1/schema1/opensky/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0235]
+sql:
+SELECT count() FROM opensky;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:20~1:27) /test/1/catalog1/schema1/opensky/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0236]
+sql:
+SELECT
+    yearweek(day) AS k,
+    count() AS c
+FROM opensky
+WHERE origin IN ('UUEE', 'UUDD', 'UUWW')
+GROUP BY k
+ORDER BY k ASC;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:4~2:12) /test/1/catalog1/schema1/yearweek/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:4~3:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:5~4:12) /test/1/catalog1/schema1/opensky/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0237]
+sql:
+SELECT
+    origin,
+    count(),
+    round(avg(st_distance_sphere(longitude_1, latitude_1, longitude_2, latitude_2))) AS distance
+FROM opensky
+WHERE origin != ''
+GROUP BY origin
+ORDER BY count() DESC
+LIMIT 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:9) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:9) /test/1/catalog1/schema1/round/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:10~4:13) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:14~4:32) /test/1/catalog1/schema1/st_distance_sphere/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:5~5:12) /test/1/catalog1/schema1/opensky/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(8:9~8:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0238]
+sql:
+SELECT round(sum(st_distance_sphere(longitude_1, latitude_1, longitude_2, latitude_2) / 1000)) FROM opensky;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/round/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:13~1:16) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:17~1:35) /test/1/catalog1/schema1/st_distance_sphere/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:100~1:107) /test/1/catalog1/schema1/opensky/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0239]
+sql:
+SELECT avg(c3) from empty
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:10) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:20~1:25) /test/1/catalog1/schema1/empty/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_012__select__0240]
+sql:
+select * from empty where 1 = 2
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:19) /test/1/catalog1/schema1/empty/",
+      "action" : "READ"
+    }
+  ]
+}

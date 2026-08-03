@@ -1,0 +1,425 @@
+-- Query data files for the current snapshot
+SELECT * FROM iceberg_table$data_files;
+
+-- Query delete files for the current snapshot
+SELECT * FROM iceberg_table$delete_files;
+
+-- Query all files (including data and delete files) from all snapshots
+SELECT * FROM iceberg_table$all_files;
+
+-- Query data files from all snapshots
+SELECT * FROM iceberg_table$all_data_files;
+
+-- Query delete files from all snapshots
+SELECT * FROM iceberg_table$all_delete_files;
+SELECT * FROM iceberg_table$manifests;
+SELECT * FROM iceberg_table$metadata_log_entries;
+SELECT * FROM iceberg_table$partitions;
+SELECT * FROM iceberg_table$refs;
+SELECT * FROM iceberg_table$snapshots;
+-- read from snapshot 2
+SELECT * FROM paimon_table@incr('startSnapshotId'='2');
+
+-- between snapshots [0, 5)
+SELECT * FROM paimon_table@incr('startSnapshotId'='0', 'endSnapshotId'='5');
+
+-- between snapshots [0, 5) with specified scan mode
+SELECT * FROM paimon_table@incr('startSnapshotId'='0', 'endSnapshotId'='5', 'incrementalBetweenScanMode'='diff');
+
+-- read from start timestamp
+SELECT * FROM paimon_table@incr('startTimestamp'='1750844949');
+
+-- read between timestamp
+SELECT * FROM paimon_table@incr('startTimestamp'='1750844949', 'endTimestamp'='1750944949');
+SELECT * FROM my_table$system_table_name;
+SELECT * FROM my_table$schemas;
+SELECT * FROM my_table$snapshots;
+SELECT * FROM my_table$options;
+SELECT * FROM my_table$files;
+SELECT * FROM my_table$tags;
+SELECT * FROM my_table$branches;
+SELECT * FROM my_table$consumers;
+SELECT * FROM my_table$manifests;
+SELECT * FROM my_table$aggregation_fields;
+SELECT * FROM my_table$partitions;
+SELECT * FROM my_table$buckets;
+SELECT * FROM my_table$statistics;
+SELECT * FROM my_table$table_indexes;
+SELECT snapshot_id, commit_time, commit_kind, total_record_count FROM catalog_sales$snapshots ORDER BY snapshot_id DESC;
+SELECT s.snapshot_id, t.schema_id, t.fields FROM store_sales$snapshots s JOIN store_sales$schemas t ON s.schema_id=t.schema_id;
+SELECT `bucket` , COUNT(*) as file_count, SUM(file_size_in_bytes)/1024/1024 as total_size_mb from paimon_s3.tpcds.catalog_sales$files GROUP BY `bucket`  ORDER BY total_size_mb;
+SELECT
+  department,
+  CASE 
+    WHEN GROUPING_ID(department, level) = 0 THEN level
+    WHEN GROUPING_ID(department, level) = 1 THEN CONCAT('Total: ', department)
+    WHEN GROUPING_ID(department, level) = 3 THEN 'Total: Company'
+    ELSE 'Unknown'
+  END AS `Job Title`,
+  COUNT(uid) AS `Employee Count`
+FROM employee 
+GROUP BY ROLLUP(department, level)
+ORDER BY department desc;
+-- Standard analyzer
+SELECT TOKENIZE("Hello World", '"built_in_analyzer"="standard"');
+-- English analyzer with stemming
+SELECT TOKENIZE("running quickly", '"built_in_analyzer"="english"');
+-- Chinese analyzer
+SELECT TOKENIZE('我来到北京清华大学', '"built_in_analyzer"="chinese"');
+-- Unicode analyzer
+SELECT TOKENIZE('Apache Doris数据库', '"built_in_analyzer"="unicode"');
+-- ICU analyzer for multilingual text
+SELECT TOKENIZE("Hello World 世界", '"built_in_analyzer"="icu"');
+-- Basic analyzer
+SELECT TOKENIZE("GET /images/hm_bg.jpg HTTP/1.0", '"built_in_analyzer"="basic"');
+-- IK analyzer for Chinese text
+SELECT TOKENIZE("中华人民共和国国歌", '"built_in_analyzer"="ik"');
+SELECT xpath_string('<a><![CDATA[123]]></a>', '/a'), xpath_string('<a>123</a>', '/a');
+-- Note URI バケット notation and use_path_style parameter setting, same for HTTP.
+  -- Since "use_path_style"="true" is set, Path Style will be used to access S3.
+  select * from s3(
+      "uri" = "https://endpoint/bucket/file/student.csv",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "endpoint",
+      "s3.region" = "region",
+      "format" = "csv",
+      "use_path_style"="true");
+  
+  -- Note URI バケット notation and use_path_style parameter setting, same for HTTP.
+  -- Since "use_path_style"="false" is set, Virtual-hosted Style will be used to access S3.
+  select * from s3(
+      "uri" = "https://bucket.endpoint/bucket/file/student.csv",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "endpoint",
+      "s3.region" = "region",
+      "format" = "csv",
+      "use_path_style"="false");
+  
+  -- Alibaba Cloud OSS and Tencent Cloud COS use Virtual-hosted Style to access S3.
+  -- OSS
+  select * from s3(
+      "uri" = "http://example-bucket.oss-cn-beijing.aliyuncs.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "oss-cn-beijing.aliyuncs.com",
+      "s3.region" = "oss-cn-beijing",
+      "format" = "parquet",
+      "use_path_style" = "false");
+  -- COS
+  select * from s3(
+      "uri" = "https://example-bucket.cos.ap-hongkong.myqcloud.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "cos.ap-hongkong.myqcloud.com",
+      "s3.region" = "ap-hongkong",
+      "format" = "parquet",
+      "use_path_style" = "false");
+  
+  -- MinIO
+  select * from s3(
+      "uri" = "s3://bucket/file.csv",
+      "s3.endpoint" = "http://172.21.0.101:9000",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.region" = "us-east-1",
+      "format" = "csv"
+  );
+  
+  -- Baidu Cloud BOS uses S3-compatible Virtual-hosted Style to access S3.
+  -- BOS
+  select * from s3(
+      "uri" = "https://example-bucket.s3.bj.bcebos.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.region" = "bj",
+      "s3.endpoint" = "http://bj.bcebos.com",
+      "format" = "parquet",
+      "use_path_style" = "false");
+-- Note URI バケット notation, no need to set use_path_style parameter.
+  -- Virtual-hosted Style will be used to access S3.
+  select * from s3(
+      "uri" = "s3://bucket/file/student.csv",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "format" = "csv");
+-- Virtual Host AWS クライアント (Hadoop S3) Mixed Style. Use by setting use_path_style=false and force_parsing_by_standard_uri=true.
+  select * from s3(
+      "URI" = "s3://my-bucket.s3.us-west-1.amazonaws.com/resources/doc.txt?versionId=abc123&partNumber=77&partNumber=88",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "format" = "csv",
+      "use_path_style"="false",
+      "force_parsing_by_standard_uri"="true");
+  
+  -- Path AWS クライアント (Hadoop S3) Mixed Style. Use by setting use_path_style=true and force_parsing_by_standard_uri=true.
+  select * from s3(
+      "URI" = "s3://s3.us-west-1.amazonaws.com/my-bucket/resources/doc.txt?versionId=abc123&partNumber=77&partNumber=88",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "format" = "csv",
+      "use_path_style"="true",
+      "force_parsing_by_standard_uri"="true");
+-- %Y、%y、%m、%d、%c、%e のプレースホルダーは対応する桁数 0 を返します
+SELECT fmt, TIME_FORMAT('12:13:14.123456', fmt) AS res FROM test_format;
+SELECT uuid_to_int('6ce4766f-6783-4b30-b357-bba1c7600348');
+SELECT uuid_to_int(NULL);
+SELECT uuid_to_int(UUID());
+SELECT uuid, uuid_to_int(uuid) AS uuid_int
+FROM (SELECT '6ce4766f-6783-4b30-b357-bba1c7600348' AS uuid) t;
+SELECT uuid_to_int('6CE4766F-6783-4B30-B357-BBA1C7600348');
+SELECT uuid_to_int('invalid-uuid-format');
+select  * from example lateral view explode_json_object_outer('{"k1": "v1", "k2": 123}') t2 as c;
+select  * from example lateral view explode_json_object_outer('{"k1": "v1", "k2": 123}') t2 as k, v;
+select  * from example lateral view explode_json_object_outer('{}') t2 as k, v;
+select  * from example lateral view explode_json_object_outer(NULL) t2 as k, v;
+select  * from example lateral view explode_json_object_outer('[]') t2 as k, v;
+SELECT COUNT(*) FROM
+  HTTP(
+      "uri" = "https://raw.githubusercontent.com/apache/doris/refs/heads/master/regression-test/data/load_p0/http_stream/all_types.csv",
+      "format" = "csv",
+      "column_separator" = ","
+  );
+SELECT arr_map, id FROM
+  HTTP(
+      "uri" = "https://raw.githubusercontent.com/apache/doris/refs/heads/master/regression-test/data/external_table_p0/tvf/t.parquet",
+      "format" = "parquet"
+  );
+------------------------------------------------------------------------------------------
+[SELECT] -- Query data files for the current snapshot
+SELECT * FROM iceberg_table$data_files;
+----------
+[SELECT] -- Query delete files for the current snapshot
+SELECT * FROM iceberg_table$delete_files;
+----------
+[SELECT] -- Query all files (including data and delete files) from all snapshots
+SELECT * FROM iceberg_table$all_files;
+----------
+[SELECT] -- Query data files from all snapshots
+SELECT * FROM iceberg_table$all_data_files;
+----------
+[SELECT] -- Query delete files from all snapshots
+SELECT * FROM iceberg_table$all_delete_files;
+----------
+[SELECT] SELECT * FROM iceberg_table$manifests;
+----------
+[SELECT] SELECT * FROM iceberg_table$metadata_log_entries;
+----------
+[SELECT] SELECT * FROM iceberg_table$partitions;
+----------
+[SELECT] SELECT * FROM iceberg_table$refs;
+----------
+[SELECT] SELECT * FROM iceberg_table$snapshots;
+----------
+[SELECT] -- read from snapshot 2
+SELECT * FROM paimon_table@incr('startSnapshotId'='2');
+----------
+[SELECT] -- between snapshots [0, 5)
+SELECT * FROM paimon_table@incr('startSnapshotId'='0', 'endSnapshotId'='5');
+----------
+[SELECT] -- between snapshots [0, 5) with specified scan mode
+SELECT * FROM paimon_table@incr('startSnapshotId'='0', 'endSnapshotId'='5', 'incrementalBetweenScanMode'='diff');
+----------
+[SELECT] -- read from start timestamp
+SELECT * FROM paimon_table@incr('startTimestamp'='1750844949');
+----------
+[SELECT] -- read between timestamp
+SELECT * FROM paimon_table@incr('startTimestamp'='1750844949', 'endTimestamp'='1750944949');
+----------
+[SELECT] SELECT * FROM my_table$system_table_name;
+----------
+[SELECT] SELECT * FROM my_table$schemas;
+----------
+[SELECT] SELECT * FROM my_table$snapshots;
+----------
+[SELECT] SELECT * FROM my_table$options;
+----------
+[SELECT] SELECT * FROM my_table$files;
+----------
+[SELECT] SELECT * FROM my_table$tags;
+----------
+[SELECT] SELECT * FROM my_table$branches;
+----------
+[SELECT] SELECT * FROM my_table$consumers;
+----------
+[SELECT] SELECT * FROM my_table$manifests;
+----------
+[SELECT] SELECT * FROM my_table$aggregation_fields;
+----------
+[SELECT] SELECT * FROM my_table$partitions;
+----------
+[SELECT] SELECT * FROM my_table$buckets;
+----------
+[SELECT] SELECT * FROM my_table$statistics;
+----------
+[SELECT] SELECT * FROM my_table$table_indexes;
+----------
+[SELECT] SELECT snapshot_id, commit_time, commit_kind, total_record_count FROM catalog_sales$snapshots ORDER BY snapshot_id DESC;
+----------
+[SELECT] SELECT s.snapshot_id, t.schema_id, t.fields FROM store_sales$snapshots s JOIN store_sales$schemas t ON s.schema_id=t.schema_id;
+----------
+[SELECT] SELECT `bucket` , COUNT(*) as file_count, SUM(file_size_in_bytes)/1024/1024 as total_size_mb from paimon_s3.tpcds.catalog_sales$files GROUP BY `bucket`  ORDER BY total_size_mb;
+----------
+[SELECT] SELECT
+  department,
+  CASE 
+    WHEN GROUPING_ID(department, level) = 0 THEN level
+    WHEN GROUPING_ID(department, level) = 1 THEN CONCAT('Total: ', department)
+    WHEN GROUPING_ID(department, level) = 3 THEN 'Total: Company'
+    ELSE 'Unknown'
+  END AS `Job Title`,
+  COUNT(uid) AS `Employee Count`
+FROM employee 
+GROUP BY ROLLUP(department, level)
+ORDER BY department desc;
+----------
+[SELECT] -- Standard analyzer
+SELECT TOKENIZE("Hello World", '"built_in_analyzer"="standard"');
+----------
+[SELECT] -- English analyzer with stemming
+SELECT TOKENIZE("running quickly", '"built_in_analyzer"="english"');
+----------
+[SELECT] -- Chinese analyzer
+SELECT TOKENIZE('我来到北京清华大学', '"built_in_analyzer"="chinese"');
+----------
+[SELECT] -- Unicode analyzer
+SELECT TOKENIZE('Apache Doris数据库', '"built_in_analyzer"="unicode"');
+----------
+[SELECT] -- ICU analyzer for multilingual text
+SELECT TOKENIZE("Hello World 世界", '"built_in_analyzer"="icu"');
+----------
+[SELECT] -- Basic analyzer
+SELECT TOKENIZE("GET /images/hm_bg.jpg HTTP/1.0", '"built_in_analyzer"="basic"');
+----------
+[SELECT] -- IK analyzer for Chinese text
+SELECT TOKENIZE("中华人民共和国国歌", '"built_in_analyzer"="ik"');
+----------
+[SELECT] SELECT xpath_string('<a><![CDATA[123]]></a>', '/a'), xpath_string('<a>123</a>', '/a');
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "https://endpoint/bucket/file/student.csv",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "endpoint",
+      "s3.region" = "region",
+      "format" = "csv",
+      "use_path_style"="true");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "https://bucket.endpoint/bucket/file/student.csv",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "endpoint",
+      "s3.region" = "region",
+      "format" = "csv",
+      "use_path_style"="false");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "http://example-bucket.oss-cn-beijing.aliyuncs.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "oss-cn-beijing.aliyuncs.com",
+      "s3.region" = "oss-cn-beijing",
+      "format" = "parquet",
+      "use_path_style" = "false");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "https://example-bucket.cos.ap-hongkong.myqcloud.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "cos.ap-hongkong.myqcloud.com",
+      "s3.region" = "ap-hongkong",
+      "format" = "parquet",
+      "use_path_style" = "false");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "s3://bucket/file.csv",
+      "s3.endpoint" = "http://172.21.0.101:9000",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.region" = "us-east-1",
+      "format" = "csv"
+  );
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "https://example-bucket.s3.bj.bcebos.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.region" = "bj",
+      "s3.endpoint" = "http://bj.bcebos.com",
+      "format" = "parquet",
+      "use_path_style" = "false");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "s3://bucket/file/student.csv",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "format" = "csv");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "URI" = "s3://my-bucket.s3.us-west-1.amazonaws.com/resources/doc.txt?versionId=abc123&partNumber=77&partNumber=88",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "format" = "csv",
+      "use_path_style"="false",
+      "force_parsing_by_standard_uri"="true");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "URI" = "s3://s3.us-west-1.amazonaws.com/my-bucket/resources/doc.txt?versionId=abc123&partNumber=77&partNumber=88",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "format" = "csv",
+      "use_path_style"="true",
+      "force_parsing_by_standard_uri"="true");
+----------
+[SELECT] -- %Y、%y、%m、%d、%c、%e のプレースホルダーは対応する桁数 0 を返します
+SELECT fmt, TIME_FORMAT('12:13:14.123456', fmt) AS res FROM test_format;
+----------
+[SELECT] SELECT uuid_to_int('6ce4766f-6783-4b30-b357-bba1c7600348');
+----------
+[SELECT] SELECT uuid_to_int(NULL);
+----------
+[SELECT] SELECT uuid_to_int(UUID());
+----------
+[SELECT] SELECT uuid, uuid_to_int(uuid) AS uuid_int
+FROM (SELECT '6ce4766f-6783-4b30-b357-bba1c7600348' AS uuid) t;
+----------
+[SELECT] SELECT uuid_to_int('6CE4766F-6783-4B30-B357-BBA1C7600348');
+----------
+[SELECT] SELECT uuid_to_int('invalid-uuid-format');
+----------
+[SELECT] select  * from example lateral view explode_json_object_outer('{"k1": "v1", "k2": 123}') t2 as c;
+----------
+[SELECT] select  * from example lateral view explode_json_object_outer('{"k1": "v1", "k2": 123}') t2 as k, v;
+----------
+[SELECT] select  * from example lateral view explode_json_object_outer('{}') t2 as k, v;
+----------
+[SELECT] select  * from example lateral view explode_json_object_outer(NULL) t2 as k, v;
+----------
+[SELECT] select  * from example lateral view explode_json_object_outer('[]') t2 as k, v;
+----------
+[SELECT] SELECT COUNT(*) FROM
+  HTTP(
+      "uri" = "https://raw.githubusercontent.com/apache/doris/refs/heads/master/regression-test/data/load_p0/http_stream/all_types.csv",
+      "format" = "csv",
+      "column_separator" = ","
+  );
+----------
+[SELECT] SELECT arr_map, id FROM
+  HTTP(
+      "uri" = "https://raw.githubusercontent.com/apache/doris/refs/heads/master/regression-test/data/external_table_p0/tvf/t.parquet",
+      "format" = "parquet"
+  );

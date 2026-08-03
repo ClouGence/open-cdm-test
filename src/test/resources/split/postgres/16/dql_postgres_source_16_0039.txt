@@ -1,0 +1,470 @@
+select * from (select 1 id,'name' name) a join table_2 b on a.id = b.id
+;
+-- used in a CTE
+WITH foo AS (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) SELECT * FROM foo
+;
+SELECT	JSON_OBJECTAGG('key': 1) IS NULL,
+		JSON_OBJECTAGG('key': 1 RETURNING jsonb) IS NULL
+WHERE FALSE
+;
+-- Vertical bar in any part affects only that part
+SELECT SUBSTRING('abcdefg' SIMILAR 'a|b#"%#"g' ESCAPE '#') AS "bcdef"
+;
+EXPLAIN (COSTS OFF)
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT VALUES (4, NULL)
+;
+SELECT JSON_OBJECT('foo': NULL::int FORMAT JSON ENCODING UTF8)
+;
+SELECT JSON_OBJECT(ARRAY[1,2,3]: 'aaa')
+;
+SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%g' ESCAPE '#') AS "bcdefg"
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+select * from search_graph order by seq
+;
+-- Test JSON_ARRAY deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+SELECT JSON_ARRAY(RETURNING text FORMAT JSON)
+;
+SELECT 0b1000000000000000000000000000000000000000000000000000000000000000
+;
+-- and check we get the expected results
+select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+SELECT XMLSERIALIZE(CONTENT XMLPARSE(CONTENT 'abc<foo>bar</foo>') AS text NO INDENT) AS serialized_xml
+;
+SELECT	JSON_ARRAYAGG(NULL),
+		JSON_ARRAYAGG(NULL RETURNING jsonb)
+FROM generate_series(1, 5)
+;
+--SELECT JSON_OBJECT(KEY 'a' VALUE 2::text);
+SELECT JSON_OBJECT(1::text: 2)
+;
+SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+SELECT COUNT(*) FROM (SELECT DISTINCT name FROM road)
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle to true default false using label
+select * from search_graph
+;
+EXPLAIN (costs off)
+MERGE INTO rw_view1 t
+  USING (VALUES ('Tom'), ('Dick'), ('Harry')) AS v(person) ON t.person = v.person
+  WHEN MATCHED AND snoop(t.person) THEN UPDATE SET person = v.person
+;
+SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (NULL), (2)) AS t(i)
+;
+-- indent null
+SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': volatile_one() RETURNING text) FORMAT JSON)
+;
+--SELECT JSON_OBJECT(1::text VALUE 2);
+--SELECT JSON_OBJECT(KEY 1::text VALUE 2);
+SELECT JSON_OBJECT(json '[1]': 123)
+;
+explain (verbose, costs off)
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select * from search_graph
+;
+select foo.*, unnamed_join.* from
+  t1 join t2 using (a) as foo, t3 as unnamed_join
+  for update of unnamed_join
+;
+SELECT test_slru_page_sync(0x1234500000030)
+;
+--
+-- Similar to the previous test case, but this time it's a backwards scan
+-- using a < RowCompare.  Must use the <= strategy (and not the < strategy).
+--
+explain (costs off)
+SELECT proname, proargtypes, pronamespace
+   FROM pg_proc
+   WHERE (proname, pronamespace) < ('abs', 1_000_000)
+ORDER BY proname DESC, proargtypes DESC, pronamespace DESC LIMIT 1
+;
+select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by distinct rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST ROWS WITH TIES
+;
+-- check that we distinguish same CTE name used at different levels
+-- (this case could be supported, perhaps, but it isn't today)
+with recursive x(col) as (
+	select 1
+	union
+	(with x as (select * from x)
+	 select * from x)
+) search depth first by col set seq
+select * from x
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t, f set seq
+select * from search_graph
+;
+SELECT -0b1000000000000000000000000000000000000000000000000000000000000001
+;
+SELECT read_rel_block_ll('tbl_zero', 1, nblocks=>4, zero_on_error=>false)
+COMMIT
+;
+SELECT JSON_OBJECT(RETURNING json FORMAT JSON)
+;
+-- error
+SELECT x.* FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+select json_array ( returning jsonb format json )
+;
+SELECT ctid FROM (
+		SELECT ctid FROM corruption_test
+			WHERE (ctid::text::point)[0] != 0
+			ORDER BY random() LIMIT 5)
+		ORDER BY ctid ASC
+;
+SELECT 0b111111111111111111111111111111111111111111111111111111111111111
+;
+-- indent non singly-rooted xml with mixed contents
+SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE x.i = 1
+;
+-- JSON_ARRAYAGG()
+SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL)
+;
+SELECT bytea '\x00' IS JSON
+;
+SELECT a, b, c
+FROM (VALUES (1, 2, 3), (4, NULL, 6), (7, 8, 9)) AS t (a, b, c)
+GROUP BY DISTINCT ROLLUP(a, b), rollup(a, c)
+ORDER BY a, b, c
+;
+-- Reading page in buffer for read-only
+SELECT test_slru_page_readonly(0x1234500000020)
+;
+-- Test JSON_OBJECTAGG deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+SELECT JSON_OBJECTAGG(mod(i,100): (i)::text FORMAT JSON WITH UNIQUE)
+FROM generate_series(0, 199) i
+;
+select bar.*, unnamed_join.* from
+  (t1 join t2 using (a) as foo) as bar, t3 as unnamed_join
+  for update of foo
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t, f set is_cycle to true default false using path
+select * from search_graph
+;
+------------------------------------------------------------------------------------------
+[SELECT] select * from (select 1 id,'name' name) a join table_2 b on a.id = b.id
+;
+----------
+[SELECT|MERGE] -- used in a CTE
+WITH foo AS (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) SELECT * FROM foo
+;
+----------
+[SELECT] SELECT	JSON_OBJECTAGG('key': 1) IS NULL,
+		JSON_OBJECTAGG('key': 1 RETURNING jsonb) IS NULL
+WHERE FALSE
+;
+----------
+[SELECT] -- Vertical bar in any part affects only that part
+SELECT SUBSTRING('abcdefg' SIMILAR 'a|b#"%#"g' ESCAPE '#') AS "bcdef"
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF)
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN NOT MATCHED THEN
+	INSERT VALUES (4, NULL)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('foo': NULL::int FORMAT JSON ENCODING UTF8)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(ARRAY[1,2,3]: 'aaa')
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%g' ESCAPE '#') AS "bcdefg"
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+select * from search_graph order by seq
+;
+----------
+[PERFORMANCE] -- Test JSON_ARRAY deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING text FORMAT JSON)
+;
+----------
+[SELECT] SELECT 0b1000000000000000000000000000000000000000000000000000000000000000
+;
+----------
+[SELECT] -- and check we get the expected results
+select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+----------
+[SELECT] SELECT XMLSERIALIZE(CONTENT XMLPARSE(CONTENT 'abc<foo>bar</foo>') AS text NO INDENT) AS serialized_xml
+;
+----------
+[SELECT] SELECT	JSON_ARRAYAGG(NULL),
+		JSON_ARRAYAGG(NULL RETURNING jsonb)
+FROM generate_series(1, 5)
+;
+----------
+[SELECT] --SELECT JSON_OBJECT(KEY 'a' VALUE 2::text);
+SELECT JSON_OBJECT(1::text: 2)
+;
+----------
+[SELECT] SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+----------
+[SELECT] SELECT COUNT(*) FROM (SELECT DISTINCT name FROM road)
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle to true default false using label
+select * from search_graph
+;
+----------
+[PERFORMANCE] EXPLAIN (costs off)
+MERGE INTO rw_view1 t
+  USING (VALUES ('Tom'), ('Dick'), ('Harry')) AS v(person) ON t.person = v.person
+  WHEN MATCHED AND snoop(t.person) THEN UPDATE SET person = v.person
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (NULL), (2)) AS t(i)
+;
+----------
+[SELECT] -- indent null
+SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': volatile_one() RETURNING text) FORMAT JSON)
+;
+----------
+[SELECT] --SELECT JSON_OBJECT(1::text VALUE 2);
+--SELECT JSON_OBJECT(KEY 1::text VALUE 2);
+SELECT JSON_OBJECT(json '[1]': 123)
+;
+----------
+[PERFORMANCE] explain (verbose, costs off)
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select * from search_graph
+;
+----------
+[SELECT|QUERY_LOCK] select foo.*, unnamed_join.* from
+  t1 join t2 using (a) as foo, t3 as unnamed_join
+  for update of unnamed_join
+;
+----------
+[SELECT] SELECT test_slru_page_sync(0x1234500000030)
+;
+----------
+[PERFORMANCE] --
+-- Similar to the previous test case, but this time it's a backwards scan
+-- using a < RowCompare.  Must use the <= strategy (and not the < strategy).
+--
+explain (costs off)
+SELECT proname, proargtypes, pronamespace
+   FROM pg_proc
+   WHERE (proname, pronamespace) < ('abs', 1_000_000)
+ORDER BY proname DESC, proargtypes DESC, pronamespace DESC LIMIT 1
+;
+----------
+[SELECT] select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by distinct rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+----------
+[SELECT] SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST ROWS WITH TIES
+;
+----------
+[SELECT] -- check that we distinguish same CTE name used at different levels
+-- (this case could be supported, perhaps, but it isn't today)
+with recursive x(col) as (
+	select 1
+	union
+	(with x as (select * from x)
+	 select * from x)
+) search depth first by col set seq
+select * from x
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t, f set seq
+select * from search_graph
+;
+----------
+[SELECT] SELECT -0b1000000000000000000000000000000000000000000000000000000000000001
+;
+----------
+[SELECT] SELECT read_rel_block_ll('tbl_zero', 1, nblocks=>4, zero_on_error=>false)
+COMMIT
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING json FORMAT JSON)
+;
+----------
+[SELECT] -- error
+SELECT x.* FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+----------
+[SELECT] select json_array ( returning jsonb format json )
+;
+----------
+[SELECT] SELECT ctid FROM (
+		SELECT ctid FROM corruption_test
+			WHERE (ctid::text::point)[0] != 0
+			ORDER BY random() LIMIT 5)
+		ORDER BY ctid ASC
+;
+----------
+[SELECT] SELECT 0b111111111111111111111111111111111111111111111111111111111111111
+;
+----------
+[SELECT] -- indent non singly-rooted xml with mixed contents
+SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE x.i = 1
+;
+----------
+[SELECT] -- JSON_ARRAYAGG()
+SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL)
+;
+----------
+[SELECT] SELECT bytea '\x00' IS JSON
+;
+----------
+[SELECT] SELECT a, b, c
+FROM (VALUES (1, 2, 3), (4, NULL, 6), (7, 8, 9)) AS t (a, b, c)
+GROUP BY DISTINCT ROLLUP(a, b), rollup(a, c)
+ORDER BY a, b, c
+;
+----------
+[SELECT] -- Reading page in buffer for read-only
+SELECT test_slru_page_readonly(0x1234500000020)
+;
+----------
+[PERFORMANCE] -- Test JSON_OBJECTAGG deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(mod(i,100): (i)::text FORMAT JSON WITH UNIQUE)
+FROM generate_series(0, 199) i
+;
+----------
+[SELECT|QUERY_LOCK] select bar.*, unnamed_join.* from
+  (t1 join t2 using (a) as foo) as bar, t3 as unnamed_join
+  for update of foo
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t, f set is_cycle to true default false using path
+select * from search_graph
+;

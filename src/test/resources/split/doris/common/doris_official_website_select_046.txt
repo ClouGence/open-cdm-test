@@ -1,0 +1,438 @@
+SELECT RTRIM('123000', '0'), RTRIM('123abc123', '123');
+SELECT RTRIM('---text---', '-'), RTRIM('@@hello@@', '@');
+SELECT STRLEFT('ṭṛì ḍḍu', 5);
+SELECT substring('ṭṛì ḍḍumai test', 5, 7);
+-- 使用标准分词器
+SELECT TOKENIZE("Hello World", '"built_in_analyzer"="standard"');
+-- 使用英语分词器
+SELECT TOKENIZE("running quickly", '"built_in_analyzer"="english"');
+-- 使用unicode分词器处理中文文本
+SELECT TOKENIZE("Apache Doris数据库", '"built_in_analyzer"="unicode"');
+-- 使用中文分词器
+SELECT TOKENIZE("我来到北京清华大学", '"built_in_analyzer"="chinese"');
+-- 使用ICU分词器处理多语言文本
+SELECT TOKENIZE("Hello World 世界", '"built_in_analyzer"="icu"');
+-- 使用基础分词器
+SELECT TOKENIZE("GET /images/hm_bg.jpg HTTP/1.0", '"built_in_analyzer"="basic"');
+-- 使用IK分词器处理中文文本
+SELECT TOKENIZE("中华人民共和国国歌", '"built_in_analyzer"="ik"');
+SELECT TRANSLATE('abcd', 'a', 'z');
+SELECT TRANSLATE('abcd', 'ac', 'zx');
+SELECT TRANSLATE(NULL, 'a', 'z'), TRANSLATE('abc', NULL, 'z'), TRANSLATE('abc', 'a', NULL);
+SELECT TRANSLATE('', 'a', 'z'), TRANSLATE('abc', '', 'z'), TRANSLATE('abc', 'a', '');
+SELECT TRANSLATE('aabbccaa', 'abab', 'xyuv');
+SELECT trim_in('   ab d   ');
+SELECT trim_in('ababccaab', 'ab');
+SELECT trim_in('', 'abc'),trim_in('abc', '');
+SELECT trim('   hello   ');
+SELECT trim('xxxhelloxxx', 'x');
+SELECT trim('   ab d   ');
+SELECT trim('ababccaab', 'ab');
+SELECT trim(NULL);
+SELECT trim('xxxhelloxxx', ''), trim('', 'x');
+SELECT UNHEX('41'), UNHEX('61');
+SELECT UNHEX('4142'), UNHEX('48656C6C6F');
+SELECT UNHEX(''), UNHEX_NULL('');
+SELECT UNHEX('@'), UNHEX_NULL('@');
+SELECT UNHEX('123'), UNHEX_NULL('123');
+SELECT UNHEX('313233'), UNHEX('393837');
+-- 'Café' 中 é 可能是组合形式，NFD 会将其分解为 e + 组合重音符
+SELECT length(unicode_normalize('Café', 'NFC')) AS nfc_len, length(unicode_normalize('Café', 'NFD')) AS nfd_len;
+-- 全角数字 '１２３' 会被转换为半角 '123'
+SELECT unicode_normalize('１２３ＡＢＣ', 'NFKC') AS result;
+-- ℃ (摄氏度符号) 会被分解为 °C
+SELECT unicode_normalize('25℃', 'NFKD') AS result;
+-- ① ② ③ 等带圈数字会被转换为普通数字
+SELECT unicode_normalize('①②③', 'NFKC') AS result;
+-- 使用标准化来比较视觉上相同但编码不同的字符串
+SELECT unicode_normalize('café', 'NFC') = unicode_normalize('café', 'NFC') AS is_equal;
+select  URL_DECODE('Doris+Q%26A');
+SELECT xpath_string('<a><![CDATA[123]]></a>', '/a');
+SELECT xpath_string('<a><!-- comment -->123</a>', '/a');
+SELECT xpath_string('<a>123</a>', '/b');
+SELECT xpath_string('<a><!-- comment -->123/a>', '/a');
+select * from hdfs(
+                "uri" = "hdfs://127.0.0.1:842/user/doris/csv_format_test/student.csv",
+                "fs.defaultFS" = "hdfs://127.0.0.1:8424",
+                "hadoop.username" = "doris",
+                "format" = "csv");
+select * from hdfs(
+              "uri" = "hdfs://127.0.0.1:842/user/doris/csv_format_test/student.csv",
+              "fs.defaultFS" = "hdfs://127.0.0.1:8424",
+              "hadoop.username" = "doris",
+              "format" = "csv",
+              "dfs.nameservices" = "my_hdfs",
+              "dfs.ha.namenodes.my_hdfs" = "nn1,nn2",
+              "dfs.namenode.rpc-address.my_hdfs.nn1" = "nanmenode01:8020",
+              "dfs.namenode.rpc-address.my_hdfs.nn2" = "nanmenode02:8020",
+              "dfs.client.failover.proxy.provider.my_hdfs" = "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider");
+-- 注意 URI Bucket 写法以及 use_path_style 参数设置，HTTP 同理。
+  -- 由于设置了 "use_path_style"="true"，所以将采用 Path Style 方式访问 S3。
+  select * from s3(
+      "uri" = "https://endpoint/bucket/file/student.csv",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "endpoint",
+      "s3.region" = "region",
+      "format" = "csv",
+      "use_path_style"="true");
+  
+  -- 注意 URI Bucket 写法以及 use_path_style 参数设置，HTTP 同理。
+  -- 由于设置了 "use_path_style"="false"，所以将采用 Virtual-hosted Style 方式访问 S3。
+  select * from s3(
+      "uri" = "https://bucket.endpoint/bucket/file/student.csv",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "endpoint",
+      "s3.region" = "region",
+      "format" = "csv",
+      "use_path_style"="false");
+  
+  -- 阿里云 OSS 和腾讯云 COS 采用 Virtual-hosted Style 方式访问 S3。
+  -- OSS
+  select * from s3(
+      "uri" = "http://example-bucket.oss-cn-beijing.aliyuncs.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "oss-cn-beijing.aliyuncs.com",
+      "s3.region" = "oss-cn-beijing",
+      "format" = "parquet",
+      "use_path_style" = "false");
+  -- COS
+  select * from s3(
+      "uri" = "https://example-bucket.cos.ap-hongkong.myqcloud.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "cos.ap-hongkong.myqcloud.com",
+      "s3.region" = "ap-hongkong",
+      "format" = "parquet",
+      "use_path_style" = "false");
+  
+  -- MinIO
+  select * from s3(
+      "uri" = "s3://bucket/file.csv",
+      "s3.endpoint" = "http://172.21.0.101:9000",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.region" = "us-east-1",
+      "format" = "csv"
+  );
+  
+  -- 百度云 BOS 采用兼容 S3 协议的 Virtual-hosted Style 方式访问 S3。
+  -- BOS
+  select * from s3(
+      "uri" = "https://example-bucket.s3.bj.bcebos.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.region" = "bj",
+      "s3.endpoint" = "http://bj.bcebos.com",
+      "format" = "parquet",
+      "use_path_style" = "false");
+-- 注意 URI Bucket 写法，无需设置 use_path_style 参数。
+  -- 将采用 Virtual-hosted Style 方式访问 S3。
+  select * from s3(
+      "uri" = "s3://bucket/file/student.csv",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "format" = "csv");
+-- Virtual Host AWS Client (Hadoop S3) Mixed Style。通过设置 use_path_style=false 以及 force_parsing_by_standard_uri=true 来使用。
+  select * from s3(
+      "URI" = "s3://my-bucket.s3.us-west-1.amazonaws.com/resources/doc.txt?versionId=abc123&partNumber=77&partNumber=88",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "format" = "csv",
+      "use_path_style"="false",
+      "force_parsing_by_standard_uri"="true");
+  
+  -- Path AWS Client (Hadoop S3) Mixed Style。通过设置 use_path_style=true 以及 force_parsing_by_standard_uri=true 来使用。
+  select * from s3(
+      "URI" = "s3://s3.us-west-1.amazonaws.com/my-bucket/resources/doc.txt?versionId=abc123&partNumber=77&partNumber=88",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "format" = "csv",
+      "use_path_style"="true",
+      "force_parsing_by_standard_uri"="true");
+WITH example_data AS (
+    SELECT 1 as column1, NULL as column2, 'A' as group_name
+    UNION ALL
+    SELECT 1, 10, 'A'
+    UNION ALL
+    SELECT 1, NULL, 'A'
+    UNION ALL
+    SELECT 1, 20, 'A'
+    UNION ALL
+    SELECT 2, NULL, 'B'
+    UNION ALL
+    SELECT 2, 30, 'B'
+    UNION ALL
+    SELECT 2, 40, 'B'
+)
+SELECT 
+    group_name,
+    column1,
+    column2,
+    FIRST_VALUE(column2) OVER (
+        PARTITION BY column1 
+        ORDER BY column2 NULLS LAST -- 定义NULL值位置在最后
+    ) AS first_value_default,
+    FIRST_VALUE(column2, true) OVER (
+        PARTITION BY column1 
+        ORDER BY column2 NULLS FIRST -- 定义NULL值位置在最前
+    ) AS first_value_ignore_null
+FROM example_data
+ORDER BY column1, column2;
+-- fileSystem_port 默认值为 9000
+    SELECT * FROM tbl
+    INTO OUTFILE "hdfs://${host}:${fileSystem_port}/path/to/result_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "fs.defaultFS" = "hdfs://ip:port",
+        "hadoop.username" = "work"
+    );
+-- 查询除了学生年龄的所有信息
+   select * except(age) from student;
+--查询 tb_book 表，按照 type 分组，求每类图书的平均价格，
+   select type,avg(price) from tb_book group by type;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT RTRIM('123000', '0'), RTRIM('123abc123', '123');
+----------
+[SELECT] SELECT RTRIM('---text---', '-'), RTRIM('@@hello@@', '@');
+----------
+[SELECT] SELECT STRLEFT('ṭṛì ḍḍu', 5);
+----------
+[SELECT] SELECT substring('ṭṛì ḍḍumai test', 5, 7);
+----------
+[SELECT] -- 使用标准分词器
+SELECT TOKENIZE("Hello World", '"built_in_analyzer"="standard"');
+----------
+[SELECT] -- 使用英语分词器
+SELECT TOKENIZE("running quickly", '"built_in_analyzer"="english"');
+----------
+[SELECT] -- 使用unicode分词器处理中文文本
+SELECT TOKENIZE("Apache Doris数据库", '"built_in_analyzer"="unicode"');
+----------
+[SELECT] -- 使用中文分词器
+SELECT TOKENIZE("我来到北京清华大学", '"built_in_analyzer"="chinese"');
+----------
+[SELECT] -- 使用ICU分词器处理多语言文本
+SELECT TOKENIZE("Hello World 世界", '"built_in_analyzer"="icu"');
+----------
+[SELECT] -- 使用基础分词器
+SELECT TOKENIZE("GET /images/hm_bg.jpg HTTP/1.0", '"built_in_analyzer"="basic"');
+----------
+[SELECT] -- 使用IK分词器处理中文文本
+SELECT TOKENIZE("中华人民共和国国歌", '"built_in_analyzer"="ik"');
+----------
+[SELECT] SELECT TRANSLATE('abcd', 'a', 'z');
+----------
+[SELECT] SELECT TRANSLATE('abcd', 'ac', 'zx');
+----------
+[SELECT] SELECT TRANSLATE(NULL, 'a', 'z'), TRANSLATE('abc', NULL, 'z'), TRANSLATE('abc', 'a', NULL);
+----------
+[SELECT] SELECT TRANSLATE('', 'a', 'z'), TRANSLATE('abc', '', 'z'), TRANSLATE('abc', 'a', '');
+----------
+[SELECT] SELECT TRANSLATE('aabbccaa', 'abab', 'xyuv');
+----------
+[SELECT] SELECT trim_in('   ab d   ');
+----------
+[SELECT] SELECT trim_in('ababccaab', 'ab');
+----------
+[SELECT] SELECT trim_in('', 'abc'),trim_in('abc', '');
+----------
+[SELECT] SELECT trim('   hello   ');
+----------
+[SELECT] SELECT trim('xxxhelloxxx', 'x');
+----------
+[SELECT] SELECT trim('   ab d   ');
+----------
+[SELECT] SELECT trim('ababccaab', 'ab');
+----------
+[SELECT] SELECT trim(NULL);
+----------
+[SELECT] SELECT trim('xxxhelloxxx', ''), trim('', 'x');
+----------
+[SELECT] SELECT UNHEX('41'), UNHEX('61');
+----------
+[SELECT] SELECT UNHEX('4142'), UNHEX('48656C6C6F');
+----------
+[SELECT] SELECT UNHEX(''), UNHEX_NULL('');
+----------
+[SELECT] SELECT UNHEX('@'), UNHEX_NULL('@');
+----------
+[SELECT] SELECT UNHEX('123'), UNHEX_NULL('123');
+----------
+[SELECT] SELECT UNHEX('313233'), UNHEX('393837');
+----------
+[SELECT] -- 'Café' 中 é 可能是组合形式，NFD 会将其分解为 e + 组合重音符
+SELECT length(unicode_normalize('Café', 'NFC')) AS nfc_len, length(unicode_normalize('Café', 'NFD')) AS nfd_len;
+----------
+[SELECT] -- 全角数字 '１２３' 会被转换为半角 '123'
+SELECT unicode_normalize('１２３ＡＢＣ', 'NFKC') AS result;
+----------
+[SELECT] -- ℃ (摄氏度符号) 会被分解为 °C
+SELECT unicode_normalize('25℃', 'NFKD') AS result;
+----------
+[SELECT] -- ① ② ③ 等带圈数字会被转换为普通数字
+SELECT unicode_normalize('①②③', 'NFKC') AS result;
+----------
+[SELECT] -- 使用标准化来比较视觉上相同但编码不同的字符串
+SELECT unicode_normalize('café', 'NFC') = unicode_normalize('café', 'NFC') AS is_equal;
+----------
+[SELECT] select  URL_DECODE('Doris+Q%26A');
+----------
+[SELECT] SELECT xpath_string('<a><![CDATA[123]]></a>', '/a');
+----------
+[SELECT] SELECT xpath_string('<a><!-- comment -->123</a>', '/a');
+----------
+[SELECT] SELECT xpath_string('<a>123</a>', '/b');
+----------
+[SELECT] SELECT xpath_string('<a><!-- comment -->123/a>', '/a');
+----------
+[SELECT|DATA_IMPORT] select * from hdfs(
+                "uri" = "hdfs://127.0.0.1:842/user/doris/csv_format_test/student.csv",
+                "fs.defaultFS" = "hdfs://127.0.0.1:8424",
+                "hadoop.username" = "doris",
+                "format" = "csv");
+----------
+[SELECT|DATA_IMPORT] select * from hdfs(
+              "uri" = "hdfs://127.0.0.1:842/user/doris/csv_format_test/student.csv",
+              "fs.defaultFS" = "hdfs://127.0.0.1:8424",
+              "hadoop.username" = "doris",
+              "format" = "csv",
+              "dfs.nameservices" = "my_hdfs",
+              "dfs.ha.namenodes.my_hdfs" = "nn1,nn2",
+              "dfs.namenode.rpc-address.my_hdfs.nn1" = "nanmenode01:8020",
+              "dfs.namenode.rpc-address.my_hdfs.nn2" = "nanmenode02:8020",
+              "dfs.client.failover.proxy.provider.my_hdfs" = "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "https://endpoint/bucket/file/student.csv",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "endpoint",
+      "s3.region" = "region",
+      "format" = "csv",
+      "use_path_style"="true");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "https://bucket.endpoint/bucket/file/student.csv",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "endpoint",
+      "s3.region" = "region",
+      "format" = "csv",
+      "use_path_style"="false");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "http://example-bucket.oss-cn-beijing.aliyuncs.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "oss-cn-beijing.aliyuncs.com",
+      "s3.region" = "oss-cn-beijing",
+      "format" = "parquet",
+      "use_path_style" = "false");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "https://example-bucket.cos.ap-hongkong.myqcloud.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint" = "cos.ap-hongkong.myqcloud.com",
+      "s3.region" = "ap-hongkong",
+      "format" = "parquet",
+      "use_path_style" = "false");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "s3://bucket/file.csv",
+      "s3.endpoint" = "http://172.21.0.101:9000",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.region" = "us-east-1",
+      "format" = "csv"
+  );
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "https://example-bucket.s3.bj.bcebos.com/your-folder/file.parquet",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.region" = "bj",
+      "s3.endpoint" = "http://bj.bcebos.com",
+      "format" = "parquet",
+      "use_path_style" = "false");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "uri" = "s3://bucket/file/student.csv",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "format" = "csv");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "URI" = "s3://my-bucket.s3.us-west-1.amazonaws.com/resources/doc.txt?versionId=abc123&partNumber=77&partNumber=88",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "format" = "csv",
+      "use_path_style"="false",
+      "force_parsing_by_standard_uri"="true");
+----------
+[SELECT|DATA_IMPORT] select * from s3(
+      "URI" = "s3://s3.us-west-1.amazonaws.com/my-bucket/resources/doc.txt?versionId=abc123&partNumber=77&partNumber=88",
+      "s3.access_key"= "ak",
+      "s3.secret_key" = "sk",
+      "s3.endpoint"= "endpont",
+      "s3.region"= "region",
+      "format" = "csv",
+      "use_path_style"="true",
+      "force_parsing_by_standard_uri"="true");
+----------
+[SELECT] WITH example_data AS (
+    SELECT 1 as column1, NULL as column2, 'A' as group_name
+    UNION ALL
+    SELECT 1, 10, 'A'
+    UNION ALL
+    SELECT 1, NULL, 'A'
+    UNION ALL
+    SELECT 1, 20, 'A'
+    UNION ALL
+    SELECT 2, NULL, 'B'
+    UNION ALL
+    SELECT 2, 30, 'B'
+    UNION ALL
+    SELECT 2, 40, 'B'
+)
+SELECT 
+    group_name,
+    column1,
+    column2,
+    FIRST_VALUE(column2) OVER (
+        PARTITION BY column1 
+        ORDER BY column2 NULLS LAST -- 定义NULL值位置在最后
+    ) AS first_value_default,
+    FIRST_VALUE(column2, true) OVER (
+        PARTITION BY column1 
+        ORDER BY column2 NULLS FIRST -- 定义NULL值位置在最前
+    ) AS first_value_ignore_null
+FROM example_data
+ORDER BY column1, column2;
+----------
+[SELECT|DATA_EXPORT] SELECT * FROM tbl
+    INTO OUTFILE "hdfs://${host}:${fileSystem_port}/path/to/result_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "fs.defaultFS" = "hdfs://ip:port",
+        "hadoop.username" = "work"
+    );
+----------
+[SELECT] select * except(age) from student;
+----------
+[SELECT] select type,avg(price) from tb_book group by type;

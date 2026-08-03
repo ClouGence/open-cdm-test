@@ -1,0 +1,488 @@
+select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+SELECT count(test_slru_page_write(a, 'Test SLRU 64-bit'))
+  FROM generate_series(0x1234500000001, 0x1234500000030, 1) as a
+;
+SELECT 0x1122334455667788::int8::bytea AS "\x1122334455667788",
+       (-0x1122334455667788)::int8::bytea AS "\xeeddccbbaa998878"
+;
+with recursive
+graph(f, t, label) as (
+  values (1, 2, 'arc 1 -> 2'),
+         (1, 3, 'arc 1 -> 3'),
+         (2, 3, 'arc 2 -> 3'),
+         (1, 4, 'arc 1 -> 4'),
+         (4, 5, 'arc 4 -> 5'),
+         (5, 1, 'arc 5 -> 1')
+),
+search_graph(f, t, label) as (
+        select * from graph g
+        union all
+        select g.*
+        from graph g, search_graph sg
+        where g.f = sg.t
+) cycle f, t set is_cycle to true default false using path
+select f, t, label from search_graph
+;
+SELECT JSON_OBJECT('a' VALUE 2::text)
+;
+SELECT SUBSTRING('abcdefg' SIMILAR '#"(b_d)#"%' ESCAPE '#') IS NULL AS "True"
+;
+with recursive a as (
+	select 1 as b
+	union all
+	select * from a
+) cycle b set c using p
+select * from a
+;
+SELECT JSON_OBJECT(('a' || 2) VALUE 1)
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle foo, tar set is_cycle using path
+select * from search_graph
+;
+SELECT substring('Thomas' similar '%#"o_a#"_' escape '#')
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union distinct
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle to 'Y' default 'N' using path
+select * from search_graph
+;
+-- error (XXX could use better hint)
+SELECT * FROM J1_TBL a1 JOIN J2_TBL a2 USING (i) AS a1
+;
+-- whitespaces
+SELECT xmlserialize(DOCUMENT '  ' AS text INDENT)
+;
+-- error
+SELECT * FROM (J1_TBL JOIN J2_TBL USING (i) AS x) AS xx WHERE x.i = 1
+;
+SELECT xmlserialize(CONTENT  '<!DOCTYPE a><a/>' AS text INDENT)
+;
+-- Subselects without aliases
+
+SELECT count FROM (SELECT COUNT(DISTINCT name) FROM road)
+;
+SELECT 0o777777777777777777777
+;
+EXPLAIN (COSTS OFF) MERGE INTO stats_track_tab
+  USING (SELECT id FROM generate_series(1, 10) id) ON x = id
+  WHEN MATCHED THEN UPDATE SET x = id
+  WHEN NOT MATCHED THEN INSERT (x) VALUES (id)
+;
+SELECT 0x42F
+;
+SELECT SUBSTRING(NULL SIMILAR '%' ESCAPE '#') IS NULL AS "True"
+;
+SELECT xmlserialize(DOCUMENT '<?xml version="1.0" encoding="UTF-8"?><foo><bar><val>73</val></bar></foo>' AS text INDENT)
+;
+SELECT JSON_OBJECTAGG(NULL: 1)
+;
+SELECT JSON_OBJECT('a': JSON_OBJECT('b': 1 RETURNING bytea))
+;
+-- CYCLE clause
+
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select * from search_graph
+;
+SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text INDENT)
+;
+-- See EXPLAIN output for same query:
+EXPLAIN (VERBOSE, COSTS OFF)
+WITH merge_source_cte AS MATERIALIZED (SELECT 15 a, 'merge_source_cte val' b)
+MERGE INTO m USING (select * from merge_source_cte) o ON m.k=o.a
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || merge_source_cte.*::text || ' merge update' FROM merge_source_cte WHERE a = 15)
+WHEN NOT MATCHED THEN INSERT VALUES(o.a, o.b || (SELECT merge_source_cte.*::text || ' merge insert' FROM merge_source_cte))
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAYAGG(('111' || i)::bytea FORMAT JSON NULL ON NULL RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+SELECT * FROM (J1_TBL JOIN J2_TBL USING (i) AS x) AS xx WHERE x.i = 1
+;
+-- Can't have more than two part separators
+SELECT SUBSTRING('abcdefg' SIMILAR 'a*#"%#"g*#"x' ESCAPE '#') AS "error"
+;
+SELECT JSON_ARRAY(SELECT * FROM (VALUES (1, 2)) foo(i, j))
+;
+SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val><val x="y">text node<val>73</val></val></bar></foo>' AS text INDENT)
+;
+SELECT JSON_OBJECT(1: 1, '2': NULL, '1': 1 ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set foo
+  cycle f, t set foo to true default false using path
+select * from search_graph
+;
+SELECT JSON_OBJECT(NULL: 1)
+;
+SELECT JSON_ARRAY(SELECT FROM (VALUES (1)) foo(i))
+;
+SELECT JSON_EXISTS(JSON_OBJECT(RETURNING jsonb), '$')
+;
+select json_object ( 1 : 1 , '2' : null , 1 : '2' absent on null without unique keys )
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+MERGE INTO pa_target t USING pa_source s ON t.tid = s.sid
+  WHEN NOT MATCHED THEN INSERT VALUES (s.sid)
+;
+--
+-- FETCH FIRST
+-- Check the WITH TIES clause
+--
+
+SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST 2 ROW WITH TIES
+;
+SELECT
+	js,
+	js IS JSON "IS JSON",
+	js IS NOT JSON "IS NOT JSON",
+	js IS JSON VALUE "IS VALUE",
+	js IS JSON OBJECT "IS OBJECT",
+	js IS JSON ARRAY "IS ARRAY",
+	js IS JSON SCALAR "IS SCALAR",
+	js IS JSON WITHOUT UNIQUE KEYS "WITHOUT UNIQUE",
+	js IS JSON WITH UNIQUE KEYS "WITH UNIQUE"
+FROM
+	test_is_json
+;
+SELECT JSON_OBJECT('a': '1', 'b': NULL, 'c': 2 NULL ON NULL)
+;
+SELECT 0x1234::int2::bytea AS "\x1234", (-0x1234)::int2::bytea AS "\xedcc"
+;
+explain (costs off)
+select * from emp1 t1 left join
+    (select coalesce(t3.code, 1) from emp1 t2
+        left join (emp1 t3 join emp1 t4 on t3.id = t4.id)
+        on true)
+on true
+;
+SELECT test_slru_page_read(0x1234500000000)
+;
+SELECT JSON_ARRAY('a', NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+EXPLAIN (COSTS OFF)
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED THEN
+	UPDATE SET balance = 0
+;
+-- all partitions but rparted_by_int2_maxvalue pruned
+explain (costs off) select * from rparted_by_int2 where a > 100_000_000_000_000
+;
+explain (verbose, costs off)
+with recursive test as (
+  select 1 as x
+  union all
+  select x + 1
+  from test
+) search breadth first by x set y
+select * from test limit 5
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search breadth first by f, t set seq
+  cycle f, t set is_cycle using path
+select * from search_graph
+;
+------------------------------------------------------------------------------------------
+[SELECT] select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+----------
+[SELECT] SELECT count(test_slru_page_write(a, 'Test SLRU 64-bit'))
+  FROM generate_series(0x1234500000001, 0x1234500000030, 1) as a
+;
+----------
+[SELECT] SELECT 0x1122334455667788::int8::bytea AS "\x1122334455667788",
+       (-0x1122334455667788)::int8::bytea AS "\xeeddccbbaa998878"
+;
+----------
+[SELECT] with recursive
+graph(f, t, label) as (
+  values (1, 2, 'arc 1 -> 2'),
+         (1, 3, 'arc 1 -> 3'),
+         (2, 3, 'arc 2 -> 3'),
+         (1, 4, 'arc 1 -> 4'),
+         (4, 5, 'arc 4 -> 5'),
+         (5, 1, 'arc 5 -> 1')
+),
+search_graph(f, t, label) as (
+        select * from graph g
+        union all
+        select g.*
+        from graph g, search_graph sg
+        where g.f = sg.t
+) cycle f, t set is_cycle to true default false using path
+select f, t, label from search_graph
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a' VALUE 2::text)
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR '#"(b_d)#"%' ESCAPE '#') IS NULL AS "True"
+;
+----------
+[SELECT] with recursive a as (
+	select 1 as b
+	union all
+	select * from a
+) cycle b set c using p
+select * from a
+;
+----------
+[SELECT] SELECT JSON_OBJECT(('a' || 2) VALUE 1)
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle foo, tar set is_cycle using path
+select * from search_graph
+;
+----------
+[SELECT] SELECT substring('Thomas' similar '%#"o_a#"_' escape '#')
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union distinct
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle to 'Y' default 'N' using path
+select * from search_graph
+;
+----------
+[SELECT] -- error (XXX could use better hint)
+SELECT * FROM J1_TBL a1 JOIN J2_TBL a2 USING (i) AS a1
+;
+----------
+[SELECT] -- whitespaces
+SELECT xmlserialize(DOCUMENT '  ' AS text INDENT)
+;
+----------
+[SELECT] -- error
+SELECT * FROM (J1_TBL JOIN J2_TBL USING (i) AS x) AS xx WHERE x.i = 1
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '<!DOCTYPE a><a/>' AS text INDENT)
+;
+----------
+[SELECT] -- Subselects without aliases
+
+SELECT count FROM (SELECT COUNT(DISTINCT name) FROM road)
+;
+----------
+[SELECT] SELECT 0o777777777777777777777
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF) MERGE INTO stats_track_tab
+  USING (SELECT id FROM generate_series(1, 10) id) ON x = id
+  WHEN MATCHED THEN UPDATE SET x = id
+  WHEN NOT MATCHED THEN INSERT (x) VALUES (id)
+;
+----------
+[SELECT] SELECT 0x42F
+;
+----------
+[SELECT] SELECT SUBSTRING(NULL SIMILAR '%' ESCAPE '#') IS NULL AS "True"
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT '<?xml version="1.0" encoding="UTF-8"?><foo><bar><val>73</val></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(NULL: 1)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': JSON_OBJECT('b': 1 RETURNING bytea))
+;
+----------
+[SELECT] -- CYCLE clause
+
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select * from search_graph
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text INDENT)
+;
+----------
+[PERFORMANCE] -- See EXPLAIN output for same query:
+EXPLAIN (VERBOSE, COSTS OFF)
+WITH merge_source_cte AS MATERIALIZED (SELECT 15 a, 'merge_source_cte val' b)
+MERGE INTO m USING (select * from merge_source_cte) o ON m.k=o.a
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || merge_source_cte.*::text || ' merge update' FROM merge_source_cte WHERE a = 15)
+WHEN NOT MATCHED THEN INSERT VALUES(o.a, o.b || (SELECT merge_source_cte.*::text || ' merge insert' FROM merge_source_cte))
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAYAGG(('111' || i)::bytea FORMAT JSON NULL ON NULL RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[SELECT] SELECT * FROM (J1_TBL JOIN J2_TBL USING (i) AS x) AS xx WHERE x.i = 1
+;
+----------
+[SELECT] -- Can't have more than two part separators
+SELECT SUBSTRING('abcdefg' SIMILAR 'a*#"%#"g*#"x' ESCAPE '#') AS "error"
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT * FROM (VALUES (1, 2)) foo(i, j))
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val><val x="y">text node<val>73</val></val></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1: 1, '2': NULL, '1': 1 ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set foo
+  cycle f, t set foo to true default false using path
+select * from search_graph
+;
+----------
+[SELECT] SELECT JSON_OBJECT(NULL: 1)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT FROM (VALUES (1)) foo(i))
+;
+----------
+[SELECT] SELECT JSON_EXISTS(JSON_OBJECT(RETURNING jsonb), '$')
+;
+----------
+[SELECT] select json_object ( 1 : 1 , '2' : null , 1 : '2' absent on null without unique keys )
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+MERGE INTO pa_target t USING pa_source s ON t.tid = s.sid
+  WHEN NOT MATCHED THEN INSERT VALUES (s.sid)
+;
+----------
+[SELECT] --
+-- FETCH FIRST
+-- Check the WITH TIES clause
+--
+
+SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST 2 ROW WITH TIES
+;
+----------
+[SELECT] SELECT
+	js,
+	js IS JSON "IS JSON",
+	js IS NOT JSON "IS NOT JSON",
+	js IS JSON VALUE "IS VALUE",
+	js IS JSON OBJECT "IS OBJECT",
+	js IS JSON ARRAY "IS ARRAY",
+	js IS JSON SCALAR "IS SCALAR",
+	js IS JSON WITHOUT UNIQUE KEYS "WITHOUT UNIQUE",
+	js IS JSON WITH UNIQUE KEYS "WITH UNIQUE"
+FROM
+	test_is_json
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': '1', 'b': NULL, 'c': 2 NULL ON NULL)
+;
+----------
+[SELECT] SELECT 0x1234::int2::bytea AS "\x1234", (-0x1234)::int2::bytea AS "\xedcc"
+;
+----------
+[PERFORMANCE] explain (costs off)
+select * from emp1 t1 left join
+    (select coalesce(t3.code, 1) from emp1 t2
+        left join (emp1 t3 join emp1 t4 on t3.id = t4.id)
+        on true)
+on true
+;
+----------
+[SELECT] SELECT test_slru_page_read(0x1234500000000)
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a', NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF)
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED THEN
+	UPDATE SET balance = 0
+;
+----------
+[PERFORMANCE] -- all partitions but rparted_by_int2_maxvalue pruned
+explain (costs off) select * from rparted_by_int2 where a > 100_000_000_000_000
+;
+----------
+[PERFORMANCE] explain (verbose, costs off)
+with recursive test as (
+  select 1 as x
+  union all
+  select x + 1
+  from test
+) search breadth first by x set y
+select * from test limit 5
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search breadth first by f, t set seq
+  cycle f, t set is_cycle using path
+select * from search_graph
+;

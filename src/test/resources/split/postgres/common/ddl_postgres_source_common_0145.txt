@@ -1,0 +1,518 @@
+CREATE FUNCTION dblink_cancel_query(text)
+RETURNS text
+AS '$libdir/dblink', 'dblink_cancel_query'
+LANGUAGE C STRICT PARALLEL RESTRICTED
+;
+CREATE DATABASE "template1" WITH TEMPLATE = template0 OID = 1 STRATEGY = FILE_COPY ENCODING = 'UTF8' LOCALE_PROVIDER = builtin LOCALE = 'C' BUILTIN_LOCALE = 'C.UTF-8' COLLATION_VERSION = '1'
+;
+CREATE TEMP TABLE test_mark_restore(col1 int, col2 int, col12 int)
+;
+CREATE INDEX t1_spgist ON s2.t1 USING SPGIST (ir)
+;
+CREATE FUNCTION "public"."city_update"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+declare
+    ctry_id int;
+begin
+    if NEW.country_name IS DISTINCT FROM OLD.country_name then
+        SELECT country_id, continent INTO ctry_id, NEW.continent
+            FROM country_table WHERE country_name = NEW.country_name;
+        if NOT FOUND then
+            raise exception 'No such country: "%"', NEW.country_name;
+        end if;
+
+        UPDATE city_table SET city_name = NEW.city_name,
+                              population = NEW.population,
+                              country_id = ctry_id
+            WHERE city_id = OLD.city_id;
+    else
+        UPDATE city_table SET city_name = NEW.city_name,
+                              population = NEW.population
+            WHERE city_id = OLD.city_id;
+        NEW.continent := OLD.continent;
+    end if;
+
+    if NOT FOUND then RETURN NULL; end if;
+    RETURN NEW;
+end;
+$$
+;
+CREATE TRIGGER "transition_table_level2_ri_child_ins_trigger" AFTER INSERT ON "public"."transition_table_level2" REFERENCING NEW TABLE AS "i" FOR EACH STATEMENT EXECUTE FUNCTION "public"."transition_table_level2_ri_child_insupd_func"()
+;
+ANALYZE gtest22c
+;
+CREATE AGGREGATE sumdouble (float8)
+(
+    stype = float8,
+    sfunc = float8pl,
+    mstype = float8,
+    msfunc = float8pl,
+    minvfunc = float8mi
+)
+;
+ALTER TABLE a2 RENAME TO tx1
+;
+ANALYZE vactst, vacparted
+;
+ANALYZE pg_temp_14.pg_temp_26714_2
+;
+CREATE TABLE road (
+	name		text,
+	thepath 	path
+)
+;
+--
+-- If we drop the original generic one, we don't have to qualify the type
+-- anymore, since there's only one match
+--
+DROP FUNCTION echo_me(anyenum)
+;
+CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy')
+;
+-- cannot use system columns in partition key
+CREATE TABLE partitioned (
+	a int
+) PARTITION BY RANGE (xmin)
+;
+--
+-- different tree example
+--
+CREATE TEMPORARY TABLE tree(
+    id INTEGER PRIMARY KEY,
+    parent_id INTEGER REFERENCES tree(id)
+)
+;
+create function parted_trigfunc() returns trigger language plpgsql as $$
+begin
+  new.a = new.a + 1;
+  return new;
+end;
+$$
+;
+DROP FUNCTION getrngfunc6(int)
+;
+CREATE TABLESPACE tblspc2 LOCATION '/tmp/tsqNVC_rsv/tempdir/tbl=spc2'
+;
+CREATE TABLE pt(i int) PARTITION BY hash (i part_test_int4_ops_bad)
+;
+CREATE FUNCTION ean13_out(issn13)
+	RETURNS cstring
+	AS '$libdir/isn'
+	LANGUAGE C
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+--
+-- brin_page_type()
+--
+CREATE FUNCTION brin_page_type(IN page bytea)
+RETURNS text
+AS '$libdir/pageinspect', 'brin_page_type'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+ALTER TABLE ONLY pp_nn ADD PRIMARY KEY (a)
+;
+TRUNCATE cj_target
+;
+CREATE TRIGGER delete_when AFTER DELETE ON main_table
+FOR EACH STATEMENT WHEN (true) EXECUTE PROCEDURE trigger_func('delete_when')
+;
+create table mcrparted5a partition of mcrparted5 for values in(20)
+;
+VACUUM (FULL) information_schema.sql_features
+;
+CREATE VIEW pg_stat_io AS
+SELECT
+       b.backend_type,
+       b.object,
+       b.context,
+       b.reads,
+       b.read_bytes,
+       b.read_time,
+       b.writes,
+       b.write_bytes,
+       b.write_time,
+       b.writebacks,
+       b.writeback_time,
+       b.extends,
+       b.extend_bytes,
+       b.extend_time,
+       b.hits,
+       b.evictions,
+       b.reuses,
+       b.fsyncs,
+       b.fsync_time,
+       b.stats_reset
+FROM pg_stat_get_io() b
+;
+-- INSERT ... ON CONFLICT ... UPDATE has OLD and NEW
+CREATE UNIQUE INDEX foo_f1_idx ON foo (f1)
+;
+drop domain domainchar4arr restrict
+;
+CREATE DATABASE "regression[\]^_`abcdefghijklmnopqrstuvwxyz{|}~" WITH TEMPLATE = template0 ENCODING = 'SQL_ASCII' LC_COLLATE = 'C' LC_CTYPE = 'C'
+;
+CREATE TRIGGER city_insert_trig INSTEAD OF INSERT ON city_view
+FOR EACH ROW EXECUTE PROCEDURE city_insert()
+;
+DROP TABLE lock_tbl3
+;
+CREATE TABLE regress_tbl1(i int) TABLESPACE regress_ts1
+;
+CREATE FUNCTION ghstore_in(cstring)
+RETURNS ghstore
+AS '$libdir/hstore'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+ALTER TEXT SEARCH CONFIGURATION armenian ADD MAPPING
+    FOR asciiword, hword_asciipart, asciihword
+	WITH armenian_stem
+;
+CREATE TABLE only_inh_child () INHERITS (only_inh_parent)
+;
+DO $$
+DECLARE
+  exists boolean;
+  waiters integer;
+BEGIN
+  -- The second client always comes in second, and the number of rows in the
+  -- table first_client_table reflect this. Here the first client inserts a row,
+  -- so the second client will see a non-empty table when repeating the
+  -- transaction after the serialization error.
+  SELECT EXISTS (SELECT * FROM first_client_table) INTO STRICT exists;
+  IF NOT exists THEN
+	-- Let the second client begin
+	PERFORM pg_advisory_unlock(0);
+	-- And wait until the second client tries to get the same lock
+	LOOP
+	  SELECT COUNT(*) INTO STRICT waiters FROM pg_locks WHERE
+	  locktype = 'advisory' AND objsubid = 1 AND
+	  ((classid::bigint << 32) | objid::bigint = 1::bigint) AND NOT granted;
+	  IF waiters = 1 THEN
+		INSERT INTO first_client_table VALUES (1);
+
+		-- Exit loop
+		EXIT;
+	  END IF;
+	END LOOP;
+  END IF;
+END$$
+;
+ALTER OPERATOR FAMILY gist_hstore_ops USING gist
+ADD FUNCTION 10 (hstore) ghstore_options (internal)
+;
+DROP TABLE parted_col_comment
+;
+do $$
+declare x int_nn := 42;
+begin
+  raise notice 'x = %', x;
+  x := null;  -- fail
+end$$
+;
+VACUUM (FREEZE) pg_catalog.pg_database
+;
+CREATE TABLE split_table_idx.list_part_default PARTITION OF split_table_idx.list_part DEFAULT
+;
+CREATE TABLE regress_encoding(good text, truncated text, with_nul text, truncated_with_nul text)
+;
+CREATE TABLE ac (aa TEXT)
+;
+create rule irule2 as on insert to inserttest2 do also
+  insert into inserttest (f4[1].if1, f4[1].if2[2])
+  values (1,'fool'),(new.f1,new.f2)
+;
+DROP TABLE IF EXISTS dummy
+;
+create type pp_colors as enum ('green', 'blue', 'black')
+;
+create trigger trig_ins_after_parent after insert on parted_stmt_trig
+  for each row execute procedure trigger_notice()
+;
+CREATE TYPE "public"."int42"
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE FUNCTION dblink_cancel_query(text)
+RETURNS text
+AS '$libdir/dblink', 'dblink_cancel_query'
+LANGUAGE C STRICT PARALLEL RESTRICTED
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE "template1" WITH TEMPLATE = template0 OID = 1 STRATEGY = FILE_COPY ENCODING = 'UTF8' LOCALE_PROVIDER = builtin LOCALE = 'C' BUILTIN_LOCALE = 'C.UTF-8' COLLATION_VERSION = '1'
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE test_mark_restore(col1 int, col2 int, col12 int)
+;
+----------
+[ADD_INDEX] CREATE INDEX t1_spgist ON s2.t1 USING SPGIST (ir)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."city_update"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+declare
+    ctry_id int;
+begin
+    if NEW.country_name IS DISTINCT FROM OLD.country_name then
+        SELECT country_id, continent INTO ctry_id, NEW.continent
+            FROM country_table WHERE country_name = NEW.country_name;
+        if NOT FOUND then
+            raise exception 'No such country: "%"', NEW.country_name;
+        end if;
+
+        UPDATE city_table SET city_name = NEW.city_name,
+                              population = NEW.population,
+                              country_id = ctry_id
+            WHERE city_id = OLD.city_id;
+    else
+        UPDATE city_table SET city_name = NEW.city_name,
+                              population = NEW.population
+            WHERE city_id = OLD.city_id;
+        NEW.continent := OLD.continent;
+    end if;
+
+    if NOT FOUND then RETURN NULL; end if;
+    RETURN NEW;
+end;
+$$
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER "transition_table_level2_ri_child_ins_trigger" AFTER INSERT ON "public"."transition_table_level2" REFERENCING NEW TABLE AS "i" FOR EACH STATEMENT EXECUTE FUNCTION "public"."transition_table_level2_ri_child_insupd_func"()
+;
+----------
+[ADMIN_TABLE] ANALYZE gtest22c
+;
+----------
+[CREATE_PROG_OBJ] CREATE AGGREGATE sumdouble (float8)
+(
+    stype = float8,
+    sfunc = float8pl,
+    mstype = float8,
+    msfunc = float8pl,
+    minvfunc = float8mi
+)
+;
+----------
+[RENAME_TABLE] ALTER TABLE a2 RENAME TO tx1
+;
+----------
+[ADMIN_TABLE] ANALYZE vactst, vacparted
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_14.pg_temp_26714_2
+;
+----------
+[CREATE_TABLE] CREATE TABLE road (
+	name		text,
+	thepath 	path
+)
+;
+----------
+[DROP_PROG_OBJ] --
+-- If we drop the original generic one, we don't have to qualify the type
+-- anymore, since there's only one match
+--
+DROP FUNCTION echo_me(anyenum)
+;
+----------
+[CREATE_TYPE] CREATE TYPE mood AS ENUM ('sad', 'ok', 'happy')
+;
+----------
+[CREATE_TABLE] -- cannot use system columns in partition key
+CREATE TABLE partitioned (
+	a int
+) PARTITION BY RANGE (xmin)
+;
+----------
+[CREATE_TABLE] --
+-- different tree example
+--
+CREATE TEMPORARY TABLE tree(
+    id INTEGER PRIMARY KEY,
+    parent_id INTEGER REFERENCES tree(id)
+)
+;
+----------
+[CREATE_PROG_OBJ] create function parted_trigfunc() returns trigger language plpgsql as $$
+begin
+  new.a = new.a + 1;
+  return new;
+end;
+$$
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION getrngfunc6(int)
+;
+----------
+[CREATE_TABLESPACE] CREATE TABLESPACE tblspc2 LOCATION '/tmp/tsqNVC_rsv/tempdir/tbl=spc2'
+;
+----------
+[CREATE_TABLE] CREATE TABLE pt(i int) PARTITION BY hash (i part_test_int4_ops_bad)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ean13_out(issn13)
+	RETURNS cstring
+	AS '$libdir/isn'
+	LANGUAGE C
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[CREATE_PROG_OBJ] --
+-- brin_page_type()
+--
+CREATE FUNCTION brin_page_type(IN page bytea)
+RETURNS text
+AS '$libdir/pageinspect', 'brin_page_type'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY pp_nn ADD PRIMARY KEY (a)
+;
+----------
+[TRUNCATE_TABLE] TRUNCATE cj_target
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER delete_when AFTER DELETE ON main_table
+FOR EACH STATEMENT WHEN (true) EXECUTE PROCEDURE trigger_func('delete_when')
+;
+----------
+[CREATE_TABLE] create table mcrparted5a partition of mcrparted5 for values in(20)
+;
+----------
+[ADMIN_TABLE] VACUUM (FULL) information_schema.sql_features
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW pg_stat_io AS
+SELECT
+       b.backend_type,
+       b.object,
+       b.context,
+       b.reads,
+       b.read_bytes,
+       b.read_time,
+       b.writes,
+       b.write_bytes,
+       b.write_time,
+       b.writebacks,
+       b.writeback_time,
+       b.extends,
+       b.extend_bytes,
+       b.extend_time,
+       b.hits,
+       b.evictions,
+       b.reuses,
+       b.fsyncs,
+       b.fsync_time,
+       b.stats_reset
+FROM pg_stat_get_io() b
+;
+----------
+[ADD_INDEX] -- INSERT ... ON CONFLICT ... UPDATE has OLD and NEW
+CREATE UNIQUE INDEX foo_f1_idx ON foo (f1)
+;
+----------
+[DROP_TYPE] drop domain domainchar4arr restrict
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE "regression[\]^_`abcdefghijklmnopqrstuvwxyz{|}~" WITH TEMPLATE = template0 ENCODING = 'SQL_ASCII' LC_COLLATE = 'C' LC_CTYPE = 'C'
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER city_insert_trig INSTEAD OF INSERT ON city_view
+FOR EACH ROW EXECUTE PROCEDURE city_insert()
+;
+----------
+[DROP_TABLE] DROP TABLE lock_tbl3
+;
+----------
+[CREATE_TABLE] CREATE TABLE regress_tbl1(i int) TABLESPACE regress_ts1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ghstore_in(cstring)
+RETURNS ghstore
+AS '$libdir/hstore'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION armenian ADD MAPPING
+    FOR asciiword, hword_asciipart, asciihword
+	WITH armenian_stem
+;
+----------
+[CREATE_TABLE] CREATE TABLE only_inh_child () INHERITS (only_inh_parent)
+;
+----------
+[BLOCK] DO $$
+DECLARE
+  exists boolean;
+  waiters integer;
+BEGIN
+  -- The second client always comes in second, and the number of rows in the
+  -- table first_client_table reflect this. Here the first client inserts a row,
+  -- so the second client will see a non-empty table when repeating the
+  -- transaction after the serialization error.
+  SELECT EXISTS (SELECT * FROM first_client_table) INTO STRICT exists;
+  IF NOT exists THEN
+	-- Let the second client begin
+	PERFORM pg_advisory_unlock(0);
+	-- And wait until the second client tries to get the same lock
+	LOOP
+	  SELECT COUNT(*) INTO STRICT waiters FROM pg_locks WHERE
+	  locktype = 'advisory' AND objsubid = 1 AND
+	  ((classid::bigint << 32) | objid::bigint = 1::bigint) AND NOT granted;
+	  IF waiters = 1 THEN
+		INSERT INTO first_client_table VALUES (1);
+
+		-- Exit loop
+		EXIT;
+	  END IF;
+	END LOOP;
+  END IF;
+END$$
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY gist_hstore_ops USING gist
+ADD FUNCTION 10 (hstore) ghstore_options (internal)
+;
+----------
+[DROP_TABLE] DROP TABLE parted_col_comment
+;
+----------
+[BLOCK] do $$
+declare x int_nn := 42;
+begin
+  raise notice 'x = %', x;
+  x := null;  -- fail
+end$$
+;
+----------
+[ADMIN_TABLE] VACUUM (FREEZE) pg_catalog.pg_database
+;
+----------
+[CREATE_TABLE] CREATE TABLE split_table_idx.list_part_default PARTITION OF split_table_idx.list_part DEFAULT
+;
+----------
+[CREATE_TABLE] CREATE TABLE regress_encoding(good text, truncated text, with_nul text, truncated_with_nul text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE ac (aa TEXT)
+;
+----------
+[CREATE_POLICY] create rule irule2 as on insert to inserttest2 do also
+  insert into inserttest (f4[1].if1, f4[1].if2[2])
+  values (1,'fool'),(new.f1,new.f2)
+;
+----------
+[DROP_TABLE] DROP TABLE IF EXISTS dummy
+;
+----------
+[CREATE_TYPE] create type pp_colors as enum ('green', 'blue', 'black')
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger trig_ins_after_parent after insert on parted_stmt_trig
+  for each row execute procedure trigger_notice()
+;
+----------
+[CREATE_TYPE] CREATE TYPE "public"."int42"
+;

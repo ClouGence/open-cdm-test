@@ -1,0 +1,452 @@
+select json_object ( 1 : 1 , '1' : null with unique )
+;
+SELECT
+	JSON_ARRAYAGG(bar) as no_options,
+	JSON_ARRAYAGG(bar RETURNING jsonb) as returning_jsonb,
+	JSON_ARRAYAGG(bar ABSENT ON NULL) as absent_on_null,
+	JSON_ARRAYAGG(bar ABSENT ON NULL RETURNING jsonb) as absentonnull_returning_jsonb,
+	JSON_ARRAYAGG(bar NULL ON NULL) as null_on_null,
+	JSON_ARRAYAGG(bar NULL ON NULL RETURNING jsonb) as nullonnull_returning_jsonb,
+	JSON_ARRAYAGG(foo) as row_no_options,
+	JSON_ARRAYAGG(foo RETURNING jsonb) as row_returning_jsonb,
+	JSON_ARRAYAGG(foo ORDER BY bar) FILTER (WHERE bar > 2) as row_filtered_agg,
+	JSON_ARRAYAGG(foo ORDER BY bar RETURNING jsonb) FILTER (WHERE bar > 2) as row_filtered_agg_returning_jsonb
+FROM
+	(VALUES (NULL), (3), (1), (NULL), (NULL), (5), (2), (4), (NULL)) foo(bar)
+;
+WITH t AS (
+    MERGE INTO target_tg t
+    USING (SELECT 1 as key) s
+    ON s.key = t.key
+    WHEN MATCHED AND balance < 100 THEN
+      UPDATE SET balance = balance * 2, val = t.val || ' when1'
+    WHEN MATCHED AND balance < 200 THEN
+      UPDATE SET balance = balance * 4, val = t.val || ' when2'
+    WHEN MATCHED AND balance < 300 THEN
+      UPDATE SET balance = balance * 8, val = t.val || ' when3'
+    RETURNING t.*
+  )
+  SELECT * FROM t
+;
+SELECT 0o17777777777
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON('123'::bytea FORMAT JSON ENCODING UTF8)
+;
+-- Test JSON_ARRAY(subquery) deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+SELECT JSON('{"a": 1, "a": 2}' WITH UNIQUE KEYS)
+;
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text FORMAT JSON PATH '$' WITH WRAPPER KEEP QUOTES))
+;
+select foo from json_table ( jsonb '[{"foo":"1"}]' , '$[*]' as p0 columns ( nested '$' as p1 columns ( nested path '$' as p11 columns ( foo int ) ) ) ) jt ( foo )
+;
+explain (verbose, costs off)
+select * from
+     (select k from
+         (select i, coalesce(i, j) as k from
+             (select i from t union all select 0)
+             join (select 1 as j limit 1) on i = j)
+         right join (select 2 as x) on true
+         join (select 3 as y) on i is not null
+     ),
+     lateral (select k as kl limit 1)
+;
+SELECT JSON_OBJECT('foo': NULL::json FORMAT JSON)
+;
+-- indent containing DOCTYPE declaration
+SELECT xmlserialize(DOCUMENT '<!DOCTYPE a><a/>' AS text INDENT)
+;
+-- Segment deletion
+SELECT test_slru_page_delete(0x1234500000030)
+;
+SELECT * FROM JSON_TABLE(jsonb '{"d1": "foo"}', '$'
+    COLUMNS (js1 jsonb_test_domain PATH '$.d1' DEFAULT 'foo2'::jsonb_test_domain ON ERROR))
+;
+SELECT JSON_VALUE(jsonb '1', 'strict $.a' ERROR ON ERROR)
+;
+-- 48 extra pages
+SELECT count(test_slru_page_write(a, 'Test SLRU 64-bit'))
+  FROM generate_series(0x1234500000001, 0x1234500000030, 1) as a
+;
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int) NULL ON ERROR)
+;
+SELECT a, a::bool FROM JSON_TABLE(jsonb '{"a":1}', '$' COLUMNS (a dint4_0 EXISTS PATH '$.b'))
+;
+-- Test applying PASSING variables at different nesting levels
+SELECT sub.* FROM s,
+	(VALUES (23)) x(x), generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[0].z1[*]' COLUMNS (NESTED PATH '$ ?(@ >= ($"x" -2))' COLUMNS (a int PATH '$')),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' COLUMNS (b int PATH '$'))
+	)) sub
+;
+EXPLAIN (verbose, costs off)
+MERGE INTO tgt t
+USING (SELECT *, (SELECT count(*) FROM ref r
+                   WHERE r.ab = s.a + s.b
+                     AND r.cd = s.c - s.d) cnt
+         FROM src s) s
+ON t.a = s.a AND t.b < s.cnt
+WHEN MATCHED AND t.c > s.cnt THEN
+  UPDATE SET (b, c) = (SELECT s.b, s.cnt)
+;
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			aaa int, -- "aaa" has implicit path '$."aaa"'
+			aaa1 int PATH '$.aaa',
+			js2 json PATH '$',
+			jsb2w jsonb PATH '$' WITH WRAPPER,
+			jsb2q jsonb PATH '$' OMIT QUOTES,
+			ia int[] PATH '$',
+			ta text[] PATH '$',
+			jba jsonb[] PATH '$'
+		)
+	) jt
+	ON true
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+WITH cte_init AS MATERIALIZED (SELECT 1 a, 'cte_init val' b)
+MERGE INTO m USING (select 1 k, 'merge source InitPlan' v offset 0) o ON m.k=o.k
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || ' merge update' FROM cte_init WHERE a = 1 LIMIT 1)
+WHEN NOT MATCHED THEN INSERT VALUES(o.k, o.v)
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+WITH cte_basic AS MATERIALIZED (SELECT 1 a, 'cte_basic val' b)
+MERGE INTO m USING (select 0 k, 'merge source SubPlan' v offset 0) o ON m.k=o.k
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || ' merge update' FROM cte_basic WHERE cte_basic.a = m.k LIMIT 1)
+WHEN NOT MATCHED THEN INSERT VALUES(o.k, o.v)
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' EMPTY ON EMPTY)
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int4 EXISTS PATH '$' ERROR ON ERROR))
+;
+SELECT JSON_OBJECT(1: 1, '1': NULL WITH UNIQUE)
+;
+-- error
+
+--
+-- conversions between bytea and integer types
+--
+SELECT 0x1234::int2::bytea AS "\x1234", (-0x1234)::int2::bytea AS "\xedcc"
+;
+SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) OVER (ORDER BY i DESC) FROM (VALUES (1), (2), (3)) AS t(i)
+;
+SELECT JSON_OBJECTAGG(k: v NULL ON NULL RETURNING text) FROM (VALUES ('a', 1), ('b', NULL)) AS t(k,v)
+;
+-- RETUGNING pseudo-types not allowed
+SELECT JSON_QUERY(jsonb '[3,4]', '$[*]' RETURNING anyarray EMPTY OBJECT ON ERROR)
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+SELECT JSON_OBJECT(1: 1, '1': NULL ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+with recursive test as (
+  select 0 as x
+  union all
+  select (x + 1) % 10
+  from test
+) cycle x set is_cycle using path
+select * from test
+;
+SELECT xmlserialize(CONTENT  '<foo><bar><val x="y">42</val></bar></foo>' AS text INDENT)
+;
+SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING json)
+;
+SELECT JSON_OBJECT('a': '123', 'b': JSON_OBJECT('a': 111, 'b': 'aaa'))
+;
+SELECT sub.* FROM s,
+	(VALUES (23)) x(x), generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[0].z1[*]' COLUMNS (NESTED PATH '$ ?(@ >= ($"x" -2))' COLUMNS (a int PATH '$')),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' COLUMNS (b int PATH '$'))
+	)) sub
+;
+-- ok
+SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE x.t = 'one'
+;
+SELECT JSON_VALUE(jsonb '123', '$' RETURNING text)
+;
+SELECT JSON_QUERY(jsonb'{"rec": "[1,2]"}', '$.rec' returning int4range omit quotes)
+;
+SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%#"g' ESCAPE '#') AS "bcdef"
+;
+SELECT test_slru_page_delete(0x1234500000030)
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING char(3))
+;
+SELECT JSON_QUERY(jsonb '123', '$' RETURNING queryfuncs_char2 DEFAULT '1' ON ERROR)
+;
+SELECT t1.c2 FROM ft1 t1 WHERE t1.c1 > 960 ORDER BY t1.c2 FETCH FIRST 2 ROWS WITH TIES
+;
+SELECT test_slru_page_exists(0x1234500000030)
+;
+SELECT ROW(x.*) FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING json OMIT QUOTES ERROR ON ERROR)
+;
+SELECT TIMESTAMP WITH TIME ZONE '2001-02-16 20:38:40-05' AT LOCAL
+;
+SELECT JSON_OBJECT('a' VALUE 2 + 3)
+;
+------------------------------------------------------------------------------------------
+[SELECT] select json_object ( 1 : 1 , '1' : null with unique )
+;
+----------
+[SELECT] SELECT
+	JSON_ARRAYAGG(bar) as no_options,
+	JSON_ARRAYAGG(bar RETURNING jsonb) as returning_jsonb,
+	JSON_ARRAYAGG(bar ABSENT ON NULL) as absent_on_null,
+	JSON_ARRAYAGG(bar ABSENT ON NULL RETURNING jsonb) as absentonnull_returning_jsonb,
+	JSON_ARRAYAGG(bar NULL ON NULL) as null_on_null,
+	JSON_ARRAYAGG(bar NULL ON NULL RETURNING jsonb) as nullonnull_returning_jsonb,
+	JSON_ARRAYAGG(foo) as row_no_options,
+	JSON_ARRAYAGG(foo RETURNING jsonb) as row_returning_jsonb,
+	JSON_ARRAYAGG(foo ORDER BY bar) FILTER (WHERE bar > 2) as row_filtered_agg,
+	JSON_ARRAYAGG(foo ORDER BY bar RETURNING jsonb) FILTER (WHERE bar > 2) as row_filtered_agg_returning_jsonb
+FROM
+	(VALUES (NULL), (3), (1), (NULL), (NULL), (5), (2), (4), (NULL)) foo(bar)
+;
+----------
+[SELECT|MERGE] WITH t AS (
+    MERGE INTO target_tg t
+    USING (SELECT 1 as key) s
+    ON s.key = t.key
+    WHEN MATCHED AND balance < 100 THEN
+      UPDATE SET balance = balance * 2, val = t.val || ' when1'
+    WHEN MATCHED AND balance < 200 THEN
+      UPDATE SET balance = balance * 4, val = t.val || ' when2'
+    WHEN MATCHED AND balance < 300 THEN
+      UPDATE SET balance = balance * 8, val = t.val || ' when3'
+    RETURNING t.*
+  )
+  SELECT * FROM t
+;
+----------
+[SELECT] SELECT 0o17777777777
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON('123'::bytea FORMAT JSON ENCODING UTF8)
+;
+----------
+[PERFORMANCE] -- Test JSON_ARRAY(subquery) deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON('{"a": 1, "a": 2}' WITH UNIQUE KEYS)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text FORMAT JSON PATH '$' WITH WRAPPER KEEP QUOTES))
+;
+----------
+[SELECT] select foo from json_table ( jsonb '[{"foo":"1"}]' , '$[*]' as p0 columns ( nested '$' as p1 columns ( nested path '$' as p11 columns ( foo int ) ) ) ) jt ( foo )
+;
+----------
+[PERFORMANCE] explain (verbose, costs off)
+select * from
+     (select k from
+         (select i, coalesce(i, j) as k from
+             (select i from t union all select 0)
+             join (select 1 as j limit 1) on i = j)
+         right join (select 2 as x) on true
+         join (select 3 as y) on i is not null
+     ),
+     lateral (select k as kl limit 1)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('foo': NULL::json FORMAT JSON)
+;
+----------
+[SELECT] -- indent containing DOCTYPE declaration
+SELECT xmlserialize(DOCUMENT '<!DOCTYPE a><a/>' AS text INDENT)
+;
+----------
+[SELECT] -- Segment deletion
+SELECT test_slru_page_delete(0x1234500000030)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '{"d1": "foo"}', '$'
+    COLUMNS (js1 jsonb_test_domain PATH '$.d1' DEFAULT 'foo2'::jsonb_test_domain ON ERROR))
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'strict $.a' ERROR ON ERROR)
+;
+----------
+[SELECT] -- 48 extra pages
+SELECT count(test_slru_page_write(a, 'Test SLRU 64-bit'))
+  FROM generate_series(0x1234500000001, 0x1234500000030, 1) as a
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int) NULL ON ERROR)
+;
+----------
+[SELECT] SELECT a, a::bool FROM JSON_TABLE(jsonb '{"a":1}', '$' COLUMNS (a dint4_0 EXISTS PATH '$.b'))
+;
+----------
+[SELECT] -- Test applying PASSING variables at different nesting levels
+SELECT sub.* FROM s,
+	(VALUES (23)) x(x), generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[0].z1[*]' COLUMNS (NESTED PATH '$ ?(@ >= ($"x" -2))' COLUMNS (a int PATH '$')),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' COLUMNS (b int PATH '$'))
+	)) sub
+;
+----------
+[PERFORMANCE] EXPLAIN (verbose, costs off)
+MERGE INTO tgt t
+USING (SELECT *, (SELECT count(*) FROM ref r
+                   WHERE r.ab = s.a + s.b
+                     AND r.cd = s.c - s.d) cnt
+         FROM src s) s
+ON t.a = s.a AND t.b < s.cnt
+WHEN MATCHED AND t.c > s.cnt THEN
+  UPDATE SET (b, c) = (SELECT s.b, s.cnt)
+;
+----------
+[SELECT] SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			aaa int, -- "aaa" has implicit path '$."aaa"'
+			aaa1 int PATH '$.aaa',
+			js2 json PATH '$',
+			jsb2w jsonb PATH '$' WITH WRAPPER,
+			jsb2q jsonb PATH '$' OMIT QUOTES,
+			ia int[] PATH '$',
+			ta text[] PATH '$',
+			jba jsonb[] PATH '$'
+		)
+	) jt
+	ON true
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+WITH cte_init AS MATERIALIZED (SELECT 1 a, 'cte_init val' b)
+MERGE INTO m USING (select 1 k, 'merge source InitPlan' v offset 0) o ON m.k=o.k
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || ' merge update' FROM cte_init WHERE a = 1 LIMIT 1)
+WHEN NOT MATCHED THEN INSERT VALUES(o.k, o.v)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+WITH cte_basic AS MATERIALIZED (SELECT 1 a, 'cte_basic val' b)
+MERGE INTO m USING (select 0 k, 'merge source SubPlan' v offset 0) o ON m.k=o.k
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || ' merge update' FROM cte_basic WHERE cte_basic.a = m.k LIMIT 1)
+WHEN NOT MATCHED THEN INSERT VALUES(o.k, o.v)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' EMPTY ON EMPTY)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int4 EXISTS PATH '$' ERROR ON ERROR))
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1: 1, '1': NULL WITH UNIQUE)
+;
+----------
+[SELECT] -- error
+
+--
+-- conversions between bytea and integer types
+--
+SELECT 0x1234::int2::bytea AS "\x1234", (-0x1234)::int2::bytea AS "\xedcc"
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) OVER (ORDER BY i DESC) FROM (VALUES (1), (2), (3)) AS t(i)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v NULL ON NULL RETURNING text) FROM (VALUES ('a', 1), ('b', NULL)) AS t(k,v)
+;
+----------
+[SELECT] -- RETUGNING pseudo-types not allowed
+SELECT JSON_QUERY(jsonb '[3,4]', '$[*]' RETURNING anyarray EMPTY OBJECT ON ERROR)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1: 1, '1': NULL ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+----------
+[SELECT] with recursive test as (
+  select 0 as x
+  union all
+  select (x + 1) % 10
+  from test
+) cycle x set is_cycle using path
+select * from test
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '<foo><bar><val x="y">42</val></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$ts' PASSING timestamptz '2018-02-21 12:34:56 +10' AS ts RETURNING json)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': '123', 'b': JSON_OBJECT('a': 111, 'b': 'aaa'))
+;
+----------
+[SELECT] SELECT sub.* FROM s,
+	(VALUES (23)) x(x), generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[0].z1[*]' COLUMNS (NESTED PATH '$ ?(@ >= ($"x" -2))' COLUMNS (a int PATH '$')),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' COLUMNS (b int PATH '$'))
+	)) sub
+;
+----------
+[SELECT] -- ok
+SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE x.t = 'one'
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '123', '$' RETURNING text)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb'{"rec": "[1,2]"}', '$.rec' returning int4range omit quotes)
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%#"g' ESCAPE '#') AS "bcdef"
+;
+----------
+[SELECT] SELECT test_slru_page_delete(0x1234500000030)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING char(3))
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '123', '$' RETURNING queryfuncs_char2 DEFAULT '1' ON ERROR)
+;
+----------
+[SELECT] SELECT t1.c2 FROM ft1 t1 WHERE t1.c1 > 960 ORDER BY t1.c2 FETCH FIRST 2 ROWS WITH TIES
+;
+----------
+[SELECT] SELECT test_slru_page_exists(0x1234500000030)
+;
+----------
+[SELECT] SELECT ROW(x.*) FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING json OMIT QUOTES ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT TIMESTAMP WITH TIME ZONE '2001-02-16 20:38:40-05' AT LOCAL
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a' VALUE 2 + 3)
+;

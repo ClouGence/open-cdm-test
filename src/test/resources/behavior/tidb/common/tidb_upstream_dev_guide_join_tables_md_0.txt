@@ -1,0 +1,139 @@
+[performance__common_tidb_upstream_dev_guide_join_tables_md_0_000]
+sql:
+EXPLAIN SELECT *
+FROM authors a STRAIGHT_JOIN book_authors ba STRAIGHT_JOIN books b
+WHERE b.id = ba.book_id AND ba.author_id = a.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(2:5~2:12) /test/1/catalog1/schema1/authors/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:29~2:41) /test/1/catalog1/schema1/book_authors/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:59~2:64) /test/1/catalog1/schema1/books/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_dev_guide_join_tables_md_0_001]
+sql:
+EXPLAIN SELECT /*+ HASH_JOIN(b, r) */ b.id AS book_id, ANY_VALUE(b.title) AS book_title, AVG(r.score) AS average_score
+FROM books b
+LEFT JOIN ratings r ON b.id = r.book_id
+GROUP BY b.id
+ORDER BY b.published_at DESC
+LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Function(1:55~1:64) /test/1/catalog1/schema1/ANY_VALUE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:89~1:92) /test/1/catalog1/schema1/AVG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:10) /test/1/catalog1/schema1/books/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:10~3:17) /test/1/catalog1/schema1/ratings/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_dev_guide_join_tables_md_0_002]
+sql:
+SELECT b.id AS book_id, ANY_VALUE(b.title) AS book_title, AVG(r.score) AS average_score
+FROM books b
+LEFT JOIN ratings r ON b.id = r.book_id
+GROUP BY b.id
+ORDER BY b.published_at DESC
+LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:24~1:33) /test/1/catalog1/schema1/ANY_VALUE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:58~1:61) /test/1/catalog1/schema1/AVG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:10) /test/1/catalog1/schema1/books/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:10~3:17) /test/1/catalog1/schema1/ratings/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_dev_guide_join_tables_md_0_003]
+sql:
+SELECT ANY_VALUE(a.id) AS author_id, ANY_VALUE(a.name) AS author_name, COUNT(ba.book_id) AS books
+FROM authors a
+JOIN book_authors ba ON a.id = ba.author_id
+GROUP BY ba.author_id
+ORDER BY books DESC
+LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:16) /test/1/catalog1/schema1/ANY_VALUE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:71~1:76) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:12) /test/1/catalog1/schema1/authors/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:5~3:17) /test/1/catalog1/schema1/book_authors/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[delete__common_tidb_upstream_dev_guide_join_tables_md_0_004]
+sql:
+DELETE FROM ratings WHERE book_id = 3438991610;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "DELETE": [
+    {
+      "subject": "Table(1:12~1:19) /test/1/catalog1/schema1/ratings/",
+      "action" : "DELETE"
+    }
+  ]
+}

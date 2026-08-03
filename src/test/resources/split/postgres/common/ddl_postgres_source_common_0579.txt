@@ -1,0 +1,600 @@
+CREATE FUNCTION rw_view1_trig_fn()
+RETURNS trigger AS
+$$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO base_tbl VALUES (NEW.a, NEW.b);
+    RETURN NEW;
+  ELSIF TG_OP = 'UPDATE' THEN
+    UPDATE base_tbl SET b=NEW.b WHERE a=OLD.a;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    DELETE FROM base_tbl WHERE a=OLD.a;
+    RETURN OLD;
+  END IF;
+END;
+$$
+LANGUAGE plpgsql
+;
+create index gin_test_idx on gin_test_tbl using gin (i)
+  with (fastupdate = on, gin_pending_list_limit = 4096)
+;
+ALTER OPERATOR <= (isbn13, isbn) SET (
+	RESTRICT = scalarlesel,
+	JOIN = scalarlejoinsel)
+;
+-- test range types and collations
+
+create type textrange_c as range(subtype=text, collation="C")
+;
+CREATE SCHEMA fkpart12
+  CREATE TABLE fk_p ( id int, jd int, PRIMARY KEY(id, jd)) PARTITION BY list (id)
+  CREATE TABLE fk_p_1 PARTITION OF fk_p FOR VALUES IN (1) PARTITION BY list (jd)
+  CREATE TABLE fk_p_1_1 PARTITION OF fk_p_1 FOR VALUES IN (1)
+  CREATE TABLE fk_p_1_2 PARTITION OF fk_p_1 FOR VALUES IN (2)
+  CREATE TABLE fk_p_2 PARTITION OF fk_p FOR VALUES IN (2) PARTITION BY list (jd)
+  CREATE TABLE fk_p_2_1 PARTITION OF fk_p_2 FOR VALUES IN (1)
+  CREATE TABLE fk_p_2_2 PARTITION OF fk_p_2 FOR VALUES IN (2)
+  CREATE TABLE fk_r_1 ( id int PRIMARY KEY, p_id int NOT NULL, p_jd int NOT NULL)
+  CREATE TABLE fk_r_2 ( id int PRIMARY KEY, p_id int NOT NULL, p_jd int NOT NULL) PARTITION BY list (id)
+  CREATE TABLE fk_r_2_1 PARTITION OF fk_r_2 FOR VALUES IN (2, 1)
+  CREATE TABLE fk_r   ( id int PRIMARY KEY, p_id int NOT NULL, p_jd int NOT NULL,
+       FOREIGN KEY (p_id, p_jd) REFERENCES fk_p (id, jd)
+  ) PARTITION BY list (id)
+;
+CREATE VIEW pg_available_extension_versions AS
+    SELECT E.name, E.version, (X.extname IS NOT NULL) AS installed,
+           E.superuser, E.trusted, E.relocatable,
+           E.schema, E.requires, E.comment
+      FROM pg_available_extension_versions() AS E
+           LEFT JOIN pg_extension AS X
+             ON E.name = X.extname AND E.version = X.extversion
+;
+DROP INDEX concur_index8
+;
+CREATE OPERATOR CLASS gist_timestamptz_ops
+DEFAULT FOR TYPE timestamptz USING gist
+AS
+	OPERATOR	1	<  ,
+	OPERATOR	2	<= ,
+	OPERATOR	3	=  ,
+	OPERATOR	4	>= ,
+	OPERATOR	5	>  ,
+	FUNCTION	1	gbt_tstz_consistent (internal, timestamptz, int2, oid, internal),
+	FUNCTION	2	gbt_ts_union (internal, internal),
+	FUNCTION	3	gbt_tstz_compress (internal),
+	FUNCTION	4	gbt_decompress (internal),
+	FUNCTION	5	gbt_ts_penalty (internal, internal, internal),
+	FUNCTION	6	gbt_ts_picksplit (internal, internal),
+	FUNCTION	7	gbt_ts_same (gbtreekey16, gbtreekey16, internal),
+	STORAGE		gbtreekey16
+;
+CREATE TABLE test1 (a int, b text)
+;
+-- INSTEAD OF triggers aren't allowed on tables
+CREATE TRIGGER invalid_trig INSTEAD OF INSERT ON main_table
+FOR EACH ROW EXECUTE PROCEDURE view_trigger('instead_of_ins')
+;
+CREATE TABLE atest3 (one int, two int, three int)
+;
+VACUUM (SKIP_DATABASE_STATS, SKIP_LOCKED) pg_catalog.pg_ts_template
+;
+VACUUM (PROCESS_MAIN FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_type
+;
+CREATE OPERATOR #%# (
+   leftarg = int8,		
+   procedure = factorial
+)
+;
+create trigger self_ref_before_trig
+  before delete on self_ref
+  for each statement execute procedure trigger_func('self_ref')
+;
+CREATE TABLE "public"."gtest_normal_child" (
+    "a" integer,
+    "b" integer GENERATED ALWAYS AS (("a" * 2)) STORED
+)
+;
+CREATE AGGREGATE priv_testagg1(int) (sfunc = int4pl, stype = int4)
+;
+alter table pp1 alter column f1 drop not null
+;
+CREATE FUNCTION isnge(ismn, ismn13)
+	RETURNS boolean
+	AS 'int8ge'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+CREATE TABLE public.tst_comp_enum (
+		a INTEGER PRIMARY KEY,
+		b public.tst_comp_enum_t
+		)
+;
+CREATE OPERATOR CLASS text_ops
+DEFAULT FOR TYPE text USING bloom AS
+	OPERATOR	1	=(text, text),
+	FUNCTION	1	hashtext(text)
+;
+COMMENT ON TYPE ismn
+	IS 'International Standard Music Number (ISMN)'
+;
+--
+-- pruning with clauses containing <> operator
+--
+
+-- doesn't prune range partitions
+create table rp (a int) partition by range (a)
+;
+CREATE OR REPLACE FUNCTION hs_subxids (n integer)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+    BEGIN
+      IF n <= 0 THEN RETURN; END IF;
+      INSERT INTO hs_extreme VALUES (n);
+      PERFORM hs_subxids(n - 1);
+      RETURN;
+    EXCEPTION WHEN raise_exception THEN NULL; END;
+$$
+;
+CREATE TABLE test_ex_constraints (
+    c circle,
+    EXCLUDE USING gist (c WITH &&)
+)
+;
+ANALYZE (BUFFER_USAGE_LIMIT 0) vac_option_tab
+;
+CALL ptest10(null, 7, c => 2)
+;
+CREATE TABLE tab2 (a int PRIMARY KEY, b varchar, c int)
+;
+ALTER TABLE pg_toast.pg_toast_27531 RENAME TO reind_con_toast
+;
+CREATE SCHEMA AUTHORIZATION regress_create_schema_role
+  CREATE INDEX ON schema_not_existing.tab (id)
+;
+CREATE TABLE reindex_temp_before AS
+SELECT oid, relname, relfilenode, relkind, reltoastrelid
+  FROM pg_class
+  WHERE relname IN ('concur_temp_ind_1', 'concur_temp_ind_2')
+;
+--
+-- heap_page_item_attrs()
+--
+CREATE FUNCTION heap_page_item_attrs(
+    IN page bytea,
+    IN rel_oid regclass,
+    IN do_detoast bool,
+    OUT lp smallint,
+    OUT lp_off smallint,
+    OUT lp_flags smallint,
+    OUT lp_len smallint,
+    OUT t_xmin xid,
+    OUT t_xmax xid,
+    OUT t_field3 int4,
+    OUT t_ctid tid,
+    OUT t_infomask2 integer,
+    OUT t_infomask integer,
+    OUT t_hoff smallint,
+    OUT t_bits text,
+    OUT t_oid oid,
+    OUT t_attrs bytea[]
+    )
+RETURNS SETOF record AS $$
+SELECT lp,
+       lp_off,
+       lp_flags,
+       lp_len,
+       t_xmin,
+       t_xmax,
+       t_field3,
+       t_ctid,
+       t_infomask2,
+       t_infomask,
+       t_hoff,
+       t_bits,
+       t_oid,
+       tuple_data_split(
+         rel_oid,
+         t_data,
+         t_infomask,
+         t_infomask2,
+         t_bits,
+         do_detoast)
+         AS t_attrs
+  FROM heap_page_items(page);
+$$ LANGUAGE SQL PARALLEL SAFE
+;
+CREATE TEXT SEARCH CONFIGURATION irish
+	(PARSER = default)
+;
+-- make sure expanded tuple has correct self pointer
+-- it will be required by the RI trigger doing the cascading delete
+
+CREATE TABLE leader (a int PRIMARY KEY, b int)
+;
+-- fail
+
+-- cleanup
+drop table nulltest
+;
+CREATE TABLE tab_default (a int)
+;
+CREATE SUBSCRIPTION regress_testsub CONNECTION 'testconn' PUBLICATION testpub
+;
+ALTER SUBSCRIPTION tap_sub_copy SET (two_phase = false)
+;
+CREATE VIEW pg_stat_all_indexes AS
+    SELECT
+            C.oid AS relid,
+            I.oid AS indexrelid,
+            N.nspname AS schemaname,
+            C.relname AS relname,
+            I.relname AS indexrelname,
+            pg_stat_get_numscans(I.oid) AS idx_scan,
+            pg_stat_get_tuples_returned(I.oid) AS idx_tup_read,
+            pg_stat_get_tuples_fetched(I.oid) AS idx_tup_fetch
+    FROM pg_class C JOIN
+            pg_index X ON C.oid = X.indrelid JOIN
+            pg_class I ON I.oid = X.indexrelid
+            LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+    WHERE C.relkind IN ('r', 't', 'm')
+;
+CREATE INDEX t_b_partial_2_idx ON bitmap_split_or (b) WHERE a = 2
+;
+CREATE DOMAIN arrdomain AS int[]
+;
+CREATE VIEW v4_temp AS
+    SELECT t1.a AS t1_a, t2.a AS t2_a
+    FROM base_table t1, temp_table t2
+    WHERE t1.id = t2.id
+;
+-- VALUES RTEs
+
+CREATE TABLE itest5 (a int generated always as identity, b text)
+;
+CREATE SUBSCRIPTION mysub CONNECTION 'port=20762 host=/tmp/rq1dGsiOuR dbname=postgres' PUBLICATION mypub
+;
+create unique index both_index_key on insertconflicttest(key, fruit collate "C" text_pattern_ops)
+;
+alter table loc2 add constraint loc2_f1positive check (f1 >= 0)
+;
+-- now() is stable, because it returns the transaction timestamp
+ALTER TABLE T ADD COLUMN c1 TIMESTAMP DEFAULT now()
+;
+DROP TABLE ios_bitmap
+;
+-- Test domains with default value for table rewrite.
+CREATE DOMAIN domain1 AS int DEFAULT 11
+;
+CREATE FUNCTION int42_out(int42)
+   RETURNS cstring
+   AS 'int4out'
+   LANGUAGE internal STRICT IMMUTABLE
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE FUNCTION rw_view1_trig_fn()
+RETURNS trigger AS
+$$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    INSERT INTO base_tbl VALUES (NEW.a, NEW.b);
+    RETURN NEW;
+  ELSIF TG_OP = 'UPDATE' THEN
+    UPDATE base_tbl SET b=NEW.b WHERE a=OLD.a;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    DELETE FROM base_tbl WHERE a=OLD.a;
+    RETURN OLD;
+  END IF;
+END;
+$$
+LANGUAGE plpgsql
+;
+----------
+[ADD_INDEX] create index gin_test_idx on gin_test_tbl using gin (i)
+  with (fastupdate = on, gin_pending_list_limit = 4096)
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR <= (isbn13, isbn) SET (
+	RESTRICT = scalarlesel,
+	JOIN = scalarlejoinsel)
+;
+----------
+[CREATE_POLICY] -- test range types and collations
+
+create type textrange_c as range(subtype=text, collation="C")
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA fkpart12
+  CREATE TABLE fk_p ( id int, jd int, PRIMARY KEY(id, jd)) PARTITION BY list (id)
+  CREATE TABLE fk_p_1 PARTITION OF fk_p FOR VALUES IN (1) PARTITION BY list (jd)
+  CREATE TABLE fk_p_1_1 PARTITION OF fk_p_1 FOR VALUES IN (1)
+  CREATE TABLE fk_p_1_2 PARTITION OF fk_p_1 FOR VALUES IN (2)
+  CREATE TABLE fk_p_2 PARTITION OF fk_p FOR VALUES IN (2) PARTITION BY list (jd)
+  CREATE TABLE fk_p_2_1 PARTITION OF fk_p_2 FOR VALUES IN (1)
+  CREATE TABLE fk_p_2_2 PARTITION OF fk_p_2 FOR VALUES IN (2)
+  CREATE TABLE fk_r_1 ( id int PRIMARY KEY, p_id int NOT NULL, p_jd int NOT NULL)
+  CREATE TABLE fk_r_2 ( id int PRIMARY KEY, p_id int NOT NULL, p_jd int NOT NULL) PARTITION BY list (id)
+  CREATE TABLE fk_r_2_1 PARTITION OF fk_r_2 FOR VALUES IN (2, 1)
+  CREATE TABLE fk_r   ( id int PRIMARY KEY, p_id int NOT NULL, p_jd int NOT NULL,
+       FOREIGN KEY (p_id, p_jd) REFERENCES fk_p (id, jd)
+  ) PARTITION BY list (id)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW pg_available_extension_versions AS
+    SELECT E.name, E.version, (X.extname IS NOT NULL) AS installed,
+           E.superuser, E.trusted, E.relocatable,
+           E.schema, E.requires, E.comment
+      FROM pg_available_extension_versions() AS E
+           LEFT JOIN pg_extension AS X
+             ON E.name = X.extname AND E.version = X.extversion
+;
+----------
+[DROP_INDEX] DROP INDEX concur_index8
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR CLASS gist_timestamptz_ops
+DEFAULT FOR TYPE timestamptz USING gist
+AS
+	OPERATOR	1	<  ,
+	OPERATOR	2	<= ,
+	OPERATOR	3	=  ,
+	OPERATOR	4	>= ,
+	OPERATOR	5	>  ,
+	FUNCTION	1	gbt_tstz_consistent (internal, timestamptz, int2, oid, internal),
+	FUNCTION	2	gbt_ts_union (internal, internal),
+	FUNCTION	3	gbt_tstz_compress (internal),
+	FUNCTION	4	gbt_decompress (internal),
+	FUNCTION	5	gbt_ts_penalty (internal, internal, internal),
+	FUNCTION	6	gbt_ts_picksplit (internal, internal),
+	FUNCTION	7	gbt_ts_same (gbtreekey16, gbtreekey16, internal),
+	STORAGE		gbtreekey16
+;
+----------
+[CREATE_TABLE] CREATE TABLE test1 (a int, b text)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] -- INSTEAD OF triggers aren't allowed on tables
+CREATE TRIGGER invalid_trig INSTEAD OF INSERT ON main_table
+FOR EACH ROW EXECUTE PROCEDURE view_trigger('instead_of_ins')
+;
+----------
+[CREATE_TABLE] CREATE TABLE atest3 (one int, two int, three int)
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, SKIP_LOCKED) pg_catalog.pg_ts_template
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_MAIN FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_type
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR #%# (
+   leftarg = int8,		
+   procedure = factorial
+)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger self_ref_before_trig
+  before delete on self_ref
+  for each statement execute procedure trigger_func('self_ref')
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."gtest_normal_child" (
+    "a" integer,
+    "b" integer GENERATED ALWAYS AS (("a" * 2)) STORED
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE AGGREGATE priv_testagg1(int) (sfunc = int4pl, stype = int4)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table pp1 alter column f1 drop not null
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isnge(ismn, ismn13)
+	RETURNS boolean
+	AS 'int8ge'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] CREATE TABLE public.tst_comp_enum (
+		a INTEGER PRIMARY KEY,
+		b public.tst_comp_enum_t
+		)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR CLASS text_ops
+DEFAULT FOR TYPE text USING bloom AS
+	OPERATOR	1	=(text, text),
+	FUNCTION	1	hashtext(text)
+;
+----------
+[COMMENT_TYPE] COMMENT ON TYPE ismn
+	IS 'International Standard Music Number (ISMN)'
+;
+----------
+[CREATE_TABLE] --
+-- pruning with clauses containing <> operator
+--
+
+-- doesn't prune range partitions
+create table rp (a int) partition by range (a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION hs_subxids (n integer)
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+    BEGIN
+      IF n <= 0 THEN RETURN; END IF;
+      INSERT INTO hs_extreme VALUES (n);
+      PERFORM hs_subxids(n - 1);
+      RETURN;
+    EXCEPTION WHEN raise_exception THEN NULL; END;
+$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_ex_constraints (
+    c circle,
+    EXCLUDE USING gist (c WITH &&)
+)
+;
+----------
+[ADMIN_TABLE] ANALYZE (BUFFER_USAGE_LIMIT 0) vac_option_tab
+;
+----------
+[CALL_PROG_OBJ] CALL ptest10(null, 7, c => 2)
+;
+----------
+[CREATE_TABLE] CREATE TABLE tab2 (a int PRIMARY KEY, b varchar, c int)
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_27531 RENAME TO reind_con_toast
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA AUTHORIZATION regress_create_schema_role
+  CREATE INDEX ON schema_not_existing.tab (id)
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE reindex_temp_before AS
+SELECT oid, relname, relfilenode, relkind, reltoastrelid
+  FROM pg_class
+  WHERE relname IN ('concur_temp_ind_1', 'concur_temp_ind_2')
+;
+----------
+[CREATE_PROG_OBJ] --
+-- heap_page_item_attrs()
+--
+CREATE FUNCTION heap_page_item_attrs(
+    IN page bytea,
+    IN rel_oid regclass,
+    IN do_detoast bool,
+    OUT lp smallint,
+    OUT lp_off smallint,
+    OUT lp_flags smallint,
+    OUT lp_len smallint,
+    OUT t_xmin xid,
+    OUT t_xmax xid,
+    OUT t_field3 int4,
+    OUT t_ctid tid,
+    OUT t_infomask2 integer,
+    OUT t_infomask integer,
+    OUT t_hoff smallint,
+    OUT t_bits text,
+    OUT t_oid oid,
+    OUT t_attrs bytea[]
+    )
+RETURNS SETOF record AS $$
+SELECT lp,
+       lp_off,
+       lp_flags,
+       lp_len,
+       t_xmin,
+       t_xmax,
+       t_field3,
+       t_ctid,
+       t_infomask2,
+       t_infomask,
+       t_hoff,
+       t_bits,
+       t_oid,
+       tuple_data_split(
+         rel_oid,
+         t_data,
+         t_infomask,
+         t_infomask2,
+         t_bits,
+         do_detoast)
+         AS t_attrs
+  FROM heap_page_items(page);
+$$ LANGUAGE SQL PARALLEL SAFE
+;
+----------
+[CREATE_POLICY] CREATE TEXT SEARCH CONFIGURATION irish
+	(PARSER = default)
+;
+----------
+[CREATE_TABLE] -- make sure expanded tuple has correct self pointer
+-- it will be required by the RI trigger doing the cascading delete
+
+CREATE TABLE leader (a int PRIMARY KEY, b int)
+;
+----------
+[DROP_TABLE] -- fail
+
+-- cleanup
+drop table nulltest
+;
+----------
+[CREATE_TABLE] CREATE TABLE tab_default (a int)
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION regress_testsub CONNECTION 'testconn' PUBLICATION testpub
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION tap_sub_copy SET (two_phase = false)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW pg_stat_all_indexes AS
+    SELECT
+            C.oid AS relid,
+            I.oid AS indexrelid,
+            N.nspname AS schemaname,
+            C.relname AS relname,
+            I.relname AS indexrelname,
+            pg_stat_get_numscans(I.oid) AS idx_scan,
+            pg_stat_get_tuples_returned(I.oid) AS idx_tup_read,
+            pg_stat_get_tuples_fetched(I.oid) AS idx_tup_fetch
+    FROM pg_class C JOIN
+            pg_index X ON C.oid = X.indrelid JOIN
+            pg_class I ON I.oid = X.indexrelid
+            LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+    WHERE C.relkind IN ('r', 't', 'm')
+;
+----------
+[ADD_INDEX] CREATE INDEX t_b_partial_2_idx ON bitmap_split_or (b) WHERE a = 2
+;
+----------
+[CREATE_TYPE] CREATE DOMAIN arrdomain AS int[]
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW v4_temp AS
+    SELECT t1.a AS t1_a, t2.a AS t2_a
+    FROM base_table t1, temp_table t2
+    WHERE t1.id = t2.id
+;
+----------
+[CREATE_TABLE] -- VALUES RTEs
+
+CREATE TABLE itest5 (a int generated always as identity, b text)
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION mysub CONNECTION 'port=20762 host=/tmp/rq1dGsiOuR dbname=postgres' PUBLICATION mypub
+;
+----------
+[ADD_INDEX] create unique index both_index_key on insertconflicttest(key, fruit collate "C" text_pattern_ops)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table loc2 add constraint loc2_f1positive check (f1 >= 0)
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] -- now() is stable, because it returns the transaction timestamp
+ALTER TABLE T ADD COLUMN c1 TIMESTAMP DEFAULT now()
+;
+----------
+[DROP_TABLE] DROP TABLE ios_bitmap
+;
+----------
+[CREATE_TYPE] -- Test domains with default value for table rewrite.
+CREATE DOMAIN domain1 AS int DEFAULT 11
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION int42_out(int42)
+   RETURNS cstring
+   AS 'int4out'
+   LANGUAGE internal STRICT IMMUTABLE
+;

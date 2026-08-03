@@ -1,0 +1,814 @@
+[doris_official_website_create_table_010__create_table__0001]
+sql:
+CREATE TABLE example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "用户 id",
+    `date` DATE NOT NULL COMMENT "数据灌入日期时间",
+    `timestamp` DATETIME NOT NULL COMMENT "数据灌入的时间戳",
+    `city` VARCHAR(20) COMMENT "用户所在城市",
+    `age` SMALLINT COMMENT "用户年龄",
+    `sex` TINYINT COMMENT "用户性别",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "用户最后一次访问时间",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "用户总消费",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "用户最大停留时间",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "用户最小停留时间"
+)
+AUTO PARTITION BY RANGE(date_trunc(`date`, 'month')) --- 使用月作为分区粒度
+()
+DISTRIBUTED BY HASH(`user_id`) BUCKETS 16
+PROPERTIES
+(
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "month", --- 二者粒度必须相同
+    "dynamic_partition.start" = "-2", --- 动态分区自动清理超过两周的历史分区
+    "dynamic_partition.end" = "0", --- 动态分区不创建未来分区，完全交给自动分区
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "8"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:30) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Function(14:24~14:34) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0002]
+sql:
+CREATE TABLE IF NOT EXISTS example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "用户 id",
+    `date` DATE NOT NULL COMMENT "数据灌入日期时间",
+    `timestamp` DATETIME NOT NULL COMMENT "数据灌入的时间戳",
+    `city` VARCHAR(20) COMMENT "用户所在城市",
+    `age` SMALLINT COMMENT "用户年龄",
+    `sex` TINYINT COMMENT "用户性别",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "用户最后一次访问时间",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "用户总消费",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "用户最大停留时间",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "用户最小停留时间"
+)
+PARTITION BY RANGE(`date`)
+(
+    PARTITION `p201701` VALUES LESS THAN ("2017-02-01"),
+    PARTITION `p201702` VALUES LESS THAN ("2017-03-01"),
+    PARTITION `p201703` VALUES LESS THAN ("2017-04-01"),
+    PARTITION `p2018` VALUES [("2018-01-01"), ("2019-01-01"))
+)
+DISTRIBUTED BY HASH(`user_id`) BUCKETS AUTO
+PROPERTIES
+(
+    "replication_num" = "1",
+    "estimate_partition_size" = "2G" --- 用户估计一个分区将有的数据量，不提供则默认为 10G
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:44) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0003]
+sql:
+CREATE TABLE iceberg_ctas
+PARTITION BY LIST (pt1, pt2) ()
+AS SELECT col1,pt1,pt2 FROM part_ctas_src WHERE col1>0;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:25) /test/1/catalog1/schema1/iceberg_ctas/",
+      "action" : "CREATE",
+      "target" : "Table(3:28~3:41) /test/1/catalog1/schema1/part_ctas_src/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0004]
+sql:
+CREATE TABLE iceberg.iceberg_db.iceberg_ctas (col1,col2,pt1)
+PARTITION BY LIST (pt1) ()
+PROPERTIES (
+    'write-format'='parquet',
+    'compression-codec'='zstd'
+)
+AS SELECT col1,pt1 as col2,pt2 as pt1 FROM test_ctas.part_ctas_src WHERE col1>0;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:44) /test/1/iceberg/iceberg_db/iceberg_ctas/",
+      "action" : "CREATE",
+      "target" : "Table(7:43~7:66) /test/1/catalog1/test_ctas/part_ctas_src/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0005]
+sql:
+-- Range Partition
+CREATE TABLE IF NOT EXISTS example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "用户id",
+    `date` DATE NOT NULL COMMENT "数据灌入日期时间",
+    `timestamp` DATETIME NOT NULL COMMENT "数据灌入的时间戳",
+    `city` VARCHAR(20) COMMENT "用户所在城市",
+    `age` SMALLINT COMMENT "用户年龄",
+    `sex` TINYINT COMMENT "用户性别",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "用户最后一次访问时间",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "用户总消费",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "用户最大停留时间",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "用户最小停留时间"
+)
+ENGINE=OLAP
+AGGREGATE KEY(`user_id`, `date`, `timestamp`, `city`, `age`, `sex`)
+PARTITION BY RANGE(`date`)
+(
+    PARTITION `p201701` VALUES LESS THAN ("2017-02-01"),
+    PARTITION `p201702` VALUES LESS THAN ("2017-03-01"),
+    PARTITION `p201703` VALUES LESS THAN ("2017-04-01"),
+    PARTITION `p2018` VALUES [("2018-01-01"), ("2019-01-01"))
+)
+DISTRIBUTED BY HASH(`user_id`) BUCKETS 16
+PROPERTIES
+(
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:27~2:44) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0006]
+sql:
+CREATE TABLE IF NOT EXISTS example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "用户 id",
+    `date` DATE NOT NULL COMMENT "数据灌入日期时间",
+    `timestamp` DATETIME NOT NULL COMMENT "数据灌入的时间戳",
+    `city` VARCHAR(20) COMMENT "用户所在城市",
+    `age` SMALLINT COMMENT "用户年龄",
+    `sex` TINYINT COMMENT "用户性别",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "用户最后一次访问时间",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "用户总消费",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "用户最大停留时间",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "用户最小停留时间"
+)
+ENGINE=OLAP
+AGGREGATE KEY(`user_id`, `date`, `timestamp`, `city`, `age`, `sex`)
+AUTO PARTITION BY RANGE(date_trunc(`date`, 'month')) --- 使用月作为分区粒度
+()
+DISTRIBUTED BY HASH(`user_id`) BUCKETS 16
+PROPERTIES
+(
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:44) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Function(16:24~16:34) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0007]
+sql:
+CREATE TABLE IF NOT EXISTS example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "用户 id",
+    `date` DATE NOT NULL COMMENT "数据灌入日期时间",
+    `timestamp` DATETIME NOT NULL COMMENT "数据灌入的时间戳",
+    `city` VARCHAR(20) COMMENT "用户所在城市",
+    `age` SMALLINT COMMENT "用户年龄",
+    `sex` TINYINT COMMENT "用户性别",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "用户最后一次访问时间",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "用户总消费",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "用户最大停留时间",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "用户最小停留时间"
+)
+ENGINE=OLAP
+AGGREGATE KEY(`user_id`, `date`, `timestamp`, `city`, `age`, `sex`)
+PARTITION BY RANGE(`date`)
+()
+DISTRIBUTED BY HASH(`user_id`) BUCKETS 16
+PROPERTIES
+(
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "WEEK", --- 分区粒度为周
+    "dynamic_partition.start" = "-2", --- 向前保留两周
+    "dynamic_partition.end" = "2", --- 提前创建后两周
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "8"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:44) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0008]
+sql:
+CREATE TABLE IF NOT EXISTS example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "用户 id",
+    `date` DATE NOT NULL COMMENT "数据灌入日期时间",
+    `timestamp` DATETIME NOT NULL COMMENT "数据灌入的时间戳",
+    `city` VARCHAR(20) COMMENT "用户所在城市",
+    `age` SMALLINT COMMENT "用户年龄",
+    `sex` TINYINT COMMENT "用户性别",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "用户最后一次访问时间",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "用户总消费",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "用户最大停留时间",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "用户最小停留时间"
+)
+ENGINE=OLAP
+AGGREGATE KEY(`user_id`, `date`, `timestamp`, `city`, `age`, `sex`)
+AUTO PARTITION BY RANGE(date_trunc(`date`, 'month')) --- 使用月作为分区粒度
+()
+DISTRIBUTED BY HASH(`user_id`) BUCKETS 16
+PROPERTIES
+(
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "month", --- 二者粒度必须相同
+    "dynamic_partition.start" = "-2", --- 动态分区自动清理超过两周的历史分区
+    "dynamic_partition.end" = "0", --- 动态分区不创建未来分区，完全交给自动分区
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "8"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:44) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Function(16:24~16:34) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0009]
+sql:
+CREATE TABLE IF NOT EXISTS example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "用户 id",
+    `date` DATE NOT NULL COMMENT "数据灌入日期时间",
+    `timestamp` DATETIME NOT NULL COMMENT "数据灌入的时间戳",
+    `city` VARCHAR(20) COMMENT "用户所在城市",
+    `age` SMALLINT COMMENT "用户年龄",
+    `sex` TINYINT COMMENT "用户性别",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "用户最后一次访问时间",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "用户总消费",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "用户最大停留时间",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "用户最小停留时间"
+)
+ENGINE=OLAP
+AGGREGATE KEY(`user_id`, `date`, `timestamp`, `city`, `age`, `sex`)
+PARTITION BY RANGE(`date`)
+(
+    PARTITION `p201701` VALUES LESS THAN ("2017-02-01"),
+    PARTITION `p201702` VALUES LESS THAN ("2017-03-01"),
+    PARTITION `p201703` VALUES LESS THAN ("2017-04-01"),
+    PARTITION `p2018` VALUES [("2018-01-01"), ("2019-01-01"))
+)
+DISTRIBUTED BY HASH(`user_id`) BUCKETS AUTO
+PROPERTIES
+(
+    "replication_num" = "1",
+    "estimate_partition_size" = "2G" --- 用户估计一个分区将有的数据量，不提供则默认为 10G
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:44) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0010]
+sql:
+CREATE TABLE unpartitioned_table (
+    `col1` BOOLEAN COMMENT 'col1',
+    `col2` INT COMMENT 'col2',
+    `col3` BIGINT COMMENT 'col3',
+    `col4` CHAR(10) COMMENT 'col4',
+    `col5` FLOAT COMMENT 'col5',
+    `col6` DOUBLE COMMENT 'col6',
+    `col7` DECIMAL(9,4) COMMENT 'col7',
+    `col8` VARCHAR(11) COMMENT 'col8',
+    `col9` STRING COMMENT 'col9'
+  )  ENGINE=hive
+  PROPERTIES (
+    'file_format'='parquet'
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:32) /test/1/catalog1/schema1/unpartitioned_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0011]
+sql:
+CREATE TABLE partition_table (
+    `col1` BOOLEAN COMMENT 'col1',
+    `col2` INT COMMENT 'col2',
+    `col3` BIGINT COMMENT 'col3',
+    `col4` DECIMAL(2,1) COMMENT 'col4',
+    `pt1` VARCHAR COMMENT 'pt1',
+    `pt2` VARCHAR COMMENT 'pt2'
+  )  ENGINE=hive
+  PARTITION BY LIST (pt1, pt2) ()
+  PROPERTIES (
+    'file_format'='orc',
+    'compression'='zlib'
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:28) /test/1/catalog1/schema1/partition_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0012]
+sql:
+CREATE TABLE text_table (
+      `id` INT,
+      `name` STRING
+  ) PROPERTIES (
+      'file_format'='text',
+      'compression'='gzip',
+      'field.delim'='\t',
+      'line.delim'='\n',
+      'collection.delim'=';',
+      'mapkey.delim'=':',
+      'serialization.null.format'='\\N',
+      'escape.delim'='\\'
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:23) /test/1/catalog1/schema1/text_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0013]
+sql:
+-- Range Partition
+CREATE TABLE IF NOT EXISTS example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "User ID",
+    `date` DATE NOT NULL COMMENT "Date when the data are imported",
+    `timestamp` DATETIME NOT NULL COMMENT "Timestamp when the data are imported",
+    `city` VARCHAR(20) COMMENT "User location city",
+    `age` SMALLINT COMMENT "User age",
+    `sex` TINYINT COMMENT "User gender",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "User last visit time",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "Total user consumption",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "Maximum user dwell time",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "Minimum user dwell time"   
+)
+ENGINE=OLAP
+AGGREGATE KEY(`user_id`, `date`, `timestamp`, `city`, `age`, `sex`)
+PARTITION BY RANGE(`date`)
+(
+    PARTITION `p201701` VALUES [("2017-01-01"),  ("2017-02-01")),
+    PARTITION `p201702` VALUES [("2017-02-01"), ("2017-03-01")),
+    PARTITION `p201703` VALUES [("2017-03-01"), ("2017-04-01"))
+)
+DISTRIBUTED BY HASH(`user_id`) BUCKETS 16
+PROPERTIES
+(
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:27~2:44) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0014]
+sql:
+CREATE TABLE IF NOT EXISTS example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "User ID",
+    `date` DATE NOT NULL COMMENT "Date when the data are imported",
+    `timestamp` DATETIME NOT NULL COMMENT "Timestamp when the data are imported",
+    `city` VARCHAR(20) COMMENT "User location city",
+    `age` SMALLINT COMMENT "User age",
+    `sex` TINYINT COMMENT "User gender",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "User last visit time",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "Total user consumption",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "Maximum user dwell time",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "Minimum user dwell time"   
+)
+ENGINE=OLAP
+AGGREGATE KEY(`user_id`, `date`, `timestamp`, `city`, `age`, `sex`)
+AUTO PARTITION BY RANGE(date_trunc(`date`, 'month')) --- Using months as partition granularity
+()
+DISTRIBUTED BY HASH(`user_id`) BUCKETS 16
+PROPERTIES
+(
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:44) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Function(16:24~16:34) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0015]
+sql:
+CREATE TABLE IF NOT EXISTS example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "User ID",
+    `date` DATE NOT NULL COMMENT "Date when the data are imported",
+    `timestamp` DATETIME NOT NULL COMMENT "Timestamp when the data are imported",
+    `city` VARCHAR(20) COMMENT "User location city",
+    `age` SMALLINT COMMENT "User age",
+    `sex` TINYINT COMMENT "User gender",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "User last visit time",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "Total user consumption",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "Maximum user dwell time",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "Minimum user dwell time"   
+)
+ENGINE=OLAP
+AGGREGATE KEY(`user_id`, `date`, `timestamp`, `city`, `age`, `sex`)
+PARTITION BY RANGE(`date`)
+()
+DISTRIBUTED BY HASH(`user_id`) BUCKETS 16
+PROPERTIES
+(
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "WEEK", --- Partition granularity is week
+    "dynamic_partition.start" = "-2", --- Retain two weeks forward
+    "dynamic_partition.end" = "2", --- Two weeks after creation in advance
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "8"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:44) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0016]
+sql:
+CREATE TABLE IF NOT EXISTS example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "User ID",
+    `date` DATE NOT NULL COMMENT "Date when the data are imported",
+    `timestamp` DATETIME NOT NULL COMMENT "Timestamp when the data are imported",
+    `city` VARCHAR(20) COMMENT "User location city",
+    `age` SMALLINT COMMENT "User age",
+    `sex` TINYINT COMMENT "User gender",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "User last visit time",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "Total user consumption",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "Maximum user dwell time",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "Minimum user dwell time"   
+)
+ENGINE=OLAP
+AGGREGATE KEY(`user_id`, `date`, `timestamp`, `city`, `age`, `sex`)
+AUTO PARTITION BY RANGE(date_trunc(`date`, 'month')) --- Using months as partition granularity
+()
+DISTRIBUTED BY HASH(`user_id`) BUCKETS 16
+PROPERTIES
+(
+    "replication_num" = "1",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.time_unit" = "month", --- Both must have the same granularity
+    "dynamic_partition.start" = "-2", --- Dynamic Partition automatically cleans up partitions that are more than two weeks old
+    "dynamic_partition.end" = "0", --- Dynamic Partition does not create future partitions. it is left entirely to Auto Partition.
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "8"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:44) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Function(16:24~16:34) /test/1/catalog1/schema1/date_trunc/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0017]
+sql:
+CREATE TABLE IF NOT EXISTS example_range_tbl
+(
+    `user_id` LARGEINT NOT NULL COMMENT "User ID",
+    `date` DATE NOT NULL COMMENT "Date when the data are imported",
+    `timestamp` DATETIME NOT NULL COMMENT "Timestamp when the data are imported",
+    `city` VARCHAR(20) COMMENT "User location city",
+    `age` SMALLINT COMMENT "User age",
+    `sex` TINYINT COMMENT "User gender",
+    `last_visit_date` DATETIME REPLACE DEFAULT "1970-01-01 00:00:00" COMMENT "User last visit time",
+    `cost` BIGINT SUM DEFAULT "0" COMMENT "Total user consumption",
+    `max_dwell_time` INT MAX DEFAULT "0" COMMENT "Maximum user dwell time",
+    `min_dwell_time` INT MIN DEFAULT "99999" COMMENT "Minimum user dwell time"   
+)
+ENGINE=OLAP
+AGGREGATE KEY(`user_id`, `date`, `timestamp`, `city`, `age`, `sex`)
+PARTITION BY RANGE(`date`)
+(
+    PARTITION `p201701` VALUES LESS THAN ("2017-02-01"),
+    PARTITION `p201702` VALUES LESS THAN ("2017-03-01"),
+    PARTITION `p201703` VALUES LESS THAN ("2017-04-01"),
+    PARTITION `p2018` VALUES [("2018-01-01"), ("2019-01-01"))
+)
+DISTRIBUTED BY HASH(`user_id`) BUCKETS AUTO
+PROPERTIES
+(
+    "replication_num" = "1",
+    "estimate_partition_size" = "2G" --- User estimate of the amount of data a partition will have, defaults to 10G if not provided 
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:44) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0018]
+sql:
+CREATE TABLE unpartitioned_table (
+    `col1` BOOLEAN COMMENT 'col1',
+    `col2` INT COMMENT 'col2',
+    `col3` BIGINT COMMENT 'col3',
+    `col4` CHAR(10) COMMENT 'col4',
+    `col5` FLOAT COMMENT 'col5',
+    `col6` DOUBLE COMMENT 'col6',
+    `col7` DECIMAL(9,4) COMMENT 'col7',
+    `col8` VARCHAR(11) COMMENT 'col8',
+    `col9` STRING COMMENT 'col9'
+  )  ENGINE=hive
+  PROPERTIES (
+    'file_format'='parquet'
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:32) /test/1/catalog1/schema1/unpartitioned_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0019]
+sql:
+CREATE TABLE partition_table (
+    `col1` BOOLEAN COMMENT 'col1',
+    `col2` INT COMMENT 'col2',
+    `col3` BIGINT COMMENT 'col3',
+    `col4` DECIMAL(2,1) COMMENT 'col4',
+    `pt1` VARCHAR COMMENT 'pt1',
+    `pt2` VARCHAR COMMENT 'pt2'
+  )  ENGINE=hive
+  PARTITION BY LIST (pt1, pt2) ()
+  PROPERTIES (
+    'file_format'='orc',
+    'compression'='zlib'
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:28) /test/1/catalog1/schema1/partition_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0020]
+sql:
+CREATE TABLE text_table (
+      `id` INT,
+      `name` STRING
+  ) PROPERTIES (
+      'file_format'='text',
+      'compression'='gzip',
+      'field.delim'='\t',
+      'line.delim'='\n',
+      'collection.delim'=';',
+      'mapkey.delim'=':',
+      'serialization.null.format'='\\N',
+      'escape.delim'='\\'
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:23) /test/1/catalog1/schema1/text_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0021]
+sql:
+CREATE TABLE unpartitioned_table (
+    `col1` BOOLEAN COMMENT 'col1',
+    `col2` INT COMMENT 'col2',
+    `col3` BIGINT COMMENT 'col3',
+    `col4` CHAR(10) COMMENT 'col4',
+    `col5` FLOAT COMMENT 'col5',
+    `col6` DOUBLE COMMENT 'col6',
+    `col7` DECIMAL(9,4) COMMENT 'col7',
+    `col8` VARCHAR(11) COMMENT 'col8',
+    `col9` STRING COMMENT 'col9'
+  )  ENGINE=hive
+  PROPERTIES (
+    'file_format'='parquet'
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:32) /test/1/catalog1/schema1/unpartitioned_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0022]
+sql:
+CREATE TABLE partition_table (
+    `col1` BOOLEAN COMMENT 'col1',
+    `col2` INT COMMENT 'col2',
+    `col3` BIGINT COMMENT 'col3',
+    `col4` DECIMAL(2,1) COMMENT 'col4',
+    `pt1` VARCHAR COMMENT 'pt1',
+    `pt2` VARCHAR COMMENT 'pt2'
+  )  ENGINE=hive
+  PARTITION BY LIST (pt1, pt2) ()
+  PROPERTIES (
+    'file_format'='orc',
+    'compression'='zlib'
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:28) /test/1/catalog1/schema1/partition_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_table_010__create_table__0023]
+sql:
+CREATE TABLE text_table (
+      `id` INT,
+      `name` STRING
+  ) PROPERTIES (
+      'file_format'='text',
+      'compression'='gzip',
+      'field.delim'='\t',
+      'line.delim'='\n',
+      'collection.delim'=';',
+      'mapkey.delim'=':',
+      'serialization.null.format'='\\N',
+      'escape.delim'='\\'
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:23) /test/1/catalog1/schema1/text_table/",
+      "action" : "CREATE"
+    }
+  ]
+}

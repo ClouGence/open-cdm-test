@@ -1,0 +1,550 @@
+create function test1() returns int
+    begin atomic
+      select 2 + 2;
+    end
+;
+ALTER PUBLICATION testpub6 SET TABLES IN SCHEMA testpub_rf_schema2, TABLE testpub_rf_schema2.testpub_rf_tbl6 WHERE (i < 99)
+;
+-- ok - can use column list for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk (b)
+;
+ALTER PUBLICATION tap_pub_1 SET TABLE tab_rowfilter_1 WHERE (a > 1000 AND b <> 'filtered'), tab_rowfilter_2 WHERE (c % 2 = 0), tab_rowfilter_3
+;
+ALTER MATERIALIZED VIEW heapmv SET ACCESS METHOD heap, SET ACCESS METHOD heap2
+;
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb,
+  CURRENT_DATE as cd,
+  (select * from CURRENT_DATE) as cd2,
+  CURRENT_TIME as ct,
+  (select * from CURRENT_TIME) as ct2,
+  CURRENT_TIME (1) as ct3,
+  (select * from CURRENT_TIME (1)) as ct4,
+  CURRENT_TIMESTAMP as ct5,
+  (select * from CURRENT_TIMESTAMP) as ct6,
+  CURRENT_TIMESTAMP (1) as ct7,
+  (select * from CURRENT_TIMESTAMP (1)) as ct8,
+  LOCALTIME as lt1,
+  (select * from LOCALTIME) as lt2,
+  LOCALTIME (1) as lt3,
+  (select * from LOCALTIME (1)) as lt4,
+  LOCALTIMESTAMP as lt5,
+  (select * from LOCALTIMESTAMP) as lt6,
+  LOCALTIMESTAMP (1) as lt7,
+  (select * from LOCALTIMESTAMP (1)) as lt8,
+  CURRENT_CATALOG as ca,
+  (select * from CURRENT_CATALOG) as ca2,
+  CURRENT_ROLE as cr,
+  (select * from CURRENT_ROLE) as cr2,
+  CURRENT_SCHEMA as cs,
+  (select * from CURRENT_SCHEMA) as cs2,
+  CURRENT_USER as cu,
+  (select * from CURRENT_USER) as cu2,
+  USER as us,
+  (select * from USER) as us2,
+  SESSION_USER seu,
+  (select * from SESSION_USER) as seu2,
+  SYSTEM_USER as su,
+  (select * from SYSTEM_USER) as su2
+;
+CREATE OR REPLACE FUNCTION interval_pl_timestamptz(interval, timestamptz)
+ RETURNS timestamptz
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+DROP DATABASE IF EXISTS split_db_renamed WITH (FORCE)
+;
+ALTER TABLE split_alter_table.base_table ALTER COLUMN generated_col DROP EXPRESSION IF EXISTS
+;
+ALTER PUBLICATION pub_mix_1 SET TABLE test_mix_1 (a, b)
+;
+alter table "catalog1".schema1."test" alter column "a1" drop expression
+;
+-- drop schema that is not present in the publication
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test2
+;
+-- fail - can't set schema to 'FOR ALL TABLES' publication
+ALTER PUBLICATION testpub_foralltables SET TABLES IN SCHEMA pub_test
+;
+ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl7 (a, b)
+;
+CREATE TABLE cmdata(f1 text COMPRESSION pglz)
+;
+CREATE PUBLICATION testpub_rf_yes FOR TABLE testpub_rf_tbl1 WHERE (a > 1) WITH (publish = 'insert')
+;
+CREATE PUBLICATION tap_pub_not_used FOR TABLE tab_rowfilter_1 WHERE (a < 0)
+;
+CREATE FUNCTION "public"."fipshash"("text") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE STRICT LEAKPROOF PARALLEL SAFE
+    RETURN "substr"("encode"("sha256"(($1)::"bytea"), 'hex'::"text"), 1, 32)
+;
+-- failure - specify a schema when there is already a column list in the
+-- publication
+ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public
+;
+alter database abc refresh collation version
+;
+CREATE OR REPLACE FUNCTION obj_description(oid)
+ RETURNS text
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT
+BEGIN ATOMIC
+select description from pg_description where objoid = $1 and objsubid = 0;
+END
+;
+CREATE PUBLICATION tap_pub_allinschema FOR TABLES IN SCHEMA schema_rf_x, TABLE schema_rf_x.tab_rf_x WHERE (x > 10)
+;
+CREATE PUBLICATION testpub6 FOR TABLE testpub_rf_tbl3 WHERE (e =#> 27)
+;
+ALTER TABLE am_partitioned SET ACCESS METHOD heap2
+;
+create function rls_f(text) returns text
+begin atomic
+ select set_config('rls_test.blah', $1, true) || set_config('row_security', 'false', true) || string_agg(c, ',' order by c) from rls_t;
+end
+;
+CREATE OR REPLACE FUNCTION earth() RETURNS float8
+LANGUAGE SQL IMMUTABLE PARALLEL SAFE
+RETURN '6378168'::float8
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk WHERE (d > 99)
+;
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA non_existent_schema
+;
+-- test compression with partition
+CREATE TABLE cmpart(f1 text COMPRESSION lz4) PARTITION BY HASH(f1)
+;
+create view view_of_joins_2b as select * from tbl1 join tbl1a using (a) as x
+;
+CREATE FUNCTION merge_sf_test()
+ RETURNS void
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN MATCHED
+   AND (s.a + t.id) = 42
+   THEN UPDATE SET data = repeat(t.data, s.a) || s.b, id = length(s.b)
+WHEN NOT MATCHED
+   AND (s.b IS NOT NULL)
+   THEN INSERT (data, id)
+   VALUES (s.b, s.a)
+WHEN MATCHED
+   AND length(s.b || t.data) > 10
+   THEN UPDATE SET data = s.b
+WHEN MATCHED
+   AND s.a > 200
+   THEN UPDATE SET filling[s.a] = t.id
+WHEN MATCHED
+   AND s.a > 100
+   THEN DELETE
+WHEN MATCHED
+   THEN DO NOTHING
+WHEN NOT MATCHED
+   AND s.a > 200
+   THEN INSERT DEFAULT VALUES
+WHEN NOT MATCHED
+   AND s.a > 100
+   THEN INSERT (id, data) OVERRIDING USER VALUE
+   VALUES (s.a, DEFAULT)
+WHEN NOT MATCHED
+   AND s.a > 0
+   THEN INSERT
+   VALUES (s.a, s.b, DEFAULT)
+WHEN NOT MATCHED
+   THEN INSERT (filling[1], id)
+   VALUES (s.a, s.a);
+END
+;
+ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+-- test ruleutils
+CREATE VIEW limit_thousand_v_1 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST 5 ROWS WITH TIES OFFSET 10
+;
+ALTER PUBLICATION testpub_fortable ADD TABLES IN SCHEMA pub_test
+;
+CREATE UNIQUE INDEX cwi_a_nnd ON cwi_test (a) NULLS NOT DISTINCT
+;
+CREATE VIEW "public"."limit_thousand_v_4" AS
+ SELECT "onek"."thousand"
+   FROM "public"."onek"
+  WHERE ("onek"."thousand" < 995)
+  ORDER BY "onek"."thousand"
+ FETCH FIRST ((5)::bigint) ROWS WITH TIES
+;
+CREATE FUNCTION _pg_datetime_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1082) /* date */
+           THEN 0
+       WHEN $1 IN (1083, 1114, 1184, 1266) /* time, timestamp, same + tz */
+           THEN CASE WHEN $2 < 0 THEN 6 ELSE $2 END
+       WHEN $1 IN (1186) /* interval */
+           THEN CASE WHEN $2 < 0 OR $2 & 0xFFFF = 0xFFFF THEN 6 ELSE $2 & 0xFFFF END
+       ELSE null
+  END
+;
+CREATE PROCEDURE ptest8(x text)
+BEGIN ATOMIC
+END
+;
+CREATE PUBLICATION testpub5 FOR TABLE testpub_rf_tbl1, testpub_rf_tbl2 WHERE (c <> 'test' AND d < 5) WITH (publish = 'insert')
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 (b)
+;
+-- pg_column_toast_chunk_id
+CREATE TABLE test_chunk_id (a TEXT, b TEXT STORAGE EXTERNAL)
+;
+CREATE OR REPLACE FUNCTION "overlaps"(time, interval,
+  time, time)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;
+ALTER TYPE cube SET ( RECEIVE = cube_recv, SEND = cube_send )
+;
+ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION default
+;
+-- test minmax-multi specific index options
+-- number of values must be >= 16
+CREATE INDEX brinidx_multi ON brintest_multi USING brin (
+	int8col int8_minmax_multi_ops(values_per_range = 7)
+)
+;
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test2
+;
+CREATE TABLE cminh(f1 TEXT COMPRESSION lz4) INHERITS(cmdata)
+;
+ALTER PUBLICATION "dump_pub_all" ADD TABLE ONLY "pubme"."t1" WHERE (("c" < 0))
+;
+CREATE PUBLICATION split_pub18_schema FOR TABLES IN SCHEMA split_pub18_b, CURRENT_SCHEMA WITH (publish = 'insert')
+;
+CREATE PUBLICATION split_pub_cols FOR TABLE split_fdw_repl.accounts (id, owner_name) WHERE (amount > 0) WITH (publish = 'insert, update', publish_via_partition_root = true)
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] create function test1() returns int
+    begin atomic
+      select 2 + 2;
+    end
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLES IN SCHEMA testpub_rf_schema2, TABLE testpub_rf_schema2.testpub_rf_tbl6 WHERE (i < 99)
+;
+----------
+[ALTER_PUB_SUB] -- ok - can use column list for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk (b)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION tap_pub_1 SET TABLE tab_rowfilter_1 WHERE (a > 1000 AND b <> 'filtered'), tab_rowfilter_2 WHERE (c % 2 = 0), tab_rowfilter_3
+;
+----------
+[ALTER_VIEW] ALTER MATERIALIZED VIEW heapmv SET ACCESS METHOD heap, SET ACCESS METHOD heap2
+;
+----------
+[CREATE_VIEW(SELECT)] create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb,
+  CURRENT_DATE as cd,
+  (select * from CURRENT_DATE) as cd2,
+  CURRENT_TIME as ct,
+  (select * from CURRENT_TIME) as ct2,
+  CURRENT_TIME (1) as ct3,
+  (select * from CURRENT_TIME (1)) as ct4,
+  CURRENT_TIMESTAMP as ct5,
+  (select * from CURRENT_TIMESTAMP) as ct6,
+  CURRENT_TIMESTAMP (1) as ct7,
+  (select * from CURRENT_TIMESTAMP (1)) as ct8,
+  LOCALTIME as lt1,
+  (select * from LOCALTIME) as lt2,
+  LOCALTIME (1) as lt3,
+  (select * from LOCALTIME (1)) as lt4,
+  LOCALTIMESTAMP as lt5,
+  (select * from LOCALTIMESTAMP) as lt6,
+  LOCALTIMESTAMP (1) as lt7,
+  (select * from LOCALTIMESTAMP (1)) as lt8,
+  CURRENT_CATALOG as ca,
+  (select * from CURRENT_CATALOG) as ca2,
+  CURRENT_ROLE as cr,
+  (select * from CURRENT_ROLE) as cr2,
+  CURRENT_SCHEMA as cs,
+  (select * from CURRENT_SCHEMA) as cs2,
+  CURRENT_USER as cu,
+  (select * from CURRENT_USER) as cu2,
+  USER as us,
+  (select * from USER) as us2,
+  SESSION_USER seu,
+  (select * from SESSION_USER) as seu2,
+  SYSTEM_USER as su,
+  (select * from SYSTEM_USER) as su2
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION interval_pl_timestamptz(interval, timestamptz)
+ RETURNS timestamptz
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+----------
+[DROP_CATALOG] DROP DATABASE IF EXISTS split_db_renamed WITH (FORCE)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE split_alter_table.base_table ALTER COLUMN generated_col DROP EXPRESSION IF EXISTS
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub_mix_1 SET TABLE test_mix_1 (a, b)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table "catalog1".schema1."test" alter column "a1" drop expression
+;
+----------
+[ALTER_PUB_SUB] -- drop schema that is not present in the publication
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test2
+;
+----------
+[ALTER_PUB_SUB] -- fail - can't set schema to 'FOR ALL TABLES' publication
+ALTER PUBLICATION testpub_foralltables SET TABLES IN SCHEMA pub_test
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl7 (a, b)
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmdata(f1 text COMPRESSION pglz)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_rf_yes FOR TABLE testpub_rf_tbl1 WHERE (a > 1) WITH (publish = 'insert')
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_not_used FOR TABLE tab_rowfilter_1 WHERE (a < 0)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."fipshash"("text") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE STRICT LEAKPROOF PARALLEL SAFE
+    RETURN "substr"("encode"("sha256"(($1)::"bytea"), 'hex'::"text"), 1, 32)
+;
+----------
+[ALTER_PUB_SUB] -- failure - specify a schema when there is already a column list in the
+-- publication
+ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public
+;
+----------
+[ALTER_CATALOG] alter database abc refresh collation version
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION obj_description(oid)
+ RETURNS text
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT
+BEGIN ATOMIC
+select description from pg_description where objoid = $1 and objsubid = 0;
+END
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_allinschema FOR TABLES IN SCHEMA schema_rf_x, TABLE schema_rf_x.tab_rf_x WHERE (x > 10)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub6 FOR TABLE testpub_rf_tbl3 WHERE (e =#> 27)
+;
+----------
+[ALTER_TABLE] ALTER TABLE am_partitioned SET ACCESS METHOD heap2
+;
+----------
+[CREATE_PROG_OBJ] create function rls_f(text) returns text
+begin atomic
+ select set_config('rls_test.blah', $1, true) || set_config('row_security', 'false', true) || string_agg(c, ',' order by c) from rls_t;
+end
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION earth() RETURNS float8
+LANGUAGE SQL IMMUTABLE PARALLEL SAFE
+RETURN '6378168'::float8
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk WHERE (d > 99)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA non_existent_schema
+;
+----------
+[CREATE_TABLE] -- test compression with partition
+CREATE TABLE cmpart(f1 text COMPRESSION lz4) PARTITION BY HASH(f1)
+;
+----------
+[CREATE_VIEW(SELECT)] create view view_of_joins_2b as select * from tbl1 join tbl1a using (a) as x
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION merge_sf_test()
+ RETURNS void
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN MATCHED
+   AND (s.a + t.id) = 42
+   THEN UPDATE SET data = repeat(t.data, s.a) || s.b, id = length(s.b)
+WHEN NOT MATCHED
+   AND (s.b IS NOT NULL)
+   THEN INSERT (data, id)
+   VALUES (s.b, s.a)
+WHEN MATCHED
+   AND length(s.b || t.data) > 10
+   THEN UPDATE SET data = s.b
+WHEN MATCHED
+   AND s.a > 200
+   THEN UPDATE SET filling[s.a] = t.id
+WHEN MATCHED
+   AND s.a > 100
+   THEN DELETE
+WHEN MATCHED
+   THEN DO NOTHING
+WHEN NOT MATCHED
+   AND s.a > 200
+   THEN INSERT DEFAULT VALUES
+WHEN NOT MATCHED
+   AND s.a > 100
+   THEN INSERT (id, data) OVERRIDING USER VALUE
+   VALUES (s.a, DEFAULT)
+WHEN NOT MATCHED
+   AND s.a > 0
+   THEN INSERT
+   VALUES (s.a, s.b, DEFAULT)
+WHEN NOT MATCHED
+   THEN INSERT (filling[1], id)
+   VALUES (s.a, s.a);
+END
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+----------
+[CREATE_VIEW(SELECT)] -- test ruleutils
+CREATE VIEW limit_thousand_v_1 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST 5 ROWS WITH TIES OFFSET 10
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLES IN SCHEMA pub_test
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX cwi_a_nnd ON cwi_test (a) NULLS NOT DISTINCT
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."limit_thousand_v_4" AS
+ SELECT "onek"."thousand"
+   FROM "public"."onek"
+  WHERE ("onek"."thousand" < 995)
+  ORDER BY "onek"."thousand"
+ FETCH FIRST ((5)::bigint) ROWS WITH TIES
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_datetime_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1082) /* date */
+           THEN 0
+       WHEN $1 IN (1083, 1114, 1184, 1266) /* time, timestamp, same + tz */
+           THEN CASE WHEN $2 < 0 THEN 6 ELSE $2 END
+       WHEN $1 IN (1186) /* interval */
+           THEN CASE WHEN $2 < 0 OR $2 & 0xFFFF = 0xFFFF THEN 6 ELSE $2 & 0xFFFF END
+       ELSE null
+  END
+;
+----------
+[CREATE_PROG_OBJ] CREATE PROCEDURE ptest8(x text)
+BEGIN ATOMIC
+END
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub5 FOR TABLE testpub_rf_tbl1, testpub_rf_tbl2 WHERE (c <> 'test' AND d < 5) WITH (publish = 'insert')
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 (b)
+;
+----------
+[CREATE_TABLE] -- pg_column_toast_chunk_id
+CREATE TABLE test_chunk_id (a TEXT, b TEXT STORAGE EXTERNAL)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "overlaps"(time, interval,
+  time, time)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;
+----------
+[ALTER_TYPE] ALTER TYPE cube SET ( RECEIVE = cube_recv, SEND = cube_send )
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE cmdata2 ALTER COLUMN f1 SET COMPRESSION default
+;
+----------
+[ADD_INDEX] -- test minmax-multi specific index options
+-- number of values must be >= 16
+CREATE INDEX brinidx_multi ON brintest_multi USING brin (
+	int8col int8_minmax_multi_ops(values_per_range = 7)
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test2
+;
+----------
+[CREATE_TABLE] CREATE TABLE cminh(f1 TEXT COMPRESSION lz4) INHERITS(cmdata)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_all" ADD TABLE ONLY "pubme"."t1" WHERE (("c" < 0))
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION split_pub18_schema FOR TABLES IN SCHEMA split_pub18_b, CURRENT_SCHEMA WITH (publish = 'insert')
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION split_pub_cols FOR TABLE split_fdw_repl.accounts (id, owner_name) WHERE (amount > 0) WITH (publish = 'insert, update', publish_via_partition_root = true)
+;

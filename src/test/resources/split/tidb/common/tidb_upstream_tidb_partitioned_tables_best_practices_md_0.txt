@@ -1,0 +1,118 @@
+INSERT INTO fa_new SELECT * FROM fa;
+SELECT * FROM server_info WHERE `serial_no` = ?;
+CREATE TABLE employees (
+  id INT NOT NULL,
+  fname VARCHAR(30),
+  lname VARCHAR(30),
+  hired DATE NOT NULL DEFAULT '1970-01-01',
+  separated DATE DEFAULT '9999-12-31',
+  job_code INT,
+  store_id INT,
+  PRIMARY KEY (`id`,`hired`) NONCLUSTERED,
+  KEY `idx_employees_on_store_id` (`store_id`)
+) SHARD_ROW_ID_BITS = 2 PRE_SPLIT_REGIONS = 2
+PARTITION BY RANGE ( YEAR(hired) ) (
+  PARTITION p0 VALUES LESS THAN (1991),
+  PARTITION p1 VALUES LESS THAN (1996),
+  PARTITION p2 VALUES LESS THAN (2001),
+  PARTITION p3 VALUES LESS THAN (2006)
+);
+SET @@global.tidb_ddl_REORGANIZE_batch_size = 4096;
+SET @@global.tidb_ddl_REORGANIZE_worker_cnt = 16;
+CREATE TABLE `fa_new` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `account_id` bigint(20) NOT NULL,
+  `sid` bigint(20) DEFAULT NULL,
+  `user_id` bigint NOT NULL,
+  `date` int NOT NULL,
+  PRIMARY KEY (`id`,`date`) /*T![clustered_index] CLUSTERED */,
+  KEY `index_fa_on_sid` (`sid`),
+  KEY `index_fa_on_account_id` (`account_id`),
+  KEY `index_fa_on_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+SELECT MIN(id), MAX(id) FROM employees;
+SET tidb_enable_mutation_checker = OFF;
+SET tidb_mem_quota_query = 0;
+-- Table level
+ALTER TABLE employees ATTRIBUTES 'merge_option=deny';
+CREATE TABLE server_info (
+  id bigint NOT NULL AUTO_INCREMENT,
+  serial_no varchar(100) DEFAULT NULL,
+  device_name varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  device_type varchar(50) DEFAULT NULL,
+  modified_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id) /*T![clustered_index] CLUSTERED */,
+  KEY idx_serial_no (serial_no),
+  KEY idx_modified_ts (modified_ts)
+) /*T![auto_id_cache] AUTO_ID_CACHE=1 */
+PARTITION BY KEY (id) PARTITIONS 16;
+ALTER TABLE A DROP PARTITION A_2024363;
+-- Partition level
+ALTER TABLE employees PARTITION `p3` ATTRIBUTES 'merge_option=deny';
+ALTER TABLE fa REMOVE PARTITIONING;
+------------------------------------------------------------------------------------------
+[INSERT|SELECT] INSERT INTO fa_new SELECT * FROM fa;
+----------
+[SELECT] SELECT * FROM server_info WHERE `serial_no` = ?;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT|ADD_INDEX] CREATE TABLE employees (
+  id INT NOT NULL,
+  fname VARCHAR(30),
+  lname VARCHAR(30),
+  hired DATE NOT NULL DEFAULT '1970-01-01',
+  separated DATE DEFAULT '9999-12-31',
+  job_code INT,
+  store_id INT,
+  PRIMARY KEY (`id`,`hired`) NONCLUSTERED,
+  KEY `idx_employees_on_store_id` (`store_id`)
+) SHARD_ROW_ID_BITS = 2 PRE_SPLIT_REGIONS = 2
+PARTITION BY RANGE ( YEAR(hired) ) (
+  PARTITION p0 VALUES LESS THAN (1991),
+  PARTITION p1 VALUES LESS THAN (1996),
+  PARTITION p2 VALUES LESS THAN (2001),
+  PARTITION p3 VALUES LESS THAN (2006)
+);
+----------
+[SYSTEM_SETTING_WRITE] SET @@global.tidb_ddl_REORGANIZE_batch_size = 4096;
+----------
+[SYSTEM_SETTING_WRITE] SET @@global.tidb_ddl_REORGANIZE_worker_cnt = 16;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT|ADD_INDEX] CREATE TABLE `fa_new` (
+  `id` bigint NOT NULL AUTO_INCREMENT,
+  `account_id` bigint(20) NOT NULL,
+  `sid` bigint(20) DEFAULT NULL,
+  `user_id` bigint NOT NULL,
+  `date` int NOT NULL,
+  PRIMARY KEY (`id`,`date`) /*T![clustered_index] CLUSTERED */,
+  KEY `index_fa_on_sid` (`sid`),
+  KEY `index_fa_on_account_id` (`account_id`),
+  KEY `index_fa_on_user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin;
+----------
+[SELECT] SELECT MIN(id), MAX(id) FROM employees;
+----------
+[SESSION_SETTING_WRITE] SET tidb_enable_mutation_checker = OFF;
+----------
+[SESSION_SETTING_WRITE] SET tidb_mem_quota_query = 0;
+----------
+[ALTER_TABLE] -- Table level
+ALTER TABLE employees ATTRIBUTES 'merge_option=deny';
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT|ADD_INDEX] CREATE TABLE server_info (
+  id bigint NOT NULL AUTO_INCREMENT,
+  serial_no varchar(100) DEFAULT NULL,
+  device_name varchar(256) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  device_type varchar(50) DEFAULT NULL,
+  modified_ts timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (id) /*T![clustered_index] CLUSTERED */,
+  KEY idx_serial_no (serial_no),
+  KEY idx_modified_ts (modified_ts)
+) /*T![auto_id_cache] AUTO_ID_CACHE=1 */
+PARTITION BY KEY (id) PARTITIONS 16;
+----------
+[ALTER_TABLE|DROP_PARTITION] ALTER TABLE A DROP PARTITION A_2024363;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- Partition level
+ALTER TABLE employees PARTITION `p3` ATTRIBUTES 'merge_option=deny';
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE fa REMOVE PARTITIONING;

@@ -1,0 +1,41 @@
+INSERT INTO t1 (id) VALUES (6);
+BEGIN /*T! PESSIMISTIC */;
+SET CONFIG tikv `pessimistic-txn.in-memory-instance-size-limit`="100MiB";
+set config tikv pessimistic-txn.pipelined='false';
+set config tikv pessimistic-txn.in-memory='false';
+-- blocks only in MySQL
+    UPDATE t1 SET pad1='new value' WHERE id = 5;
+SET GLOBAL tidb_txn_mode = 'pessimistic';
+SET CONFIG tikv `pessimistic-txn.in-memory-peer-size-limit`="512KiB";
+INSERT INTO t1 (id) VALUES (1),(5),(10);
+SELECT * FROM t1 WHERE id BETWEEN 1 AND 10 FOR UPDATE;
+CREATE TABLE t1 (
+     id INT NOT NULL PRIMARY KEY,
+     pad1 VARCHAR(100)
+    );
+------------------------------------------------------------------------------------------
+[INSERT] INSERT INTO t1 (id) VALUES (6);
+----------
+[TRANSACTION] BEGIN /*T! PESSIMISTIC */;
+----------
+[SYSTEM_SETTING_WRITE] SET CONFIG tikv `pessimistic-txn.in-memory-instance-size-limit`="100MiB";
+----------
+[SYSTEM_SETTING_WRITE] set config tikv pessimistic-txn.pipelined='false';
+----------
+[SYSTEM_SETTING_WRITE] set config tikv pessimistic-txn.in-memory='false';
+----------
+[UPDATE] -- blocks only in MySQL
+    UPDATE t1 SET pad1='new value' WHERE id = 5;
+----------
+[SYSTEM_SETTING_WRITE] SET GLOBAL tidb_txn_mode = 'pessimistic';
+----------
+[SYSTEM_SETTING_WRITE] SET CONFIG tikv `pessimistic-txn.in-memory-peer-size-limit`="512KiB";
+----------
+[INSERT] INSERT INTO t1 (id) VALUES (1),(5),(10);
+----------
+[SELECT|QUERY_LOCK] SELECT * FROM t1 WHERE id BETWEEN 1 AND 10 FOR UPDATE;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_CONSTRAINT] CREATE TABLE t1 (
+     id INT NOT NULL PRIMARY KEY,
+     pad1 VARCHAR(100)
+    );

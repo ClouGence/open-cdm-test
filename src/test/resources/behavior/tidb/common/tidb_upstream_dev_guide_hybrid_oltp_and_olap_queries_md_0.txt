@@ -1,0 +1,199 @@
+[alter_table__common_tidb_upstream_dev_guide_hybrid_oltp_and_olap_queries_md_0_000]
+sql:
+ALTER TABLE books SET TIFLASH REPLICA 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:17) /test/1/catalog1/schema1/books/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[alter_table__common_tidb_upstream_dev_guide_hybrid_oltp_and_olap_queries_md_0_001]
+sql:
+ALTER TABLE orders SET TIFLASH REPLICA 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:18) /test/1/catalog1/schema1/orders/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[metadata__common_tidb_upstream_dev_guide_hybrid_oltp_and_olap_queries_md_0_002]
+sql:
+SELECT * FROM information_schema.tiflash_replica WHERE TABLE_SCHEMA = 'bookshop' and TABLE_NAME = 'books';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Table(1:14~1:48) /test/1/catalog1/information_schema/tiflash_replica/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_dev_guide_hybrid_oltp_and_olap_queries_md_0_003]
+sql:
+WITH orders_group_by_month AS (
+    SELECT
+        b.type AS book_type,
+        DATE_FORMAT(ordered_at, '%Y-%c') AS month,
+        COUNT(*) AS orders
+    FROM orders o
+    LEFT JOIN books b ON o.book_id = b.id
+    WHERE b.type IS NOT NULL
+    GROUP BY book_type, month
+), acc AS (
+    SELECT
+        book_type,
+        month,
+        SUM(orders) OVER(PARTITION BY book_type ORDER BY book_type, month ASC) as acc
+    FROM orders_group_by_month
+    ORDER BY book_type, month ASC
+)
+SELECT * FROM acc;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:8~4:19) /test/1/catalog1/schema1/DATE_FORMAT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:8~5:13) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:9~6:15) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:14~7:19) /test/1/catalog1/schema1/books/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(14:8~14:11) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[metadata__common_tidb_upstream_dev_guide_hybrid_oltp_and_olap_queries_md_0_004]
+sql:
+SELECT * FROM information_schema.tiflash_replica WHERE TABLE_SCHEMA = 'bookshop' and TABLE_NAME = 'orders';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Table(1:14~1:48) /test/1/catalog1/information_schema/tiflash_replica/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_dev_guide_hybrid_oltp_and_olap_queries_md_0_005]
+sql:
+WITH orders_group_by_month AS (
+  SELECT DATE_FORMAT(ordered_at, '%Y-%c') AS month, COUNT(*) AS orders
+  FROM orders
+  WHERE book_id = 3461722937
+  GROUP BY 1
+)
+SELECT
+month,
+SUM(orders) OVER(ORDER BY month ASC) as acc
+FROM orders_group_by_month
+ORDER BY month ASC;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:9~2:20) /test/1/catalog1/schema1/DATE_FORMAT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:52~2:57) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:7~3:13) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(9:0~9:3) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_dev_guide_hybrid_oltp_and_olap_queries_md_0_006]
+sql:
+WITH orders_group_by_month AS (
+    SELECT
+        /*+ read_from_storage(tikv[o]) */
+        b.type AS book_type,
+        DATE_FORMAT(ordered_at, '%Y-%c') AS month,
+        COUNT(*) AS orders
+    FROM orders o
+    LEFT JOIN books b ON o.book_id = b.id
+    WHERE b.type IS NOT NULL
+    GROUP BY book_type, month
+), acc AS (
+    SELECT
+        book_type,
+        month,
+        SUM(orders) OVER(PARTITION BY book_type ORDER BY book_type, month ASC) as acc
+    FROM orders_group_by_month mo
+    ORDER BY book_type, month ASC
+)
+SELECT * FROM acc;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:8~5:19) /test/1/catalog1/schema1/DATE_FORMAT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:8~6:13) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:9~7:15) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:14~8:19) /test/1/catalog1/schema1/books/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(15:8~15:11) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    }
+  ]
+}

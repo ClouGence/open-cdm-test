@@ -1,0 +1,646 @@
+ALTER TABLE rls_test_restrictive ENABLE ROW LEVEL SECURITY
+;
+ALTER TABLE pg_enum ADD UNIQUE USING INDEX pg_enum_typid_sortorder_index
+;
+/*
+ * 5.51
+ * ROUTINE_ROUTINE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.52
+ * ROUTINE_SEQUENCE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.53
+ * ROUTINE_TABLE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.54
+ * ROUTINES view
+ */
+
+CREATE VIEW routines AS
+    SELECT CAST(current_database() AS sql_identifier) AS specific_catalog,
+           CAST(n.nspname AS sql_identifier) AS specific_schema,
+           CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier) AS specific_name,
+           CAST(current_database() AS sql_identifier) AS routine_catalog,
+           CAST(n.nspname AS sql_identifier) AS routine_schema,
+           CAST(p.proname AS sql_identifier) AS routine_name,
+           CAST(CASE p.prokind WHEN 'f' THEN 'FUNCTION' WHEN 'p' THEN 'PROCEDURE' END
+             AS character_data) AS routine_type,
+           CAST(null AS sql_identifier) AS module_catalog,
+           CAST(null AS sql_identifier) AS module_schema,
+           CAST(null AS sql_identifier) AS module_name,
+           CAST(null AS sql_identifier) AS udt_catalog,
+           CAST(null AS sql_identifier) AS udt_schema,
+           CAST(null AS sql_identifier) AS udt_name,
+
+           CAST(
+             CASE WHEN p.prokind = 'p' THEN NULL
+                  WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                  WHEN nt.nspname = 'pg_catalog' THEN format_type(t.oid, null)
+                  ELSE 'USER-DEFINED' END AS character_data)
+             AS data_type,
+           CAST(null AS cardinal_number) AS character_maximum_length,
+           CAST(null AS cardinal_number) AS character_octet_length,
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+           CAST(null AS sql_identifier) AS collation_catalog,
+           CAST(null AS sql_identifier) AS collation_schema,
+           CAST(null AS sql_identifier) AS collation_name,
+           CAST(null AS cardinal_number) AS numeric_precision,
+           CAST(null AS cardinal_number) AS numeric_precision_radix,
+           CAST(null AS cardinal_number) AS numeric_scale,
+           CAST(null AS cardinal_number) AS datetime_precision,
+           CAST(null AS character_data) AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+           CAST(CASE WHEN nt.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS type_udt_catalog,
+           CAST(nt.nspname AS sql_identifier) AS type_udt_schema,
+           CAST(t.typname AS sql_identifier) AS type_udt_name,
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(CASE WHEN p.prokind <> 'p' THEN 0 END AS sql_identifier) AS dtd_identifier,
+
+           CAST(CASE WHEN l.lanname = 'sql' THEN 'SQL' ELSE 'EXTERNAL' END AS character_data)
+             AS routine_body,
+           CAST(
+             CASE WHEN pg_has_role(p.proowner, 'USAGE') THEN p.prosrc ELSE null END
+             AS character_data) AS routine_definition,
+           CAST(
+             CASE WHEN l.lanname = 'c' THEN p.prosrc ELSE null END
+             AS character_data) AS external_name,
+           CAST(upper(l.lanname) AS character_data) AS external_language,
+
+           CAST('GENERAL' AS character_data) AS parameter_style,
+           CAST(CASE WHEN p.provolatile = 'i' THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_deterministic,
+           CAST('MODIFIES' AS character_data) AS sql_data_access,
+           CAST(CASE WHEN p.prokind <> 'p' THEN
+             CASE WHEN p.proisstrict THEN 'YES' ELSE 'NO' END END AS yes_or_no) AS is_null_call,
+           CAST(null AS character_data) AS sql_path,
+           CAST('YES' AS yes_or_no) AS schema_level_routine,
+           CAST(0 AS cardinal_number) AS max_dynamic_result_sets,
+           CAST(null AS yes_or_no) AS is_user_defined_cast,
+           CAST(null AS yes_or_no) AS is_implicitly_invocable,
+           CAST(CASE WHEN p.prosecdef THEN 'DEFINER' ELSE 'INVOKER' END AS character_data) AS security_type,
+           CAST(null AS sql_identifier) AS to_sql_specific_catalog,
+           CAST(null AS sql_identifier) AS to_sql_specific_schema,
+           CAST(null AS sql_identifier) AS to_sql_specific_name,
+           CAST('NO' AS yes_or_no) AS as_locator,
+           CAST(null AS time_stamp) AS created,
+           CAST(null AS time_stamp) AS last_altered,
+           CAST(null AS yes_or_no) AS new_savepoint_level,
+           CAST('NO' AS yes_or_no) AS is_udt_dependent,
+
+           CAST(null AS character_data) AS result_cast_from_data_type,
+           CAST(null AS yes_or_no) AS result_cast_as_locator,
+           CAST(null AS cardinal_number) AS result_cast_char_max_length,
+           CAST(null AS cardinal_number) AS result_cast_char_octet_length,
+           CAST(null AS sql_identifier) AS result_cast_char_set_catalog,
+           CAST(null AS sql_identifier) AS result_cast_char_set_schema,
+           CAST(null AS sql_identifier) AS result_cast_char_set_name,
+           CAST(null AS sql_identifier) AS result_cast_collation_catalog,
+           CAST(null AS sql_identifier) AS result_cast_collation_schema,
+           CAST(null AS sql_identifier) AS result_cast_collation_name,
+           CAST(null AS cardinal_number) AS result_cast_numeric_precision,
+           CAST(null AS cardinal_number) AS result_cast_numeric_precision_radix,
+           CAST(null AS cardinal_number) AS result_cast_numeric_scale,
+           CAST(null AS cardinal_number) AS result_cast_datetime_precision,
+           CAST(null AS character_data) AS result_cast_interval_type,
+           CAST(null AS cardinal_number) AS result_cast_interval_precision,
+           CAST(null AS sql_identifier) AS result_cast_type_udt_catalog,
+           CAST(null AS sql_identifier) AS result_cast_type_udt_schema,
+           CAST(null AS sql_identifier) AS result_cast_type_udt_name,
+           CAST(null AS sql_identifier) AS result_cast_scope_catalog,
+           CAST(null AS sql_identifier) AS result_cast_scope_schema,
+           CAST(null AS sql_identifier) AS result_cast_scope_name,
+           CAST(null AS cardinal_number) AS result_cast_maximum_cardinality,
+           CAST(null AS sql_identifier) AS result_cast_dtd_identifier
+
+    FROM (pg_namespace n
+          JOIN pg_proc p ON n.oid = p.pronamespace
+          JOIN pg_language l ON p.prolang = l.oid)
+         LEFT JOIN
+         (pg_type t JOIN pg_namespace nt ON t.typnamespace = nt.oid)
+         ON p.prorettype = t.oid AND p.prokind <> 'p'
+
+    WHERE (pg_has_role(p.proowner, 'USAGE')
+           OR has_function_privilege(p.oid, 'EXECUTE'))
+;
+ALTER TABLE errtst_parent ATTACH PARTITION errtst_child_plaindef FOR VALUES FROM (10) TO (20)
+;
+ANALYZE (SKIP_LOCKED) pg_catalog.pg_aggregate
+;
+CREATE VIEW ro_view10 AS SELECT 1 AS a
+;
+DROP TABLE  BOOLTBL3
+;
+ALTER OPERATOR === (boolean, real) SET (NEGATOR = !====)
+;
+--
+-- injection_points_stats_numcalls()
+--
+-- Reports statistics, if any, related to the given injection point.
+--
+CREATE FUNCTION injection_points_stats_numcalls(IN point_name TEXT)
+RETURNS bigint
+AS 'MODULE_PATHNAME', 'injection_points_stats_numcalls'
+LANGUAGE C STRICT
+;
+-- check INSERT ... SELECT rule actions are disallowed on commands
+-- that have modifyingCTEs
+CREATE OR REPLACE RULE bug6051_ins AS ON INSERT TO bug6051 DO INSTEAD
+ INSERT INTO bug6051_2
+ SELECT NEW.i
+;
+CREATE INDEX people_names ON people (firstname, lastname, (firstname || ' ' || lastname))
+;
+CREATE VIEW test_tablesample_v1 AS
+  SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (10*2) REPEATABLE (2)
+;
+ALTER TABLE ONLY list_parted2 ALTER b SET NOT NULL
+;
+analyze simple
+;
+COMMENT ON LARGE OBJECT 16595 IS 'comment on large object'
+;
+ALTER TABLE range_parted ATTACH PARTITION part_b_20_b_30 FOR VALUES FROM ('b', 20) TO ('b', 30)
+;
+create or replace function doubledecrement(p1 pos_int) returns pos_int as $$
+declare v pos_int := 0;
+begin
+    return p1;
+end$$ language plpgsql
+;
+DROP FOREIGN TABLE async_p_broken
+;
+CREATE FUNCTION test_integerset()
+RETURNS pg_catalog.void STRICT
+AS 'MODULE_PATHNAME' LANGUAGE C
+;
+-- 6.9 ADMINISTRABLE_ROLE_AUTHORIZATIONS view appears later.
+
+
+/*
+ * 6.10
+ * APPLICABLE_ROLES view
+ */
+
+CREATE VIEW applicable_roles AS
+    SELECT CAST(a.rolname AS sql_identifier) AS grantee,
+           CAST(b.rolname AS sql_identifier) AS role_name,
+           CAST(CASE WHEN m.admin_option THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+    FROM (SELECT member, roleid, admin_option FROM pg_auth_members
+          -- This UNION could be UNION ALL, but UNION works even if we start
+          -- to allow explicit pg_database_owner membership.
+          UNION
+          SELECT datdba, pg_authid.oid, false
+          FROM pg_database, pg_authid
+          WHERE datname = current_database() AND rolname = 'pg_database_owner'
+         )  m
+         JOIN pg_authid a ON (m.member = a.oid)
+         JOIN pg_authid b ON (m.roleid = b.oid)
+    WHERE pg_has_role(a.oid, 'USAGE')
+;
+CREATE TABLE "public"."idxpart21" (
+    "a" integer
+)
+;
+drop table parted_constr_ancestor
+;
+-- policy on system catalog
+CREATE POLICY foo ON pg_description FOR SELECT USING (description NOT LIKE 'secret%')
+;
+create table test_2 (id integer primary key) inherits (id)
+;
+DROP TABLE XLogFlush
+;
+alter table attbl alter column p1 set data type bigint
+;
+CREATE FUNCTION seg_ge(seg, seg)
+RETURNS bool
+AS '$libdir/seg'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+CREATE DATABASE foobar7 STRATEGY file_copy TEMPLATE foobar2
+;
+CREATE FUNCTION trigfunc () RETURNS TRIGGER LANGUAGE plpgsql as $$ BEGIN NEW.e := 'in trigfunc()'; RETURN NEW; END; $$
+;
+ALTER TABLE testpub_tbl_both_filters REPLICA IDENTITY USING INDEX testpub_tbl_both_filters_pkey
+;
+create table join_bar as select generate_series(1, 10000) as id, 'xxxxx'::text as t
+;
+ALTER INDEX pg_toast.pg_toast_30624_index RENAME TO reind_con_toast_idx
+;
+DROP INDEX CONCURRENTLY "concur_index1"
+;
+create table coll_pruning_multi2 partition of coll_pruning_multi for values from ('a', 'e') to ('a', 'z')
+;
+VACUUM (SKIP_DATABASE_STATS, SKIP_LOCKED) pg_catalog.pg_largeobject
+;
+ALTER TYPE "public"."stoplight" ADD VALUE 'yellow'
+;
+CREATE PUBLICATION pub_gencol FOR TABLE testpub_gencol with (publish_generated_columns = stored)
+;
+create table rtest_system (sysname text, sysdesc text)
+;
+VACUUM (INDEX_CLEANUP FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_db_role_setting
+;
+DROP TABLE test_having
+;
+CREATE TABLE test__int( a int[] )
+;
+--
+-- Regression Tests for Label Management
+--
+
+--
+-- Setup
+--
+CREATE TABLE t1 (a int, b text)
+;
+CREATE TABLE pred_child () INHERITS (pred_parent)
+;
+CREATE VIEW mysecview8 WITH (security_invoker=false, security_barrier=true)
+       AS SELECT * FROM tbl1 WHERE a > 100
+;
+CREATE TABLE prt4_n_p2 PARTITION OF prt4_n FOR VALUES FROM (300) TO (500)
+;
+DROP TABLE drop_tab_test1
+;
+CREATE FUNCTION gbt_enum_fetch(internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+drop function parent_del_func()
+;
+CREATE TABLE fail_part PARTITION OF hash_parted2 FOR VALUES WITH (MODULUS 2, REMAINDER 1)
+;
+CREATE TABLE public.tht_p2 (
+    en public.digit,
+    data integer
+)
+;
+------------------------------------------------------------------------------------------
+[ALTER_TABLE] ALTER TABLE rls_test_restrictive ENABLE ROW LEVEL SECURITY
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE pg_enum ADD UNIQUE USING INDEX pg_enum_typid_sortorder_index
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 5.51
+ * ROUTINE_ROUTINE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.52
+ * ROUTINE_SEQUENCE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.53
+ * ROUTINE_TABLE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.54
+ * ROUTINES view
+ */
+
+CREATE VIEW routines AS
+    SELECT CAST(current_database() AS sql_identifier) AS specific_catalog,
+           CAST(n.nspname AS sql_identifier) AS specific_schema,
+           CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier) AS specific_name,
+           CAST(current_database() AS sql_identifier) AS routine_catalog,
+           CAST(n.nspname AS sql_identifier) AS routine_schema,
+           CAST(p.proname AS sql_identifier) AS routine_name,
+           CAST(CASE p.prokind WHEN 'f' THEN 'FUNCTION' WHEN 'p' THEN 'PROCEDURE' END
+             AS character_data) AS routine_type,
+           CAST(null AS sql_identifier) AS module_catalog,
+           CAST(null AS sql_identifier) AS module_schema,
+           CAST(null AS sql_identifier) AS module_name,
+           CAST(null AS sql_identifier) AS udt_catalog,
+           CAST(null AS sql_identifier) AS udt_schema,
+           CAST(null AS sql_identifier) AS udt_name,
+
+           CAST(
+             CASE WHEN p.prokind = 'p' THEN NULL
+                  WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                  WHEN nt.nspname = 'pg_catalog' THEN format_type(t.oid, null)
+                  ELSE 'USER-DEFINED' END AS character_data)
+             AS data_type,
+           CAST(null AS cardinal_number) AS character_maximum_length,
+           CAST(null AS cardinal_number) AS character_octet_length,
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+           CAST(null AS sql_identifier) AS collation_catalog,
+           CAST(null AS sql_identifier) AS collation_schema,
+           CAST(null AS sql_identifier) AS collation_name,
+           CAST(null AS cardinal_number) AS numeric_precision,
+           CAST(null AS cardinal_number) AS numeric_precision_radix,
+           CAST(null AS cardinal_number) AS numeric_scale,
+           CAST(null AS cardinal_number) AS datetime_precision,
+           CAST(null AS character_data) AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+           CAST(CASE WHEN nt.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS type_udt_catalog,
+           CAST(nt.nspname AS sql_identifier) AS type_udt_schema,
+           CAST(t.typname AS sql_identifier) AS type_udt_name,
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(CASE WHEN p.prokind <> 'p' THEN 0 END AS sql_identifier) AS dtd_identifier,
+
+           CAST(CASE WHEN l.lanname = 'sql' THEN 'SQL' ELSE 'EXTERNAL' END AS character_data)
+             AS routine_body,
+           CAST(
+             CASE WHEN pg_has_role(p.proowner, 'USAGE') THEN p.prosrc ELSE null END
+             AS character_data) AS routine_definition,
+           CAST(
+             CASE WHEN l.lanname = 'c' THEN p.prosrc ELSE null END
+             AS character_data) AS external_name,
+           CAST(upper(l.lanname) AS character_data) AS external_language,
+
+           CAST('GENERAL' AS character_data) AS parameter_style,
+           CAST(CASE WHEN p.provolatile = 'i' THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_deterministic,
+           CAST('MODIFIES' AS character_data) AS sql_data_access,
+           CAST(CASE WHEN p.prokind <> 'p' THEN
+             CASE WHEN p.proisstrict THEN 'YES' ELSE 'NO' END END AS yes_or_no) AS is_null_call,
+           CAST(null AS character_data) AS sql_path,
+           CAST('YES' AS yes_or_no) AS schema_level_routine,
+           CAST(0 AS cardinal_number) AS max_dynamic_result_sets,
+           CAST(null AS yes_or_no) AS is_user_defined_cast,
+           CAST(null AS yes_or_no) AS is_implicitly_invocable,
+           CAST(CASE WHEN p.prosecdef THEN 'DEFINER' ELSE 'INVOKER' END AS character_data) AS security_type,
+           CAST(null AS sql_identifier) AS to_sql_specific_catalog,
+           CAST(null AS sql_identifier) AS to_sql_specific_schema,
+           CAST(null AS sql_identifier) AS to_sql_specific_name,
+           CAST('NO' AS yes_or_no) AS as_locator,
+           CAST(null AS time_stamp) AS created,
+           CAST(null AS time_stamp) AS last_altered,
+           CAST(null AS yes_or_no) AS new_savepoint_level,
+           CAST('NO' AS yes_or_no) AS is_udt_dependent,
+
+           CAST(null AS character_data) AS result_cast_from_data_type,
+           CAST(null AS yes_or_no) AS result_cast_as_locator,
+           CAST(null AS cardinal_number) AS result_cast_char_max_length,
+           CAST(null AS cardinal_number) AS result_cast_char_octet_length,
+           CAST(null AS sql_identifier) AS result_cast_char_set_catalog,
+           CAST(null AS sql_identifier) AS result_cast_char_set_schema,
+           CAST(null AS sql_identifier) AS result_cast_char_set_name,
+           CAST(null AS sql_identifier) AS result_cast_collation_catalog,
+           CAST(null AS sql_identifier) AS result_cast_collation_schema,
+           CAST(null AS sql_identifier) AS result_cast_collation_name,
+           CAST(null AS cardinal_number) AS result_cast_numeric_precision,
+           CAST(null AS cardinal_number) AS result_cast_numeric_precision_radix,
+           CAST(null AS cardinal_number) AS result_cast_numeric_scale,
+           CAST(null AS cardinal_number) AS result_cast_datetime_precision,
+           CAST(null AS character_data) AS result_cast_interval_type,
+           CAST(null AS cardinal_number) AS result_cast_interval_precision,
+           CAST(null AS sql_identifier) AS result_cast_type_udt_catalog,
+           CAST(null AS sql_identifier) AS result_cast_type_udt_schema,
+           CAST(null AS sql_identifier) AS result_cast_type_udt_name,
+           CAST(null AS sql_identifier) AS result_cast_scope_catalog,
+           CAST(null AS sql_identifier) AS result_cast_scope_schema,
+           CAST(null AS sql_identifier) AS result_cast_scope_name,
+           CAST(null AS cardinal_number) AS result_cast_maximum_cardinality,
+           CAST(null AS sql_identifier) AS result_cast_dtd_identifier
+
+    FROM (pg_namespace n
+          JOIN pg_proc p ON n.oid = p.pronamespace
+          JOIN pg_language l ON p.prolang = l.oid)
+         LEFT JOIN
+         (pg_type t JOIN pg_namespace nt ON t.typnamespace = nt.oid)
+         ON p.prorettype = t.oid AND p.prokind <> 'p'
+
+    WHERE (pg_has_role(p.proowner, 'USAGE')
+           OR has_function_privilege(p.oid, 'EXECUTE'))
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE errtst_parent ATTACH PARTITION errtst_child_plaindef FOR VALUES FROM (10) TO (20)
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) pg_catalog.pg_aggregate
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW ro_view10 AS SELECT 1 AS a
+;
+----------
+[DROP_TABLE] DROP TABLE  BOOLTBL3
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR === (boolean, real) SET (NEGATOR = !====)
+;
+----------
+[CREATE_PROG_OBJ] --
+-- injection_points_stats_numcalls()
+--
+-- Reports statistics, if any, related to the given injection point.
+--
+CREATE FUNCTION injection_points_stats_numcalls(IN point_name TEXT)
+RETURNS bigint
+AS 'MODULE_PATHNAME', 'injection_points_stats_numcalls'
+LANGUAGE C STRICT
+;
+----------
+[CREATE_POLICY] -- check INSERT ... SELECT rule actions are disallowed on commands
+-- that have modifyingCTEs
+CREATE OR REPLACE RULE bug6051_ins AS ON INSERT TO bug6051 DO INSTEAD
+ INSERT INTO bug6051_2
+ SELECT NEW.i
+;
+----------
+[ADD_INDEX] CREATE INDEX people_names ON people (firstname, lastname, (firstname || ' ' || lastname))
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW test_tablesample_v1 AS
+  SELECT id FROM test_tablesample TABLESAMPLE SYSTEM (10*2) REPEATABLE (2)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE ONLY list_parted2 ALTER b SET NOT NULL
+;
+----------
+[ADMIN_TABLE] analyze simple
+;
+----------
+[UNKNOWN] COMMENT ON LARGE OBJECT 16595 IS 'comment on large object'
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE range_parted ATTACH PARTITION part_b_20_b_30 FOR VALUES FROM ('b', 20) TO ('b', 30)
+;
+----------
+[CREATE_PROG_OBJ] create or replace function doubledecrement(p1 pos_int) returns pos_int as $$
+declare v pos_int := 0;
+begin
+    return p1;
+end$$ language plpgsql
+;
+----------
+[DROP_TABLE] DROP FOREIGN TABLE async_p_broken
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION test_integerset()
+RETURNS pg_catalog.void STRICT
+AS 'MODULE_PATHNAME' LANGUAGE C
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] -- 6.9 ADMINISTRABLE_ROLE_AUTHORIZATIONS view appears later.
+
+
+/*
+ * 6.10
+ * APPLICABLE_ROLES view
+ */
+
+CREATE VIEW applicable_roles AS
+    SELECT CAST(a.rolname AS sql_identifier) AS grantee,
+           CAST(b.rolname AS sql_identifier) AS role_name,
+           CAST(CASE WHEN m.admin_option THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+    FROM (SELECT member, roleid, admin_option FROM pg_auth_members
+          -- This UNION could be UNION ALL, but UNION works even if we start
+          -- to allow explicit pg_database_owner membership.
+          UNION
+          SELECT datdba, pg_authid.oid, false
+          FROM pg_database, pg_authid
+          WHERE datname = current_database() AND rolname = 'pg_database_owner'
+         )  m
+         JOIN pg_authid a ON (m.member = a.oid)
+         JOIN pg_authid b ON (m.roleid = b.oid)
+    WHERE pg_has_role(a.oid, 'USAGE')
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."idxpart21" (
+    "a" integer
+)
+;
+----------
+[DROP_TABLE] drop table parted_constr_ancestor
+;
+----------
+[CREATE_POLICY] -- policy on system catalog
+CREATE POLICY foo ON pg_description FOR SELECT USING (description NOT LIKE 'secret%')
+;
+----------
+[CREATE_TABLE] create table test_2 (id integer primary key) inherits (id)
+;
+----------
+[DROP_TABLE] DROP TABLE XLogFlush
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table attbl alter column p1 set data type bigint
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION seg_ge(seg, seg)
+RETURNS bool
+AS '$libdir/seg'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE foobar7 STRATEGY file_copy TEMPLATE foobar2
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION trigfunc () RETURNS TRIGGER LANGUAGE plpgsql as $$ BEGIN NEW.e := 'in trigfunc()'; RETURN NEW; END; $$
+;
+----------
+[ALTER_TABLE] ALTER TABLE testpub_tbl_both_filters REPLICA IDENTITY USING INDEX testpub_tbl_both_filters_pkey
+;
+----------
+[CREATE_TABLE|SELECT] create table join_bar as select generate_series(1, 10000) as id, 'xxxxx'::text as t
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_30624_index RENAME TO reind_con_toast_idx
+;
+----------
+[DROP_INDEX] DROP INDEX CONCURRENTLY "concur_index1"
+;
+----------
+[CREATE_TABLE] create table coll_pruning_multi2 partition of coll_pruning_multi for values from ('a', 'e') to ('a', 'z')
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, SKIP_LOCKED) pg_catalog.pg_largeobject
+;
+----------
+[ALTER_TYPE] ALTER TYPE "public"."stoplight" ADD VALUE 'yellow'
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_gencol FOR TABLE testpub_gencol with (publish_generated_columns = stored)
+;
+----------
+[CREATE_TABLE] create table rtest_system (sysname text, sysdesc text)
+;
+----------
+[ADMIN_TABLE] VACUUM (INDEX_CLEANUP FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_db_role_setting
+;
+----------
+[DROP_TABLE] DROP TABLE test_having
+;
+----------
+[CREATE_TABLE] CREATE TABLE test__int( a int[] )
+;
+----------
+[CREATE_TABLE] --
+-- Regression Tests for Label Management
+--
+
+--
+-- Setup
+--
+CREATE TABLE t1 (a int, b text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE pred_child () INHERITS (pred_parent)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW mysecview8 WITH (security_invoker=false, security_barrier=true)
+       AS SELECT * FROM tbl1 WHERE a > 100
+;
+----------
+[CREATE_TABLE] CREATE TABLE prt4_n_p2 PARTITION OF prt4_n FOR VALUES FROM (300) TO (500)
+;
+----------
+[DROP_TABLE] DROP TABLE drop_tab_test1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_enum_fetch(internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[DROP_PROG_OBJ] drop function parent_del_func()
+;
+----------
+[CREATE_TABLE] CREATE TABLE fail_part PARTITION OF hash_parted2 FOR VALUES WITH (MODULUS 2, REMAINDER 1)
+;
+----------
+[CREATE_TABLE] CREATE TABLE public.tht_p2 (
+    en public.digit,
+    data integer
+)
+;

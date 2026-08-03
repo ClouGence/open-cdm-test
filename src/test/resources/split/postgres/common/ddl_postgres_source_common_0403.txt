@@ -1,0 +1,480 @@
+DROP PUBLICATION pub_gencol
+;
+-- invalid: non-lowercase quoted identifiers
+CREATE OPERATOR ===
+(
+	"Leftarg" = box,
+	"Rightarg" = box,
+	"Procedure" = area_equal_function,
+	"Commutator" = ===,
+	"Negator" = !==,
+	"Restrict" = area_restriction_function,
+	"Join" = area_join_function,
+	"Hashes",
+	"Merges"
+)
+;
+CREATE INDEX idx_sto1 ON sto1 USING HASH (c)
+;
+DO $$
+  BEGIN
+    EXECUTE 'ALTER LARGE OBJECT ' || (select loid from lotest_stash_values)
+		|| ' OWNER TO regress_lo_user';
+  END
+$$
+;
+--
+-- Partitioned tables
+--
+
+-- cannot combine INHERITS and PARTITION BY (although grammar allows)
+CREATE TABLE partitioned (
+	a int
+) INHERITS (some_table) PARTITION BY LIST (a)
+;
+ANALYZE public.depth1
+;
+CREATE TABLE partitioned (
+	a int,
+	b int
+) PARTITION BY RANGE ((avg(a) OVER (PARTITION BY b)))
+;
+-- you can write an expression, but it's not evaluated
+CALL ptest9(1/0)
+;
+DROP TRIGGER delete_a ON main_table
+;
+CALL test_proc8c(_a, _b)
+;
+---
+
+ALTER SEQUENCE regtest_seq_1 RENAME TO regtest_seq
+;
+CREATE TABLE test_like_6c (LIKE test_like_6 INCLUDING ALL)
+;
+create table text_hashp1 partition of text_hashp for values with (modulus 2, remainder 1)
+;
+-- test where predicate is able to do a transactional update during
+-- a concurrent build before switching pg_index state flags.
+CREATE FUNCTION predicate_stable() RETURNS bool IMMUTABLE
+LANGUAGE plpgsql AS $$
+BEGIN
+  EXECUTE 'SELECT txid_current()';
+  RETURN true;
+END; $$
+;
+-- Check that partitioned tables cannot be clustered
+CREATE TABLE clstrpart (a int) PARTITION BY RANGE (a)
+;
+CREATE VIEW "public"."my_property_normal" WITH ("security_barrier"='true') AS
+ SELECT "customer"."cid",
+    "customer"."name",
+    "customer"."tel",
+    "customer"."passwd"
+   FROM "public"."customer"
+  WHERE ("customer"."name" = CURRENT_USER)
+;
+ANALYZE pg_temp_9.pg_temp_38133
+;
+-- cannot drop inherited NOT NULL constraint from a partition
+ALTER TABLE fd_pt2_1 ALTER c1 DROP NOT NULL
+;
+CREATE AGGREGATE "public"."logging_agg_strict"("text") (
+    SFUNC = "public"."logging_sfunc_strict",
+    STYPE = "text",
+    MSFUNC = "public"."logging_msfunc_strict",
+    MINVFUNC = "public"."logging_minvfunc_strict",
+    MSTYPE = "text"
+)
+;
+--error
+
+ALTER TABLE notnull_chld0 DROP CONSTRAINT nn_chld0
+;
+alter table target_parted attach partition attach_parted for values in (1)
+;
+/* but works fine with FULL replica identity */
+ALTER TABLE testpub_tbl5d REPLICA IDENTITY FULL
+;
+ALTER FOREIGN TABLE table30000 OPTIONS ( SET fetch_size '60000')
+;
+TRUNCATE TABLE trunc_c CASCADE
+;
+CREATE SCHEMA newschema5 AUTHORIZATION "Public"
+;
+CREATE FUNCTION gbt_numeric_same(gbtreekey_var, gbtreekey_var, internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+CREATE SCHEMA IF NOT EXISTS newschema2 AUTHORIZATION "current_user"
+;
+-- fail
+
+drop table trigger_ddl_table
+;
+CREATE TABLE "public"."inet_tbl" (
+    "c" "cidr",
+    "i" "inet"
+)
+;
+VACUUM (SKIP_DATABASE_STATS, SKIP_LOCKED) pg_catalog.pg_auth_members
+;
+DROP OPERATOR !==== (boolean, real)
+;
+ALTER TABLE ONLY "public"."plt2" ATTACH PARTITION "public"."plt2_p1" FOR VALUES IN ('0000', '0003', '0004', '0010')
+;
+CREATE INDEX test1_a_idx ON test1 USING btree (a)
+;
+-- create or replace aggregate
+CREATE AGGREGATE myavg (numeric)
+(
+	stype = internal,
+	sfunc = numeric_avg_accum,
+	finalfunc = numeric_avg
+)
+;
+VACUUM (SKIP_DATABASE_STATS) pg_catalog.pg_opfamily
+;
+CREATE VIEW v6_temp AS SELECT * FROM base_table WHERE id IN (SELECT id FROM temp_table)
+;
+-- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."c" INHERIT "public"."a"
+;
+CREATE POLICY p1 ON rls_tbl USING (rls_tbl >= ROW(1,1,1))
+;
+VACUUM (DISABLE_PAGE_SKIPPING) pg_catalog.pg_parameter_acl
+;
+CREATE INDEX concur_reindex_ind ON concur_reindex_tab (c1)
+;
+CREATE OPERATOR < (
+	PROCEDURE = isnlt,
+	LEFTARG = ean13,
+	RIGHTARG = ean13,
+	COMMUTATOR = >,
+	NEGATOR = >=,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+-- Unique constraints don't give raise to not-null constraints, however.
+create table cnn_uq (a int)
+;
+CREATE OPERATOR < (
+	PROCEDURE = isnlt,
+	LEFTARG = ean13,
+	RIGHTARG = ismn,
+	COMMUTATOR = >,
+	NEGATOR = >=,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+-- ok
+CREATE TABLE thirdparent (tomorrow date default now()::date - 1)
+;
+/*
+ * 6.18
+ * COLUMN_COLUMN_USAGE view
+ */
+
+CREATE VIEW column_column_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(n.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+           CAST(ac.attname AS sql_identifier) AS column_name,
+           CAST(ad.attname AS sql_identifier) AS dependent_column
+
+    FROM pg_namespace n, pg_class c, pg_depend d,
+         pg_attribute ac, pg_attribute ad, pg_attrdef atd
+
+    WHERE n.oid = c.relnamespace
+          AND c.oid = ac.attrelid
+          AND c.oid = ad.attrelid
+          AND ac.attnum <> ad.attnum
+          AND ad.attrelid = atd.adrelid
+          AND ad.attnum = atd.adnum
+          AND d.classid = 'pg_catalog.pg_attrdef'::regclass
+          AND d.refclassid = 'pg_catalog.pg_class'::regclass
+          AND d.objid = atd.oid
+          AND d.refobjid = ac.attrelid
+          AND d.refobjsubid = ac.attnum
+          AND ad.attgenerated <> ''
+          AND pg_has_role(c.relowner, 'USAGE')
+;
+-- fail
+
+alter domain dom drop not null
+;
+create table test_range_gist(ir int4range)
+;
+CREATE TABLE tab_rep_next (a) AS SELECT generate_series(1,10)
+;
+CREATE TYPE comptype AS (r float8)
+;
+CREATE TEMP TABLE pg_temp_32.pg_temp_28153_2 (tid pg_catalog.tid)
+;
+------------------------------------------------------------------------------------------
+[DROP_PUB_SUB] DROP PUBLICATION pub_gencol
+;
+----------
+[CREATE_PROG_OBJ] -- invalid: non-lowercase quoted identifiers
+CREATE OPERATOR ===
+(
+	"Leftarg" = box,
+	"Rightarg" = box,
+	"Procedure" = area_equal_function,
+	"Commutator" = ===,
+	"Negator" = !==,
+	"Restrict" = area_restriction_function,
+	"Join" = area_join_function,
+	"Hashes",
+	"Merges"
+)
+;
+----------
+[ADD_INDEX] CREATE INDEX idx_sto1 ON sto1 USING HASH (c)
+;
+----------
+[BLOCK] DO $$
+  BEGIN
+    EXECUTE 'ALTER LARGE OBJECT ' || (select loid from lotest_stash_values)
+		|| ' OWNER TO regress_lo_user';
+  END
+$$
+;
+----------
+[CREATE_TABLE] --
+-- Partitioned tables
+--
+
+-- cannot combine INHERITS and PARTITION BY (although grammar allows)
+CREATE TABLE partitioned (
+	a int
+) INHERITS (some_table) PARTITION BY LIST (a)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.depth1
+;
+----------
+[CREATE_TABLE] CREATE TABLE partitioned (
+	a int,
+	b int
+) PARTITION BY RANGE ((avg(a) OVER (PARTITION BY b)))
+;
+----------
+[CALL_PROG_OBJ] -- you can write an expression, but it's not evaluated
+CALL ptest9(1/0)
+;
+----------
+[DROP_TRIGGER] DROP TRIGGER delete_a ON main_table
+;
+----------
+[CALL_PROG_OBJ] CALL test_proc8c(_a, _b)
+;
+----------
+[RENAME_SEQUENCE] ---
+
+ALTER SEQUENCE regtest_seq_1 RENAME TO regtest_seq
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_like_6c (LIKE test_like_6 INCLUDING ALL)
+;
+----------
+[CREATE_TABLE] create table text_hashp1 partition of text_hashp for values with (modulus 2, remainder 1)
+;
+----------
+[CREATE_PROG_OBJ] -- test where predicate is able to do a transactional update during
+-- a concurrent build before switching pg_index state flags.
+CREATE FUNCTION predicate_stable() RETURNS bool IMMUTABLE
+LANGUAGE plpgsql AS $$
+BEGIN
+  EXECUTE 'SELECT txid_current()';
+  RETURN true;
+END; $$
+;
+----------
+[CREATE_TABLE] -- Check that partitioned tables cannot be clustered
+CREATE TABLE clstrpart (a int) PARTITION BY RANGE (a)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."my_property_normal" WITH ("security_barrier"='true') AS
+ SELECT "customer"."cid",
+    "customer"."name",
+    "customer"."tel",
+    "customer"."passwd"
+   FROM "public"."customer"
+  WHERE ("customer"."name" = CURRENT_USER)
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_9.pg_temp_38133
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] -- cannot drop inherited NOT NULL constraint from a partition
+ALTER TABLE fd_pt2_1 ALTER c1 DROP NOT NULL
+;
+----------
+[CREATE_PROG_OBJ] CREATE AGGREGATE "public"."logging_agg_strict"("text") (
+    SFUNC = "public"."logging_sfunc_strict",
+    STYPE = "text",
+    MSFUNC = "public"."logging_msfunc_strict",
+    MINVFUNC = "public"."logging_minvfunc_strict",
+    MSTYPE = "text"
+)
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] --error
+
+ALTER TABLE notnull_chld0 DROP CONSTRAINT nn_chld0
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] alter table target_parted attach partition attach_parted for values in (1)
+;
+----------
+[ALTER_TABLE] /* but works fine with FULL replica identity */
+ALTER TABLE testpub_tbl5d REPLICA IDENTITY FULL
+;
+----------
+[ALTER_TABLE] ALTER FOREIGN TABLE table30000 OPTIONS ( SET fetch_size '60000')
+;
+----------
+[TRUNCATE_TABLE] TRUNCATE TABLE trunc_c CASCADE
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA newschema5 AUTHORIZATION "Public"
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_numeric_same(gbtreekey_var, gbtreekey_var, internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA IF NOT EXISTS newschema2 AUTHORIZATION "current_user"
+;
+----------
+[DROP_TABLE] -- fail
+
+drop table trigger_ddl_table
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."inet_tbl" (
+    "c" "cidr",
+    "i" "inet"
+)
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, SKIP_LOCKED) pg_catalog.pg_auth_members
+;
+----------
+[DROP_PROG_OBJ] DROP OPERATOR !==== (boolean, real)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "public"."plt2" ATTACH PARTITION "public"."plt2_p1" FOR VALUES IN ('0000', '0003', '0004', '0010')
+;
+----------
+[ADD_INDEX] CREATE INDEX test1_a_idx ON test1 USING btree (a)
+;
+----------
+[CREATE_PROG_OBJ] -- create or replace aggregate
+CREATE AGGREGATE myavg (numeric)
+(
+	stype = internal,
+	sfunc = numeric_avg_accum,
+	finalfunc = numeric_avg
+)
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS) pg_catalog.pg_opfamily
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW v6_temp AS SELECT * FROM base_table WHERE id IN (SELECT id FROM temp_table)
+;
+----------
+[ALTER_TABLE] -- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."c" INHERIT "public"."a"
+;
+----------
+[CREATE_POLICY] CREATE POLICY p1 ON rls_tbl USING (rls_tbl >= ROW(1,1,1))
+;
+----------
+[ADMIN_TABLE] VACUUM (DISABLE_PAGE_SKIPPING) pg_catalog.pg_parameter_acl
+;
+----------
+[ADD_INDEX] CREATE INDEX concur_reindex_ind ON concur_reindex_tab (c1)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR < (
+	PROCEDURE = isnlt,
+	LEFTARG = ean13,
+	RIGHTARG = ean13,
+	COMMUTATOR = >,
+	NEGATOR = >=,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+----------
+[CREATE_TABLE] -- Unique constraints don't give raise to not-null constraints, however.
+create table cnn_uq (a int)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR < (
+	PROCEDURE = isnlt,
+	LEFTARG = ean13,
+	RIGHTARG = ismn,
+	COMMUTATOR = >,
+	NEGATOR = >=,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+----------
+[CREATE_TABLE] -- ok
+CREATE TABLE thirdparent (tomorrow date default now()::date - 1)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 6.18
+ * COLUMN_COLUMN_USAGE view
+ */
+
+CREATE VIEW column_column_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(n.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+           CAST(ac.attname AS sql_identifier) AS column_name,
+           CAST(ad.attname AS sql_identifier) AS dependent_column
+
+    FROM pg_namespace n, pg_class c, pg_depend d,
+         pg_attribute ac, pg_attribute ad, pg_attrdef atd
+
+    WHERE n.oid = c.relnamespace
+          AND c.oid = ac.attrelid
+          AND c.oid = ad.attrelid
+          AND ac.attnum <> ad.attnum
+          AND ad.attrelid = atd.adrelid
+          AND ad.attnum = atd.adnum
+          AND d.classid = 'pg_catalog.pg_attrdef'::regclass
+          AND d.refclassid = 'pg_catalog.pg_class'::regclass
+          AND d.objid = atd.oid
+          AND d.refobjid = ac.attrelid
+          AND d.refobjsubid = ac.attnum
+          AND ad.attgenerated <> ''
+          AND pg_has_role(c.relowner, 'USAGE')
+;
+----------
+[ALTER_TYPE] -- fail
+
+alter domain dom drop not null
+;
+----------
+[CREATE_TABLE] create table test_range_gist(ir int4range)
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE tab_rep_next (a) AS SELECT generate_series(1,10)
+;
+----------
+[CREATE_TYPE] CREATE TYPE comptype AS (r float8)
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE pg_temp_32.pg_temp_28153_2 (tid pg_catalog.tid)
+;

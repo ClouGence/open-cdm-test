@@ -1,0 +1,478 @@
+COMMENT ON AGGREGATE nosuchagg (*) IS 'should fail'
+;
+DROP TYPE tt_enum_type
+;
+CREATE TABLE test_bpchar (
+	i char(10)
+)
+;
+-- Fail, in use for some partitioned object
+DROP TABLESPACE regress_tblspace
+;
+ALTER TABLE pg_temp_10.pg_temp_25340_2 ADD COLUMN newdata pg_temp_10.pg_temp_25340
+;
+create table s5.p2 (a int, b int) PARTITION BY list (a)
+;
+-- Neither check_a nor check_b are droppable from part_b
+ALTER TABLE part_b DROP CONSTRAINT check_a
+;
+CREATE TABLE "public"."regress_notnull2" (
+    "a" integer NOT NULL
+)
+;
+CREATE TABLE selinto_schema.tmp3 (a,b,c)
+	   AS SELECT oid,relname,relacl FROM pg_class
+	   WHERE relname like '%c%'
+;
+CREATE TABLE rngfunc2(rngfuncid int, f2 int)
+;
+CREATE SEQUENCE s4.seq2
+;
+ALTER INDEX "fkpart6"."pk1_pkey" ATTACH PARTITION "fkpart6"."pk11_pkey"
+;
+-- some more test data
+CREATE TEMP TABLE arrtest_f (f0 int, f1 text, f2 float8)
+;
+CREATE TYPE "public"."tt_t1" AS (
+	"x" integer,
+	"y" numeric(8,2)
+)
+;
+CREATE VIEW pg_stats_ext WITH (security_barrier) AS
+    SELECT cn.nspname AS schemaname,
+           c.relname AS tablename,
+           sn.nspname AS statistics_schemaname,
+           s.stxname AS statistics_name,
+           pg_get_userbyid(s.stxowner) AS statistics_owner,
+           ( SELECT array_agg(a.attname ORDER BY a.attnum)
+             FROM unnest(s.stxkeys) k
+                  JOIN pg_attribute a
+                       ON (a.attrelid = s.stxrelid AND a.attnum = k)
+           ) AS attnames,
+           pg_get_statisticsobjdef_expressions(s.oid) as exprs,
+           s.stxkind AS kinds,
+           sd.stxdndistinct AS n_distinct,
+           sd.stxddependencies AS dependencies,
+           m.most_common_vals,
+           m.most_common_val_nulls,
+           m.most_common_freqs,
+           m.most_common_base_freqs
+    FROM pg_statistic_ext s JOIN pg_class c ON (c.oid = s.stxrelid)
+         JOIN pg_statistic_ext_data sd ON (s.oid = sd.stxoid)
+         LEFT JOIN pg_namespace cn ON (cn.oid = c.relnamespace)
+         LEFT JOIN pg_namespace sn ON (sn.oid = s.stxnamespace)
+         LEFT JOIN LATERAL
+                   ( SELECT array_agg(values) AS most_common_vals,
+                            array_agg(nulls) AS most_common_val_nulls,
+                            array_agg(frequency) AS most_common_freqs,
+                            array_agg(base_frequency) AS most_common_base_freqs
+                     FROM pg_mcv_list_items(sd.stxdmcv)
+                   ) m ON sd.stxdmcv IS NOT NULL
+    WHERE pg_has_role(c.relowner, 'USAGE')
+    AND (c.relrowsecurity = false OR NOT row_security_active(c.oid))
+;
+analyze gs_data_1
+;
+/* contrib/dblink/dblink--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+-- dblink_connect now restricts non-superusers to password
+-- authenticated connections
+CREATE FUNCTION dblink_connect (text)
+RETURNS text
+AS '$libdir/dblink','dblink_connect'
+LANGUAGE C STRICT PARALLEL RESTRICTED
+;
+/* contrib/pageinspect/pageinspect--1.10--1.11.sql */
+
+-- complain if script is sourced in psql, rather than via ALTER EXTENSION
+
+
+--
+-- Functions that fetch relation pages must be PARALLEL RESTRICTED,
+-- not PARALLEL SAFE, otherwise they will fail when run on a
+-- temporary table in a parallel worker process.
+--
+
+ALTER FUNCTION get_raw_page(text, int8) PARALLEL RESTRICTED
+;
+CREATE TABLE tab2 (a int PRIMARY KEY, c text DEFAULT 'sub1_tab2', b text) PARTITION BY RANGE (a)
+;
+CREATE FUNCTION merge_func() RETURNS integer LANGUAGE plpgsql AS $$
+DECLARE
+  result integer;
+BEGIN
+MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid + 1, balance = balance + delta, val = val || ' updated by merge'
+  WHEN NOT MATCHED THEN
+    INSERT VALUES (sid, delta, 'inserted by merge');
+IF FOUND THEN
+  GET DIAGNOSTICS result := ROW_COUNT;
+END IF;
+RETURN result;
+END;
+$$
+;
+-- should fail
+DROP TABLE FKTABLE
+;
+--
+-- Test partitioning planner code
+--
+create table lp (a char) partition by list (a)
+;
+ALTER TEXT SEARCH CONFIGURATION "public"."hunspell_tst"
+    ADD MAPPING FOR "hword_part" WITH "public"."hunspell_num", "english_stem"
+;
+CREATE MATERIALIZED VIEW s5.t2_mv AS SELECT * FROM s5.t2
+;
+CREATE OPERATOR -> (
+	LEFTARG = hstore,
+	RIGHTARG = text[],
+	PROCEDURE = slice_array
+)
+;
+CREATE TABLE pvactst (i INT, a INT[], p POINT) with (autovacuum_enabled = off)
+;
+CREATE INDEX "brinidx_bloom" ON "public"."brintest_bloom" USING "brin" ("byteacol" "bytea_bloom_ops", "charcol" "char_bloom_ops", "namecol" "name_bloom_ops", "int8col" "int8_bloom_ops", "int2col" "int2_bloom_ops", "int4col" "int4_bloom_ops", "textcol" "text_bloom_ops", "oidcol" "oid_bloom_ops", "float4col" "float4_bloom_ops", "float8col" "float8_bloom_ops", "macaddrcol" "macaddr_bloom_ops", "inetcol" "inet_bloom_ops", "cidrcol" "inet_bloom_ops", "bpcharcol" "bpchar_bloom_ops", "datecol" "date_bloom_ops", "timecol" "time_bloom_ops", "timestampcol" "timestamp_bloom_ops", "timestamptzcol" "timestamptz_bloom_ops", "intervalcol" "interval_bloom_ops", "timetzcol" "timetz_bloom_ops", "numericcol" "numeric_bloom_ops", "uuidcol" "uuid_bloom_ops", "lsncol" "pg_lsn_bloom_ops") WITH ("pages_per_range"='1')
+;
+CREATE PUBLICATION testpub_ins_trunct WITH (publish = insert)
+;
+ALTER TABLE itest6 ALTER COLUMN b SET INCREMENT BY 2
+;
+alter view my_locks reset (autovacuum_enabled)
+;
+CREATE TABLE "public"."partitioned_table" (
+    "a" integer,
+    "b" "text"
+)
+PARTITION BY LIST ("a")
+;
+DROP TABLE itest_parent
+;
+ALTER TABLE ONLY "public"."gtest10"
+    ADD CONSTRAINT "gtest10_pkey" PRIMARY KEY ("a")
+;
+CREATE TABLE default_expr_agg (a int DEFAULT (avg(1)))
+;
+create table c_mutable(f1 int, f2 text)
+;
+-- hash support
+
+CREATE FUNCTION hstore_hash(hstore)
+RETURNS integer
+AS '$libdir/hstore','hstore_hash'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+CREATE SUBSCRIPTION tap_sub_A_B
+	CONNECTION 'port=29891 host=/tmp/7Wj1Y48wnU dbname=postgres application_name=tap_sub_A_B'
+	PUBLICATION tap_pub_B
+	WITH (origin = none, copy_data = off)
+;
+alter table extremely_skewed set (parallel_workers = 2)
+;
+drop domain dnotnulltest cascade
+;
+ANALYZE (SKIP_LOCKED) pg_catalog.pg_tablespace
+;
+-- Validate we handle IS NULL and IS NOT NULL quals correctly with inheritance
+-- parents.
+CREATE TABLE pred_parent (a int)
+;
+VACUUM (PARALLEL 2) pg_catalog.pg_publication_namespace
+;
+CREATE INDEX alter_idx_rename_test_idx ON alter_idx_rename_test (a)
+;
+CREATE FUNCTION spgist_name_leaf_consistent(internal, internal)
+RETURNS boolean IMMUTABLE PARALLEL SAFE STRICT
+AS '$libdir/spgist_name_ops' LANGUAGE C
+;
+COMMENT ON COLUMN dump_test.test_second_table.col1
+					   IS 'comment on column col1'
+;
+/* contrib/pg_stat_statements/pg_stat_statements--1.6--1.7.sql */
+
+-- complain if script is sourced in psql, rather than via ALTER EXTENSION
+
+
+/* First we have to remove them from the extension */
+ALTER EXTENSION pg_stat_statements DROP FUNCTION pg_stat_statements_reset()
+;
+create trigger trig_upd_after after update on parted_stmt_trig
+  for each statement execute procedure trigger_notice()
+;
+VACUUM (TRUNCATE FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_authid
+;
+CREATE TABLE ctlt2 (c text NOT NULL)
+;
+ANALYZE public.spgist_point_tbl
+;
+------------------------------------------------------------------------------------------
+[COMMENT_PROG_OBJ] COMMENT ON AGGREGATE nosuchagg (*) IS 'should fail'
+;
+----------
+[DROP_TYPE] DROP TYPE tt_enum_type
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_bpchar (
+	i char(10)
+)
+;
+----------
+[DROP_TABLESPACE] -- Fail, in use for some partitioned object
+DROP TABLESPACE regress_tblspace
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE pg_temp_10.pg_temp_25340_2 ADD COLUMN newdata pg_temp_10.pg_temp_25340
+;
+----------
+[CREATE_TABLE] create table s5.p2 (a int, b int) PARTITION BY list (a)
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] -- Neither check_a nor check_b are droppable from part_b
+ALTER TABLE part_b DROP CONSTRAINT check_a
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."regress_notnull2" (
+    "a" integer NOT NULL
+)
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE selinto_schema.tmp3 (a,b,c)
+	   AS SELECT oid,relname,relacl FROM pg_class
+	   WHERE relname like '%c%'
+;
+----------
+[CREATE_TABLE] CREATE TABLE rngfunc2(rngfuncid int, f2 int)
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE s4.seq2
+;
+----------
+[ALTER_INDEX] ALTER INDEX "fkpart6"."pk1_pkey" ATTACH PARTITION "fkpart6"."pk11_pkey"
+;
+----------
+[CREATE_TABLE] -- some more test data
+CREATE TEMP TABLE arrtest_f (f0 int, f1 text, f2 float8)
+;
+----------
+[CREATE_TYPE] CREATE TYPE "public"."tt_t1" AS (
+	"x" integer,
+	"y" numeric(8,2)
+)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA,PERFORMANCE)] CREATE VIEW pg_stats_ext WITH (security_barrier) AS
+    SELECT cn.nspname AS schemaname,
+           c.relname AS tablename,
+           sn.nspname AS statistics_schemaname,
+           s.stxname AS statistics_name,
+           pg_get_userbyid(s.stxowner) AS statistics_owner,
+           ( SELECT array_agg(a.attname ORDER BY a.attnum)
+             FROM unnest(s.stxkeys) k
+                  JOIN pg_attribute a
+                       ON (a.attrelid = s.stxrelid AND a.attnum = k)
+           ) AS attnames,
+           pg_get_statisticsobjdef_expressions(s.oid) as exprs,
+           s.stxkind AS kinds,
+           sd.stxdndistinct AS n_distinct,
+           sd.stxddependencies AS dependencies,
+           m.most_common_vals,
+           m.most_common_val_nulls,
+           m.most_common_freqs,
+           m.most_common_base_freqs
+    FROM pg_statistic_ext s JOIN pg_class c ON (c.oid = s.stxrelid)
+         JOIN pg_statistic_ext_data sd ON (s.oid = sd.stxoid)
+         LEFT JOIN pg_namespace cn ON (cn.oid = c.relnamespace)
+         LEFT JOIN pg_namespace sn ON (sn.oid = s.stxnamespace)
+         LEFT JOIN LATERAL
+                   ( SELECT array_agg(values) AS most_common_vals,
+                            array_agg(nulls) AS most_common_val_nulls,
+                            array_agg(frequency) AS most_common_freqs,
+                            array_agg(base_frequency) AS most_common_base_freqs
+                     FROM pg_mcv_list_items(sd.stxdmcv)
+                   ) m ON sd.stxdmcv IS NOT NULL
+    WHERE pg_has_role(c.relowner, 'USAGE')
+    AND (c.relrowsecurity = false OR NOT row_security_active(c.oid))
+;
+----------
+[ADMIN_TABLE] analyze gs_data_1
+;
+----------
+[CREATE_PROG_OBJ] /* contrib/dblink/dblink--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+-- dblink_connect now restricts non-superusers to password
+-- authenticated connections
+CREATE FUNCTION dblink_connect (text)
+RETURNS text
+AS '$libdir/dblink','dblink_connect'
+LANGUAGE C STRICT PARALLEL RESTRICTED
+;
+----------
+[ALTER_PROG_OBJ] /* contrib/pageinspect/pageinspect--1.10--1.11.sql */
+
+-- complain if script is sourced in psql, rather than via ALTER EXTENSION
+
+
+--
+-- Functions that fetch relation pages must be PARALLEL RESTRICTED,
+-- not PARALLEL SAFE, otherwise they will fail when run on a
+-- temporary table in a parallel worker process.
+--
+
+ALTER FUNCTION get_raw_page(text, int8) PARALLEL RESTRICTED
+;
+----------
+[CREATE_TABLE] CREATE TABLE tab2 (a int PRIMARY KEY, c text DEFAULT 'sub1_tab2', b text) PARTITION BY RANGE (a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION merge_func() RETURNS integer LANGUAGE plpgsql AS $$
+DECLARE
+  result integer;
+BEGIN
+MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid + 1, balance = balance + delta, val = val || ' updated by merge'
+  WHEN NOT MATCHED THEN
+    INSERT VALUES (sid, delta, 'inserted by merge');
+IF FOUND THEN
+  GET DIAGNOSTICS result := ROW_COUNT;
+END IF;
+RETURN result;
+END;
+$$
+;
+----------
+[DROP_TABLE] -- should fail
+DROP TABLE FKTABLE
+;
+----------
+[CREATE_TABLE] --
+-- Test partitioning planner code
+--
+create table lp (a char) partition by list (a)
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION "public"."hunspell_tst"
+    ADD MAPPING FOR "hword_part" WITH "public"."hunspell_num", "english_stem"
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW s5.t2_mv AS SELECT * FROM s5.t2
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR -> (
+	LEFTARG = hstore,
+	RIGHTARG = text[],
+	PROCEDURE = slice_array
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE pvactst (i INT, a INT[], p POINT) with (autovacuum_enabled = off)
+;
+----------
+[ADD_INDEX] CREATE INDEX "brinidx_bloom" ON "public"."brintest_bloom" USING "brin" ("byteacol" "bytea_bloom_ops", "charcol" "char_bloom_ops", "namecol" "name_bloom_ops", "int8col" "int8_bloom_ops", "int2col" "int2_bloom_ops", "int4col" "int4_bloom_ops", "textcol" "text_bloom_ops", "oidcol" "oid_bloom_ops", "float4col" "float4_bloom_ops", "float8col" "float8_bloom_ops", "macaddrcol" "macaddr_bloom_ops", "inetcol" "inet_bloom_ops", "cidrcol" "inet_bloom_ops", "bpcharcol" "bpchar_bloom_ops", "datecol" "date_bloom_ops", "timecol" "time_bloom_ops", "timestampcol" "timestamp_bloom_ops", "timestamptzcol" "timestamptz_bloom_ops", "intervalcol" "interval_bloom_ops", "timetzcol" "timetz_bloom_ops", "numericcol" "numeric_bloom_ops", "uuidcol" "uuid_bloom_ops", "lsncol" "pg_lsn_bloom_ops") WITH ("pages_per_range"='1')
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_ins_trunct WITH (publish = insert)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE itest6 ALTER COLUMN b SET INCREMENT BY 2
+;
+----------
+[ALTER_VIEW] alter view my_locks reset (autovacuum_enabled)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."partitioned_table" (
+    "a" integer,
+    "b" "text"
+)
+PARTITION BY LIST ("a")
+;
+----------
+[DROP_TABLE] DROP TABLE itest_parent
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "public"."gtest10"
+    ADD CONSTRAINT "gtest10_pkey" PRIMARY KEY ("a")
+;
+----------
+[CREATE_TABLE] CREATE TABLE default_expr_agg (a int DEFAULT (avg(1)))
+;
+----------
+[CREATE_TABLE] create table c_mutable(f1 int, f2 text)
+;
+----------
+[CREATE_PROG_OBJ] -- hash support
+
+CREATE FUNCTION hstore_hash(hstore)
+RETURNS integer
+AS '$libdir/hstore','hstore_hash'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION tap_sub_A_B
+	CONNECTION 'port=29891 host=/tmp/7Wj1Y48wnU dbname=postgres application_name=tap_sub_A_B'
+	PUBLICATION tap_pub_B
+	WITH (origin = none, copy_data = off)
+;
+----------
+[ALTER_TABLE] alter table extremely_skewed set (parallel_workers = 2)
+;
+----------
+[DROP_TYPE] drop domain dnotnulltest cascade
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) pg_catalog.pg_tablespace
+;
+----------
+[CREATE_TABLE] -- Validate we handle IS NULL and IS NOT NULL quals correctly with inheritance
+-- parents.
+CREATE TABLE pred_parent (a int)
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 2) pg_catalog.pg_publication_namespace
+;
+----------
+[ADD_INDEX] CREATE INDEX alter_idx_rename_test_idx ON alter_idx_rename_test (a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION spgist_name_leaf_consistent(internal, internal)
+RETURNS boolean IMMUTABLE PARALLEL SAFE STRICT
+AS '$libdir/spgist_name_ops' LANGUAGE C
+;
+----------
+[COMMENT_COLUMN] COMMENT ON COLUMN dump_test.test_second_table.col1
+					   IS 'comment on column col1'
+;
+----------
+[ALTER_LIBRARY] /* contrib/pg_stat_statements/pg_stat_statements--1.6--1.7.sql */
+
+-- complain if script is sourced in psql, rather than via ALTER EXTENSION
+
+
+/* First we have to remove them from the extension */
+ALTER EXTENSION pg_stat_statements DROP FUNCTION pg_stat_statements_reset()
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger trig_upd_after after update on parted_stmt_trig
+  for each statement execute procedure trigger_notice()
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_authid
+;
+----------
+[CREATE_TABLE] CREATE TABLE ctlt2 (c text NOT NULL)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.spgist_point_tbl
+;

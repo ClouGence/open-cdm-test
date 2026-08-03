@@ -1,0 +1,3195 @@
+[doris_official_website_mixed_011__switch_catalog__0001]
+sql:
+-- 1. Switch to catalog, use database, and query
+SWITCH paimon_ctl;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_CATALOG": [
+    {
+      "subject": "Catalog(2:7~2:17) /test/1/paimon_ctl/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__switch_schema__0002]
+sql:
+USE paimon_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:13) /test/1/catalog1/paimon_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0003]
+sql:
+SELECT * FROM paimon_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:24) /test/1/catalog1/schema1/paimon_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__switch_schema__0004]
+sql:
+-- 2. Use Paimon database directly
+USE paimon_ctl.paimon_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(2:15~2:24) /test/1/catalog1/paimon_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0005]
+sql:
+SELECT * FROM paimon_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:24) /test/1/catalog1/schema1/paimon_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0006]
+sql:
+-- 3. Use fully qualified name to query
+SELECT * FROM paimon_ctl.paimon_db.paimon_tbl LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:45) /test/1/paimon_ctl/paimon_db/paimon_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__switch_catalog__0007]
+sql:
+-- Materialized views can only be created on 内部カタログ, switch to 内部カタログ
+switch internal;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_CATALOG": [
+    {
+      "subject": "Catalog(2:7~2:15) /test/1/internal/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_schema__0008]
+sql:
+create database hive_mv_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_SCHEMA": [
+    {
+      "subject": "Schema(1:16~1:26) /test/1/catalog1/hive_mv_db/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__switch_schema__0009]
+sql:
+use hive_mv_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:14) /test/1/catalog1/hive_mv_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_view__0010]
+sql:
+CREATE MATERIALIZED VIEW external_hive_mv
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 12
+AS
+SELECT
+n_name,
+o_orderdate,
+sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM
+customer,
+orders,
+lineitem,
+supplier,
+nation,
+region
+WHERE
+c_custkey = o_custkey
+AND l_orderkey = o_orderkey
+AND l_suppkey = s_suppkey
+AND c_nationkey = s_nationkey
+AND s_nationkey = n_nationkey
+AND n_regionkey = r_regionkey
+AND r_name = 'ASIA'
+GROUP BY
+n_name,
+o_orderdate;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:41) /test/1/catalog1/schema1/external_hive_mv/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(10:0~10:8) /test/1/catalog1/schema1/customer/",
+        "Table(11:0~11:6) /test/1/catalog1/schema1/orders/",
+        "Table(12:0~12:8) /test/1/catalog1/schema1/lineitem/",
+        "Table(13:0~13:8) /test/1/catalog1/schema1/supplier/",
+        "Table(14:0~14:6) /test/1/catalog1/schema1/nation/",
+        "Table(15:0~15:6) /test/1/catalog1/schema1/region/"
+      ]
+    },
+    {
+      "subject": "Function(8:0~8:3) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0011]
+sql:
+-- Create a table to store test data
+CREATE TABLE test_table_for_regexp_replace (
+        id INT,
+        original_text VARCHAR(500),
+        pattern VARCHAR(100),
+        replacement VARCHAR(100)
+    ) PROPERTIES ("replication_num"="1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:42) /test/1/catalog1/schema1/test_table_for_regexp_replace/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0012]
+sql:
+-- Insert test data
+INSERT INTO test_table_for_regexp_replace VALUES
+    (1, 'Hello, World!', ',', '-'),    
+    (2, 'apple123', '[0-9]', '*'),    
+    (3, 'aabbcc', '(aa|bb|cc)', 'XX'),         
+    (4, '123-456-7890', '-', ' '), 
+    (5, 'test,data', ',', ';'),              
+    (6, 'a1b2c3', '[0-9]', '#'),         
+    (7, 'book keeper', 'oo|ee', '**'),        
+    (8, 'ababab', '(ab)', 'XY'),       
+    (9, 'aabbcc', '(aa|bb|cc)', 'ZZ'),         
+    (10, 'apple,banana', ',', ' - ');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:41) /test/1/catalog1/schema1/test_table_for_regexp_replace/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0013]
+sql:
+-- Perform replacement 運用 on the inserted data
+SELECT id, regexp_replace(original_text, pattern, replacement) as replaced_text FROM test_table_for_regexp_replace ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:11~2:25) /test/1/catalog1/schema1/regexp_replace/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:85~2:114) /test/1/catalog1/schema1/test_table_for_regexp_replace/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0014]
+sql:
+CREATE TABLE candidate_profiles (
+    candidate_id INT,
+    name         VARCHAR(50),
+    self_intro   VARCHAR(500)
+)
+DUPLICATE KEY(candidate_id)
+DISTRIBUTED BY HASH(candidate_id) BUCKETS 1
+PROPERTIES (
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:31) /test/1/catalog1/schema1/candidate_profiles/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0015]
+sql:
+CREATE TABLE job_requirements (
+    job_id   INT,
+    title    VARCHAR(100),
+    jd_text  VARCHAR(500)
+)
+DUPLICATE KEY(job_id)
+DISTRIBUTED BY HASH(job_id) BUCKETS 1
+PROPERTIES (
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:29) /test/1/catalog1/schema1/job_requirements/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0016]
+sql:
+INSERT INTO candidate_profiles VALUES
+(1, 'Alice', 'I am a senior backend engineer with 7 years of experience in Java, Spring Cloud and high-concurrency systems.'),
+(2, 'Bob',   'Frontend developer focusing on React, TypeScript and performance 最適化 for e-commerce sites.'),
+(3, 'Cathy', 'Data scientist specializing in NLP, large language models and recommendation systems.');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:30) /test/1/catalog1/schema1/candidate_profiles/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0017]
+sql:
+INSERT INTO job_requirements VALUES
+(101, 'Backend Engineer', 'Looking for a senior backend engineer with deep Java expertise and experience designing distributed systems.'),
+(102, 'ML Engineer',      'Seeking a data scientist or ML engineer familiar with NLP and large language models.');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:28) /test/1/catalog1/schema1/job_requirements/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0018]
+sql:
+CREATE TABLE IF NOT EXISTS user.activity (
+    `user_id` INT NOT NULL,
+    `date` DATE NOT NULL,
+    `city` VARCHAR(20),
+    `age` SMALLINT,
+    `sex` TINYINT,
+    `last_visit_date` DATETIME DEFAULT '1970-01-01 00:00:00',
+    `cost` BIGINT DEFAULT '0',
+    `max_dwell_time` INT DEFAULT '0',
+    `min_dwell_time` INT DEFAULT '99999'
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:40) /test/1/catalog1/user/activity/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0019]
+sql:
+INSERT INTO user.activity VALUES
+    (10000, '2017-10-01', 'Beijing', 20, 0, '2017-10-01 06:00:00', 20, 10, 10),
+    (10000, '2017-10-01', 'Beijing', 20, 0, '2017-10-01 07:00:00', 15, 2, 2),
+    (10001, '2017-10-01', 'Beijing', 30, 1, '2017-10-01 17:05:00', 2, 22, 22),
+    (10002, '2017-10-02', 'Shanghai', 20, 1, '2017-10-02 12:59:00', 200, 5, 5),
+    (10003, '2017-10-02', 'Guangzhou', 32, 0, '2017-10-02 11:20:00', 30, 11, 11),
+    (10004, '2017-10-01', 'Shenzhen', 35, 0, '2017-10-01 10:00:00', 100, 3, 3),
+    (10004, '2017-10-03', 'Shenzhen', 35, 0, '2017-10-03 10:20:00', 11, 6, 6);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:25) /test/1/catalog1/user/activity/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__admin__0020]
+sql:
+alter system modify backend "host1:9050, 1212:9050" set ("tag.location" = "group_a");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN": []
+}
+
+----------
+[doris_official_website_mixed_011__alter_table__0021]
+sql:
+alter table my_table modify partition p1 set ("replication_allocation" = "tag.location.group_a:2");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:20) /test/1/catalog1/schema1/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__grant__0022]
+sql:
+GRANT USAGE_PRIV ON RESOURCE "spark0" TO "user0"@"%";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:29~1:37) /test/1/spark0/",
+      "action" : "GRANT",
+      "target" : "User(1:41~1:52) /test/1/user0\"@\"%/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__grant__0023]
+sql:
+GRANT USAGE_PRIV ON RESOURCE "spark0" TO ROLE "role0";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:29~1:37) /test/1/spark0/",
+      "action" : "GRANT",
+      "target" : "Role(1:46~1:53) /test/1/role0/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__grant__0024]
+sql:
+GRANT USAGE_PRIV ON RESOURCE * TO "user0"@"%";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:29~1:30) /test/1/*/",
+      "action" : "GRANT",
+      "target" : "User(1:34~1:45) /test/1/user0\"@\"%/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__grant__0025]
+sql:
+GRANT USAGE_PRIV ON RESOURCE * TO ROLE "role0";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:29~1:30) /test/1/*/",
+      "action" : "GRANT",
+      "target" : "Role(1:39~1:46) /test/1/role0/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__revoke__0026]
+sql:
+REVOKE USAGE_PRIV ON RESOURCE "spark0" FROM "user0"@"%";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "REVOKE": [
+    {
+      "subject": "Object(1:30~1:38) /test/1/spark0/",
+      "action" : "REVOKE",
+      "target" : "User(1:44~1:55) /test/1/user0\"@\"%/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0027]
+sql:
+create table d_table (
+       k1 int null,
+       k2 int not null,
+       k3 bigint null,
+       k4 varchar(100) null
+    )
+    duplicate key (k1,k2,k3)
+    distributed BY hash(k1) buckets 3
+    properties("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:20) /test/1/catalog1/schema1/d_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0028]
+sql:
+insert into d_table select 1,1,1,'2020-02-20';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:19) /test/1/catalog1/schema1/d_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0029]
+sql:
+insert into d_table select 2,2,2,'2021-02-20';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:19) /test/1/catalog1/schema1/d_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0030]
+sql:
+insert into d_table select 3,-3,null,'2022-02-20';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:19) /test/1/catalog1/schema1/d_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0031]
+sql:
+CREATE TABLE `roles` (
+  role_id       INT,
+  occupation    VARCHAR(32),
+  camp          VARCHAR(32),
+  register_time DATE
+)
+UNIQUE KEY(role_id)
+DISTRIBUTED BY HASH(role_id) BUCKETS 1
+PROPERTIES (
+  "replication_allocation" = "tag.location.default: 1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:20) /test/1/catalog1/schema1/roles/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0032]
+sql:
+INSERT INTO `roles` VALUES
+(0, 'who am I', NULL, NULL),
+(1, 'mage', 'alliance', '2018-12-03 16:11:28'),
+(2, 'paladin', 'alliance', '2018-11-30 16:11:28'),
+(3, 'rogue', 'horde', '2018-12-01 16:11:28'),
+(4, 'priest', 'alliance', '2018-12-02 16:11:28'),
+(5, 'shaman', 'horde', NULL),
+(6, 'warrior', 'alliance', NULL),
+(7, 'warlock', 'horde', '2018-12-04 16:11:28'),
+(8, 'hunter', 'horde', NULL);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:19) /test/1/catalog1/schema1/roles/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0033]
+sql:
+SELECT 
+  camp, 
+  COUNT(occupation) AS 'occ_cnt',
+  GROUPING(camp)    AS 'grouping'
+FROM
+   `roles`
+GROUP BY
+  ROLLUP(camp);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:2~3:7) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:2~4:10) /test/1/catalog1/schema1/GROUPING/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:3~6:10) /test/1/catalog1/schema1/roles/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__system_setting_write__0034]
+sql:
+CREATE RESOURCE hms_resource PROPERTIES (
+		'type'='hms',
+		'hive.metastore.uris' = 'thrift://127.0.0.1:7004',
+		'dfs.nameservices'='HANN',
+		'dfs.ha.namenodes.HANN'='nn1,nn2',
+		'dfs.namenode.rpc-address.HANN.nn1'='nn1_host:rpc_port',
+		'dfs.namenode.rpc-address.HANN.nn2'='nn2_host:rpc_port',
+		'dfs.client.failover.proxy.provider.HANN'='org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider'
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0035]
+sql:
+CREATE CATALOG hive WITH RESOURCE hms_resource;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:19) /test/1/hive/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0036]
+sql:
+CREATE CATALOG hive PROPERTIES (
+		'type'='hms',
+		'hive.metastore.uris' = 'thrift://127.0.0.1:7004',
+		'dfs.nameservices'='HANN',
+		'dfs.ha.namenodes.HANN'='nn1,nn2',
+		'dfs.namenode.rpc-address.HANN.nn1'='nn1_host:rpc_port',
+		'dfs.namenode.rpc-address.HANN.nn2'='nn2_host:rpc_port',
+		'dfs.client.failover.proxy.provider.HANN'='org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider'
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:19) /test/1/hive/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__system_setting_write__0037]
+sql:
+CREATE RESOURCE es_resource PROPERTIES (
+		"type"="es",
+		"hosts"="http://127.0.0.1:9200"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0038]
+sql:
+CREATE CATALOG es WITH RESOURCE es_resource;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:17) /test/1/es/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0039]
+sql:
+CREATE CATALOG es PROPERTIES (
+		"type"="es",
+		"hosts"="http://127.0.0.1:9200"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:17) /test/1/es/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__system_setting_write__0040]
+sql:
+CREATE RESOURCE mysql_resource PROPERTIES (
+		"type"="jdbc",
+		"user"="root",
+		"password"="123456",
+		"jdbc_url" = "jdbc:mysql://127.0.0.1:3316/doris_test?useSSL=false",
+		"driver_url" = "https://doris-community-test-1308700295.cos.ap-hongkong.myqcloud.com/jdbc_driver/mysql-connector-java-8.0.25.jar",
+		"driver_class" = "com.mysql.cj.jdbc.Driver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0041]
+sql:
+CREATE CATALOG jdbc WITH RESOURCE mysql_resource;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:19) /test/1/jdbc/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0042]
+sql:
+CREATE CATALOG jdbc PROPERTIES (
+		"type"="jdbc",
+		"user"="root",
+		"password"="123456",
+		"jdbc_url" = "jdbc:mysql://127.0.0.1:3316/doris_test?useSSL=false",
+		"driver_url" = "https://doris-community-test-1308700295.cos.ap-hongkong.myqcloud.com/jdbc_driver/mysql-connector-java-8.0.25.jar",
+		"driver_class" = "com.mysql.cj.jdbc.Driver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:19) /test/1/jdbc/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0043]
+sql:
+CREATE CATALOG jdbc PROPERTIES (
+		"type"="jdbc",
+		"jdbc.user"="root",
+		"jdbc.password"="123456",
+		"jdbc.jdbc_url" = "jdbc:mysql://127.0.0.1:3316/doris_test?useSSL=false",
+		"jdbc.driver_url" = "https://doris-community-test-1308700295.cos.ap-hongkong.myqcloud.com/jdbc_driver/mysql-connector-java-8.0.25.jar",
+		"jdbc.driver_class" = "com.mysql.cj.jdbc.Driver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:19) /test/1/jdbc/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__system_setting_write__0044]
+sql:
+CREATE RESOURCE pg_resource PROPERTIES (
+		"type"="jdbc",
+		"user"="postgres",
+		"password"="123456",
+		"jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/demo",
+		"driver_url" = "file:///path/to/postgresql-42.5.1.jar",
+		"driver_class" = "org.postgresql.Driver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0045]
+sql:
+CREATE CATALOG jdbc WITH RESOURCE pg_resource;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:19) /test/1/jdbc/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0046]
+sql:
+CREATE CATALOG jdbc PROPERTIES (
+		"type"="jdbc",
+		"user"="postgres",
+		"password"="123456",
+		"jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/demo",
+		"driver_url" = "file:///path/to/postgresql-42.5.1.jar",
+		"driver_class" = "org.postgresql.Driver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:19) /test/1/jdbc/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__system_setting_write__0047]
+sql:
+CREATE RESOURCE oracle_resource PROPERTIES (
+		"type"="jdbc",
+		"user"="doris",
+		"password"="123456",
+		"jdbc_url" = "jdbc:oracle:thin:@127.0.0.1:1521:helowin",
+		"driver_url" = "file:///path/to/ojdbc6.jar",
+		"driver_class" = "oracle.jdbc.driver.OracleDriver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0048]
+sql:
+CREATE CATALOG jdbc WITH RESOURCE oracle_resource;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:19) /test/1/jdbc/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0049]
+sql:
+CREATE CATALOG jdbc PROPERTIES (
+		"type"="jdbc",
+		"user"="doris",
+		"password"="123456",
+		"jdbc_url" = "jdbc:oracle:thin:@127.0.0.1:1521:helowin",
+		"driver_url" = "file:///path/to/ojdbc6.jar",
+		"driver_class" = "oracle.jdbc.driver.OracleDriver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:19) /test/1/jdbc/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__system_setting_write__0050]
+sql:
+CREATE RESOURCE sqlserver_resource PROPERTIES (
+		"type"="jdbc",
+		"user"="SA",
+		"password"="Doris123456",
+		"jdbc_url" = "jdbc:sqlserver://localhost:1433;DataBaseName=doris_test",
+		"driver_url" = "file:///path/to/mssql-jdbc-11.2.3.jre8.jar",
+		"driver_class" = "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0051]
+sql:
+CREATE CATALOG sqlserver_catalog WITH RESOURCE sqlserver_resource;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:32) /test/1/sqlserver_catalog/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0052]
+sql:
+CREATE CATALOG sqlserver_catalog PROPERTIES (
+		"type"="jdbc",
+		"user"="SA",
+		"password"="Doris123456",
+		"jdbc_url" = "jdbc:sqlserver://localhost:1433;DataBaseName=doris_test",
+		"driver_url" = "file:///path/to/mssql-jdbc-11.2.3.jre8.jar",
+		"driver_class" = "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:32) /test/1/sqlserver_catalog/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__system_setting_write__0053]
+sql:
+CREATE RESOURCE saphana_resource PROPERTIES (
+       "type"="jdbc",
+       "user"="SYSTEM",
+       "password"="SAPHANA",
+       "jdbc_url" = "jdbc:sap://localhost:31515/TEST",
+       "driver_url" = "file:///path/to/ngdbc.jar",
+       "driver_class" = "com.sap.db.jdbc.Driver"
+   );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0054]
+sql:
+CREATE CATALOG saphana_catalog WITH RESOURCE saphana_resource;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:30) /test/1/saphana_catalog/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0055]
+sql:
+CREATE CATALOG saphana_catalog PROPERTIES (
+       "type"="jdbc",
+       "user"="SYSTEM",
+       "password"="SAPHANA",
+       "jdbc_url" = "jdbc:sap://localhost:31515/TEST",
+       "driver_url" = "file:///path/to/ngdbc.jar",
+       "driver_class" = "com.sap.db.jdbc.Driver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:30) /test/1/saphana_catalog/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__system_setting_write__0056]
+sql:
+CREATE EXTERNAL RESOURCE trino_resource PROPERTIES (
+       "type"="jdbc",
+       "user"="hadoop",
+       "password"="",
+       "jdbc_url" = "jdbc:trino://localhost:8080/hive",
+       "driver_url" = "file:///path/to/trino-jdbc-389.jar",
+       "driver_class" = "io.trino.jdbc.TrinoDriver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0057]
+sql:
+CREATE CATALOG trino_catalog WITH RESOURCE trino_resource;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:28) /test/1/trino_catalog/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0058]
+sql:
+CREATE CATALOG trino_catalog PROPERTIES (
+       "type"="jdbc",
+       "user"="hadoop",
+       "password"="",
+       "jdbc_url" = "jdbc:trino://localhost:8080/hive",
+       "driver_url" = "file:///path/to/trino-jdbc-389.jar",
+       "driver_class" = "io.trino.jdbc.TrinoDriver"
+	);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:28) /test/1/trino_catalog/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0059]
+sql:
+-- create t1, t2, t3 tables
+CREATE TABLE t1
+  (id INT, c1 BIGINT, c2 STRING, c3 DOUBLE, c4 DATE)
+UNIQUE KEY (id)
+DISTRIBUTED BY HASH (id)
+PROPERTIES('replication_num'='1', "function_column.sequence_col" = "c4");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:15) /test/1/catalog1/schema1/t1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0060]
+sql:
+CREATE TABLE t2
+  (id INT, c1 BIGINT, c2 STRING, c3 DOUBLE, c4 DATE)
+DISTRIBUTED BY HASH (id)
+PROPERTIES('replication_num'='1');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0061]
+sql:
+CREATE TABLE t3
+  (id INT)
+DISTRIBUTED BY HASH (id)
+PROPERTIES('replication_num'='1');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t3/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0062]
+sql:
+-- insert data
+INSERT INTO t1 VALUES
+  (1, 1, '1', 1.0, '2000-01-01'),
+  (2, 2, '2', 2.0, '2000-01-02'),
+  (3, 3, '3', 3.0, '2000-01-03');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:14) /test/1/catalog1/schema1/t1/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0063]
+sql:
+INSERT INTO t2 VALUES
+  (1, 10, '10', 10.0, '2000-01-10'),
+  (2, 20, '20', 20.0, '2000-01-20'),
+  (3, 30, '30', 30.0, '2000-01-30'),
+  (4, 4, '4', 4.0, '2000-01-04'),
+  (5, 5, '5', 5.0, '2000-01-05');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t2/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0064]
+sql:
+INSERT INTO t3 VALUES
+  (1),
+  (4),
+  (5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t3/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__delete__0065]
+sql:
+-- remove rows from t1
+DELETE FROM t1
+  USING t2 INNER JOIN t3 ON t2.id = t3.id
+  WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "DELETE": [
+    {
+      "subject": "Table(2:12~2:14) /test/1/catalog1/schema1/t1/",
+      "action" : "DELETE",
+      "target" : [
+        "Table(3:8~3:10) /test/1/catalog1/schema1/t2/",
+        "Table(3:22~3:24) /test/1/catalog1/schema1/t3/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__session_setting_write__0066]
+sql:
+set enable_parallel_outfile = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:27) /test/1/enable_parallel_outfile/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0067]
+sql:
+select k1 from tb1 limit 1000
+   into outfile "s3://my_bucket/export/my_file_"
+   format as csv
+   properties
+   (
+       "AWS_ENDPOINT" = "http://s3.bd.bcebos.com",
+       "AWS_ACCESS_KEY" = "xxxx",
+       "AWS_SECRET_KEY" = "xxx",
+       "AWS_REGION" = "bd"
+   )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:15~1:18) /test/1/catalog1/schema1/tb1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__session_setting_write__0068]
+sql:
+set enable_parallel_outfile = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:27) /test/1/enable_parallel_outfile/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0069]
+sql:
+select k1 from tb1 order by k1 limit 1000
+   into outfile "s3://my_bucket/export/my_file_"
+   format as csv
+   properties
+   (
+       "AWS_ENDPOINT" = "http://s3.bd.bcebos.com",
+       "AWS_ACCESS_KEY" = "xxxx",
+       "AWS_SECRET_KEY" = "xxx",
+       "AWS_REGION" = "bd"
+   )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:15~1:18) /test/1/catalog1/schema1/tb1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__switch_schema__0070]
+sql:
+use example_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:14) /test/1/catalog1/example_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__metadata__0071]
+sql:
+SHOW ALL ROUTINE LOAD;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_011__switch_schema__0072]
+sql:
+use example_db;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:14) /test/1/catalog1/example_db/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__metadata__0073]
+sql:
+SHOW ROUTINE LOAD;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0074]
+sql:
+-- Create t1, t2, t3 tables
+CREATE TABLE t1
+  (id INT, c1 BIGINT, c2 STRING, c3 DOUBLE, c4 DATE)
+UNIQUE KEY (id)
+DISTRIBUTED BY HASH (id)
+PROPERTIES('replication_num'='1', "function_column.sequence_col" = "c4");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:15) /test/1/catalog1/schema1/t1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0075]
+sql:
+CREATE TABLE t2
+  (id INT, c1 BIGINT, c2 STRING, c3 DOUBLE, c4 DATE)
+DISTRIBUTED BY HASH (id)
+PROPERTIES('replication_num'='1');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0076]
+sql:
+CREATE TABLE t3
+  (id INT)
+DISTRIBUTED BY HASH (id)
+PROPERTIES('replication_num'='1');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t3/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0077]
+sql:
+-- Insert data
+INSERT INTO t1 VALUES
+  (1, 1, '1', 1.0, '2000-01-01'),
+  (2, 2, '2', 2.0, '2000-01-02'),
+  (3, 3, '3', 3.0, '2000-01-03');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:14) /test/1/catalog1/schema1/t1/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0078]
+sql:
+INSERT INTO t2 VALUES
+  (1, 10, '10', 10.0, '2000-01-10'),
+  (2, 20, '20', 20.0, '2000-01-20'),
+  (3, 30, '30', 30.0, '2000-01-30'),
+  (4, 4, '4', 4.0, '2000-01-04'),
+  (5, 5, '5', 5.0, '2000-01-05');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t2/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0079]
+sql:
+INSERT INTO t3 VALUES
+  (1),
+  (4),
+  (5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t3/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__delete__0080]
+sql:
+-- Remove rows from t1
+DELETE FROM t1
+  USING t2 INNER JOIN t3 ON t2.id = t3.id
+  WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "DELETE": [
+    {
+      "subject": "Table(2:12~2:14) /test/1/catalog1/schema1/t1/",
+      "action" : "DELETE",
+      "target" : [
+        "Table(3:8~3:10) /test/1/catalog1/schema1/t2/",
+        "Table(3:22~3:24) /test/1/catalog1/schema1/t3/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__session_setting_write__0081]
+sql:
+set enable_unique_key_partial_update=true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:36) /test/1/enable_unique_key_partial_update/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0082]
+sql:
+INSERT INTO order_tbl (order_id, order_status) values (1,'To be shipped');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:21) /test/1/catalog1/schema1/order_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_view__0083]
+sql:
+CREATE VIEW v1 AS 
+SELECT * FROM s3(
+    "uri" = "http://127.0.0.1:9312/test2/test.snappy.parquet",
+    "s3.access_key"= "ak",
+    "s3.secret_key" = "sk",
+    "format" = "parquet",
+    "use_path_style"="true");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "View(1:12~1:14) /test/1/catalog1/schema1/v1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__metadata__0084]
+sql:
+DESC v1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_011__select__0085]
+sql:
+SELECT * FROM v1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:16) /test/1/catalog1/schema1/v1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__grant__0086]
+sql:
+GRANT SELECT_PRIV ON db1.v1 TO user1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Table(1:21~1:27) /test/1/catalog1/db1/v1/",
+      "action" : "GRANT",
+      "target" : "User(1:31~1:36) /test/1/user1/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0087]
+sql:
+create table d_table (
+       k1 int null,
+       k2 int not null,
+       k3 bigint null,
+       k4 date null
+    )
+    duplicate key (k1,k2,k3)
+    distributed BY hash(k1) buckets 3
+    properties("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:20) /test/1/catalog1/schema1/d_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0088]
+sql:
+insert into d_table select 1,1,1,'2020-02-20';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:19) /test/1/catalog1/schema1/d_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0089]
+sql:
+insert into d_table select 2,2,2,'2021-02-20';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:19) /test/1/catalog1/schema1/d_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0090]
+sql:
+insert into d_table select 3,-3,null,'2022-02-20';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:19) /test/1/catalog1/schema1/d_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__session_setting_write__0091]
+sql:
+set enable_parallel_outfile = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:27) /test/1/enable_parallel_outfile/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0092]
+sql:
+select k1 from tb1 limit 1000
+   into outfile "s3://my_bucket/export/my_file_"
+   format as csv
+   properties
+   (
+        "s3.endpoint" = "http://s3.bd.bcebos.com",
+        "s3.access_key" = "xxxx",
+        "s3.secret_key" = "xxx",
+        "s3.region" = "bd"
+   )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:15~1:18) /test/1/catalog1/schema1/tb1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__session_setting_write__0093]
+sql:
+set enable_parallel_outfile = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:27) /test/1/enable_parallel_outfile/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0094]
+sql:
+select k1 from tb1 order by k1 limit 1000
+   into outfile "s3://my_bucket/export/my_file_"
+   format as csv
+   properties
+   (
+        "s3.endpoint" = "http://s3.bd.bcebos.com",
+        "s3.access_key" = "xxxx",
+        "s3.secret_key" = "xxx",
+        "s3.region" = "bd"
+   )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:15~1:18) /test/1/catalog1/schema1/tb1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0095]
+sql:
+CREATE CATALOG mysql_catalog properties(
+    'type' = 'jdbc',
+    'user' = 'root',
+    'password' = '123456',
+    'jdbc_url' = 'jdbc:mysql://host:3306/mysql_db',
+    'driver_url' = 'mysql-connector-java-8.0.25.jar',
+    'driver_class' = 'com.mysql.cj.jdbc.Driver'
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:28) /test/1/mysql_catalog/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0096]
+sql:
+-- Load via INSERT
+INSERT INTO internal.doris_db.tbl1
+SELECT * FROM mysql_catalog.mysql_db.table1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:34) /test/1/internal/doris_db/tbl1/",
+      "action" : "INSERT",
+      "target" : "Table(3:14~3:43) /test/1/mysql_catalog/mysql_db/table1/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0097]
+sql:
+-- Load via CTAS
+CREATE TABLE internal.doris_db.tbl1
+PROPERTIES('replication_num' = '1')
+AS
+SELECT * FROM mysql_catalog.mysql_db.table1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:35) /test/1/internal/doris_db/tbl1/",
+      "action" : "CREATE",
+      "target" : "Table(5:14~5:43) /test/1/mysql_catalog/mysql_db/table1/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0098]
+sql:
+CREATE TABLE order_tbl (
+  order_id     INT,
+  order_status VARCHAR(64),
+  order_amount INT
+)
+UNIQUE KEY (order_id)
+DISTRIBUTED BY HASH (order_id) BUCKETS 1
+PROPERTIES (
+  "replication_num" = "1",
+  "enable_unique_key_merge_on_write" = "true"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:22) /test/1/catalog1/schema1/order_tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0099]
+sql:
+INSERT INTO order_tbl VALUES (1, 'Pending payment', 100);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:21) /test/1/catalog1/schema1/order_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_schema__0100]
+sql:
+-- Purpose: create a demo database and table
+create database demo;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_SCHEMA": [
+    {
+      "subject": "Schema(2:16~2:20) /test/1/catalog1/demo/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__switch_schema__0101]
+sql:
+use demo;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_SCHEMA": [
+    {
+      "subject": "Schema(1:4~1:8) /test/1/catalog1/demo/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0102]
+sql:
+create table mytable
+(
+    k1 TINYINT,
+    k2 DECIMAL(10, 2) DEFAULT "10.05",
+    k3 CHAR(10) COMMENT "string column",
+    k4 INT NOT NULL DEFAULT "1" COMMENT "int column"
+)
+COMMENT "my first table"
+DISTRIBUTED BY HASH(k1) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:20) /test/1/catalog1/schema1/mytable/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0103]
+sql:
+CREATE TABLE orders (
+  customer_id INT, order_date DATE, amount DECIMAL(10,2)
+) DISTRIBUTED BY HASH(customer_id) BUCKETS 4
+PROPERTIES ("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/orders/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0104]
+sql:
+INSERT INTO orders VALUES
+  (1,'2026-04-30',50),(1,'2026-05-01',80),(1,'2026-05-02',30),
+  (2,'2026-04-30',20),(2,'2026-05-01',90);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:18) /test/1/catalog1/schema1/orders/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0105]
+sql:
+SELECT customer_id, order_date, amount,
+       ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY order_date) AS seq,
+       SUM(amount)  OVER (PARTITION BY customer_id ORDER BY order_date) AS running_total,
+       LAG(amount,1,0) OVER (PARTITION BY customer_id ORDER BY order_date) AS prev_amount
+FROM orders;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:17) /test/1/catalog1/schema1/ROW_NUMBER/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:7~3:10) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:7~4:10) /test/1/catalog1/schema1/LAG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:5~5:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0106]
+sql:
+CREATE TABLE articles (
+  id BIGINT,
+  content TEXT,
+  INDEX idx_content(content) USING INVERTED PROPERTIES("parser" = "english")
+) DUPLICATE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:21) /test/1/catalog1/schema1/articles/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0107]
+sql:
+INSERT INTO articles VALUES
+  (1, 'apache doris is a real-time analytics database'),
+  (2, 'real-time analytics on streaming data'),
+  (3, 'a guide to apache kafka');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:20) /test/1/catalog1/schema1/articles/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0108]
+sql:
+SELECT id, content, score() AS relevance
+FROM articles
+WHERE content MATCH_ANY 'apache doris analytics'
+ORDER BY relevance DESC
+LIMIT 3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:20~1:25) /test/1/catalog1/schema1/score/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:13) /test/1/catalog1/schema1/articles/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_catalog__0109]
+sql:
+-- Connect to an Iceberg REST catalog (Polaris, Lakekeeper, Tabular,
+-- Snowflake Open Catalog, Unity, or any spec-compatible service).
+CREATE CATALOG iceberg_rest PROPERTIES (
+  'type' = 'iceberg',
+  'iceberg.catalog.type' = 'rest',
+  'iceberg.rest.uri' = 'https://catalog.example.com/api/catalog',
+  'warehouse' = 'analytics',
+  'iceberg.rest.security.type' = 'oauth2',
+  'iceberg.rest.oauth2.credential' = 'client_id:client_secret',
+  'iceberg.rest.vended-credentials-enabled' = 'true',
+  's3.endpoint' = 'https://s3.us-west-2.amazonaws.com',
+  's3.region' = 'us-west-2'
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_CATALOG": [
+    {
+      "subject": "Catalog(3:15~3:27) /test/1/iceberg_rest/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__switch_catalog__0110]
+sql:
+SWITCH iceberg_rest;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SWITCH_CATALOG": [
+    {
+      "subject": "Catalog(1:7~1:19) /test/1/iceberg_rest/",
+      "action" : "SWITCH"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0111]
+sql:
+SELECT region, SUM(amount) FROM sales.orders WHERE dt = '2026-05-01' GROUP BY region;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:15~1:18) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:32~1:44) /test/1/catalog1/sales/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0112]
+sql:
+CREATE TABLE access_log (
+  ts DATETIME,
+  user_id BIGINT,
+  url VARCHAR(512),
+  country CHAR(2)
+)
+DUPLICATE KEY(ts, user_id)
+DISTRIBUTED BY HASH(user_id) BUCKETS 4
+PROPERTIES (
+  "compression" = "zstd",
+  "bloom_filter_columns" = "url",
+  "storage_format" = "V3"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:23) /test/1/catalog1/schema1/access_log/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0113]
+sql:
+SELECT country, COUNT(*) AS hits
+FROM access_log
+WHERE ts >= '2026-05-01'
+GROUP BY country
+ORDER BY hits DESC;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:16~1:21) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:15) /test/1/catalog1/schema1/access_log/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__session_setting_write__0114]
+sql:
+SET enable_condition_cache = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:26) /test/1/enable_condition_cache/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0115]
+sql:
+-- Run 1: misses every segment, builds bit vectors, writes them back
+SELECT region, country, SUM(amount)
+FROM orders
+WHERE region = 'ASIA' AND order_date >= '2023-01-01'
+GROUP BY region, country;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:24~2:27) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0116]
+sql:
+-- Run 2: different SELECT, same WHERE; hits the cache on every segment
+SELECT COUNT(DISTINCT customer_id)
+FROM orders
+WHERE region = 'ASIA' AND order_date >= '2023-01-01';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0117]
+sql:
+CREATE TABLE access_log (
+  ts DATETIME, user_id BIGINT, url VARCHAR(512)
+)
+DUPLICATE KEY(ts, user_id)
+PARTITION BY RANGE(ts) (
+  PARTITION p202605 VALUES LESS THAN ("2026-06-01")
+)
+DISTRIBUTED BY HASH(user_id) BUCKETS 4
+PROPERTIES (
+  "compaction_policy" = "time_series",
+  "time_series_compaction_goal_size_mbytes" = "1024",
+  "time_series_compaction_file_count_threshold" = "2000",
+  "time_series_compaction_time_threshold_seconds" = "3600"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:23) /test/1/catalog1/schema1/access_log/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__admin__0118]
+sql:
+ADMIN COMPACT TABLE access_log PARTITION (p202605) WHERE TYPE = "cumulative";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN": []
+}
+
+----------
+[doris_official_website_mixed_011__system_setting_write__0119]
+sql:
+-- 1. Enable the audit plugin so query-level lineage is recorded.
+SET GLOBAL enable_audit_plugin = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(2:11~2:30) /test/1/enable_audit_plugin/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0120]
+sql:
+-- 2. Run a query that joins two base tables.
+SELECT n.n_name, SUM(o.o_totalprice)
+FROM orders o JOIN nation n ON o.o_custkey = n.n_nationkey
+GROUP BY n.n_name;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:17~2:20) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:19~3:25) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0121]
+sql:
+-- 3. Read the lineage out of the audit log.
+SELECT time, queried_tables_and_views, chosen_m_views, stmt_id
+FROM   internal.__internal_schema.audit_log
+WHERE  user = CURRENT_USER() AND is_query = 1
+ORDER  BY time DESC LIMIT 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:7~3:43) /test/1/internal/__internal_schema/audit_log/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:14~4:26) /test/1/catalog1/schema1/CURRENT_USER/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0122]
+sql:
+CREATE TABLE events (
+  ts DATETIME, user_id BIGINT, action VARCHAR(64)
+)
+DUPLICATE KEY(ts, user_id)
+PARTITION BY RANGE(ts) (
+  PARTITION p202604 VALUES LESS THAN ("2026-05-01"),
+  PARTITION p202605 VALUES LESS THAN ("2026-06-01")
+)
+DISTRIBUTED BY HASH(user_id) BUCKETS 16
+PROPERTIES ("bloom_filter_columns" = "action");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/events/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0123]
+sql:
+EXPLAIN
+SELECT count(*) FROM events
+WHERE ts >= '2026-05-08' AND user_id = 42 AND action = 'click';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:21~2:27) /test/1/catalog1/schema1/events/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0124]
+sql:
+CREATE TABLE orders (
+  order_id BIGINT,
+  status   VARCHAR(20),
+  amount   DECIMAL(10, 2),
+  updated  DATETIME
+)
+UNIQUE KEY(order_id)
+DISTRIBUTED BY HASH(order_id) BUCKETS 4
+PROPERTIES ("function_column.sequence_col" = "updated");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/orders/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0125]
+sql:
+INSERT INTO orders VALUES
+  (1, 'created', 99.50,  '2026-05-08 10:00:00'),
+  (2, 'created', 149.00, '2026-05-08 10:01:00');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:18) /test/1/catalog1/schema1/orders/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__update__0126]
+sql:
+UPDATE orders SET status = 'shipped', updated = NOW() WHERE order_id = 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "UPDATE": [
+    {
+      "subject": "Table(1:7~1:13) /test/1/catalog1/schema1/orders/",
+      "action" : "UPDATE"
+    },
+    {
+      "subject": "Function(1:48~1:51) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__delete__0127]
+sql:
+DELETE FROM orders WHERE order_id = 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "DELETE": [
+    {
+      "subject": "Table(1:12~1:18) /test/1/catalog1/schema1/orders/",
+      "action" : "DELETE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__system_setting_write__0128]
+sql:
+CREATE RESOURCE "openai_embed" PROPERTIES (
+  "type" = "ai", "ai.provider_type" = "openai",
+  "ai.endpoint"   = "https://api.openai.com/v1/embeddings",
+  "ai.model_name" = "text-embedding-3-small",
+  "ai.api_key"    = "sk-xxx", "ai.dimensions" = "8"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_011__session_setting_write__0129]
+sql:
+SET default_ai_resource = "openai_embed";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:23) /test/1/default_ai_resource/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0130]
+sql:
+CREATE TABLE notes (id INT, body STRING, vec ARRAY<FLOAT>)
+  DUPLICATE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:18) /test/1/catalog1/schema1/notes/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0131]
+sql:
+INSERT INTO notes VALUES
+  (1, 'travel reimbursement policy', EMBED('travel reimbursement policy')),
+  (2, 'VPN setup guide',             EMBED('VPN setup guide'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:17) /test/1/catalog1/schema1/notes/",
+      "action" : "INSERT"
+    },
+    {
+      "subject": "Function(2:37~2:42) /test/1/catalog1/schema1/EMBED/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:37~3:42) /test/1/catalog1/schema1/EMBED/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0132]
+sql:
+SELECT id, body, cosine_distance(vec, EMBED('how do I expense a trip?')) AS d
+FROM notes ORDER BY d ASC LIMIT 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:17~1:32) /test/1/catalog1/schema1/cosine_distance/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:38~1:43) /test/1/catalog1/schema1/EMBED/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:10) /test/1/catalog1/schema1/notes/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0133]
+sql:
+CREATE TABLE articles (
+  id INT,
+  title  STRING,
+  body   STRING,
+  INDEX idx_body (body) USING INVERTED
+    PROPERTIES("parser" = "english", "support_phrase" = "true")
+) DUPLICATE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:21) /test/1/catalog1/schema1/articles/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0134]
+sql:
+INSERT INTO articles VALUES
+  (1, 'Doris 4.0 release', 'Apache Doris adds BM25 scoring for full-text search'),
+  (2, 'Storage notes',     'Inverted indexes accelerate text and structured filters'),
+  (3, 'Vector primer',     'Approximate nearest neighbor search complements text search');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:20) /test/1/catalog1/schema1/articles/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0135]
+sql:
+SELECT id, title, score() AS rel
+FROM articles
+WHERE body MATCH_ANY 'text search'
+ORDER BY rel DESC LIMIT 3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:18~1:23) /test/1/catalog1/schema1/score/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:13) /test/1/catalog1/schema1/articles/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0136]
+sql:
+CREATE TABLE events (
+  id BIGINT, ts DATETIME, payload STRING
+)
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 4
+PROPERTIES ("group_commit_interval_ms" = "1000");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/events/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__session_setting_write__0137]
+sql:
+SET group_commit = async_mode;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:16) /test/1/group_commit/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0138]
+sql:
+INSERT INTO events VALUES (1, NOW(), 'a');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:18) /test/1/catalog1/schema1/events/",
+      "action" : "INSERT"
+    },
+    {
+      "subject": "Function(1:30~1:33) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0139]
+sql:
+INSERT INTO events VALUES (2, NOW(), 'b');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:18) /test/1/catalog1/schema1/events/",
+      "action" : "INSERT"
+    },
+    {
+      "subject": "Function(1:30~1:33) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0140]
+sql:
+CREATE TABLE tbl_point_query (
+  k1 INT,
+  v1 VARCHAR(64),
+  v2 DECIMAL(27, 9)
+)
+UNIQUE KEY(k1)
+DISTRIBUTED BY HASH(k1) BUCKETS 1
+PROPERTIES (
+  "enable_unique_key_merge_on_write" = "true",
+  "light_schema_change" = "true",
+  "store_row_column" = "true"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:28) /test/1/catalog1/schema1/tbl_point_query/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0141]
+sql:
+EXPLAIN SELECT * FROM tbl_point_query WHERE k1 = 42;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:22~1:37) /test/1/catalog1/schema1/tbl_point_query/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0142]
+sql:
+CREATE TABLE lineitem (
+  l_orderkey INT, l_extendedprice DECIMAL(15,2),
+  l_discount DECIMAL(15,2), l_ordertime DATETIME
+) DUPLICATE KEY(l_orderkey)
+PARTITION BY RANGE(l_ordertime)
+  (FROM ('2026-05-01') TO ('2026-05-09') INTERVAL 1 DAY)
+DISTRIBUTED BY HASH(l_orderkey) BUCKETS 3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:21) /test/1/catalog1/schema1/lineitem/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_view__0143]
+sql:
+CREATE MATERIALIZED VIEW daily_revenue
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 HOUR
+PARTITION BY (DATE_TRUNC(l_ordertime, 'DAY'))
+DISTRIBUTED BY RANDOM BUCKETS 2 AS
+SELECT DATE_TRUNC(l_ordertime, 'DAY') AS d,
+       SUM(l_extendedprice * (1 - l_discount)) AS revenue
+FROM lineitem GROUP BY DATE_TRUNC(l_ordertime, 'DAY');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "Materialized(1:25~1:38) /test/1/catalog1/schema1/daily_revenue/",
+      "action" : "CREATE",
+      "target" : "Table(7:5~7:13) /test/1/catalog1/schema1/lineitem/"
+    },
+    {
+      "subject": "Function(3:14~3:24) /test/1/catalog1/schema1/DATE_TRUNC/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:7~5:17) /test/1/catalog1/schema1/DATE_TRUNC/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:7~6:10) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:23~7:33) /test/1/catalog1/schema1/DATE_TRUNC/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0144]
+sql:
+CREATE TABLE access_log (
+  ts        DATETIME    NOT NULL,
+  user_id   BIGINT      NOT NULL,
+  status    INT         NOT NULL,
+  url       STRING      NOT NULL,
+  INDEX idx_user(user_id)  USING INVERTED,
+  INDEX idx_status(status) USING INVERTED,
+  INDEX idx_url(url) USING INVERTED PROPERTIES("parser"="english")
+) DUPLICATE KEY(ts) DISTRIBUTED BY HASH(user_id) BUCKETS 4;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:23) /test/1/catalog1/schema1/access_log/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0145]
+sql:
+INSERT INTO access_log VALUES
+  ('2026-05-01 10:00:00', 42, 200, '/api/orders/list'),
+  ('2026-05-01 10:01:00', 42, 500, '/api/orders/create'),
+  ('2026-05-01 10:02:00', 99, 200, '/api/users/profile');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:22) /test/1/catalog1/schema1/access_log/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0146]
+sql:
+SELECT user_id, status, url FROM access_log
+WHERE user_id = 42 AND status >= 500 AND url MATCH_ANY 'orders';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:33~1:43) /test/1/catalog1/schema1/access_log/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0147]
+sql:
+CREATE TABLE events (
+  user_id BIGINT, event_type STRING, ts DATETIME
+)
+DUPLICATE KEY(user_id)
+DISTRIBUTED BY HASH(user_id) BUCKETS 8;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/events/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__data_import__0148]
+sql:
+CREATE ROUTINE LOAD events_kafka ON events
+COLUMNS(user_id, event_type, ts)
+PROPERTIES (
+  "format" = "json",
+  "jsonpaths" = "[\"$.user_id\",\"$.event_type\",\"$.ts\"]"
+)
+FROM KAFKA (
+  "kafka_broker_list" = "localhost:9092",
+  "kafka_topic" = "events",
+  "property.kafka_default_offsets" = "OFFSET_BEGINNING"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "DATA_IMPORT": []
+}
+
+----------
+[doris_official_website_mixed_011__system_setting_write__0149]
+sql:
+CREATE RESOURCE "deepseek_chat" PROPERTIES (
+  "type" = "ai",                     "ai.provider_type" = "deepseek",
+  "ai.endpoint"   = "https://api.deepseek.com/chat/completions",
+  "ai.model_name" = "deepseek-chat", "ai.api_key" = "sk-xxx"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_011__session_setting_write__0150]
+sql:
+SET default_ai_resource = "deepseek_chat";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:23) /test/1/default_ai_resource/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0151]
+sql:
+CREATE TABLE reviews (id INT, body STRING)
+  DUPLICATE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:20) /test/1/catalog1/schema1/reviews/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0152]
+sql:
+INSERT INTO reviews VALUES
+  (1, 'Battery dies in 4 hours. Returning it.'),
+  (2, 'Fits perfectly, color is exactly as pictured. Love it.');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:19) /test/1/catalog1/schema1/reviews/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__select__0153]
+sql:
+SELECT id, body, AI_SENTIMENT(body) AS sentiment,
+       AI_CLASSIFY(body, ['battery', 'fit', 'price', 'shipping']) AS topic
+FROM reviews;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:17~1:29) /test/1/catalog1/schema1/AI_SENTIMENT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:7~2:18) /test/1/catalog1/schema1/AI_CLASSIFY/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:12) /test/1/catalog1/schema1/reviews/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0154]
+sql:
+CREATE TABLE orders (
+  id INT, amount DECIMAL(10,2)
+) DUPLICATE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 4;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/orders/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__create_table__0155]
+sql:
+CREATE TABLE order_audit (
+  id INT, action STRING
+) DUPLICATE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 4;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:24) /test/1/catalog1/schema1/order_audit/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__transaction__0156]
+sql:
+BEGIN;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "TRANSACTION": []
+}
+
+----------
+[doris_official_website_mixed_011__insert__0157]
+sql:
+INSERT INTO orders       VALUES (1, 99.50), (2, 149.00);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:18) /test/1/catalog1/schema1/orders/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__insert__0158]
+sql:
+INSERT INTO order_audit  VALUES (1, 'created'), (2, 'created');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:23) /test/1/catalog1/schema1/order_audit/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__transaction__0159]
+sql:
+COMMIT;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "TRANSACTION": []
+}
+
+----------
+[doris_official_website_mixed_011__select__0160]
+sql:
+-- Inspect cache state.
+SELECT * FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'hive_ctl';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:62) /test/1/catalog1/information_schema/catalog_meta_cache_statistics/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_011__admin_table__0161]
+sql:
+-- Refresh just the table whose partition you just added.
+REFRESH TABLE hive_ctl.sales.orders;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_TABLE": []
+}
+
+----------
+[doris_official_website_mixed_011__alter_catalog__0162]
+sql:
+-- For a fast-changing fact table, disable the file listing cache.
+ALTER CATALOG hive_ctl SET PROPERTIES (
+  "meta.cache.hive.file.ttl-second" = "0"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_CATALOG": []
+}

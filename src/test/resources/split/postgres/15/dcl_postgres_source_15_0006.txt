@@ -1,0 +1,70 @@
+-- notice
+REINDEX (CONCURRENTLY) TABLE concur_reindex_tab
+;
+DROP USER MAPPING FOR CURRENT_ROLE SERVER sv3
+;
+ALTER SUBSCRIPTION split_sub SKIP (lsn = '0/1')
+;
+REINDEX (TABLESPACE reindex_tbspace) TABLE CONCURRENTLY pg_toast.pg_toast_16540
+;
+-- Grant privileges on parameters to the new non-superuser role
+GRANT SET, ALTER SYSTEM ON PARAMETER
+    autovacuum_work_mem, hash_mem_multiplier, max_stack_depth,
+    shared_buffers, temp_file_limit, work_mem
+TO regress_host_resource_admin
+;
+REVOKE SET ON PARAMETER work_mem FROM regress_host_resource_admin
+;
+ALTER ROLE CURRENT_ROLE RESET application_name
+;
+-- used in COPY without RETURNING
+COPY (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) TO stdout
+;
+REINDEX (TABLESPACE pg_global) INDEX regress_tblspace_test_tbl_idx
+;
+-- And this should remove the entry altogether:
+REVOKE SET ON PARAMETER enable_material FROM PUBLIC
+;
+------------------------------------------------------------------------------------------
+[ADMIN] -- notice
+REINDEX (CONCURRENTLY) TABLE concur_reindex_tab
+;
+----------
+[REVOKE] DROP USER MAPPING FOR CURRENT_ROLE SERVER sv3
+;
+----------
+[ADMIN_PUB_SUB] ALTER SUBSCRIPTION split_sub SKIP (lsn = '0/1')
+;
+----------
+[ADMIN] REINDEX (TABLESPACE reindex_tbspace) TABLE CONCURRENTLY pg_toast.pg_toast_16540
+;
+----------
+[GRANT] -- Grant privileges on parameters to the new non-superuser role
+GRANT SET, ALTER SYSTEM ON PARAMETER
+    autovacuum_work_mem, hash_mem_multiplier, max_stack_depth,
+    shared_buffers, temp_file_limit, work_mem
+TO regress_host_resource_admin
+;
+----------
+[REVOKE] REVOKE SET ON PARAMETER work_mem FROM regress_host_resource_admin
+;
+----------
+[ALTER_USER] ALTER ROLE CURRENT_ROLE RESET application_name
+;
+----------
+[DATA_EXPORT|MERGE] -- used in COPY without RETURNING
+COPY (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) TO stdout
+;
+----------
+[ADMIN] REINDEX (TABLESPACE pg_global) INDEX regress_tblspace_test_tbl_idx
+;
+----------
+[REVOKE] -- And this should remove the entry altogether:
+REVOKE SET ON PARAMETER enable_material FROM PUBLIC
+;

@@ -1,0 +1,554 @@
+ALTER PUBLICATION pub4 ADD TABLE dump_test.test_second_table WHERE (col2 = 'test')
+;
+CREATE OR REPLACE FUNCTION ll_to_earth(float8, float8)
+RETURNS earth
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN public.cube(public.cube(public.cube(
+    earth() * cos(radians($1)) * cos(radians($2))),
+    earth() * cos(radians($1)) * sin(radians($2))),
+    earth() * sin(radians($1)))::earth
+;
+-- drop all schemas
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test1
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (a, b, c)
+;
+create index on btree_tall_tbl (id int4_ops(foo=1))
+;
+create table inh_child (a int not null no inherit)
+;
+CREATE TABLE gtestnn_parent (
+    f1 int,
+    f2 bigint,
+    f3 bigint GENERATED ALWAYS AS (nullif(f1, 1) + nullif(f2, 10)) VIRTUAL NOT NULL
+) PARTITION BY RANGE (f1)
+;
+-- can't override
+ALTER TABLE ATACC1 ADD CONSTRAINT ditto NOT NULL a
+;
+CREATE OR REPLACE FUNCTION pg_sleep_for(interval)
+ RETURNS void
+ LANGUAGE sql
+ PARALLEL SAFE STRICT COST 1
+RETURN pg_sleep(extract(epoch from clock_timestamp() + $1) -
+                extract(epoch from clock_timestamp()))
+;
+CREATE VIEW json_arrayagg_view AS
+SELECT JSON_ARRAYAGG(('111' || i)::bytea FORMAT JSON NULL ON NULL RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+CREATE TABLE gtest23x (a int PRIMARY KEY, b int GENERATED ALWAYS AS (a * 2) VIRTUAL REFERENCES gtest23a (x) ON UPDATE CASCADE)
+;
+-- PK with a non-range column:
+
+CREATE TABLE temporal_rng (
+  id int4range,
+  valid_at TEXT,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+-- Test setting merges and hashes
+ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+CREATE TABLE "generated_virtual_tests"."gtest_child2" (
+    "f1" "date" CONSTRAINT "gtest_parent_f1_not_null" NOT NULL,
+    "f2" bigint,
+    "f3" bigint GENERATED ALWAYS AS (("f2" * 2))
+)
+;
+CREATE TABLE NE_CHECK_TBL (x int,
+	CONSTRAINT CHECK_CON CHECK (x > 3) NOT ENFORCED)
+;
+ALTER TABLE fk_partitioned_fk ADD CONSTRAINT fk_partitioned_fk_a_b_fkey FOREIGN KEY (a, b)
+	REFERENCES fk_notpartitioned_pk NOT ENFORCED
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 WHERE (b > 99)
+;
+CREATE TABLE cmdata1(f1 TEXT COMPRESSION lz4)
+;
+CREATE INDEX ON more__int using gist (a gist__int_ops(numranges = 252))
+;
+CREATE FUNCTION functest_S_xx(x date) RETURNS boolean
+    LANGUAGE SQL
+    RETURN x > 1
+;
+ALTER TABLE badcompresstbl ALTER a SET COMPRESSION I_Do_Not_Exist_Compression
+;
+CREATE OR REPLACE FUNCTION regexp_match(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_match( $1::text, $2::text, 'i' )
+;
+CREATE TABLE noinh_con_copy (a int CHECK (a > 0) NO INHERIT, b int not null,
+	c int not null no inherit)
+;
+create or replace trigger my_trig
+  before insert on my_table
+  for each row execute procedure funcB()
+;
+ALTER TABLE FKTABLE ALTER CONSTRAINT fktable_fk_fkey NOT ENFORCED
+;
+ALTER TABLE notnull_tbl1 ALTER CONSTRAINT nntbl1_a NO INHERIT
+;
+alter table p1 add constraint inh_check_constraint8 check (f1 < 10) enforced
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (CASE a WHEN 5 THEN true ELSE false END)
+;
+-- Test matching of locking clause to correct alias
+
+CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+ALTER TABLE fk_partitioned_fk ADD FOREIGN KEY (a, b)
+  REFERENCES fk_notpartitioned_pk
+  ON DELETE SET NULL (a)
+;
+-- reverse-listing of various special function syntaxes required by SQL
+
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb,
+  CURRENT_DATE as cd,
+  (select * from CURRENT_DATE) as cd2,
+  CURRENT_TIME as ct,
+  (select * from CURRENT_TIME) as ct2,
+  CURRENT_TIME (1) as ct3,
+  (select * from CURRENT_TIME (1)) as ct4,
+  CURRENT_TIMESTAMP as ct5,
+  (select * from CURRENT_TIMESTAMP) as ct6,
+  CURRENT_TIMESTAMP (1) as ct7,
+  (select * from CURRENT_TIMESTAMP (1)) as ct8,
+  LOCALTIME as lt1,
+  (select * from LOCALTIME) as lt2,
+  LOCALTIME (1) as lt3,
+  (select * from LOCALTIME (1)) as lt4,
+  LOCALTIMESTAMP as lt5,
+  (select * from LOCALTIMESTAMP) as lt6,
+  LOCALTIMESTAMP (1) as lt7,
+  (select * from LOCALTIMESTAMP (1)) as lt8,
+  CURRENT_CATALOG as ca,
+  (select * from CURRENT_CATALOG) as ca2,
+  CURRENT_ROLE as cr,
+  (select * from CURRENT_ROLE) as cr2,
+  CURRENT_SCHEMA as cs,
+  (select * from CURRENT_SCHEMA) as cs2,
+  CURRENT_USER as cu,
+  (select * from CURRENT_USER) as cu2,
+  USER as us,
+  (select * from USER) as us2,
+  SESSION_USER seu,
+  (select * from SESSION_USER) as seu2,
+  SYSTEM_USER as su,
+  (select * from SYSTEM_USER) as su2
+;
+CREATE TABLE ATACC2 (a int, CONSTRAINT a_is_not_null NOT NULL a NO INHERIT)
+;
+CREATE OR REPLACE FUNCTION "overlaps"(timestamptz, interval,
+  timestamptz, timestamptz)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;
+ALTER TABLE temporal_fk_mltrng2mltrng
+  ADD CONSTRAINT temporal_fk_mltrng2mltrng_fk
+  FOREIGN KEY (parent_id, PERIOD valid_at)
+  REFERENCES temporal_mltrng (id, PERIOD valid_at)
+  ON UPDATE RESTRICT
+;
+CREATE TABLE gtestm (
+  id int PRIMARY KEY,
+  f1 int,
+  f2 int,
+  f3 int GENERATED ALWAYS AS (f1 * 2) VIRTUAL,
+  f4 int GENERATED ALWAYS AS (f2 * 2) VIRTUAL
+)
+;
+CREATE OR REPLACE FUNCTION regexp_split_to_array(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_split_to_array( $1::text, $2::text, 'i' )
+;
+CREATE TABLE "generated_virtual_tests"."gtestx" (
+    "a" integer CONSTRAINT "gtest1_a_not_null" NOT NULL,
+    "b" integer GENERATED ALWAYS AS (("a" * 22)),
+    "x" integer
+)
+;
+ALTER PUBLICATION testpub_fortable SET TABLES IN SCHEMA pub_test
+;
+CREATE PUBLICATION testpub_tbl9 FOR TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+create table notnull_tbl_fail (like notnull_tbl1, constraint foo2 not null a)
+;
+-- Generated columns in column list, when 'publish_generated_columns'='stored'
+CREATE PUBLICATION pub2 FOR table gencols(a, gen1) WITH (publish_generated_columns = stored)
+;
+CREATE VIEW json_objectagg_view AS
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+ALTER TYPE hstore SET (
+  SUBSCRIPT = hstore_subscript_handler
+)
+;
+CREATE PUBLICATION pub1 FOR table tab3(gen1) WITH (publish_generated_columns=stored)
+;
+-- these functions encapsulate knowledge about the encoding of typmod:
+
+CREATE FUNCTION _pg_char_max_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $2 = -1 /* default typmod */
+       THEN null
+       WHEN $1 IN (1042, 1043) /* char, varchar */
+       THEN $2 - 4
+       WHEN $1 IN (1560, 1562) /* bit, varbit */
+       THEN $2
+       ELSE null
+  END
+;
+-- test update
+CREATE TABLE gtest3 (a int, b int GENERATED ALWAYS AS (a * 3) VIRTUAL)
+;
+CREATE TABLE temporal_rng3 (
+  id int4range,
+  valid_at textrange2,
+  CONSTRAINT temporal_rng3_uq UNIQUE (id, valid_at WITHOUT OVERLAPS)
+)
+;
+CREATE FUNCTION functest_S_xxx(x int) RETURNS int
+    LANGUAGE SQL
+    AS $$ SELECT x * 2 $$
+    RETURN x * 3
+;
+ALTER TABLE fk_partitioned_fk ALTER CONSTRAINT fk_partitioned_fk_a_b_fkey NOT ENFORCED
+;
+------------------------------------------------------------------------------------------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub4 ADD TABLE dump_test.test_second_table WHERE (col2 = 'test')
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION ll_to_earth(float8, float8)
+RETURNS earth
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN public.cube(public.cube(public.cube(
+    earth() * cos(radians($1)) * cos(radians($2))),
+    earth() * cos(radians($1)) * sin(radians($2))),
+    earth() * sin(radians($1)))::earth
+;
+----------
+[ALTER_PUB_SUB] -- drop all schemas
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test1
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (a, b, c)
+;
+----------
+[ADD_INDEX] create index on btree_tall_tbl (id int4_ops(foo=1))
+;
+----------
+[CREATE_TABLE] create table inh_child (a int not null no inherit)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtestnn_parent (
+    f1 int,
+    f2 bigint,
+    f3 bigint GENERATED ALWAYS AS (nullif(f1, 1) + nullif(f2, 10)) VIRTUAL NOT NULL
+) PARTITION BY RANGE (f1)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] -- can't override
+ALTER TABLE ATACC1 ADD CONSTRAINT ditto NOT NULL a
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION pg_sleep_for(interval)
+ RETURNS void
+ LANGUAGE sql
+ PARALLEL SAFE STRICT COST 1
+RETURN pg_sleep(extract(epoch from clock_timestamp() + $1) -
+                extract(epoch from clock_timestamp()))
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_arrayagg_view AS
+SELECT JSON_ARRAYAGG(('111' || i)::bytea FORMAT JSON NULL ON NULL RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest23x (a int PRIMARY KEY, b int GENERATED ALWAYS AS (a * 2) VIRTUAL REFERENCES gtest23a (x) ON UPDATE CASCADE)
+;
+----------
+[CREATE_TABLE] -- PK with a non-range column:
+
+CREATE TABLE temporal_rng (
+  id int4range,
+  valid_at TEXT,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[ALTER_PROG_OBJ] -- Test setting merges and hashes
+ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "generated_virtual_tests"."gtest_child2" (
+    "f1" "date" CONSTRAINT "gtest_parent_f1_not_null" NOT NULL,
+    "f2" bigint,
+    "f3" bigint GENERATED ALWAYS AS (("f2" * 2))
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE NE_CHECK_TBL (x int,
+	CONSTRAINT CHECK_CON CHECK (x > 3) NOT ENFORCED)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE fk_partitioned_fk ADD CONSTRAINT fk_partitioned_fk_a_b_fkey FOREIGN KEY (a, b)
+	REFERENCES fk_notpartitioned_pk NOT ENFORCED
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 WHERE (b > 99)
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmdata1(f1 TEXT COMPRESSION lz4)
+;
+----------
+[ADD_INDEX] CREATE INDEX ON more__int using gist (a gist__int_ops(numranges = 252))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_xx(x date) RETURNS boolean
+    LANGUAGE SQL
+    RETURN x > 1
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE badcompresstbl ALTER a SET COMPRESSION I_Do_Not_Exist_Compression
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_match(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_match( $1::text, $2::text, 'i' )
+;
+----------
+[CREATE_TABLE] CREATE TABLE noinh_con_copy (a int CHECK (a > 0) NO INHERIT, b int not null,
+	c int not null no inherit)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create or replace trigger my_trig
+  before insert on my_table
+  for each row execute procedure funcB()
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] ALTER TABLE FKTABLE ALTER CONSTRAINT fktable_fk_fkey NOT ENFORCED
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] ALTER TABLE notnull_tbl1 ALTER CONSTRAINT nntbl1_a NO INHERIT
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table p1 add constraint inh_check_constraint8 check (f1 < 10) enforced
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (CASE a WHEN 5 THEN true ELSE false END)
+;
+----------
+[CREATE_VIEW(SELECT,QUERY_LOCK)] -- Test matching of locking clause to correct alias
+
+CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE fk_partitioned_fk ADD FOREIGN KEY (a, b)
+  REFERENCES fk_notpartitioned_pk
+  ON DELETE SET NULL (a)
+;
+----------
+[CREATE_VIEW(SELECT)] -- reverse-listing of various special function syntaxes required by SQL
+
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb,
+  CURRENT_DATE as cd,
+  (select * from CURRENT_DATE) as cd2,
+  CURRENT_TIME as ct,
+  (select * from CURRENT_TIME) as ct2,
+  CURRENT_TIME (1) as ct3,
+  (select * from CURRENT_TIME (1)) as ct4,
+  CURRENT_TIMESTAMP as ct5,
+  (select * from CURRENT_TIMESTAMP) as ct6,
+  CURRENT_TIMESTAMP (1) as ct7,
+  (select * from CURRENT_TIMESTAMP (1)) as ct8,
+  LOCALTIME as lt1,
+  (select * from LOCALTIME) as lt2,
+  LOCALTIME (1) as lt3,
+  (select * from LOCALTIME (1)) as lt4,
+  LOCALTIMESTAMP as lt5,
+  (select * from LOCALTIMESTAMP) as lt6,
+  LOCALTIMESTAMP (1) as lt7,
+  (select * from LOCALTIMESTAMP (1)) as lt8,
+  CURRENT_CATALOG as ca,
+  (select * from CURRENT_CATALOG) as ca2,
+  CURRENT_ROLE as cr,
+  (select * from CURRENT_ROLE) as cr2,
+  CURRENT_SCHEMA as cs,
+  (select * from CURRENT_SCHEMA) as cs2,
+  CURRENT_USER as cu,
+  (select * from CURRENT_USER) as cu2,
+  USER as us,
+  (select * from USER) as us2,
+  SESSION_USER seu,
+  (select * from SESSION_USER) as seu2,
+  SYSTEM_USER as su,
+  (select * from SYSTEM_USER) as su2
+;
+----------
+[CREATE_TABLE] CREATE TABLE ATACC2 (a int, CONSTRAINT a_is_not_null NOT NULL a NO INHERIT)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "overlaps"(timestamptz, interval,
+  timestamptz, timestamptz)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE temporal_fk_mltrng2mltrng
+  ADD CONSTRAINT temporal_fk_mltrng2mltrng_fk
+  FOREIGN KEY (parent_id, PERIOD valid_at)
+  REFERENCES temporal_mltrng (id, PERIOD valid_at)
+  ON UPDATE RESTRICT
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtestm (
+  id int PRIMARY KEY,
+  f1 int,
+  f2 int,
+  f3 int GENERATED ALWAYS AS (f1 * 2) VIRTUAL,
+  f4 int GENERATED ALWAYS AS (f2 * 2) VIRTUAL
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_split_to_array(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_split_to_array( $1::text, $2::text, 'i' )
+;
+----------
+[CREATE_TABLE] CREATE TABLE "generated_virtual_tests"."gtestx" (
+    "a" integer CONSTRAINT "gtest1_a_not_null" NOT NULL,
+    "b" integer GENERATED ALWAYS AS (("a" * 22)),
+    "x" integer
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable SET TABLES IN SCHEMA pub_test
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_tbl9 FOR TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+----------
+[CREATE_TABLE] create table notnull_tbl_fail (like notnull_tbl1, constraint foo2 not null a)
+;
+----------
+[CREATE_PUB_SUB] -- Generated columns in column list, when 'publish_generated_columns'='stored'
+CREATE PUBLICATION pub2 FOR table gencols(a, gen1) WITH (publish_generated_columns = stored)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_objectagg_view AS
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[ALTER_TYPE] ALTER TYPE hstore SET (
+  SUBSCRIPT = hstore_subscript_handler
+)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub1 FOR table tab3(gen1) WITH (publish_generated_columns=stored)
+;
+----------
+[CREATE_PROG_OBJ] -- these functions encapsulate knowledge about the encoding of typmod:
+
+CREATE FUNCTION _pg_char_max_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $2 = -1 /* default typmod */
+       THEN null
+       WHEN $1 IN (1042, 1043) /* char, varchar */
+       THEN $2 - 4
+       WHEN $1 IN (1560, 1562) /* bit, varbit */
+       THEN $2
+       ELSE null
+  END
+;
+----------
+[CREATE_TABLE] -- test update
+CREATE TABLE gtest3 (a int, b int GENERATED ALWAYS AS (a * 3) VIRTUAL)
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_rng3 (
+  id int4range,
+  valid_at textrange2,
+  CONSTRAINT temporal_rng3_uq UNIQUE (id, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_xxx(x int) RETURNS int
+    LANGUAGE SQL
+    AS $$ SELECT x * 2 $$
+    RETURN x * 3
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] ALTER TABLE fk_partitioned_fk ALTER CONSTRAINT fk_partitioned_fk_a_b_fkey NOT ENFORCED
+;

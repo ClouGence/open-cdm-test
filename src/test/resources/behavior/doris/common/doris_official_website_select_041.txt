@@ -1,0 +1,1256 @@
+[doris_official_website_select_041__select__0001]
+sql:
+select * from tasks("type"="insert");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_041__select__0002]
+sql:
+SELECT 
+    sales_person,
+    sales_date,
+    sales_amount,
+    CUME_DIST() OVER (PARTITION BY sales_date ORDER BY sales_amount ASC) AS cumulative_sales_percentage
+FROM 
+    sales;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:4~5:13) /test/1/catalog1/schema1/CUME_DIST/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:4~7:9) /test/1/catalog1/schema1/sales/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0003]
+sql:
+select x, y, dense_rank() over(partition by x order by y) as rank from int_t;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:13~1:23) /test/1/catalog1/schema1/dense_rank/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:71~1:76) /test/1/catalog1/schema1/int_t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0004]
+sql:
+WITH example_data AS (
+    SELECT 1 as column1, NULL as column2, 'A' as group_name
+    UNION ALL
+    SELECT 1, 10, 'A'
+    UNION ALL
+    SELECT 1, NULL, 'A'
+    UNION ALL
+    SELECT 1, 20, 'A'
+    UNION ALL
+    SELECT 2, NULL, 'B'
+    UNION ALL
+    SELECT 2, 30, 'B'
+    UNION ALL
+    SELECT 2, 40, 'B'
+)
+SELECT 
+    group_name,
+    column1,
+    column2,
+    FIRST_VALUE(column2) OVER (
+        PARTITION BY column1 
+        ORDER BY column2 NULLS LAST
+    ) AS first_value_default,
+    FIRST_VALUE(column2, true) OVER (
+        PARTITION BY column1 
+        ORDER BY column2
+    ) AS first_value_ignore_null
+FROM example_data
+ORDER BY column1, column2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(20:4~20:15) /test/1/catalog1/schema1/FIRST_VALUE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(24:4~24:15) /test/1/catalog1/schema1/FIRST_VALUE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(28:5~28:17) /test/1/catalog1/schema1/example_data/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0005]
+sql:
+select stock_symbol, closing_date, closing_price,    
+lag(closing_price,1, 0) over (partition by stock_symbol order by closing_date) as "yesterday closing"   
+from stock_ticker   
+order by closing_date;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:0~2:3) /test/1/catalog1/schema1/lag/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:17) /test/1/catalog1/schema1/stock_ticker/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0006]
+sql:
+WITH example_data AS (
+    SELECT 1 as id, 21 as myday, '04-21-11' as time_col, NULL as state
+    UNION ALL
+    SELECT 2, 21, '04-21-12', 2
+    UNION ALL
+    SELECT 3, 21, '04-21-13', 3
+    UNION ALL
+    SELECT 4, 22, '04-22-10-21', NULL
+    UNION ALL
+    SELECT 5, 22, '04-22-10-22', NULL
+    UNION ALL
+    SELECT 6, 22, '04-22-10-23', 5
+    UNION ALL
+    SELECT 7, 22, '04-22-10-24', NULL
+    UNION ALL
+    SELECT 8, 22, '04-22-10-25', 9
+    UNION ALL
+    SELECT 9, 23, '04-23-11', NULL
+    UNION ALL
+    SELECT 10, 23, '04-23-12', 10
+    UNION ALL
+    SELECT 11, 23, '04-23-13', NULL
+    UNION ALL
+    SELECT 12, 24, '02-24-10-21', NULL
+)
+SELECT 
+    *,
+    last_value(`state`, 1) OVER(
+        PARTITION BY `myday` 
+        ORDER BY `time_col` DESC 
+        ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+    ) as ignore_null,
+    last_value(`state`, 0) OVER(
+        PARTITION BY `myday` 
+        ORDER BY `time_col` DESC 
+        ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+    ) as not_ignore_null,
+    last_value(`state`) OVER(
+        PARTITION BY `myday` 
+        ORDER BY `time_col` DESC 
+        ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING
+    ) as ignore_null_default
+FROM example_data 
+ORDER BY `id`, `myday`, `time_col`;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(28:4~28:14) /test/1/catalog1/schema1/last_value/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(33:4~33:14) /test/1/catalog1/schema1/last_value/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(38:4~38:14) /test/1/catalog1/schema1/last_value/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(43:5~43:17) /test/1/catalog1/schema1/example_data/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0007]
+sql:
+select stock_symbol, closing_date, closing_price,    
+case   
+(lead(closing_price,1, 0)   
+over (partition by stock_symbol order by closing_date)-closing_price) > 0   
+when true then "higher"   
+when false then "flat or lower"    
+end as "trending"   
+from stock_ticker    
+order by closing_date;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:1~3:5) /test/1/catalog1/schema1/lead/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:5~8:17) /test/1/catalog1/schema1/stock_ticker/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0008]
+sql:
+SELECT 
+    name,
+    score,
+    NTILE(4) OVER (ORDER BY score DESC) as quarter
+FROM student_scores;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:4~4:9) /test/1/catalog1/schema1/NTILE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:5~5:19) /test/1/catalog1/schema1/student_scores/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0009]
+sql:
+SELECT
+        item_id,
+        date_time,
+        sales,
+        sum(sales) OVER (
+        ORDER BY item_id,
+        date_time ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) sum
+FROM
+        test_window_order;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:8~5:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(9:8~9:25) /test/1/catalog1/schema1/test_window_order/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0010]
+sql:
+SELECT
+    productLine,
+    orderYear,
+    orderValue,
+    ROUND(
+    PERCENT_RANK()
+    OVER (
+        PARTITION BY orderYear
+        ORDER BY orderValue
+    ),2) percentile_rank
+FROM
+    test_percent_rank
+ORDER BY
+    orderYear;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:4~5:9) /test/1/catalog1/schema1/ROUND/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:16) /test/1/catalog1/schema1/PERCENT_RANK/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(12:4~12:21) /test/1/catalog1/schema1/test_percent_rank/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0011]
+sql:
+SELECT 
+    department,
+    employee_name,
+    salary,
+    RANK() OVER (
+        PARTITION BY department 
+        ORDER BY salary DESC
+    ) as salary_rank
+FROM employees;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:4~5:8) /test/1/catalog1/schema1/RANK/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(9:5~9:14) /test/1/catalog1/schema1/employees/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0012]
+sql:
+select x, y, row_number() over(partition by x order by y) as rank from int_t;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:13~1:23) /test/1/catalog1/schema1/row_number/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:71~1:76) /test/1/catalog1/schema1/int_t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0013]
+sql:
+SELECT * FROM BACKENDS();
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_041__select__0014]
+sql:
+SELECT * FROM FRONTENDS_DISKS();
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_041__select__0015]
+sql:
+SELECT * FROM FRONTENDS();
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}
+
+----------
+[doris_official_website_select_041__select__0016]
+sql:
+SELECT * FROM (SELECT * FROM table1 WHERE (c1 = 'a' AND c2 = 'b') AND (c3 = 'c' OR c4 = 'd'))
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:29~1:35) /test/1/catalog1/schema1/table1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0017]
+sql:
+SELECT * FROM merge_into_source_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:37) /test/1/catalog1/schema1/merge_into_source_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0018]
+sql:
+SELECT * FROM merge_into_target_base_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:42) /test/1/catalog1/schema1/merge_into_target_base_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0019]
+sql:
+select * from tbl1 limit 10 
+   INTO OUTFILE "file:///home/work/path/result_";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:18) /test/1/catalog1/schema1/tbl1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0020]
+sql:
+SELECT * FROM tbl
+    INTO OUTFILE "hdfs://path/to/result_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "broker.name" = "my_broker",
+        "broker.hadoop.security.authentication" = "kerberos",
+        "broker.kerberos_principal" = "doris@YOUR.COM",
+        "broker.kerberos_keytab" = "/home/doris/my.keytab",
+        "column_separator" = ",",
+        "line_delimiter" = "\n",
+        "max_file_size" = "100MB"
+    );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0021]
+sql:
+SELECT c1, c2, c3 FROM tbl
+    INTO OUTFILE "hdfs://path/to/result_"
+    FORMAT AS PARQUET
+    PROPERTIES
+    (
+        "broker.name" = "my_broker",
+        "broker.hadoop.security.authentication" = "kerberos",
+        "broker.kerberos_principal" = "doris@YOUR.COM",
+        "broker.kerberos_keytab" = "/home/doris/my.keytab"
+    );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:23~1:26) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0022]
+sql:
+SELECT k1 FROM tbl1 UNION SELECT k2 FROM tbl1
+    INTO OUTFILE "bos://bucket/result_"
+    FORMAT AS PARQUET
+    PROPERTIES
+    (
+        "broker.name" = "my_broker",
+        "broker.bos_endpoint" = "http://bj.bcebos.com",
+        "broker.bos_accesskey" = "xxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "broker.bos_secret_accesskey" = "yyyyyyyyyyyyyyyyyyyyyyyyyy"
+    );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:15~1:19) /test/1/catalog1/schema1/tbl1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:41~1:45) /test/1/catalog1/schema1/tbl1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0023]
+sql:
+select k1,k2,v1 from tbl1 limit 100000
+    into outfile "s3a://my_bucket/export/my_file_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "broker.name" = "hdfs_broker",
+        "broker.fs.s3a.access.key" = "xxx",
+        "broker.fs.s3a.secret.key" = "xxxx",
+        "broker.fs.s3a.endpoint" = "https://cos.xxxxxx.myqcloud.com/",
+        "column_separator" = ",",
+        "line_delimiter" = "\n",
+        "max_file_size" = "1024MB",
+        "success_file_name" = "SUCCESS"
+    )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:21~1:25) /test/1/catalog1/schema1/tbl1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0024]
+sql:
+SELECT * FROM tbl
+    INTO OUTFILE "hdfs://${host}:${fileSystem_port}/path/to/result_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "fs.defaultFS" = "hdfs://ip:port",
+        "hadoop.username" = "work"
+    );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0025]
+sql:
+select k1,k2,v1 from tbl1 limit 100000
+    into outfile "cosn://my_bucket/export/my_file_"
+    FORMAT AS CSV
+    PROPERTIES
+    (
+        "broker.name" = "broker_name",
+        "broker.fs.cosn.userinfo.secretId" = "xxx",
+        "broker.fs.cosn.userinfo.secretKey" = "xxxx",
+        "broker.fs.cosn.bucket.endpoint_suffix" = "cos.xxxxxx.myqcloud.com",
+        "column_separator" = ",",
+        "line_delimiter" = "\n",
+        "max_file_size" = "1024MB",
+        "success_file_name" = "SUCCESS"
+    )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:21~1:25) /test/1/catalog1/schema1/tbl1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0026]
+sql:
+WITH
+  cte1 AS (SELECT a，b FROM table1),
+  cte2 AS (SELECT c，d FROM table2)
+SELECT b，d FROM cte1 JOIN cte2
+WHERE cte1.a = cte2.c;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:27~2:33) /test/1/catalog1/schema1/table1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:27~3:33) /test/1/catalog1/schema1/table2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:16~4:20) /test/1/catalog1/schema1/cte1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:26~4:30) /test/1/catalog1/schema1/cte2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0027]
+sql:
+select Name from student where age in (18,20,25);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:17~1:24) /test/1/catalog1/schema1/student/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0028]
+sql:
+select * except(age) from student;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:26~1:33) /test/1/catalog1/schema1/student/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0029]
+sql:
+select type,avg(price) from tb_book group by type;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:12~1:15) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:28~1:35) /test/1/catalog1/schema1/tb_book/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0030]
+sql:
+select * from tb_book order by id desc limit 3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:21) /test/1/catalog1/schema1/tb_book/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0031]
+sql:
+select * from tb_book order by price desc limit 3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:21) /test/1/catalog1/schema1/tb_book/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0032]
+sql:
+select * from tb_book where id limit 1,4;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:21) /test/1/catalog1/schema1/tb_book/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0033]
+sql:
+select id,concat(name,":",price) as info,type from tb_book;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:10~1:16) /test/1/catalog1/schema1/concat/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:51~1:58) /test/1/catalog1/schema1/tb_book/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0034]
+sql:
+select sum(price) as total,type from tb_book group by type;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:37~1:44) /test/1/catalog1/schema1/tb_book/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0035]
+sql:
+select *,(price * 0.8) as "20%" from tb_book;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:37~1:44) /test/1/catalog1/schema1/tb_book/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0036]
+sql:
+SELECT a FROM t1 WHERE a = 10 AND B = 1 ORDER BY a LIMIT 10
+    UNION
+    SELECT a FROM t2 WHERE a = 11 AND B = 2 ORDER BY a LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:18~3:20) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0037]
+sql:
+WITH cte AS
+    (
+      SELECT 1 AS col1, 2 AS col2
+      UNION ALL
+      SELECT 3, 4
+    )
+    SELECT col1, col2 FROM cte;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(7:27~7:30) /test/1/catalog1/schema1/cte/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0038]
+sql:
+SELECT * FROM t1 LEFT JOIN (t2, t3, t4)
+                     ON (t2.a = t1.a AND t3.b = t1.b AND t4.c = t1.c)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:28~1:30) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:32~1:34) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:36~1:38) /test/1/catalog1/schema1/t4/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0039]
+sql:
+SELECT * FROM t1 LEFT JOIN (t2 CROSS JOIN t3 CROSS JOIN t4)
+                     ON (t2.a = t1.a AND t3.b = t1.b AND t4.c = t1.c)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:28~1:30) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:42~1:44) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:56~1:58) /test/1/catalog1/schema1/t4/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0040]
+sql:
+SELECT t1.name, t2.salary
+      FROM employee AS t1 INNER JOIN info AS t2 ON t1.name = t2.name;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:11~2:19) /test/1/catalog1/schema1/employee/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:37~2:41) /test/1/catalog1/schema1/info/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0041]
+sql:
+SELECT t1.name, t2.salary
+      FROM employee t1 INNER JOIN info t2 ON t1.name = t2.name;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:11~2:19) /test/1/catalog1/schema1/employee/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:34~2:38) /test/1/catalog1/schema1/info/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0042]
+sql:
+SELECT left_tbl.*
+      FROM left_tbl LEFT JOIN right_tbl ON left_tbl.id = right_tbl.id
+      WHERE right_tbl.id IS NULL;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:11~2:19) /test/1/catalog1/schema1/left_tbl/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:30~2:39) /test/1/catalog1/schema1/right_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0043]
+sql:
+SELECT * FROM t1 TABLET(10001) TABLESAMPLE(1000 ROWS) REPEATABLE 2 limit 1000;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:16) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0044]
+sql:
+SELECT college, region, seed FROM tournament
+       ORDER BY region, seed;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:34~1:44) /test/1/catalog1/schema1/tournament/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0045]
+sql:
+SELECT college, region AS r, seed AS s FROM tournament
+       ORDER BY r, s;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:44~1:54) /test/1/catalog1/schema1/tournament/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0046]
+sql:
+SELECT college, region, seed FROM tournament
+       ORDER BY 2, 3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:34~1:44) /test/1/catalog1/schema1/tournament/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0047]
+sql:
+SELECT a, COUNT(b) FROM test_table GROUP BY a ORDER BY NULL;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:10~1:15) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:24~1:34) /test/1/catalog1/schema1/test_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0048]
+sql:
+SELECT COUNT(col1) AS col2 FROM t GROUP BY col2 HAVING col2 = 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:32~1:33) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0049]
+sql:
+SELECT user, MAX(salary) FROM users
+       GROUP BY user HAVING MAX(salary) > 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:13~1:16) /test/1/catalog1/schema1/MAX/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:30~1:35) /test/1/catalog1/schema1/users/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:28~2:31) /test/1/catalog1/schema1/MAX/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0050]
+sql:
+SELECT * FROM tbl LIMIT 5,10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0051]
+sql:
+SELECT * FROM tbl LIMIT 95,18446744073709551615;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0052]
+sql:
+WITH cte AS (SELECT id, py_uuid_token(id) AS token FROM cte_uuid_seed)
+   SELECT id, COUNT(DISTINCT token) AS distinct_tokens
+   FROM (SELECT id, token FROM cte UNION ALL SELECT id, token FROM cte) u
+   GROUP BY id ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:24~1:37) /test/1/catalog1/schema1/py_uuid_token/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:56~1:69) /test/1/catalog1/schema1/cte_uuid_seed/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:14~2:19) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:31~3:34) /test/1/catalog1/schema1/cte/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:67~3:70) /test/1/catalog1/schema1/cte/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0053]
+sql:
+SELECT HEX(AES_ENCRYPT("Doris is Great", KEY my_key));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:10) /test/1/catalog1/schema1/HEX/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:11~1:22) /test/1/catalog1/schema1/AES_ENCRYPT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0054]
+sql:
+SELECT AES_DECRYPT(UNHEX('D26DB38579D6A343350EDDC6F2AD47C6'), KEY my_key);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:18) /test/1/catalog1/schema1/AES_DECRYPT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:19~1:24) /test/1/catalog1/schema1/UNHEX/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0055]
+sql:
+select connection_id()
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:20) /test/1/catalog1/schema1/connection_id/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_select_041__select__0056]
+sql:
+select k0, k1,k2, sum(k3) from baseall  where k9 > 1 group by k0,k1,k2
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:18~1:21) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:31~1:38) /test/1/catalog1/schema1/baseall/",
+      "action" : "READ"
+    }
+  ]
+}

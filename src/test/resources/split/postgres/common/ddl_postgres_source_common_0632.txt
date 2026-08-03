@@ -1,0 +1,618 @@
+DROP OPERATOR FAMILY alt_opf8 USING btree
+;
+--
+-- REINDEX (VERBOSE)
+--
+CREATE TABLE reindex_verbose(id integer primary key)
+;
+-- fail
+drop table pp, cc
+;
+/*
+ * 5.22
+ * CONSTRAINT_COLUMN_USAGE view
+ */
+
+CREATE VIEW constraint_column_usage AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(tblschema AS sql_identifier) AS table_schema,
+           CAST(tblname AS sql_identifier) AS table_name,
+           CAST(colname AS sql_identifier) AS column_name,
+           CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(cstrschema AS sql_identifier) AS constraint_schema,
+           CAST(cstrname AS sql_identifier) AS constraint_name
+
+    FROM (
+        /* check constraints */
+        SELECT DISTINCT nr.nspname, r.relname, r.relowner, a.attname, nc.nspname, c.conname
+          FROM pg_namespace nr, pg_class r, pg_attribute a, pg_depend d, pg_namespace nc, pg_constraint c
+          WHERE nr.oid = r.relnamespace
+            AND r.oid = a.attrelid
+            AND d.refclassid = 'pg_catalog.pg_class'::regclass
+            AND d.refobjid = r.oid
+            AND d.refobjsubid = a.attnum
+            AND d.classid = 'pg_catalog.pg_constraint'::regclass
+            AND d.objid = c.oid
+            AND c.connamespace = nc.oid
+            AND c.contype = 'c'
+            AND r.relkind IN ('r', 'p')
+            AND NOT a.attisdropped
+
+        UNION ALL
+
+        /* unique/primary key/foreign key constraints */
+        SELECT nr.nspname, r.relname, r.relowner, a.attname, nc.nspname, c.conname
+          FROM pg_namespace nr, pg_class r, pg_attribute a, pg_namespace nc,
+               pg_constraint c
+          WHERE nr.oid = r.relnamespace
+            AND r.oid = a.attrelid
+            AND nc.oid = c.connamespace
+            AND r.oid = CASE c.contype WHEN 'f' THEN c.confrelid ELSE c.conrelid END
+            AND a.attnum = ANY (CASE c.contype WHEN 'f' THEN c.confkey ELSE c.conkey END)
+            AND NOT a.attisdropped
+            AND c.contype IN ('p', 'u', 'f')
+            AND r.relkind IN ('r', 'p')
+
+      ) AS x (tblschema, tblname, tblowner, colname, cstrschema, cstrname)
+
+    WHERE pg_has_role(x.tblowner, 'USAGE')
+;
+CREATE MATERIALIZED VIEW tststats.mv AS SELECT * FROM tststats.t
+;
+create or replace function stricttest() returns void as $$
+declare x record;
+begin
+  -- this should work since EXECUTE isn't as picky
+  execute 'insert into foo values(7,8),(9,10) returning *' into x;
+  raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
+end$$ language plpgsql
+;
+CREATE TABLE distinct_group_1 AS
+SELECT DISTINCT g%1000 FROM generate_series(0,9999) g
+;
+CREATE FUNCTION "public"."ffp"("anyarray") RETURNS "anyarray"
+    LANGUAGE "sql"
+    AS $_$select $1$_$
+;
+alter type insenum add value 'i21' before 'L2'
+;
+CREATE VIEW pg_sequences AS
+    SELECT
+        N.nspname AS schemaname,
+        C.relname AS sequencename,
+        pg_get_userbyid(C.relowner) AS sequenceowner,
+        S.seqtypid::regtype AS data_type,
+        S.seqstart AS start_value,
+        S.seqmin AS min_value,
+        S.seqmax AS max_value,
+        S.seqincrement AS increment_by,
+        S.seqcycle AS cycle,
+        S.seqcache AS cache_size,
+        pg_sequence_last_value(C.oid) AS last_value
+    FROM pg_sequence S JOIN pg_class C ON (C.oid = S.seqrelid)
+         LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+    WHERE NOT pg_is_other_temp_schema(N.oid)
+          AND relkind = 'S'
+;
+DROP FUNCTION merge_trigfunc()
+;
+CREATE TABLE "public"."tt5" (
+    "x" integer,
+    "y" numeric(8,2),
+    "z" integer
+)
+;
+CREATE TRIGGER gtest2b BEFORE INSERT OR UPDATE ON gtest26
+  FOR EACH ROW
+  WHEN (NEW.* IS NOT NULL)  -- error
+  EXECUTE PROCEDURE gtest_trigger_func()
+;
+DROP TABLE IF EXISTS split_pg18.generated_virtual_table
+;
+CREATE DATABASE other_database
+;
+alter extension postgres_fdw drop operator family my_op_family using btree
+;
+VACUUM (PROCESS_MAIN FALSE, PROCESS_TOAST FALSE) vac_option_tab
+;
+ALTER TABLE vtype
+      ALTER b TYPE text USING b::text,
+      ALTER c TYPE text USING c::text
+;
+ALTER TABLE ONLY "public"."invalid_check_con_child" INHERIT "public"."invalid_check_con"
+;
+CREATE TABLE ctest (data text, res text, salt text)
+;
+create index gist_tbl_box_index on gist_tbl using gist (b)
+;
+CREATE FUNCTION hashisbn(isbn)
+	RETURNS int4
+	AS 'hashint8'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+CREATE VIEW ro_view2 AS SELECT a, b FROM base_tbl GROUP BY a, b
+;
+create table copydml_test (id serial, t text)
+;
+ALTER EXTENSION test_parser ADD function testprs_lextype(internal)
+;
+CREATE TABLE tt1 (x int, y bigint)
+;
+ALTER TABLE fkpart13_t2 DROP COLUMN column_to_drop
+;
+CREATE INDEX t12_a_idx ON t12(a)
+;
+drop table alterlock
+;
+DROP FUNCTION target_tg_trig_fn
+;
+create table nv_child_2011 () inherits (nv_parent)
+;
+ALTER TEXT SEARCH CONFIGURATION german ADD MAPPING
+    FOR word, hword_part, hword
+	WITH german_stem
+;
+create view rules_fooview as select 'rules_foo'::text
+;
+DROP TABLE pagg_tab5
+;
+drop table phv_boolpart
+;
+CREATE TABLE tbl (i INT, t BYTEA)
+;
+create table utr2 (a int check (a in (2)), b text)
+;
+VACUUM (TRUNCATE FALSE) pg_catalog.pg_user_mapping
+;
+DO $x$
+DECLARE
+	r record;
+	r2 record;
+	cond text;
+	idx_ctids tid[];
+	ss_ctids tid[];
+	count int;
+	plan_ok bool;
+	plan_line text;
+BEGIN
+	FOR r IN SELECT colname, oper, typ, value[ordinality], matches[ordinality] FROM brinopers_bloom, unnest(op) WITH ORDINALITY AS oper LOOP
+
+		-- prepare the condition
+		IF r.value IS NULL THEN
+			cond := format('%I %s %L', r.colname, r.oper, r.value);
+		ELSE
+			cond := format('%I %s %L::%s', r.colname, r.oper, r.value, r.typ);
+		END IF;
+
+		-- run the query using the brin index
+		SET enable_seqscan = 0;
+		SET enable_bitmapscan = 1;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest_bloom WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Bitmap Heap Scan on brintest_bloom%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get bitmap indexscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest_bloom WHERE %s $y$, cond)
+			INTO idx_ctids;
+
+		-- run the query using a seqscan
+		SET enable_seqscan = 1;
+		SET enable_bitmapscan = 0;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest_bloom WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Seq Scan on brintest_bloom%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get seqscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest_bloom WHERE %s $y$, cond)
+			INTO ss_ctids;
+
+		-- make sure both return the same results
+		count := array_length(idx_ctids, 1);
+
+		IF NOT (count = array_length(ss_ctids, 1) AND
+				idx_ctids @> ss_ctids AND
+				idx_ctids <@ ss_ctids) THEN
+			-- report the results of each scan to make the differences obvious
+			RAISE WARNING 'something not right in %: count %', r, count;
+			SET enable_seqscan = 1;
+			SET enable_bitmapscan = 0;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest_bloom WHERE ' || cond LOOP
+				RAISE NOTICE 'seqscan: %', r2;
+			END LOOP;
+
+			SET enable_seqscan = 0;
+			SET enable_bitmapscan = 1;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest_bloom WHERE ' || cond LOOP
+				RAISE NOTICE 'bitmapscan: %', r2;
+			END LOOP;
+		END IF;
+
+		-- make sure we found expected number of matches
+		IF count != r.matches THEN RAISE WARNING 'unexpected number of results % for %', count, r; END IF;
+	END LOOP;
+END;
+$x$
+;
+VACUUM (DISABLE_PAGE_SKIPPING) pg_catalog.pg_index
+;
+-- view on table with GENERATED columns
+
+CREATE TABLE base_tbl (id int, idplus1 int GENERATED ALWAYS AS (id + 1) STORED)
+;
+CREATE TEMPORARY TABLE test_temp(a int not null unique, b TEXT not null, cnt int not null)
+;
+-- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."b" INHERIT "public"."a"
+;
+CREATE SCHEMA test_schema_exists
+;
+CREATE TYPE gbtreekey16 (
+	INTERNALLENGTH = 16,
+	INPUT  = gbtreekey16_in,
+	OUTPUT = gbtreekey16_out
+)
+;
+do 'declare c int = 0;
+begin
+  while (select count(*) from pg_stat_activity where pid = '
+    '13970'
+  ') > 0 loop c := c + 1; perform pg_stat_clear_snapshot(); end loop;
+  raise log ''test_extensions looped % times'', c;
+end'
+;
+CREATE DOMAIN monot_int AS int CHECK (monot_incr(VALUE))
+;
+CREATE TABLE test1 AS SELECT generate_series(1, 100)
+;
+CREATE TABLE child_local (b text, c numeric, a int)
+;
+ALTER TABLE testschema.test_default_tab_p ADD CONSTRAINT test_index3 PRIMARY KEY (id)
+;
+------------------------------------------------------------------------------------------
+[DROP_PROG_OBJ] DROP OPERATOR FAMILY alt_opf8 USING btree
+;
+----------
+[CREATE_TABLE] --
+-- REINDEX (VERBOSE)
+--
+CREATE TABLE reindex_verbose(id integer primary key)
+;
+----------
+[DROP_TABLE] -- fail
+drop table pp, cc
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 5.22
+ * CONSTRAINT_COLUMN_USAGE view
+ */
+
+CREATE VIEW constraint_column_usage AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(tblschema AS sql_identifier) AS table_schema,
+           CAST(tblname AS sql_identifier) AS table_name,
+           CAST(colname AS sql_identifier) AS column_name,
+           CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(cstrschema AS sql_identifier) AS constraint_schema,
+           CAST(cstrname AS sql_identifier) AS constraint_name
+
+    FROM (
+        /* check constraints */
+        SELECT DISTINCT nr.nspname, r.relname, r.relowner, a.attname, nc.nspname, c.conname
+          FROM pg_namespace nr, pg_class r, pg_attribute a, pg_depend d, pg_namespace nc, pg_constraint c
+          WHERE nr.oid = r.relnamespace
+            AND r.oid = a.attrelid
+            AND d.refclassid = 'pg_catalog.pg_class'::regclass
+            AND d.refobjid = r.oid
+            AND d.refobjsubid = a.attnum
+            AND d.classid = 'pg_catalog.pg_constraint'::regclass
+            AND d.objid = c.oid
+            AND c.connamespace = nc.oid
+            AND c.contype = 'c'
+            AND r.relkind IN ('r', 'p')
+            AND NOT a.attisdropped
+
+        UNION ALL
+
+        /* unique/primary key/foreign key constraints */
+        SELECT nr.nspname, r.relname, r.relowner, a.attname, nc.nspname, c.conname
+          FROM pg_namespace nr, pg_class r, pg_attribute a, pg_namespace nc,
+               pg_constraint c
+          WHERE nr.oid = r.relnamespace
+            AND r.oid = a.attrelid
+            AND nc.oid = c.connamespace
+            AND r.oid = CASE c.contype WHEN 'f' THEN c.confrelid ELSE c.conrelid END
+            AND a.attnum = ANY (CASE c.contype WHEN 'f' THEN c.confkey ELSE c.conkey END)
+            AND NOT a.attisdropped
+            AND c.contype IN ('p', 'u', 'f')
+            AND r.relkind IN ('r', 'p')
+
+      ) AS x (tblschema, tblname, tblowner, colname, cstrschema, cstrname)
+
+    WHERE pg_has_role(x.tblowner, 'USAGE')
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW tststats.mv AS SELECT * FROM tststats.t
+;
+----------
+[CREATE_PROG_OBJ] create or replace function stricttest() returns void as $$
+declare x record;
+begin
+  -- this should work since EXECUTE isn't as picky
+  execute 'insert into foo values(7,8),(9,10) returning *' into x;
+  raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
+end$$ language plpgsql
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE distinct_group_1 AS
+SELECT DISTINCT g%1000 FROM generate_series(0,9999) g
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."ffp"("anyarray") RETURNS "anyarray"
+    LANGUAGE "sql"
+    AS $_$select $1$_$
+;
+----------
+[ALTER_TYPE] alter type insenum add value 'i21' before 'L2'
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW pg_sequences AS
+    SELECT
+        N.nspname AS schemaname,
+        C.relname AS sequencename,
+        pg_get_userbyid(C.relowner) AS sequenceowner,
+        S.seqtypid::regtype AS data_type,
+        S.seqstart AS start_value,
+        S.seqmin AS min_value,
+        S.seqmax AS max_value,
+        S.seqincrement AS increment_by,
+        S.seqcycle AS cycle,
+        S.seqcache AS cache_size,
+        pg_sequence_last_value(C.oid) AS last_value
+    FROM pg_sequence S JOIN pg_class C ON (C.oid = S.seqrelid)
+         LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+    WHERE NOT pg_is_other_temp_schema(N.oid)
+          AND relkind = 'S'
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION merge_trigfunc()
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."tt5" (
+    "x" integer,
+    "y" numeric(8,2),
+    "z" integer
+)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER gtest2b BEFORE INSERT OR UPDATE ON gtest26
+  FOR EACH ROW
+  WHEN (NEW.* IS NOT NULL)  -- error
+  EXECUTE PROCEDURE gtest_trigger_func()
+;
+----------
+[DROP_TABLE] DROP TABLE IF EXISTS split_pg18.generated_virtual_table
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE other_database
+;
+----------
+[ALTER_LIBRARY] alter extension postgres_fdw drop operator family my_op_family using btree
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_MAIN FALSE, PROCESS_TOAST FALSE) vac_option_tab
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE vtype
+      ALTER b TYPE text USING b::text,
+      ALTER c TYPE text USING c::text
+;
+----------
+[ALTER_TABLE] ALTER TABLE ONLY "public"."invalid_check_con_child" INHERIT "public"."invalid_check_con"
+;
+----------
+[CREATE_TABLE] CREATE TABLE ctest (data text, res text, salt text)
+;
+----------
+[ADD_INDEX] create index gist_tbl_box_index on gist_tbl using gist (b)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION hashisbn(isbn)
+	RETURNS int4
+	AS 'hashint8'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW ro_view2 AS SELECT a, b FROM base_tbl GROUP BY a, b
+;
+----------
+[CREATE_TABLE] create table copydml_test (id serial, t text)
+;
+----------
+[ALTER_LIBRARY] ALTER EXTENSION test_parser ADD function testprs_lextype(internal)
+;
+----------
+[CREATE_TABLE] CREATE TABLE tt1 (x int, y bigint)
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE fkpart13_t2 DROP COLUMN column_to_drop
+;
+----------
+[ADD_INDEX] CREATE INDEX t12_a_idx ON t12(a)
+;
+----------
+[DROP_TABLE] drop table alterlock
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION target_tg_trig_fn
+;
+----------
+[CREATE_TABLE] create table nv_child_2011 () inherits (nv_parent)
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION german ADD MAPPING
+    FOR word, hword_part, hword
+	WITH german_stem
+;
+----------
+[CREATE_VIEW(SELECT)] create view rules_fooview as select 'rules_foo'::text
+;
+----------
+[DROP_TABLE] DROP TABLE pagg_tab5
+;
+----------
+[DROP_TABLE] drop table phv_boolpart
+;
+----------
+[CREATE_TABLE] CREATE TABLE tbl (i INT, t BYTEA)
+;
+----------
+[CREATE_TABLE] create table utr2 (a int check (a in (2)), b text)
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) pg_catalog.pg_user_mapping
+;
+----------
+[BLOCK] DO $x$
+DECLARE
+	r record;
+	r2 record;
+	cond text;
+	idx_ctids tid[];
+	ss_ctids tid[];
+	count int;
+	plan_ok bool;
+	plan_line text;
+BEGIN
+	FOR r IN SELECT colname, oper, typ, value[ordinality], matches[ordinality] FROM brinopers_bloom, unnest(op) WITH ORDINALITY AS oper LOOP
+
+		-- prepare the condition
+		IF r.value IS NULL THEN
+			cond := format('%I %s %L', r.colname, r.oper, r.value);
+		ELSE
+			cond := format('%I %s %L::%s', r.colname, r.oper, r.value, r.typ);
+		END IF;
+
+		-- run the query using the brin index
+		SET enable_seqscan = 0;
+		SET enable_bitmapscan = 1;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest_bloom WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Bitmap Heap Scan on brintest_bloom%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get bitmap indexscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest_bloom WHERE %s $y$, cond)
+			INTO idx_ctids;
+
+		-- run the query using a seqscan
+		SET enable_seqscan = 1;
+		SET enable_bitmapscan = 0;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest_bloom WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Seq Scan on brintest_bloom%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get seqscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest_bloom WHERE %s $y$, cond)
+			INTO ss_ctids;
+
+		-- make sure both return the same results
+		count := array_length(idx_ctids, 1);
+
+		IF NOT (count = array_length(ss_ctids, 1) AND
+				idx_ctids @> ss_ctids AND
+				idx_ctids <@ ss_ctids) THEN
+			-- report the results of each scan to make the differences obvious
+			RAISE WARNING 'something not right in %: count %', r, count;
+			SET enable_seqscan = 1;
+			SET enable_bitmapscan = 0;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest_bloom WHERE ' || cond LOOP
+				RAISE NOTICE 'seqscan: %', r2;
+			END LOOP;
+
+			SET enable_seqscan = 0;
+			SET enable_bitmapscan = 1;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest_bloom WHERE ' || cond LOOP
+				RAISE NOTICE 'bitmapscan: %', r2;
+			END LOOP;
+		END IF;
+
+		-- make sure we found expected number of matches
+		IF count != r.matches THEN RAISE WARNING 'unexpected number of results % for %', count, r; END IF;
+	END LOOP;
+END;
+$x$
+;
+----------
+[ADMIN_TABLE] VACUUM (DISABLE_PAGE_SKIPPING) pg_catalog.pg_index
+;
+----------
+[CREATE_TABLE] -- view on table with GENERATED columns
+
+CREATE TABLE base_tbl (id int, idplus1 int GENERATED ALWAYS AS (id + 1) STORED)
+;
+----------
+[CREATE_TABLE] CREATE TEMPORARY TABLE test_temp(a int not null unique, b TEXT not null, cnt int not null)
+;
+----------
+[ALTER_TABLE] -- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."b" INHERIT "public"."a"
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA test_schema_exists
+;
+----------
+[CREATE_TYPE] CREATE TYPE gbtreekey16 (
+	INTERNALLENGTH = 16,
+	INPUT  = gbtreekey16_in,
+	OUTPUT = gbtreekey16_out
+)
+;
+----------
+[BLOCK] do 'declare c int = 0;
+begin
+  while (select count(*) from pg_stat_activity where pid = '
+    '13970'
+  ') > 0 loop c := c + 1; perform pg_stat_clear_snapshot(); end loop;
+  raise log ''test_extensions looped % times'', c;
+end'
+;
+----------
+[CREATE_TYPE] CREATE DOMAIN monot_int AS int CHECK (monot_incr(VALUE))
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE test1 AS SELECT generate_series(1, 100)
+;
+----------
+[CREATE_TABLE] CREATE TABLE child_local (b text, c numeric, a int)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE testschema.test_default_tab_p ADD CONSTRAINT test_index3 PRIMARY KEY (id)
+;

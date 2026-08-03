@@ -1,0 +1,70 @@
+ALTER USER SESSION_ROLE WITH NOREPLICATION
+;
+--
+-- Compare results between plans using sorting and plans using hash
+-- aggregation. Force spilling in both cases by setting work_mem low.
+--
+
+set work_mem='64kB'
+;
+-- test with leader participation disabled, but no workers available (so
+-- the leader will have to run the plan despite the setting)
+set max_parallel_workers = 0
+;
+PREPARE p1(int, int, int, int, int) AS
+SELECT * FROM test_squash WHERE id IN ($1, $2, $3, $4, $5)
+;
+-- fail, requires reload
+RESET autovacuum
+;
+LOCK TABLE "public"."renamecolumnchild" IN ACCESS SHARE MODE
+;
+-- check disabling of built in crypto functions
+SET pgcrypto.builtin_crypto_enabled = off
+;
+GRANT USAGE ON PROCEDURE priv_testproc1(int) TO regress_priv_user3
+;
+EXECUTE dumpOpr('433')
+;
+LOCK TABLE public.num_exp_ln IN ACCESS SHARE MODE
+;
+------------------------------------------------------------------------------------------
+[ALTER_USER] ALTER USER SESSION_ROLE WITH NOREPLICATION
+;
+----------
+[SESSION_SETTING_WRITE] --
+-- Compare results between plans using sorting and plans using hash
+-- aggregation. Force spilling in both cases by setting work_mem low.
+--
+
+set work_mem='64kB'
+;
+----------
+[SESSION_SETTING_WRITE] -- test with leader participation disabled, but no workers available (so
+-- the leader will have to run the plan despite the setting)
+set max_parallel_workers = 0
+;
+----------
+[UNSAFE] PREPARE p1(int, int, int, int, int) AS
+SELECT * FROM test_squash WHERE id IN ($1, $2, $3, $4, $5)
+;
+----------
+[SESSION_SETTING_WRITE] -- fail, requires reload
+RESET autovacuum
+;
+----------
+[SESSION_LOCK] LOCK TABLE "public"."renamecolumnchild" IN ACCESS SHARE MODE
+;
+----------
+[SESSION_SETTING_WRITE] -- check disabling of built in crypto functions
+SET pgcrypto.builtin_crypto_enabled = off
+;
+----------
+[GRANT] GRANT USAGE ON PROCEDURE priv_testproc1(int) TO regress_priv_user3
+;
+----------
+[UNSAFE] EXECUTE dumpOpr('433')
+;
+----------
+[SESSION_LOCK] LOCK TABLE public.num_exp_ln IN ACCESS SHARE MODE
+;

@@ -1,0 +1,1364 @@
+CREATE MATERIALIZED VIEW mv1 
+        BUILD DEFERRED REFRESH AUTO ON MANUAL
+        partition by(l_shipdate)
+        DISTRIBUTED BY RANDOM BUCKETS 2
+        PROPERTIES ('replication_num' = '1') 
+        AS 
+        select l_shipdate, o_orderdate, l_partkey, 
+            l_suppkey, sum(o_totalprice) as sum_total
+            from lineitem
+            left join orders on lineitem.l_orderkey = orders.o_orderkey 
+                             and l_shipdate = o_orderdate
+            group by
+            l_shipdate,
+            o_orderdate,
+            l_partkey,
+            l_suppkey;
+CREATE MATERIALIZED VIEW mv_1 
+       BUILD IMMEDIATE 
+       REFRESH AUTO ON MANUAL 
+       partition by(o_orderdate) 
+       DISTRIBUTED BY RANDOM BUCKETS 2
+       AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  o_orderdate, 
+  o_shippriority 
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+WHERE 
+  o_orderdate <= DATE '2024-06-30' 
+  AND o_orderdate >= DATE '2024-05-01' 
+GROUP BY 
+  l_linestatus, 
+  o_orderdate, 
+  o_shippriority;
+CREATE MATERIALIZED VIEW partition_mv
+BUILD IMMEDIATE 
+REFRESH AUTO 
+ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00' 
+PARTITION BY (DATE_TRUNC(o_orderdate, 'MONTH'))
+DISTRIBUTED BY HASH (l_orderkey) BUCKETS 2 
+PROPERTIES 
+("replication_num" = "3") 
+AS 
+SELECT 
+o_orderdate, 
+l_orderkey, 
+l_partkey 
+FROM 
+orders 
+LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+LEFT JOIN partsupp ON ps_partkey = l_partkey 
+and l_suppkey = ps_suppkey;
+CREATE MATERIALIZED VIEW mv11
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+partition by(l_shipdate)
+DISTRIBUTED BY HASH(l_orderkey) BUCKETS 10
+AS
+SELECT l_shipdate, l_orderkey, O_ORDERDATE, count(*)
+FROM lineitem  
+LEFT OUTER JOIN orders on l_orderkey = o_orderkey
+GROUP BY l_shipdate, l_orderkey, O_ORDERDATE;
+CREATE MATERIALIZED VIEW mv11
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+partition by(l_shipdate)
+DISTRIBUTED BY HASH(l_orderkey) BUCKETS 10
+PROPERTIES ('replication_num' = '1') 
+AS
+SELECT l_shipdate, l_orderkey, O_ORDERDATE, count(*)
+FROM lineitem  
+LEFT OUTER JOIN orders on l_orderkey = o_orderkey
+GROUP BY l_shipdate, l_orderkey, O_ORDERDATE;
+CREATE MATERIALIZED VIEW mv_6
+REFRESH COMPLETE ON SCHEDULE EVERY 10 hour
+AS
+SELECT * FROM lineitem;
+CREATE MATERIALIZED VIEW mv_7
+REFRESH AUTO ON SCHEDULE EVERY 10 hour
+PARTITION BY (l_shipdate)
+AS
+SELECT * FROM lineitem;
+CREATE MATERIALIZED VIEW mv_8
+REFRESH AUTO ON COMMIT
+PARTITION BY (l_shipdate)
+AS
+SELECT * FROM lineitem;
+CREATE MATERIALIZED VIEW mv_1_0
+BUILD IMMEDIATE
+REFRESH AUTO
+ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    l_linestatus,
+    to_date(o_orderdate) as date_alias,
+    o_shippriority
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+CREATE MATERIALIZED VIEW mv_1_1
+BUILD DEFERRED
+REFRESH COMPLETE
+ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00'
+PROPERTIES ('replication_num' = '1')
+AS
+SELECT
+    l_linestatus,
+    to_date(o_orderdate) as date_alias,
+    o_shippriority
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+CREATE MATERIALIZED VIEW mv_1_1
+BUILD IMMEDIATE
+REFRESH COMPLETE
+ON COMMIT
+PROPERTIES ('replication_num' = '1')
+AS
+SELECT
+    l_linestatus,
+    to_date(o_orderdate) as date_alias,
+    o_shippriority
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+CREATE MATERIALIZED VIEW mv_2_0
+BUILD IMMEDIATE
+REFRESH AUTO
+ON MANUAL
+PARTITION BY (order_date_month)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    l_linestatus,
+    date_trunc(o_orderdate, 'month') as order_date_month,
+    o_shippriority
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+CREATE MATERIALIZED VIEW mv_2_1
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+PARTITION BY (order_date_month)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    l_linestatus,
+    date_trunc(date_add(o_orderdate, INTERVAL 2 DAY), 'month') as order_date_month,
+    o_shippriority
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+CREATE MATERIALIZED VIEW mv_hive
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+PARTITION BY (`year`)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT k1, year, region FROM hive1;
+CREATE MATERIALIZED VIEW mv_hive2
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+PARTITION BY (`region`)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT k1, year, region FROM hive1;
+CREATE MATERIALIZED VIEW mv1
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+PARTITION BY (`k2`)
+DISTRIBUTED BY RANDOM BUCKETS 2
+PROPERTIES (
+    'partition_sync_limit' = '1',
+    'partition_sync_time_unit' = 'DAY'
+)
+AS
+SELECT * FROM t1;
+CREATE MATERIALIZED VIEW mv_3
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+PARTITION BY (date_trunc(`k2`, 'month'))
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT * FROM t1;
+CREATE MATERIALIZED VIEW mv_4
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+PARTITION BY (date_trunc(`k2`, 'year'))
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT * FROM t1;
+CREATE MATERIALIZED VIEW mv_5
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT t1.l_linenumber,
+       o_custkey,
+       o_orderdate
+FROM (SELECT * FROM lineitem WHERE l_linenumber > 1) t1
+LEFT OUTER JOIN orders
+ON l_orderkey = o_orderkey;
+CREATE MATERIALIZED VIEW mv1
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT t1.l_linenumber,
+       o_custkey,
+       o_orderdate
+FROM (SELECT * FROM lineitem WHERE l_linenumber > 1) t1
+LEFT OUTER JOIN orders
+ON l_orderkey = o_orderkey;
+CREATE MATERIALIZED VIEW mv2
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT t1.l_linenumber,
+       o_custkey,
+       o_orderdate
+FROM (SELECT * FROM lineitem WHERE l_linenumber > 1) t1
+LEFT OUTER JOIN orders
+ON l_orderkey = o_orderkey;
+CREATE MATERIALIZED VIEW mv3
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT
+    l_shipdate, l_suppkey, o_orderdate,
+    sum(o_totalprice) AS sum_total,
+    max(o_totalprice) AS max_total,
+    min(o_totalprice) AS min_total,
+    count(*) AS count_all,
+    count(distinct CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END) AS bitmap_union_basic
+FROM lineitem
+LEFT OUTER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+    l_shipdate,
+    l_suppkey,
+    o_orderdate;
+CREATE MATERIALIZED VIEW mv4
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT
+    o_shippriority, o_comment,
+    count(distinct CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END) AS cnt_1,
+    count(distinct CASE WHEN O_SHIPPRIORITY > 2 AND o_orderkey IN (2) THEN o_custkey ELSE null END) AS cnt_2,
+    sum(o_totalprice),
+    max(o_totalprice),
+    min(o_totalprice),
+    count(*)
+FROM orders
+GROUP BY
+    o_shippriority,
+    o_comment;
+CREATE MATERIALIZED VIEW mv5
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT
+    l_shipdate, o_orderdate, l_partkey, l_suppkey,
+    sum(o_totalprice) AS sum_total,
+    max(o_totalprice) AS max_total,
+    min(o_totalprice) AS min_total,
+    count(*) AS count_all,
+    bitmap_union(to_bitmap(CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END)) AS bitmap_union_basic
+FROM lineitem
+LEFT OUTER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+    l_shipdate,
+    o_orderdate,
+    l_partkey,
+    l_suppkey;
+CREATE MATERIALIZED VIEW mv5_1
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT o_orderstatus, o_orderdate, o_orderpriority,
+       sum(o_totalprice) AS sum_total,
+       max(o_totalprice) AS max_total,
+       min(o_totalprice) AS min_total,
+       count(*) AS count_all
+FROM orders
+GROUP BY
+    o_orderstatus, o_orderdate, o_orderpriority;
+CREATE MATERIALIZED VIEW mv7
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+PARTITION BY (l_shipdate)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT l_shipdate, o_orderdate, l_partkey,
+       l_suppkey, sum(o_totalprice) AS sum_total
+FROM lineitem
+LEFT JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+    l_shipdate,
+    o_orderdate,
+    l_partkey,
+    l_suppkey;
+CREATE MATERIALIZED VIEW mv8_0_inner_mv
+BUILD IMMEDIATE REFRESH COMPLETE ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    l_linenumber,
+    o_custkey,
+    o_orderkey,
+    o_orderstatus,
+    l_partkey,
+    l_suppkey,
+    l_orderkey
+FROM lineitem
+INNER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey;
+CREATE MATERIALIZED VIEW mv8_0
+BUILD IMMEDIATE REFRESH COMPLETE ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    l_linenumber,
+    o_custkey,
+    o_orderkey,
+    o_orderstatus,
+    l_partkey,
+    l_suppkey,
+    l_orderkey,
+    ps_availqty
+FROM mv8_0_inner_mv
+INNER JOIN partsupp ON l_partkey = ps_partkey AND l_suppkey = ps_suppkey;
+CREATE MATERIALIZED VIEW mv10_0
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT l_shipdate, o_orderdate, l_partkey,
+       l_suppkey, o_totalprice
+FROM lineitem
+LEFT JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate;
+CREATE MATERIALIZED VIEW mv11_0
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT *
+FROM (
+    SELECT
+        o_orderkey,
+        FIRST_VALUE(o_custkey) OVER (
+            PARTITION BY o_orderdate
+            ORDER BY o_totalprice NULLS LAST
+            RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS first_value,
+        RANK() OVER (
+            PARTITION BY o_orderdate, o_orderstatus
+            ORDER BY o_totalprice NULLS LAST
+            RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS rank_value
+    FROM orders
+) t
+WHERE o_orderkey > 1;
+CREATE MATERIALIZED VIEW mv11_1
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    o_orderkey,
+    o_orderdate,
+    FIRST_VALUE(o_custkey) OVER (
+        PARTITION BY o_orderdate
+        ORDER BY o_totalprice NULLS LAST
+        RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS first_value,
+    RANK() OVER (
+        PARTITION BY o_orderdate, o_orderstatus
+        ORDER BY o_totalprice NULLS LAST
+        RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS rank_value
+FROM orders
+WHERE o_orderdate > '2023-12-09';
+CREATE MATERIALIZED VIEW mv11_0
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    o_orderdate,
+    count(o_shippriority),
+    count(o_comment),
+    l_orderkey,
+    count(l_partkey)
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey
+LEFT JOIN partsupp ON ps_partkey = l_partkey AND l_suppkey = ps_suppkey
+GROUP BY o_orderdate, l_orderkey
+LIMIT 8 OFFSET 1;
+CREATE MATERIALIZED VIEW mv11_1
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    o_orderdate,
+    o_shippriority,
+    o_comment,
+    l_orderkey,
+    l_partkey,
+    o_orderkey
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey
+LEFT JOIN partsupp ON ps_partkey = l_partkey AND l_suppkey = ps_suppkey
+WHERE o_orderdate > '2023-12-08'
+ORDER BY o_orderkey
+LIMIT 4 OFFSET 2;
+CREATE MATERIALIZED VIEW mv9_0
+BUILD IMMEDIATE REFRESH COMPLETE ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+PROPERTIES ('replication_num' = '1')
+AS
+SELECT
+    l_linenumber,
+    o_custkey,
+    o_orderkey,
+    o_orderstatus,
+    l_partkey,
+    l_suppkey,
+    l_orderkey
+FROM lineitem
+INNER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey;
+CREATE MATERIALIZED VIEW rollup_partition_mv 
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL 
+partition by(order_date) 
+DISTRIBUTED BY RANDOM BUCKETS 2 
+AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day') AS order_date 
+FROM 
+  lineitem 
+  LEFT JOIN partsupp ON l_partkey = ps_partkey 
+  AND l_suppkey = ps_suppkey 
+GROUP BY 
+  l_linestatus, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day');
+CREATE MATERIALIZED VIEW latest_partition_mv 
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL 
+partition by(order_date) 
+DISTRIBUTED BY RANDOM BUCKETS 2 
+PROPERTIES (
+  "partition_sync_limit" = "3", 
+  "partition_sync_time_unit" = "DAY", 
+  "partition_date_format" = "yyyy-MM-dd"
+)       
+AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day') AS order_date 
+FROM 
+  lineitem 
+  LEFT JOIN partsupp ON l_partkey = ps_partkey 
+  AND l_suppkey = ps_suppkey 
+GROUP BY 
+  l_linestatus, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day');
+CREATE MATERIALIZED VIEW common_agg_mv
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  o_shippriority,
+  l_suppkey,
+  l_partkey,
+  o_orderdate
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+GROUP BY 
+  l_linestatus, 
+  o_shippriority,
+  l_suppkey,
+  l_partkey,
+  o_orderdate;
+CREATE MATERIALIZED VIEW common_join_mv
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS 
+SELECT 
+  l_linestatus, 
+  l_extendedprice * (1 - l_discount),
+  o_orderdate, 
+  o_shippriority 
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+CREATE MATERIALIZED VIEW target_agg_mv
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  o_orderdate, 
+  o_shippriority 
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+GROUP BY 
+  l_linestatus, 
+  o_orderdate, 
+  o_shippriority;
+CREATE MATERIALIZED VIEW sync_mv
+AS
+SELECT 
+  decision,
+  code, 
+  app_name, 
+  event_id, 
+  event_type, 
+  date_trunc(time, 'minute'), 
+  DATE_FORMAT(
+    `time`, '%Y-%m-%d'
+  ), 
+  cast(FLOOR(MINUTE(time) / 15) AS decimal(9, 0)),
+  count(id) AS cnt
+FROM 
+  test 
+GROUP BY 
+  code, 
+  app_name, 
+  event_id, 
+  event_type, 
+  date_trunc(time, 'minute'), 
+  decision, 
+  DATE_FORMAT(time, '%Y-%m-%d'), 
+  cast(FLOOR(MINUTE(`time`) / 15) AS decimal(9, 0));
+CREATE MATERIALIZED VIEW dwd_order_detail
+BUILD IMMEDIATE REFRESH AUTO ON COMMIT
+DISTRIBUTED BY RANDOM BUCKETS 16
+AS
+SELECT
+o.o_orderkey,
+o.o_custkey,
+o.o_orderstatus,
+o.o_totalprice,
+o.o_orderdate,
+c.c_name,
+c.c_nationkey,
+n.n_name AS nation_name,
+r.r_name AS region_name,
+l.l_partkey,
+l.l_quantity,
+l.l_extendedprice,
+l.l_discount,
+l.l_tax
+FROM orders o
+JOIN customer c ON o.o_custkey = c.c_custkey
+JOIN nation n ON c.c_nationkey = n.n_nationkey
+JOIN region r ON n.n_regionkey = r.r_regionkey
+JOIN lineitem l ON o.o_orderkey = l.l_orderkey;
+CREATE MATERIALIZED VIEW dws_daily_sales
+BUILD IMMEDIATE REFRESH AUTO ON COMMIT
+DISTRIBUTED BY RANDOM BUCKETS 16
+AS
+SELECT
+date_trunc(o_orderdate, 'month') AS month,
+nation_name,
+region_name,
+bitmap_union(to_bitmap(o_orderkey)) AS order_count,
+sum(l_extendedprice * (1 - l_discount)) AS net_revenue
+FROM dwd_order_detail
+GROUP BY
+date_trunc(o_orderdate, 'month'),
+nation_name,
+region_name;
+CREATE MATERIALIZED VIEW common_schedule_join_mv
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 2 HOUR
+DISTRIBUTED BY RANDOM BUCKETS 16
+AS
+SELECT
+l_linestatus,
+l_extendedprice * (1 - l_discount),
+o_orderdate,
+o_shippriority
+FROM
+orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+create materialized view store_amt as 
+select store_id as store_id_, sum(sale_amt) from sales_records group by store_id;
+create materialized view advertiser_uv as 
+    select 
+        advertiser as advertiser_, 
+        channel as channel_, 
+        bitmap_union(to_bitmap(user_id)) 
+    from 
+        advertiser_view_record 
+    group by 
+        advertiser, channel;
+create materialized view mv_1 as SELECT k3 as k3_, k2 as k2_, k1 as k1_ FROM test_table;
+-- mv1 performs expression computation in advance
+    create materialized view mv1 as 
+    select 
+        abs(k1)+k2+1,        
+        sum(abs(k2+2)+k3+3) 
+    from 
+        d_table 
+    group by 
+        abs(k1)+k2+1;
+    
+    -- mv2 filters with a where expression in advance to reduce the data volume in the materialized view
+    create materialized view mv2 as 
+    select 
+        year(k4),
+        month(k4) 
+    from 
+        d_table 
+    where 
+        year(k4) = 2020;
+CREATE MATERIALIZED VIEW mv1
+BUILD IMMEDIATE REFRESH COMPLETE ON MANUAL
+PARTITION BY(l_shipdate)
+DISTRIBUTED BY RANDOM BUCKETS 2
+PROPERTIES ('replication_num' = '1')
+AS
+SELECT l_shipdate, o_orderdate, l_partkey, l_suppkey, SUM(o_totalprice) AS sum_total
+FROM lineitem
+LEFT JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+l_shipdate,
+o_orderdate,
+l_partkey,
+l_suppkey;
+CREATE MATERIALIZED VIEW store_amt AS
+    SELECT store_id, SUM(sale_amt)
+    FROM sales_records
+    GROUP BY store_id;
+CREATE MATERIALIZED VIEW complete_mv (
+orderdate COMMENT 'Order date',
+orderkey COMMENT 'Order key',
+partkey COMMENT 'Part key'
+)
+BUILD IMMEDIATE
+REFRESH AUTO
+ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00'
+DISTRIBUTED BY HASH (orderkey) BUCKETS 2
+PROPERTIES
+("replication_num" = "1")
+AS
+SELECT
+o_orderdate,
+l_orderkey,
+l_partkey
+FROM
+orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey
+LEFT JOIN partsupp ON ps_partkey = l_partkey
+and l_suppkey = ps_suppkey;
+------------------------------------------------------------------------------------------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv1 
+        BUILD DEFERRED REFRESH AUTO ON MANUAL
+        partition by(l_shipdate)
+        DISTRIBUTED BY RANDOM BUCKETS 2
+        PROPERTIES ('replication_num' = '1') 
+        AS 
+        select l_shipdate, o_orderdate, l_partkey, 
+            l_suppkey, sum(o_totalprice) as sum_total
+            from lineitem
+            left join orders on lineitem.l_orderkey = orders.o_orderkey 
+                             and l_shipdate = o_orderdate
+            group by
+            l_shipdate,
+            o_orderdate,
+            l_partkey,
+            l_suppkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_1 
+       BUILD IMMEDIATE 
+       REFRESH AUTO ON MANUAL 
+       partition by(o_orderdate) 
+       DISTRIBUTED BY RANDOM BUCKETS 2
+       AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  o_orderdate, 
+  o_shippriority 
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+WHERE 
+  o_orderdate <= DATE '2024-06-30' 
+  AND o_orderdate >= DATE '2024-05-01' 
+GROUP BY 
+  l_linestatus, 
+  o_orderdate, 
+  o_shippriority;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW partition_mv
+BUILD IMMEDIATE 
+REFRESH AUTO 
+ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00' 
+PARTITION BY (DATE_TRUNC(o_orderdate, 'MONTH'))
+DISTRIBUTED BY HASH (l_orderkey) BUCKETS 2 
+PROPERTIES 
+("replication_num" = "3") 
+AS 
+SELECT 
+o_orderdate, 
+l_orderkey, 
+l_partkey 
+FROM 
+orders 
+LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+LEFT JOIN partsupp ON ps_partkey = l_partkey 
+and l_suppkey = ps_suppkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv11
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+partition by(l_shipdate)
+DISTRIBUTED BY HASH(l_orderkey) BUCKETS 10
+AS
+SELECT l_shipdate, l_orderkey, O_ORDERDATE, count(*)
+FROM lineitem  
+LEFT OUTER JOIN orders on l_orderkey = o_orderkey
+GROUP BY l_shipdate, l_orderkey, O_ORDERDATE;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv11
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+partition by(l_shipdate)
+DISTRIBUTED BY HASH(l_orderkey) BUCKETS 10
+PROPERTIES ('replication_num' = '1') 
+AS
+SELECT l_shipdate, l_orderkey, O_ORDERDATE, count(*)
+FROM lineitem  
+LEFT OUTER JOIN orders on l_orderkey = o_orderkey
+GROUP BY l_shipdate, l_orderkey, O_ORDERDATE;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_6
+REFRESH COMPLETE ON SCHEDULE EVERY 10 hour
+AS
+SELECT * FROM lineitem;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_7
+REFRESH AUTO ON SCHEDULE EVERY 10 hour
+PARTITION BY (l_shipdate)
+AS
+SELECT * FROM lineitem;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_8
+REFRESH AUTO ON COMMIT
+PARTITION BY (l_shipdate)
+AS
+SELECT * FROM lineitem;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_1_0
+BUILD IMMEDIATE
+REFRESH AUTO
+ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    l_linestatus,
+    to_date(o_orderdate) as date_alias,
+    o_shippriority
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_1_1
+BUILD DEFERRED
+REFRESH COMPLETE
+ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00'
+PROPERTIES ('replication_num' = '1')
+AS
+SELECT
+    l_linestatus,
+    to_date(o_orderdate) as date_alias,
+    o_shippriority
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_1_1
+BUILD IMMEDIATE
+REFRESH COMPLETE
+ON COMMIT
+PROPERTIES ('replication_num' = '1')
+AS
+SELECT
+    l_linestatus,
+    to_date(o_orderdate) as date_alias,
+    o_shippriority
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_2_0
+BUILD IMMEDIATE
+REFRESH AUTO
+ON MANUAL
+PARTITION BY (order_date_month)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    l_linestatus,
+    date_trunc(o_orderdate, 'month') as order_date_month,
+    o_shippriority
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_2_1
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+PARTITION BY (order_date_month)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    l_linestatus,
+    date_trunc(date_add(o_orderdate, INTERVAL 2 DAY), 'month') as order_date_month,
+    o_shippriority
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_hive
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+PARTITION BY (`year`)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT k1, year, region FROM hive1;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_hive2
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+PARTITION BY (`region`)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT k1, year, region FROM hive1;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv1
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+PARTITION BY (`k2`)
+DISTRIBUTED BY RANDOM BUCKETS 2
+PROPERTIES (
+    'partition_sync_limit' = '1',
+    'partition_sync_time_unit' = 'DAY'
+)
+AS
+SELECT * FROM t1;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_3
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+PARTITION BY (date_trunc(`k2`, 'month'))
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT * FROM t1;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_4
+BUILD DEFERRED REFRESH AUTO ON MANUAL
+PARTITION BY (date_trunc(`k2`, 'year'))
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT * FROM t1;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv_5
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT t1.l_linenumber,
+       o_custkey,
+       o_orderdate
+FROM (SELECT * FROM lineitem WHERE l_linenumber > 1) t1
+LEFT OUTER JOIN orders
+ON l_orderkey = o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv1
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT t1.l_linenumber,
+       o_custkey,
+       o_orderdate
+FROM (SELECT * FROM lineitem WHERE l_linenumber > 1) t1
+LEFT OUTER JOIN orders
+ON l_orderkey = o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv2
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT t1.l_linenumber,
+       o_custkey,
+       o_orderdate
+FROM (SELECT * FROM lineitem WHERE l_linenumber > 1) t1
+LEFT OUTER JOIN orders
+ON l_orderkey = o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv3
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT
+    l_shipdate, l_suppkey, o_orderdate,
+    sum(o_totalprice) AS sum_total,
+    max(o_totalprice) AS max_total,
+    min(o_totalprice) AS min_total,
+    count(*) AS count_all,
+    count(distinct CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END) AS bitmap_union_basic
+FROM lineitem
+LEFT OUTER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+    l_shipdate,
+    l_suppkey,
+    o_orderdate;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv4
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT
+    o_shippriority, o_comment,
+    count(distinct CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END) AS cnt_1,
+    count(distinct CASE WHEN O_SHIPPRIORITY > 2 AND o_orderkey IN (2) THEN o_custkey ELSE null END) AS cnt_2,
+    sum(o_totalprice),
+    max(o_totalprice),
+    min(o_totalprice),
+    count(*)
+FROM orders
+GROUP BY
+    o_shippriority,
+    o_comment;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv5
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT
+    l_shipdate, o_orderdate, l_partkey, l_suppkey,
+    sum(o_totalprice) AS sum_total,
+    max(o_totalprice) AS max_total,
+    min(o_totalprice) AS min_total,
+    count(*) AS count_all,
+    bitmap_union(to_bitmap(CASE WHEN o_shippriority > 1 AND o_orderkey IN (1, 3) THEN o_custkey ELSE null END)) AS bitmap_union_basic
+FROM lineitem
+LEFT OUTER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+    l_shipdate,
+    o_orderdate,
+    l_partkey,
+    l_suppkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv5_1
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 1 hour
+DISTRIBUTED BY RANDOM BUCKETS 3
+AS
+SELECT o_orderstatus, o_orderdate, o_orderpriority,
+       sum(o_totalprice) AS sum_total,
+       max(o_totalprice) AS max_total,
+       min(o_totalprice) AS min_total,
+       count(*) AS count_all
+FROM orders
+GROUP BY
+    o_orderstatus, o_orderdate, o_orderpriority;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv7
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+PARTITION BY (l_shipdate)
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT l_shipdate, o_orderdate, l_partkey,
+       l_suppkey, sum(o_totalprice) AS sum_total
+FROM lineitem
+LEFT JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+    l_shipdate,
+    o_orderdate,
+    l_partkey,
+    l_suppkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv8_0_inner_mv
+BUILD IMMEDIATE REFRESH COMPLETE ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    l_linenumber,
+    o_custkey,
+    o_orderkey,
+    o_orderstatus,
+    l_partkey,
+    l_suppkey,
+    l_orderkey
+FROM lineitem
+INNER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv8_0
+BUILD IMMEDIATE REFRESH COMPLETE ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    l_linenumber,
+    o_custkey,
+    o_orderkey,
+    o_orderstatus,
+    l_partkey,
+    l_suppkey,
+    l_orderkey,
+    ps_availqty
+FROM mv8_0_inner_mv
+INNER JOIN partsupp ON l_partkey = ps_partkey AND l_suppkey = ps_suppkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv10_0
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT l_shipdate, o_orderdate, l_partkey,
+       l_suppkey, o_totalprice
+FROM lineitem
+LEFT JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv11_0
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT *
+FROM (
+    SELECT
+        o_orderkey,
+        FIRST_VALUE(o_custkey) OVER (
+            PARTITION BY o_orderdate
+            ORDER BY o_totalprice NULLS LAST
+            RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS first_value,
+        RANK() OVER (
+            PARTITION BY o_orderdate, o_orderstatus
+            ORDER BY o_totalprice NULLS LAST
+            RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        ) AS rank_value
+    FROM orders
+) t
+WHERE o_orderkey > 1;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv11_1
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    o_orderkey,
+    o_orderdate,
+    FIRST_VALUE(o_custkey) OVER (
+        PARTITION BY o_orderdate
+        ORDER BY o_totalprice NULLS LAST
+        RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS first_value,
+    RANK() OVER (
+        PARTITION BY o_orderdate, o_orderstatus
+        ORDER BY o_totalprice NULLS LAST
+        RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+    ) AS rank_value
+FROM orders
+WHERE o_orderdate > '2023-12-09';
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv11_0
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    o_orderdate,
+    count(o_shippriority),
+    count(o_comment),
+    l_orderkey,
+    count(l_partkey)
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey
+LEFT JOIN partsupp ON ps_partkey = l_partkey AND l_suppkey = ps_suppkey
+GROUP BY o_orderdate, l_orderkey
+LIMIT 8 OFFSET 1;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv11_1
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS
+SELECT
+    o_orderdate,
+    o_shippriority,
+    o_comment,
+    l_orderkey,
+    l_partkey,
+    o_orderkey
+FROM orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey
+LEFT JOIN partsupp ON ps_partkey = l_partkey AND l_suppkey = ps_suppkey
+WHERE o_orderdate > '2023-12-08'
+ORDER BY o_orderkey
+LIMIT 4 OFFSET 2;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv9_0
+BUILD IMMEDIATE REFRESH COMPLETE ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+PROPERTIES ('replication_num' = '1')
+AS
+SELECT
+    l_linenumber,
+    o_custkey,
+    o_orderkey,
+    o_orderstatus,
+    l_partkey,
+    l_suppkey,
+    l_orderkey
+FROM lineitem
+INNER JOIN orders ON lineitem.l_orderkey = orders.o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW rollup_partition_mv 
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL 
+partition by(order_date) 
+DISTRIBUTED BY RANDOM BUCKETS 2 
+AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day') AS order_date 
+FROM 
+  lineitem 
+  LEFT JOIN partsupp ON l_partkey = ps_partkey 
+  AND l_suppkey = ps_suppkey 
+GROUP BY 
+  l_linestatus, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day');
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW latest_partition_mv 
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL 
+partition by(order_date) 
+DISTRIBUTED BY RANDOM BUCKETS 2 
+PROPERTIES (
+  "partition_sync_limit" = "3", 
+  "partition_sync_time_unit" = "DAY", 
+  "partition_date_format" = "yyyy-MM-dd"
+)       
+AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day') AS order_date 
+FROM 
+  lineitem 
+  LEFT JOIN partsupp ON l_partkey = ps_partkey 
+  AND l_suppkey = ps_suppkey 
+GROUP BY 
+  l_linestatus, 
+  ps_partkey, 
+  date_trunc(l_ordertime, 'day');
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW common_agg_mv
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  o_shippriority,
+  l_suppkey,
+  l_partkey,
+  o_orderdate
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+GROUP BY 
+  l_linestatus, 
+  o_shippriority,
+  l_suppkey,
+  l_partkey,
+  o_orderdate;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW common_join_mv
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS 
+SELECT 
+  l_linestatus, 
+  l_extendedprice * (1 - l_discount),
+  o_orderdate, 
+  o_shippriority 
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW target_agg_mv
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 2
+AS 
+SELECT 
+  l_linestatus, 
+  sum(
+    l_extendedprice * (1 - l_discount)
+  ) AS revenue, 
+  o_orderdate, 
+  o_shippriority 
+FROM 
+  orders 
+  LEFT JOIN lineitem ON l_orderkey = o_orderkey 
+GROUP BY 
+  l_linestatus, 
+  o_orderdate, 
+  o_shippriority;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW sync_mv
+AS
+SELECT 
+  decision,
+  code, 
+  app_name, 
+  event_id, 
+  event_type, 
+  date_trunc(time, 'minute'), 
+  DATE_FORMAT(
+    `time`, '%Y-%m-%d'
+  ), 
+  cast(FLOOR(MINUTE(time) / 15) AS decimal(9, 0)),
+  count(id) AS cnt
+FROM 
+  test 
+GROUP BY 
+  code, 
+  app_name, 
+  event_id, 
+  event_type, 
+  date_trunc(time, 'minute'), 
+  decision, 
+  DATE_FORMAT(time, '%Y-%m-%d'), 
+  cast(FLOOR(MINUTE(`time`) / 15) AS decimal(9, 0));
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW dwd_order_detail
+BUILD IMMEDIATE REFRESH AUTO ON COMMIT
+DISTRIBUTED BY RANDOM BUCKETS 16
+AS
+SELECT
+o.o_orderkey,
+o.o_custkey,
+o.o_orderstatus,
+o.o_totalprice,
+o.o_orderdate,
+c.c_name,
+c.c_nationkey,
+n.n_name AS nation_name,
+r.r_name AS region_name,
+l.l_partkey,
+l.l_quantity,
+l.l_extendedprice,
+l.l_discount,
+l.l_tax
+FROM orders o
+JOIN customer c ON o.o_custkey = c.c_custkey
+JOIN nation n ON c.c_nationkey = n.n_nationkey
+JOIN region r ON n.n_regionkey = r.r_regionkey
+JOIN lineitem l ON o.o_orderkey = l.l_orderkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW dws_daily_sales
+BUILD IMMEDIATE REFRESH AUTO ON COMMIT
+DISTRIBUTED BY RANDOM BUCKETS 16
+AS
+SELECT
+date_trunc(o_orderdate, 'month') AS month,
+nation_name,
+region_name,
+bitmap_union(to_bitmap(o_orderkey)) AS order_count,
+sum(l_extendedprice * (1 - l_discount)) AS net_revenue
+FROM dwd_order_detail
+GROUP BY
+date_trunc(o_orderdate, 'month'),
+nation_name,
+region_name;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW common_schedule_join_mv
+BUILD IMMEDIATE REFRESH AUTO ON SCHEDULE EVERY 2 HOUR
+DISTRIBUTED BY RANDOM BUCKETS 16
+AS
+SELECT
+l_linestatus,
+l_extendedprice * (1 - l_discount),
+o_orderdate,
+o_shippriority
+FROM
+orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey;
+----------
+[CREATE_VIEW(SELECT)] create materialized view store_amt as 
+select store_id as store_id_, sum(sale_amt) from sales_records group by store_id;
+----------
+[CREATE_VIEW(SELECT)] create materialized view advertiser_uv as 
+    select 
+        advertiser as advertiser_, 
+        channel as channel_, 
+        bitmap_union(to_bitmap(user_id)) 
+    from 
+        advertiser_view_record 
+    group by 
+        advertiser, channel;
+----------
+[CREATE_VIEW(SELECT)] create materialized view mv_1 as SELECT k3 as k3_, k2 as k2_, k1 as k1_ FROM test_table;
+----------
+[CREATE_VIEW(SELECT)] create materialized view mv1 as 
+    select 
+        abs(k1)+k2+1,        
+        sum(abs(k2+2)+k3+3) 
+    from 
+        d_table 
+    group by 
+        abs(k1)+k2+1;
+----------
+[CREATE_VIEW(SELECT)] create materialized view mv2 as 
+    select 
+        year(k4),
+        month(k4) 
+    from 
+        d_table 
+    where 
+        year(k4) = 2020;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW mv1
+BUILD IMMEDIATE REFRESH COMPLETE ON MANUAL
+PARTITION BY(l_shipdate)
+DISTRIBUTED BY RANDOM BUCKETS 2
+PROPERTIES ('replication_num' = '1')
+AS
+SELECT l_shipdate, o_orderdate, l_partkey, l_suppkey, SUM(o_totalprice) AS sum_total
+FROM lineitem
+LEFT JOIN orders ON lineitem.l_orderkey = orders.o_orderkey AND l_shipdate = o_orderdate
+GROUP BY
+l_shipdate,
+o_orderdate,
+l_partkey,
+l_suppkey;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW store_amt AS
+    SELECT store_id, SUM(sale_amt)
+    FROM sales_records
+    GROUP BY store_id;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW complete_mv (
+orderdate COMMENT 'Order date',
+orderkey COMMENT 'Order key',
+partkey COMMENT 'Part key'
+)
+BUILD IMMEDIATE
+REFRESH AUTO
+ON SCHEDULE EVERY 1 DAY STARTS '2024-12-01 20:30:00'
+DISTRIBUTED BY HASH (orderkey) BUCKETS 2
+PROPERTIES
+("replication_num" = "1")
+AS
+SELECT
+o_orderdate,
+l_orderkey,
+l_partkey
+FROM
+orders
+LEFT JOIN lineitem ON l_orderkey = o_orderkey
+LEFT JOIN partsupp ON ps_partkey = l_partkey
+and l_suppkey = ps_suppkey;

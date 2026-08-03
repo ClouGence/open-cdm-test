@@ -1,0 +1,467 @@
+select id,name,score, k,v from table_test lateral view posexplode_outer(score) tmp as k,v order by id;
+-- 2. 使用 MATCH_PHRASE 进行全文检索短语匹配
+
+-- 2.1 content 列中同时包含 keyword1 和 keyword2 的行，且 keyword2 必须紧跟在 keyword1 之后
+-- 'keyword1 keyword2'、'wordx keyword1 keyword2'、'wordx keyword1 keyword2 wordy' 都能匹配，因为它们包含 'keyword1 keyword2' 且 keyword2 紧跟在 keyword1 之后
+-- 'keyword1 wordx keyword2' 不匹配，因为 keyword1 和 keyword2 之间有其他词
+-- 'keyword2 keyword1' 不匹配，因为顺序相反
+-- 要使用 MATCH_PHRASE，需要在 PROPERTIES 中启用 "support_phrase" = "true"。
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2';
+
+-- 2.2 content 列中同时包含 keyword1 和 keyword2 的行，slop（最大词距）为 3
+-- 'keyword1 keyword2'、'keyword1 a keyword2'、'keyword1 a b c keyword2' 都能匹配，因为 slop 分别为 0、1 和 3，均在 3 以内
+-- 'keyword1 a b c d keyword2' 不匹配，因为 slop 为 4，超过了 3
+-- 'keyword2 keyword1'、'keyword2 a keyword1'、'keyword2 a b c keyword1' 也能匹配，因为当 slop > 0 时，不要求 keyword1 和 keyword2 的顺序。如需强制顺序，Doris 提供了在 slop 后加 + 号的方式
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3';
+-- 强制顺序，使用正号加 slop；'keyword1 a b c keyword2' 匹配，而 'keyword2 a b c keyword1' 不匹配
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3+';
+
+-- 2.3 对最后一个词 keyword2 进行前缀匹配，默认限制 50 个前缀（由会话变量 inverted_index_max_expansions 控制）
+-- 需要确保 keyword1 和 keyword2 在原始文本分词后保持相邻，中间没有其他词。
+-- 'keyword1 keyword2abc' 匹配，因为 keyword1 相同且 keyword2abc 以 keyword2 为前缀
+-- 'keyword1 keyword2' 也匹配，因为 keyword2 是 keyword2 的前缀
+-- 'keyword1 keyword3' 不匹配，因为 keyword3 不是 keyword2 的前缀
+-- 'keyword1 keyword3abc' 不匹配，因为 keyword3abc 不是 keyword2 的前缀
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1 keyword2';
+
+-- 2.4 如果仅提供一个词，默认进行前缀查询，限制 50 个前缀（由会话变量 inverted_index_max_expansions 控制）
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1';
+
+-- 2.5 对分词后的词进行正则表达式匹配，默认限制 50 个匹配（由会话变量 inverted_index_max_expansions 控制）
+-- 类似于 MATCH_PHRASE_PREFIX，但使用正则表达式代替前缀
+SELECT * FROM table_name WHERE content MATCH_REGEXP 'key.*';
+
+-- 3. 普通的等值、范围、IN 和 NOT IN 查询使用标准 SQL 语法，例如：
+SELECT * FROM table_name WHERE id = 123;
+SELECT * FROM table_name WHERE ts > '2023-01-01 00:00:00';
+SELECT * FROM table_name WHERE op_type IN ('add', 'delete');
+
+-- 4. 使用 multi_match 函数进行多列全文检索
+-- 参数：
+--   前 N 个参数为要搜索的列名
+--   倒数第二个参数指定匹配模式：'any'/'all'/'phrase'/'phrase_prefix'
+--   最后一个参数是要搜索的关键词或短语
+
+-- 4.1 keyword1 出现在 col1、col2、col3 中任意一列的行（OR 逻辑）
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'any', 'keyword1');
+
+-- 4.2 keyword1 出现在 col1、col2、col3 所有列的行（AND 逻辑）
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'all', 'keyword1');
+
+-- 4.3 精确短语 keyword1 出现在 col1、col2、col3 中任意一列的行（精确短语匹配）
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'phrase', 'keyword1');
+
+-- 4.4 以 keyword1 为前缀的短语出现在 col1、col2、col3 中任意一列的行（短语前缀匹配）
+-- 例如，会匹配 "keyword123" 这样的内容
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'phrase_prefix', 'keyword1');
+-- 查询全部列
+SELECT * FROM tbl WHERE k1 = 1 AND k2 = 2;
+
+-- 查询部分列
+SELECT v1, v2 FROM tbl WHERE k1 = 1 AND k2 = 2;
+SELECT k, v1, v3, v5, v7 FROM tbl_point_query WHERE k = 100;
+SELECT * FROM t1 ORDER BY id;
+select * from test_corr order by id, k1, k2;
+select id, corr_welford(k1, k2) from test_corr group by id order by id;
+select corr_welford(k1, k2) from test_corr where id = 999;
+SELECT array_enumerate_uniq(NULL), array_enumerate_uniq(NULL, NULL);
+SELECT array_filter(x -> x >= 3, double_array) FROM array_filter_test WHERE id = 1;
+SELECT array_filter(x -> length(x) > 2, string_array) FROM array_filter_test WHERE id = 1;
+SELECT array_filter(int_array, [false, true, false, true, true]) FROM array_filter_test WHERE id = 1;
+SELECT array_filter([1,2,3], [true, false, true]);
+SELECT array_filter([1,2,3], [true, false, true, false]);
+SELECT array_filter([1,2,3], [true, false]);
+SELECT array_filter(x -> x > 0, int_array) FROM array_filter_test WHERE id = 3;
+SELECT array_filter(x -> x > 0, int_array) FROM array_filter_test WHERE id = 4;
+SELECT array_filter(x -> x is not null, [null, 1, null, 2, null]);
+SELECT array_filter((x, y) -> x > y, int_array, double_array) FROM array_filter_test WHERE id = 1;
+SELECT array_filter(x -> size(x) > 2, [[1,2], [3,4,5], [6], [7,8,9,10]]);
+SELECT array_filter(x -> x['a'] > 10, [{'a':5}, {'a':15}, {'a':20}]);
+SELECT array_filter(x -> struct_element(x, 'age') > 18, array(named_struct('name','Alice','age',20),named_struct('name','Bob','age',16),named_struct('name','Eve','age',30)));
+SELECT array_filter(x -> x > 0, [1,2,3], [4,5,6], [7,8,9]);
+SELECT array_filter((x, y) -> x > y, [1,2,3], [4,5]);
+SELECT array_filter(x -> x > 0, 'not_an_array');
+SELECT array_filter(x -> array_count(y -> y > 5, x) > 0, [[1,2,3],[4,5,6],[7,8,9]]);
+SELECT array_filter(x -> array_exists(y -> y > 5, x), [[1,2,3],[4,5,6]]);
+SELECT array_first_index((x, y) -> x > y, [1, 2, 3, 4, 5], [1.1, 2.2, 3.3, 4.4, 5.5]);
+SELECT hamming_distance('karolin', 'kathrin') AS distance;
+SELECT hamming_distance('数据库', '数据仓') AS distance;
+SELECT hamming_distance('Doris', 'doris') AS distance;
+SELECT hamming_distance(NULL, 'abc') AS distance;
+SELECT TRANSLATE('abcda', 'a', 'z');
+select url_decode('Doris+Q%26A');
+select URL_ENCODE('Doris Q&A');
+SELECT * FROM partitioned_table WHERE dt = '2024-01-01';
+SELECT TOKENIZE('مرحبا بالعالم Hello 世界', '"parser"="icu"');
+  -- 结果：["مرحبا", "بالعالم", "Hello", "世界"]
+
+  SELECT TOKENIZE('มนไมเปนไปตามความตองการ', '"parser"="icu"');
+  -- 结果：["มน", "ไมเปน", "ไป", "ตาม", "ความ", "ตองการ"]
+;
+-- 智能模式
+  SELECT TOKENIZE('中华人民共和国国歌', '"parser"="ik","parser_mode"="ik_smart"');
+  -- 结果：["中华人民共和国", "国歌"]
+
+  -- 最细粒度模式
+  SELECT TOKENIZE('中华人民共和国国歌', '"parser"="ik","parser_mode"="ik_max_word"');
+  -- 结果：["中华人民共和国", "中华人民", "中华", "华人", "人民共和国", "人民", "共和国", "共和", "国歌"]
+;
+-- 英文文本分词
+  SELECT TOKENIZE('Hello World! This is a test.', '"parser"="basic"');
+  -- 结果：["hello", "world", "this", "is", "a", "test"]
+
+  -- 中文文本分词
+  SELECT TOKENIZE('你好世界', '"parser"="basic"');
+  -- 结果：["你", "好", "世", "界"]
+
+  -- 混合语言分词
+  SELECT TOKENIZE('Hello 你好 World 世界', '"parser"="basic"');
+  -- 结果：["hello", "你", "好", "world", "世", "界"]
+
+  -- 包含数字和特殊字符
+  SELECT TOKENIZE('GET /images/hm_bg.jpg HTTP/1.0', '"parser"="basic"');
+  -- 结果：["get", "images", "hm", "bg", "jpg", "http", "1", "0"]
+
+  -- 处理长数字序列
+  SELECT TOKENIZE('12345678901234567890', '"parser"="basic"');
+  -- 结果：["12345678901234567890"]
+;
+SELECT * FROM paimon_tbl@incr('startSnapshotId'='2', 'endSnapshotId'='5');
+SELECT count(DISTINCT c1,c2), count(DISTINCT c2,c3), count(DISTINCT c3) FROM t;
+-- 词项查询
+SELECT * FROM docs WHERE search('title:apache');
+
+-- ANY：匹配任意一个值
+SELECT * FROM docs WHERE search('tags:ANY(java python golang)');
+
+-- ALL：同时包含多个值
+SELECT * FROM docs WHERE search('tags:ALL(machine learning)');
+
+-- 布尔 + 多字段
+SELECT * FROM docs
+WHERE search('(title:Doris OR content:database) AND NOT category:archived');
+
+-- 结合结构化过滤（结构化条件不参与打分）
+SELECT * FROM docs
+WHERE search('title:apache') AND publish_date >= '2025-01-01';
+SELECT *, score() as score 
+FROM search_demo 
+WHERE content MATCH_ANY 'search query' 
+ORDER BY score DESC 
+LIMIT 10;
+SELECT TOKENIZE('مرحبا بالعالم Hello 世界', '"parser"="icu"');
+-- 结果: ["مرحبا", "بالعالم", "Hello", "世界"]
+
+SELECT TOKENIZE('มนไมเปนไปตามความตองการ', '"parser"="icu"');
+-- 结果: ["มน", "ไมเปน", "ไป", "ตาม", "ความ", "ตองการ"]
+;
+SELECT TOKENIZE('中华人民共和国国歌', '"parser"="ik","parser_mode"="ik_smart"');
+-- 结果: ["中华人民共和国", "国歌"]
+
+SELECT TOKENIZE('中华人民共和国国歌', '"parser"="ik","parser_mode"="ik_max_word"');
+-- 结果: ["中华人民共和国", "中华人民", "中华", "华人", "人民共和国", "人民", "共和国", "共和", "国歌"]
+;
+-- 英文文本分词
+SELECT TOKENIZE('Hello World! This is a test.', '"parser"="basic"');
+-- 结果: ["hello", "world", "this", "is", "a", "test"]
+
+-- 中文文本分词
+SELECT TOKENIZE('你好世界', '"parser"="basic"');
+-- 结果: ["你", "好", "世", "界"]
+
+-- 混合语言分词
+SELECT TOKENIZE('Hello你好World世界', '"parser"="basic"');
+-- 结果: ["hello", "你", "好", "world", "世", "界"]
+
+-- 包含数字和特殊字符
+SELECT TOKENIZE('GET /images/hm_bg.jpg HTTP/1.0', '"parser"="basic"');
+-- 结果: ["get", "images", "hm", "bg", "jpg", "http", "1", "0"]
+
+-- 处理长数字序列
+SELECT TOKENIZE('12345678901234567890', '"parser"="basic"');
+-- 结果: ["12345678901234567890"]
+;
+SELECT *,now() as etl_time from big_view;
+-- TERM + PHRASE + NOT
+SELECT request_id, error_msg, latency_ms
+FROM inference_logs
+WHERE search('
+  level:ERROR
+  AND error_msg:"CUDA out of memory"
+  AND NOT module:healthcheck
+  AND model_name:gpt*
+')
+  AND log_time > NOW() - INTERVAL 1 HOUR
+ORDER BY latency_ms DESC LIMIT 100;
+
+-- BM25
+SELECT request_id, error_msg, score() AS relevance
+FROM inference_logs
+WHERE search('error_msg:"memory allocation failed" OR error_msg:"CUDA error"')
+ORDER BY relevance DESC LIMIT 20;
+
+-- 在 VARIANT 内搜索
+SELECT * FROM agent_logs
+WHERE search('NESTED(steps, status:error AND tool:code_exec)');
+
+-- search + 聚合
+SELECT model_name, COUNT(*) AS error_count,
+       PERCENTILE_APPROX(latency_ms, 0.99) AS p99_latency
+FROM inference_logs
+WHERE search('level:ERROR AND error_msg:"CUDA out of memory"')
+  AND log_time > NOW() - INTERVAL 1 HOUR
+GROUP BY model_name ORDER BY error_count DESC;
+SELECT be_id, tablet_id, type, SUM(size) AS cache_bytes
+    FROM information_schema.file_cache_info
+    WHERE tablet_id = 1761571031445
+    GROUP BY be_id, tablet_id, type
+    ORDER BY cache_bytes DESC;
+SELECT * FROM S3 (
+      'uri' = 's3://your_bucket/path/to/tvf_test/test.parquet',
+      'format' = 'parquet',
+      's3.endpoint' = 's3.us-east-1.amazonaws.com',
+      's3.region' = 'us-east-1',
+      "s3.access_key" = "<your-access-key>",
+      "s3.secret_key"="<your-secret-key>"
+  )
+;
+------------------------------------------------------------------------------------------
+[SELECT] select id,name,score, k,v from table_test lateral view posexplode_outer(score) tmp as k,v order by id;
+----------
+[SELECT] -- 2.1 content 列中同时包含 keyword1 和 keyword2 的行，且 keyword2 必须紧跟在 keyword1 之后
+-- 'keyword1 keyword2'、'wordx keyword1 keyword2'、'wordx keyword1 keyword2 wordy' 都能匹配，因为它们包含 'keyword1 keyword2' 且 keyword2 紧跟在 keyword1 之后
+-- 'keyword1 wordx keyword2' 不匹配，因为 keyword1 和 keyword2 之间有其他词
+-- 'keyword2 keyword1' 不匹配，因为顺序相反
+-- 要使用 MATCH_PHRASE，需要在 PROPERTIES 中启用 "support_phrase" = "true"。
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2';
+----------
+[SELECT] -- 2.2 content 列中同时包含 keyword1 和 keyword2 的行，slop（最大词距）为 3
+-- 'keyword1 keyword2'、'keyword1 a keyword2'、'keyword1 a b c keyword2' 都能匹配，因为 slop 分别为 0、1 和 3，均在 3 以内
+-- 'keyword1 a b c d keyword2' 不匹配，因为 slop 为 4，超过了 3
+-- 'keyword2 keyword1'、'keyword2 a keyword1'、'keyword2 a b c keyword1' 也能匹配，因为当 slop > 0 时，不要求 keyword1 和 keyword2 的顺序。如需强制顺序，Doris 提供了在 slop 后加 + 号的方式
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3';
+----------
+[SELECT] -- 强制顺序，使用正号加 slop；'keyword1 a b c keyword2' 匹配，而 'keyword2 a b c keyword1' 不匹配
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3+';
+----------
+[SELECT] -- 2.3 对最后一个词 keyword2 进行前缀匹配，默认限制 50 个前缀（由会话变量 inverted_index_max_expansions 控制）
+-- 需要确保 keyword1 和 keyword2 在原始文本分词后保持相邻，中间没有其他词。
+-- 'keyword1 keyword2abc' 匹配，因为 keyword1 相同且 keyword2abc 以 keyword2 为前缀
+-- 'keyword1 keyword2' 也匹配，因为 keyword2 是 keyword2 的前缀
+-- 'keyword1 keyword3' 不匹配，因为 keyword3 不是 keyword2 的前缀
+-- 'keyword1 keyword3abc' 不匹配，因为 keyword3abc 不是 keyword2 的前缀
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1 keyword2';
+----------
+[SELECT] -- 2.4 如果仅提供一个词，默认进行前缀查询，限制 50 个前缀（由会话变量 inverted_index_max_expansions 控制）
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1';
+----------
+[SELECT] -- 2.5 对分词后的词进行正则表达式匹配，默认限制 50 个匹配（由会话变量 inverted_index_max_expansions 控制）
+-- 类似于 MATCH_PHRASE_PREFIX，但使用正则表达式代替前缀
+SELECT * FROM table_name WHERE content MATCH_REGEXP 'key.*';
+----------
+[SELECT] -- 3. 普通的等值、范围、IN 和 NOT IN 查询使用标准 SQL 语法，例如：
+SELECT * FROM table_name WHERE id = 123;
+----------
+[SELECT] SELECT * FROM table_name WHERE ts > '2023-01-01 00:00:00';
+----------
+[SELECT] SELECT * FROM table_name WHERE op_type IN ('add', 'delete');
+----------
+[SELECT] -- 4.1 keyword1 出现在 col1、col2、col3 中任意一列的行（OR 逻辑）
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'any', 'keyword1');
+----------
+[SELECT] -- 4.2 keyword1 出现在 col1、col2、col3 所有列的行（AND 逻辑）
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'all', 'keyword1');
+----------
+[SELECT] -- 4.3 精确短语 keyword1 出现在 col1、col2、col3 中任意一列的行（精确短语匹配）
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'phrase', 'keyword1');
+----------
+[SELECT] -- 4.4 以 keyword1 为前缀的短语出现在 col1、col2、col3 中任意一列的行（短语前缀匹配）
+-- 例如，会匹配 "keyword123" 这样的内容
+select * FROM table_name WHERE multi_match(col1, col2, col3, 'phrase_prefix', 'keyword1');
+----------
+[SELECT] -- 查询全部列
+SELECT * FROM tbl WHERE k1 = 1 AND k2 = 2;
+----------
+[SELECT] -- 查询部分列
+SELECT v1, v2 FROM tbl WHERE k1 = 1 AND k2 = 2;
+----------
+[SELECT] SELECT k, v1, v3, v5, v7 FROM tbl_point_query WHERE k = 100;
+----------
+[SELECT] SELECT * FROM t1 ORDER BY id;
+----------
+[SELECT] select * from test_corr order by id, k1, k2;
+----------
+[SELECT] select id, corr_welford(k1, k2) from test_corr group by id order by id;
+----------
+[SELECT] select corr_welford(k1, k2) from test_corr where id = 999;
+----------
+[SELECT] SELECT array_enumerate_uniq(NULL), array_enumerate_uniq(NULL, NULL);
+----------
+[SELECT] SELECT array_filter(x -> x >= 3, double_array) FROM array_filter_test WHERE id = 1;
+----------
+[SELECT] SELECT array_filter(x -> length(x) > 2, string_array) FROM array_filter_test WHERE id = 1;
+----------
+[SELECT] SELECT array_filter(int_array, [false, true, false, true, true]) FROM array_filter_test WHERE id = 1;
+----------
+[SELECT] SELECT array_filter([1,2,3], [true, false, true]);
+----------
+[SELECT] SELECT array_filter([1,2,3], [true, false, true, false]);
+----------
+[SELECT] SELECT array_filter([1,2,3], [true, false]);
+----------
+[SELECT] SELECT array_filter(x -> x > 0, int_array) FROM array_filter_test WHERE id = 3;
+----------
+[SELECT] SELECT array_filter(x -> x > 0, int_array) FROM array_filter_test WHERE id = 4;
+----------
+[SELECT] SELECT array_filter(x -> x is not null, [null, 1, null, 2, null]);
+----------
+[SELECT] SELECT array_filter((x, y) -> x > y, int_array, double_array) FROM array_filter_test WHERE id = 1;
+----------
+[SELECT] SELECT array_filter(x -> size(x) > 2, [[1,2], [3,4,5], [6], [7,8,9,10]]);
+----------
+[SELECT] SELECT array_filter(x -> x['a'] > 10, [{'a':5}, {'a':15}, {'a':20}]);
+----------
+[SELECT] SELECT array_filter(x -> struct_element(x, 'age') > 18, array(named_struct('name','Alice','age',20),named_struct('name','Bob','age',16),named_struct('name','Eve','age',30)));
+----------
+[SELECT] SELECT array_filter(x -> x > 0, [1,2,3], [4,5,6], [7,8,9]);
+----------
+[SELECT] SELECT array_filter((x, y) -> x > y, [1,2,3], [4,5]);
+----------
+[SELECT] SELECT array_filter(x -> x > 0, 'not_an_array');
+----------
+[SELECT] SELECT array_filter(x -> array_count(y -> y > 5, x) > 0, [[1,2,3],[4,5,6],[7,8,9]]);
+----------
+[SELECT] SELECT array_filter(x -> array_exists(y -> y > 5, x), [[1,2,3],[4,5,6]]);
+----------
+[SELECT] SELECT array_first_index((x, y) -> x > y, [1, 2, 3, 4, 5], [1.1, 2.2, 3.3, 4.4, 5.5]);
+----------
+[SELECT] SELECT hamming_distance('karolin', 'kathrin') AS distance;
+----------
+[SELECT] SELECT hamming_distance('数据库', '数据仓') AS distance;
+----------
+[SELECT] SELECT hamming_distance('Doris', 'doris') AS distance;
+----------
+[SELECT] SELECT hamming_distance(NULL, 'abc') AS distance;
+----------
+[SELECT] SELECT TRANSLATE('abcda', 'a', 'z');
+----------
+[SELECT] select url_decode('Doris+Q%26A');
+----------
+[SELECT] select URL_ENCODE('Doris Q&A');
+----------
+[SELECT] SELECT * FROM partitioned_table WHERE dt = '2024-01-01';
+----------
+[SELECT] SELECT TOKENIZE('مرحبا بالعالم Hello 世界', '"parser"="icu"');
+----------
+[SELECT] SELECT TOKENIZE('มนไมเปนไปตามความตองการ', '"parser"="icu"');
+----------
+[SELECT] SELECT TOKENIZE('中华人民共和国国歌', '"parser"="ik","parser_mode"="ik_smart"');
+----------
+[SELECT] SELECT TOKENIZE('中华人民共和国国歌', '"parser"="ik","parser_mode"="ik_max_word"');
+----------
+[SELECT] SELECT TOKENIZE('Hello World! This is a test.', '"parser"="basic"');
+----------
+[SELECT] SELECT TOKENIZE('你好世界', '"parser"="basic"');
+----------
+[SELECT] SELECT TOKENIZE('Hello 你好 World 世界', '"parser"="basic"');
+----------
+[SELECT] SELECT TOKENIZE('GET /images/hm_bg.jpg HTTP/1.0', '"parser"="basic"');
+----------
+[SELECT] SELECT TOKENIZE('12345678901234567890', '"parser"="basic"');
+----------
+[SELECT] SELECT * FROM paimon_tbl@incr('startSnapshotId'='2', 'endSnapshotId'='5');
+----------
+[SELECT] SELECT count(DISTINCT c1,c2), count(DISTINCT c2,c3), count(DISTINCT c3) FROM t;
+----------
+[SELECT] -- 词项查询
+SELECT * FROM docs WHERE search('title:apache');
+----------
+[SELECT] -- ANY：匹配任意一个值
+SELECT * FROM docs WHERE search('tags:ANY(java python golang)');
+----------
+[SELECT] -- ALL：同时包含多个值
+SELECT * FROM docs WHERE search('tags:ALL(machine learning)');
+----------
+[SELECT] -- 布尔 + 多字段
+SELECT * FROM docs
+WHERE search('(title:Doris OR content:database) AND NOT category:archived');
+----------
+[SELECT] -- 结合结构化过滤（结构化条件不参与打分）
+SELECT * FROM docs
+WHERE search('title:apache') AND publish_date >= '2025-01-01';
+----------
+[SELECT] SELECT *, score() as score 
+FROM search_demo 
+WHERE content MATCH_ANY 'search query' 
+ORDER BY score DESC 
+LIMIT 10;
+----------
+[SELECT] SELECT TOKENIZE('مرحبا بالعالم Hello 世界', '"parser"="icu"');
+----------
+[SELECT] SELECT TOKENIZE('มนไมเปนไปตามความตองการ', '"parser"="icu"');
+----------
+[SELECT] SELECT TOKENIZE('中华人民共和国国歌', '"parser"="ik","parser_mode"="ik_smart"');
+----------
+[SELECT] SELECT TOKENIZE('中华人民共和国国歌', '"parser"="ik","parser_mode"="ik_max_word"');
+----------
+[SELECT] -- 英文文本分词
+SELECT TOKENIZE('Hello World! This is a test.', '"parser"="basic"');
+----------
+[SELECT] -- 中文文本分词
+SELECT TOKENIZE('你好世界', '"parser"="basic"');
+----------
+[SELECT] -- 混合语言分词
+SELECT TOKENIZE('Hello你好World世界', '"parser"="basic"');
+----------
+[SELECT] -- 包含数字和特殊字符
+SELECT TOKENIZE('GET /images/hm_bg.jpg HTTP/1.0', '"parser"="basic"');
+----------
+[SELECT] -- 处理长数字序列
+SELECT TOKENIZE('12345678901234567890', '"parser"="basic"');
+----------
+[SELECT] SELECT *,now() as etl_time from big_view;
+----------
+[SELECT] -- TERM + PHRASE + NOT
+SELECT request_id, error_msg, latency_ms
+FROM inference_logs
+WHERE search('
+  level:ERROR
+  AND error_msg:"CUDA out of memory"
+  AND NOT module:healthcheck
+  AND model_name:gpt*
+')
+  AND log_time > NOW() - INTERVAL 1 HOUR
+ORDER BY latency_ms DESC LIMIT 100;
+----------
+[SELECT] -- BM25
+SELECT request_id, error_msg, score() AS relevance
+FROM inference_logs
+WHERE search('error_msg:"memory allocation failed" OR error_msg:"CUDA error"')
+ORDER BY relevance DESC LIMIT 20;
+----------
+[SELECT] -- 在 VARIANT 内搜索
+SELECT * FROM agent_logs
+WHERE search('NESTED(steps, status:error AND tool:code_exec)');
+----------
+[SELECT] -- search + 聚合
+SELECT model_name, COUNT(*) AS error_count,
+       PERCENTILE_APPROX(latency_ms, 0.99) AS p99_latency
+FROM inference_logs
+WHERE search('level:ERROR AND error_msg:"CUDA out of memory"')
+  AND log_time > NOW() - INTERVAL 1 HOUR
+GROUP BY model_name ORDER BY error_count DESC;
+----------
+[SELECT] SELECT be_id, tablet_id, type, SUM(size) AS cache_bytes
+    FROM information_schema.file_cache_info
+    WHERE tablet_id = 1761571031445
+    GROUP BY be_id, tablet_id, type
+    ORDER BY cache_bytes DESC;
+----------
+[SELECT|DATA_IMPORT] SELECT * FROM S3 (
+      'uri' = 's3://your_bucket/path/to/tvf_test/test.parquet',
+      'format' = 'parquet',
+      's3.endpoint' = 's3.us-east-1.amazonaws.com',
+      's3.region' = 'us-east-1',
+      "s3.access_key" = "<your-access-key>",
+      "s3.secret_key"="<your-secret-key>"
+  )

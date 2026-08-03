@@ -1,0 +1,764 @@
+DROP FUNCTION IF EXISTS py_array_sum(ARRAY<INT>);
+
+CREATE FUNCTION py_array_sum(ARRAY<INT>)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(arr):
+    """ ARRAY type in Doris corresponds to list in Python """
+    if arr is None:
+        return None
+    return sum(arr)
+$$;
+
+SELECT py_array_sum([1, 2, 3, 4, 5]) AS result; -- Result: 15
+;
+DROP FUNCTION IF EXISTS py_array_filter_positive(ARRAY<INT>);
+
+CREATE FUNCTION py_array_filter_positive(ARRAY<INT>)
+RETURNS ARRAY<INT>
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(arr):
+    if arr is None:
+        return None
+    return [x for x in arr if x > 0]
+$$;
+
+SELECT py_array_filter_positive([1, -2, 3, -4, 5]) AS result; -- Result: [1, 3, 5]
+;
+DROP FUNCTION IF EXISTS py_map_size(MAP<STRING, INT>);
+
+CREATE FUNCTION py_map_size(MAP<STRING, INT>)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(m):
+    """ MAP type in Doris corresponds to dict in Python """
+    if m is None:
+        return None
+    return len(m)
+$$;
+
+SELECT py_map_size({'a': 1, 'b': 2, 'c': 3}) AS result; -- Result: 3
+;
+DROP FUNCTION IF EXISTS py_map_get(MAP<STRING, STRING>, STRING);
+
+CREATE FUNCTION py_map_get(MAP<STRING, STRING>, STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(m, key):
+    if m is None or key is None:
+        return None
+    return m.get(key)
+$$;
+
+SELECT py_map_get({'name': 'Alice', 'age': '30'}, 'name') AS result; -- Result: Alice
+;
+DROP FUNCTION IF EXISTS py_struct_get_name(STRUCT<name: STRING, age: INT>);
+
+CREATE FUNCTION py_struct_get_name(STRUCT<name: STRING, age: INT>)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(s):
+    """ STRUCT type in Doris corresponds to dict in Python """
+    if s is None:
+        return None
+    return s.get('name')
+$$;
+
+SELECT py_struct_get_name({'Alice', 30}) AS result; -- Result: Alice
+;
+DROP FUNCTION IF EXISTS py_mask_email(STRING);
+
+CREATE FUNCTION py_mask_email(STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+def evaluate(email):
+    if email is None or '@' not in email:
+        return None
+    parts = email.split('@')
+    if len(parts[0]) <= 1:
+        return email
+    masked_user = parts[0][0] + '***'
+    return f"{masked_user}@{parts[1]}"
+$$;
+
+SELECT py_mask_email('user@example.com') AS masked; -- Result: u***@example.com
+;
+DROP FUNCTION IF EXISTS py_levenshtein_distance(STRING, STRING);
+
+CREATE FUNCTION py_levenshtein_distance(STRING, STRING)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+def evaluate(s1, s2):
+    if s1 is None or s2 is None:
+        return None
+    if len(s1) < len(s2):
+        return evaluate(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    
+    return previous_row[-1]
+$$;
+
+SELECT py_levenshtein_distance('kitten', 'sitting') AS distance; -- Result: 3
+;
+DROP FUNCTION IF EXISTS py_days_between(DATE, DATE);
+
+CREATE FUNCTION py_days_between(DATE, DATE)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+from datetime import datetime
+
+def evaluate(date1_str, date2_str):
+    if date1_str is None or date2_str is None:
+        return None
+    try:
+        d1 = datetime.strptime(str(date1_str), '%Y-%m-%d')
+        d2 = datetime.strptime(str(date2_str), '%Y-%m-%d')
+        return abs((d2 - d1).days)
+    except:
+        return None
+$$;
+
+SELECT py_days_between('2024-01-01', '2024-12-31') AS days; -- Result: 365
+;
+DROP FUNCTION IF EXISTS py_validate_id_card(STRING);
+
+CREATE FUNCTION py_validate_id_card(STRING)
+RETURNS BOOLEAN
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+def evaluate(id_card):
+    if id_card is None or len(id_card) != 18:
+        return False
+    
+    # Validate first 17 digits are numeric
+    if not id_card[:17].isdigit():
+        return False
+    
+    # Check code weights
+    weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+    check_codes = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2']
+    
+    # Calculate check code
+    total = sum(int(id_card[i]) * weights[i] for i in range(17))
+    check_code = check_codes[total % 11]
+    
+    return id_card[17].upper() == check_code
+$$;
+
+SELECT py_validate_id_card('11010519491231002X') AS is_valid; -- Result: True
+
+SELECT py_validate_id_card('110105194912310021x') AS is_valid; -- Result: False
+;
+-- Create branches
+ALTER TABLE iceberg_tbl CREATE BRANCH b1;
+-- Write data to a specific branch
+INSERT INTO iceberg_tbl@branch(b1) values(1, 2);
+-- Query data from a specific branch
+SELECT * FROM iceberg_tbl@branch(b1);
+-- 1. Create a custom token filter
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS complex_word_splitter
+PROPERTIES
+(
+    "type" = "word_delimiter",
+    "type_table" = "[. => SUBWORD_DELIM], [_ => SUBWORD_DELIM]");
+
+-- 2. Create a custom tokenizer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS complex_identifier_analyzer
+PROPERTIES
+(
+    "tokenizer" = "standard",
+    "token_filter" = "complex_word_splitter, lowercase"
+);
+
+SELECT TOKENIZE('apy217.39_202501260000026_526', '”analyzer“=” complex_identifier_analyzer“');
+-- Result:[apy]，[217]，[39]，[202501260000026]，[526]
+
+-- MATCH('apy217') or MATCH('202501260000026') can both work
+;
+-- Create a char group tokenizer for multi-valued column splitting
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS multi_value_tokenizer
+PROPERTIES
+(
+    "type" = "char_group",
+    "tokenize_on_chars" = "[|]",
+    "max_token_length" = "255"
+);
+-- Create a tokenizer for multi-valued columns
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS multi_value_analyzer
+PROPERTIES
+(
+    "tokenizer" = "multi_value_tokenizer",
+    "token_filter" = "lowercase, asciifolding"
+);
+
+SELECT tokenize('alice|123456|company', '"analyzer"="multi_value_analyzer"');
+-- Result: [alice]、[123456]、[company]
+
+-- Both MATCH_ANY('alice') and MATCH_ANY('123456') can successfully match
+;
+-- Switch to MaxCompute カタログ
+SWITCH mc;
+
+-- Insert a single row of data
+INSERT INTO mc_db.mc_tbl VALUES (val1, val2, val3, val4);
+
+-- Import data from Doris internal table to MaxCompute
+INSERT INTO mc_db.mc_tbl SELECT col1, col2 FROM internal.db1.tbl1;
+
+-- Write to specific columns
+INSERT INTO mc_db.mc_tbl(col1, col2) VALUES (val1, val2);
+
+-- Write to specific partition (you can specify only some partition columns, with the rest written dynamically)
+INSERT INTO mc_db.mc_tbl PARTITION(ds='20250201') SELECT id, name FROM internal.db1.source_tbl;
+INSERT INTO iceberg_table@branch(b1) SELECT * FROM other_table;
+INSERT OVERWRITE TABLE iceberg_table@branch(b1) SELECT * FROM other_table;
+-- Add stateless BEs into two compute groups
+ALTER SYSTEM ADD BACKEND 'be1:9050' PROPERTIES ("tag.compute_group_name" = "etl");
+ALTER SYSTEM ADD BACKEND 'be2:9050' PROPERTIES ("tag.compute_group_name" = "bi");
+ALTER SYSTEM ADD BACKEND 'be3:9050' PROPERTIES ("tag.compute_group_name" = "bi");
+
+-- Grant access
+GRANT USAGE_PRIV ON COMPUTE GROUP etl TO 'etl_user';
+GRANT USAGE_PRIV ON COMPUTE GROUP bi  TO 'bi_user';
+
+-- Set defaults (the user has to reconnect for new defaults to apply)
+SET PROPERTY FOR 'etl_user' 'default_compute_group' = 'etl';
+SET PROPERTY FOR 'bi_user'  'default_compute_group' = 'bi';
+
+-- One-off switch for the current session
+USE my_db@bi;
+SELECT region, SUM(amount) FROM orders WHERE dt = CURRENT_DATE() GROUP BY region;
+-- One-time setup on each BE: configure a cache directory.
+-- be.conf:
+--   enable_file_cache = true
+--   file_cache_path = [{"path":"/data/file_cache","total_size":107374182400}]
+
+-- Per-session toggles (defaults shown):
+SET enable_file_cache = true;
+
+-- Pre-populate the Data Cache for today's hot partition.
+WARM UP SELECT l_orderkey, l_shipmode
+FROM hive_catalog.tpch.lineitem
+WHERE l_shipdate = '2026-05-01';
+
+-- Now run the real query: it should hit cache on retries.
+SELECT l_shipmode, count(*)
+FROM hive_catalog.tpch.lineitem
+WHERE l_shipdate = '2026-05-01'
+GROUP BY l_shipmode;
+CREATE TABLE docs (
+  id INT NOT NULL,
+  embedding ARRAY<FLOAT> NOT NULL,
+  body STRING NOT NULL,
+  INDEX idx_body(body) USING INVERTED PROPERTIES("parser"="english"),
+  INDEX idx_vec(embedding) USING ANN
+    PROPERTIES("index_type"="hnsw","metric_type"="l2_distance","dim"="8")
+) DUPLICATE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 1;
+
+SELECT id, body,
+       l2_distance_approximate(embedding, [0.1,0.1,0.2,0.2,0.3,0.3,0.4,0.4]) AS dist
+FROM docs
+WHERE body MATCH_ANY 'music'   -- inverted index pre-filter
+ORDER BY dist ASC              -- ANN TopN over the filtered rows
+LIMIT 2;
+CREATE CATALOG iceberg_rest PROPERTIES (
+  'type' = 'iceberg',
+  'iceberg.catalog.type' = 'rest',
+  'uri' = 'http://rest:8181',
+  'warehouse' = 's3://lake/wh',
+  's3.endpoint' = 'http://minio:9000',
+  's3.access_key' = 'admin', 's3.secret_key' = 'password'
+);
+
+SWITCH iceberg_rest;
+CREATE DATABASE IF NOT EXISTS sales;
+CREATE TABLE sales.orders (id BIGINT, region STRING, amount DECIMAL(10,2), ts DATETIME)
+  PARTITION BY LIST (region, day(ts)) ()
+  PROPERTIES ('format-version' = '2');
+
+INSERT INTO sales.orders VALUES (1, 'bj', 99.50, '2026-05-08 10:00:00');
+ALTER TABLE sales.orders CREATE BRANCH dev;
+INSERT INTO sales.orders@branch(dev) VALUES (2, 'sh', 12.00, '2026-05-08 11:00:00');
+ALTER TABLE sales.orders EXECUTE expire_snapshots('retain_last' = '5');
+SWITCH iceberg_ctl;
+CREATE DATABASE IF NOT EXISTS sales;
+CREATE TABLE sales.orders (
+  order_id BIGINT, region STRING, amount DECIMAL(10,2), ts DATETIME
+) PARTITION BY LIST (day(ts), region) ();
+
+INSERT INTO sales.orders VALUES (1, 'bj', 99.50, '2026-05-08 10:00:00');
+ALTER TABLE sales.orders CREATE BRANCH dev;
+INSERT INTO sales.orders@branch(dev) VALUES (2, 'sh', 12.00, '2026-05-08 11:00:00');
+
+SELECT COUNT(*) FROM sales.orders;             -- main branch
+SELECT COUNT(*) FROM sales.orders@branch(dev); -- dev branch
+ALTER TABLE sales.orders EXECUTE expire_snapshots ("retain_last" = "5");
+CREATE TABLE docs (
+  id INT NOT NULL,
+  embedding ARRAY<FLOAT> NOT NULL,
+  INDEX idx_emb (embedding) USING ANN PROPERTIES(
+    "index_type" = "hnsw",
+    "metric_type" = "l2_distance",
+    "dim" = "3"
+  )
+) DUPLICATE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 1;
+
+INSERT INTO docs VALUES
+  (1, [1.0, 2.0, 3.0]),
+  (2, [0.5, 2.1, 2.9]),
+  (3, [10.0, 10.0, 10.0]);
+
+SELECT id, l2_distance_approximate(embedding, [1.0, 2.0, 3.0]) AS dist
+FROM docs ORDER BY dist LIMIT 3;
+------------------------------------------------------------------------------------------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_array_sum(ARRAY<INT>);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_array_sum(ARRAY<INT>)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(arr):
+    """ ARRAY type in Doris corresponds to list in Python """
+    if arr is None:
+        return None
+    return sum(arr)
+$$;
+----------
+[SELECT] SELECT py_array_sum([1, 2, 3, 4, 5]) AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_array_filter_positive(ARRAY<INT>);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_array_filter_positive(ARRAY<INT>)
+RETURNS ARRAY<INT>
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(arr):
+    if arr is None:
+        return None
+    return [x for x in arr if x > 0]
+$$;
+----------
+[SELECT] SELECT py_array_filter_positive([1, -2, 3, -4, 5]) AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_map_size(MAP<STRING, INT>);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_map_size(MAP<STRING, INT>)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(m):
+    """ MAP type in Doris corresponds to dict in Python """
+    if m is None:
+        return None
+    return len(m)
+$$;
+----------
+[SELECT] SELECT py_map_size({'a': 1, 'b': 2, 'c': 3}) AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_map_get(MAP<STRING, STRING>, STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_map_get(MAP<STRING, STRING>, STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(m, key):
+    if m is None or key is None:
+        return None
+    return m.get(key)
+$$;
+----------
+[SELECT] SELECT py_map_get({'name': 'Alice', 'age': '30'}, 'name') AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_struct_get_name(STRUCT<name: STRING, age: INT>);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_struct_get_name(STRUCT<name: STRING, age: INT>)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true"
+)
+AS $$
+def evaluate(s):
+    """ STRUCT type in Doris corresponds to dict in Python """
+    if s is None:
+        return None
+    return s.get('name')
+$$;
+----------
+[SELECT] SELECT py_struct_get_name({'Alice', 30}) AS result;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_mask_email(STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_mask_email(STRING)
+RETURNS STRING
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+def evaluate(email):
+    if email is None or '@' not in email:
+        return None
+    parts = email.split('@')
+    if len(parts[0]) <= 1:
+        return email
+    masked_user = parts[0][0] + '***'
+    return f"{masked_user}@{parts[1]}"
+$$;
+----------
+[SELECT] SELECT py_mask_email('user@example.com') AS masked;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_levenshtein_distance(STRING, STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_levenshtein_distance(STRING, STRING)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+def evaluate(s1, s2):
+    if s1 is None or s2 is None:
+        return None
+    if len(s1) < len(s2):
+        return evaluate(s2, s1)
+    if len(s2) == 0:
+        return len(s1)
+    
+    previous_row = range(len(s2) + 1)
+    for i, c1 in enumerate(s1):
+        current_row = [i + 1]
+        for j, c2 in enumerate(s2):
+            insertions = previous_row[j + 1] + 1
+            deletions = current_row[j] + 1
+            substitutions = previous_row[j] + (c1 != c2)
+            current_row.append(min(insertions, deletions, substitutions))
+        previous_row = current_row
+    
+    return previous_row[-1]
+$$;
+----------
+[SELECT] SELECT py_levenshtein_distance('kitten', 'sitting') AS distance;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_days_between(DATE, DATE);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_days_between(DATE, DATE)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+from datetime import datetime
+
+def evaluate(date1_str, date2_str):
+    if date1_str is None or date2_str is None:
+        return None
+    try:
+        d1 = datetime.strptime(str(date1_str), '%Y-%m-%d')
+        d2 = datetime.strptime(str(date2_str), '%Y-%m-%d')
+        return abs((d2 - d1).days)
+    except:
+        return None
+$$;
+----------
+[SELECT] SELECT py_days_between('2024-01-01', '2024-12-31') AS days;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION IF EXISTS py_validate_id_card(STRING);
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION py_validate_id_card(STRING)
+RETURNS BOOLEAN
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "symbol" = "evaluate",
+    "runtime_version" = "3.10.12"
+)
+AS $$
+def evaluate(id_card):
+    if id_card is None or len(id_card) != 18:
+        return False
+    
+    # Validate first 17 digits are numeric
+    if not id_card[:17].isdigit():
+        return False
+    
+    # Check code weights
+    weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2]
+    check_codes = ['1', '0', 'X', '9', '8', '7', '6', '5', '4', '3', '2']
+    
+    # Calculate check code
+    total = sum(int(id_card[i]) * weights[i] for i in range(17))
+    check_code = check_codes[total % 11]
+    
+    return id_card[17].upper() == check_code
+$$;
+----------
+[SELECT] SELECT py_validate_id_card('11010519491231002X') AS is_valid;
+----------
+[SELECT] SELECT py_validate_id_card('110105194912310021x') AS is_valid;
+----------
+[ALTER_TABLE] -- Create branches
+ALTER TABLE iceberg_tbl CREATE BRANCH b1;
+----------
+[INSERT] -- Write data to a specific branch
+INSERT INTO iceberg_tbl@branch(b1) values(1, 2);
+----------
+[SELECT] -- Query data from a specific branch
+SELECT * FROM iceberg_tbl@branch(b1);
+----------
+[SYSTEM_SETTING_WRITE] -- 1. Create a custom token filter
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS complex_word_splitter
+PROPERTIES
+(
+    "type" = "word_delimiter",
+    "type_table" = "[. => SUBWORD_DELIM], [_ => SUBWORD_DELIM]");
+----------
+[SYSTEM_SETTING_WRITE] -- 2. Create a custom tokenizer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS complex_identifier_analyzer
+PROPERTIES
+(
+    "tokenizer" = "standard",
+    "token_filter" = "complex_word_splitter, lowercase"
+);
+----------
+[SELECT] SELECT TOKENIZE('apy217.39_202501260000026_526', '”analyzer“=” complex_identifier_analyzer“');
+----------
+[SYSTEM_SETTING_WRITE] -- Create a char group tokenizer for multi-valued column splitting
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS multi_value_tokenizer
+PROPERTIES
+(
+    "type" = "char_group",
+    "tokenize_on_chars" = "[|]",
+    "max_token_length" = "255"
+);
+----------
+[SYSTEM_SETTING_WRITE] -- Create a tokenizer for multi-valued columns
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS multi_value_analyzer
+PROPERTIES
+(
+    "tokenizer" = "multi_value_tokenizer",
+    "token_filter" = "lowercase, asciifolding"
+);
+----------
+[SELECT] SELECT tokenize('alice|123456|company', '"analyzer"="multi_value_analyzer"');
+----------
+[SWITCH_CATALOG] -- Switch to MaxCompute カタログ
+SWITCH mc;
+----------
+[INSERT] -- Insert a single row of data
+INSERT INTO mc_db.mc_tbl VALUES (val1, val2, val3, val4);
+----------
+[INSERT|SELECT] -- Import data from Doris internal table to MaxCompute
+INSERT INTO mc_db.mc_tbl SELECT col1, col2 FROM internal.db1.tbl1;
+----------
+[INSERT] -- Write to specific columns
+INSERT INTO mc_db.mc_tbl(col1, col2) VALUES (val1, val2);
+----------
+[INSERT|SELECT] -- Write to specific partition (you can specify only some partition columns, with the rest written dynamically)
+INSERT INTO mc_db.mc_tbl PARTITION(ds='20250201') SELECT id, name FROM internal.db1.source_tbl;
+----------
+[INSERT|SELECT] INSERT INTO iceberg_table@branch(b1) SELECT * FROM other_table;
+----------
+[MERGE|SELECT] INSERT OVERWRITE TABLE iceberg_table@branch(b1) SELECT * FROM other_table;
+----------
+[ADMIN] -- Add stateless BEs into two compute groups
+ALTER SYSTEM ADD BACKEND 'be1:9050' PROPERTIES ("tag.compute_group_name" = "etl");
+----------
+[ADMIN] ALTER SYSTEM ADD BACKEND 'be2:9050' PROPERTIES ("tag.compute_group_name" = "bi");
+----------
+[ADMIN] ALTER SYSTEM ADD BACKEND 'be3:9050' PROPERTIES ("tag.compute_group_name" = "bi");
+----------
+[GRANT] -- Grant access
+GRANT USAGE_PRIV ON COMPUTE GROUP etl TO 'etl_user';
+----------
+[GRANT] GRANT USAGE_PRIV ON COMPUTE GROUP bi  TO 'bi_user';
+----------
+[ALTER_USER] -- Set defaults (the user has to reconnect for new defaults to apply)
+SET PROPERTY FOR 'etl_user' 'default_compute_group' = 'etl';
+----------
+[ALTER_USER] SET PROPERTY FOR 'bi_user'  'default_compute_group' = 'bi';
+----------
+[ADMIN_RESOURCE_GROUP] -- One-off switch for the current session
+USE my_db@bi;
+----------
+[SELECT] SELECT region, SUM(amount) FROM orders WHERE dt = CURRENT_DATE() GROUP BY region;
+----------
+[SESSION_SETTING_WRITE] -- Per-session toggles (defaults shown):
+SET enable_file_cache = true;
+----------
+[ADMIN_PERFORMANCE] -- Pre-populate the Data Cache for today's hot partition.
+WARM UP SELECT l_orderkey, l_shipmode
+FROM hive_catalog.tpch.lineitem
+WHERE l_shipdate = '2026-05-01';
+----------
+[SELECT] -- Now run the real query: it should hit cache on retries.
+SELECT l_shipmode, count(*)
+FROM hive_catalog.tpch.lineitem
+WHERE l_shipdate = '2026-05-01'
+GROUP BY l_shipmode;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE docs (
+  id INT NOT NULL,
+  embedding ARRAY<FLOAT> NOT NULL,
+  body STRING NOT NULL,
+  INDEX idx_body(body) USING INVERTED PROPERTIES("parser"="english"),
+  INDEX idx_vec(embedding) USING ANN
+    PROPERTIES("index_type"="hnsw","metric_type"="l2_distance","dim"="8")
+) DUPLICATE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 1;
+----------
+[SELECT] SELECT id, body,
+       l2_distance_approximate(embedding, [0.1,0.1,0.2,0.2,0.3,0.3,0.4,0.4]) AS dist
+FROM docs
+WHERE body MATCH_ANY 'music'   -- inverted index pre-filter
+ORDER BY dist ASC              -- ANN TopN over the filtered rows
+LIMIT 2;
+----------
+[CREATE_CATALOG] CREATE CATALOG iceberg_rest PROPERTIES (
+  'type' = 'iceberg',
+  'iceberg.catalog.type' = 'rest',
+  'uri' = 'http://rest:8181',
+  'warehouse' = 's3://lake/wh',
+  's3.endpoint' = 'http://minio:9000',
+  's3.access_key' = 'admin', 's3.secret_key' = 'password'
+);
+----------
+[SWITCH_CATALOG] SWITCH iceberg_rest;
+----------
+[CREATE_SCHEMA] CREATE DATABASE IF NOT EXISTS sales;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE sales.orders (id BIGINT, region STRING, amount DECIMAL(10,2), ts DATETIME)
+  PARTITION BY LIST (region, day(ts)) ()
+  PROPERTIES ('format-version' = '2');
+----------
+[INSERT] INSERT INTO sales.orders VALUES (1, 'bj', 99.50, '2026-05-08 10:00:00');
+----------
+[ALTER_TABLE] ALTER TABLE sales.orders CREATE BRANCH dev;
+----------
+[INSERT] INSERT INTO sales.orders@branch(dev) VALUES (2, 'sh', 12.00, '2026-05-08 11:00:00');
+----------
+[ADMIN_TABLE] ALTER TABLE sales.orders EXECUTE expire_snapshots('retain_last' = '5');
+----------
+[SWITCH_CATALOG] SWITCH iceberg_ctl;
+----------
+[CREATE_SCHEMA] CREATE DATABASE IF NOT EXISTS sales;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE sales.orders (
+  order_id BIGINT, region STRING, amount DECIMAL(10,2), ts DATETIME
+) PARTITION BY LIST (day(ts), region) ();
+----------
+[INSERT] INSERT INTO sales.orders VALUES (1, 'bj', 99.50, '2026-05-08 10:00:00');
+----------
+[ALTER_TABLE] ALTER TABLE sales.orders CREATE BRANCH dev;
+----------
+[INSERT] INSERT INTO sales.orders@branch(dev) VALUES (2, 'sh', 12.00, '2026-05-08 11:00:00');
+----------
+[SELECT] SELECT COUNT(*) FROM sales.orders;
+----------
+[SELECT] -- main branch
+SELECT COUNT(*) FROM sales.orders@branch(dev);
+----------
+[ADMIN_TABLE] -- dev branch
+ALTER TABLE sales.orders EXECUTE expire_snapshots ("retain_last" = "5");
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE docs (
+  id INT NOT NULL,
+  embedding ARRAY<FLOAT> NOT NULL,
+  INDEX idx_emb (embedding) USING ANN PROPERTIES(
+    "index_type" = "hnsw",
+    "metric_type" = "l2_distance",
+    "dim" = "3"
+  )
+) DUPLICATE KEY(id) DISTRIBUTED BY HASH(id) BUCKETS 1;
+----------
+[INSERT] INSERT INTO docs VALUES
+  (1, [1.0, 2.0, 3.0]),
+  (2, [0.5, 2.1, 2.9]),
+  (3, [10.0, 10.0, 10.0]);
+----------
+[SELECT] SELECT id, l2_distance_approximate(embedding, [1.0, 2.0, 3.0]) AS dist
+FROM docs ORDER BY dist LIMIT 3;

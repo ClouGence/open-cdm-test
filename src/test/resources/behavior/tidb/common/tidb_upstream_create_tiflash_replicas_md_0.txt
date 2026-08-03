@@ -1,0 +1,250 @@
+[alter_table__common_tidb_upstream_create_tiflash_replicas_md_0_000]
+sql:
+ALTER TABLE t SET TIFLASH REPLICA 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:13) /test/1/catalog1/schema1/t/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[metadata__common_tidb_upstream_create_tiflash_replicas_md_0_001]
+sql:
+SELECT * FROM information_schema.tiflash_replica WHERE TABLE_SCHEMA = '<db_name>';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Table(1:14~1:48) /test/1/catalog1/information_schema/tiflash_replica/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[metadata__common_tidb_upstream_create_tiflash_replicas_md_0_002]
+sql:
+-- Non-partitioned table
+    SELECT table_id, p.store_id, address, COUNT(p.region_id)
+    FROM
+      information_schema.tikv_region_status r,
+      information_schema.tikv_region_peers p,
+      information_schema.tikv_store_status s
+    WHERE
+      r.db_name = 'test'
+      AND r.table_name = 'table_to_check'
+      AND r.region_id = p.region_id
+      AND p.store_id = s.store_id
+      AND JSON_EXTRACT(s.label, '$[0].value') = 'tiflash'
+    GROUP BY table_id, p.store_id, address;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Function(2:42~2:47) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:6~4:43) /test/1/catalog1/information_schema/tikv_region_status/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:6~5:42) /test/1/catalog1/information_schema/tikv_region_peers/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:6~6:42) /test/1/catalog1/information_schema/tikv_store_status/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(12:10~12:22) /test/1/catalog1/schema1/JSON_EXTRACT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[unknown__common_tidb_upstream_create_tiflash_replicas_md_0_003]
+sql:
+SET CONFIG tiflash `raftstore-proxy.server.snap-io-max-bytes-per-sec` = '300MiB';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "UNKNOWN": []
+}
+
+----------
+[metadata__common_tidb_upstream_create_tiflash_replicas_md_0_004]
+sql:
+-- Partitioned table
+    SELECT table_id, r.partition_name, p.store_id, address, COUNT(p.region_id)
+    FROM
+      information_schema.tikv_region_status r,
+      information_schema.tikv_region_peers p,
+      information_schema.tikv_store_status s
+    WHERE
+      r.db_name = 'test'
+      AND r.table_name = 'table_to_check'
+      AND r.partition_name LIKE 'p202312%'
+      AND r.region_id = p.region_id
+      AND p.store_id = s.store_id
+      AND JSON_EXTRACT(s.label, '$[0].value') = 'tiflash'
+    GROUP BY table_id, r.partition_name, p.store_id, address
+    ORDER BY table_id, r.partition_name, p.store_id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Function(2:60~2:65) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:6~4:43) /test/1/catalog1/information_schema/tikv_region_status/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:6~5:42) /test/1/catalog1/information_schema/tikv_region_peers/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:6~6:42) /test/1/catalog1/information_schema/tikv_store_status/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(13:10~13:22) /test/1/catalog1/schema1/JSON_EXTRACT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[unknown__common_tidb_upstream_create_tiflash_replicas_md_0_005]
+sql:
+SET CONFIG tikv `server.snap-io-max-bytes-per-sec` = '100MiB';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "UNKNOWN": []
+}
+
+----------
+[unknown__common_tidb_upstream_create_tiflash_replicas_md_0_006]
+sql:
+-- The default value for both configurations are 100MiB, i.e. the maximum disk bandwidth used for writing snapshots is no more than 100MiB/s.
+    SET CONFIG tikv `server.snap-io-max-bytes-per-sec` = '300MiB';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "UNKNOWN": []
+}
+
+----------
+[metadata__common_tidb_upstream_create_tiflash_replicas_md_0_007]
+sql:
+SELECT * FROM information_schema.tiflash_replica WHERE TABLE_SCHEMA = '<db_name>' and TABLE_NAME = '<table_name>';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Table(1:14~1:48) /test/1/catalog1/information_schema/tiflash_replica/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[metadata__common_tidb_upstream_create_tiflash_replicas_md_0_008]
+sql:
+SELECT TABLE_NAME FROM information_schema.tables where TABLE_SCHEMA = "<db_name>" and TABLE_NAME not in (SELECT TABLE_NAME FROM information_schema.tiflash_replica where TABLE_SCHEMA = "<db_name>");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Table(1:23~1:48) /test/1/catalog1/information_schema/tables/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:128~1:162) /test/1/catalog1/information_schema/tiflash_replica/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[alter_table__common_tidb_upstream_create_tiflash_replicas_md_0_009]
+sql:
+ALTER TABLE `tpch50`.`lineitem` SET TIFLASH REPLICA 0;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/tpch50/lineitem/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[alter_table__common_tidb_upstream_create_tiflash_replicas_md_0_010]
+sql:
+ALTER TABLE `tpch50`.`lineitem` SET TIFLASH REPLICA 2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/tpch50/lineitem/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[unknown__common_tidb_upstream_create_tiflash_replicas_md_0_011]
+sql:
+SET CONFIG tiflash `raftstore-proxy.server.snap-io-max-bytes-per-sec` = '100MiB';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "UNKNOWN": []
+}
+
+----------
+[create_table__common_tidb_upstream_create_tiflash_replicas_md_0_012]
+sql:
+CREATE TABLE table_name like t;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:23) /test/1/catalog1/schema1/table_name/",
+      "action" : "CREATE",
+      "target" : "Table(1:29~1:30) /test/1/catalog1/schema1/t/"
+    }
+  ]
+}

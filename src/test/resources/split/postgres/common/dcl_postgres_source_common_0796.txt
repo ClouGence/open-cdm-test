@@ -1,0 +1,66 @@
+EXECUTE getDomainConstraints('35546')
+;
+EXECUTE dumpFunc('36450')
+;
+copy copy_default from stdin with (default '\N')
+;
+ROLLBACK TO SAVEPOINT rescue_me
+;
+-- exercise special code paths for huge tuples (note use of non-strict
+-- expression and left join required to get the detoasted tuple into
+-- the hash table)
+
+-- parallel with parallel-aware hash join (hits ExecParallelHashLoadTuple and
+-- sts_puttuple oversized tuple cases because it's multi-batch)
+savepoint settings
+;
+-- fail because we're creating a slot while in a subxact whose topxact has an xid
+BEGIN
+;
+ALTER TABLE public.xacttest OWNER TO zyc
+;
+DROP OWNED BY regress_dep_user0, regress_dep_user2
+;
+EXECUTE dumpOpr('514')
+;
+-- spilling subxact, containing a not spilling subxact
+BEGIN
+;
+------------------------------------------------------------------------------------------
+[UNSAFE] EXECUTE getDomainConstraints('35546')
+;
+----------
+[UNSAFE] EXECUTE dumpFunc('36450')
+;
+----------
+[DATA_IMPORT] copy copy_default from stdin with (default '\N')
+;
+----------
+[TRANSACTION] ROLLBACK TO SAVEPOINT rescue_me
+;
+----------
+[TRANSACTION] -- exercise special code paths for huge tuples (note use of non-strict
+-- expression and left join required to get the detoasted tuple into
+-- the hash table)
+
+-- parallel with parallel-aware hash join (hits ExecParallelHashLoadTuple and
+-- sts_puttuple oversized tuple cases because it's multi-batch)
+savepoint settings
+;
+----------
+[TRANSACTION] -- fail because we're creating a slot while in a subxact whose topxact has an xid
+BEGIN
+;
+----------
+[TRANSFER_PRIVILEGE] ALTER TABLE public.xacttest OWNER TO zyc
+;
+----------
+[REVOKE] DROP OWNED BY regress_dep_user0, regress_dep_user2
+;
+----------
+[UNSAFE] EXECUTE dumpOpr('514')
+;
+----------
+[TRANSACTION] -- spilling subxact, containing a not spilling subxact
+BEGIN
+;

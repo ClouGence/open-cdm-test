@@ -1,0 +1,512 @@
+SELECT JSON_VALUE(jsonb '1', '$' EMPTY ON ERROR)
+;
+SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING varchar)
+;
+SELECT JSON_VALUE(jsonb '1', 'lax $.a' DEFAULT 2 ON ERROR)
+;
+-- Parent columns xx1, xx appear before NESTED ones
+SELECT sub.* FROM s,
+	(VALUES (23)) x(x), generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y COLUMNS (
+		NESTED PATH '$.a.za[2]' COLUMNS (
+			NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$')),
+			NESTED PATH '$.a.za[1]' columns (d int[] PATH '$.z21'),
+			NESTED PATH '$.a.za[0]' columns (NESTED PATH '$.z1[*]' as z1 COLUMNS (a int PATH  '$')),
+			xx1 int PATH '$.c',
+			NESTED PATH '$.a.za[1]'  columns (NESTED PATH '$.z21[*]' as z21 COLUMNS (b int PATH '$')),
+			xx int PATH '$.c'
+	)) sub
+;
+SELECT JSON_QUERY(jsonb'{"rec": "{1,2,3}"}', '$.rec' returning int[] omit quotes)
+;
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int PATH 'lax $.a' ERROR ON EMPTY) ERROR ON ERROR) jt
+;
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' KEEP QUOTES ON SCALAR STRING))
+;
+SELECT JSON_VALUE(jsonb 'null', '$' RETURNING sqljsonb_int_not_null ERROR ON ERROR)
+;
+WITH m AS (
+    MERGE INTO sq_target t
+    USING sq_source s
+    ON tid = sid
+    WHEN MATCHED AND tid >= 2 THEN
+        UPDATE SET balance = t.balance + delta
+    WHEN NOT MATCHED THEN
+        INSERT (balance, tid) VALUES (balance + delta, sid)
+    WHEN MATCHED AND tid < 2 THEN
+        DELETE
+    RETURNING merge_action() AS action, t.*,
+              CASE merge_action()
+                  WHEN 'INSERT' THEN 'Inserted '||t
+                  WHEN 'UPDATE' THEN 'Added '||delta||' to balance'
+                  WHEN 'DELETE' THEN 'Removed '||t
+              END AS description
+), m2 AS (
+    MERGE INTO sq_target_merge_log l
+    USING m
+    ON l.tid = m.tid
+    WHEN MATCHED THEN
+        UPDATE SET last_change = description
+    WHEN NOT MATCHED THEN
+        INSERT VALUES (m.tid, description)
+    RETURNING action, merge_action() AS log_action, l.*
+)
+SELECT * FROM m2
+;
+SELECT JSON_VALUE(jsonb '["1"]', '$[*]' RETURNING int FORMAT JSON)
+;
+VALUES (CAST('1978-07-07 19:38 America/New_York' AS TIMESTAMP WITH TIME ZONE) AT LOCAL)
+;
+SELECT JSON_VALUE(jsonb '{}', '$' ERROR ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1234', '$' RETURNING queryfuncs_d_varbit3  DEFAULT '010' ON ERROR)
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a json EXISTS PATH '$.a'))
+;
+SELECT JSON_EXISTS(jsonb '{"a": 1, "b": 2}', '$.* ? (@ > $x)' PASSING 1 AS x)
+;
+SELECT sub.* FROM s,
+	(VALUES (23)) x(x),
+	generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y
+	COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[1]'
+			COLUMNS (NESTED PATH '$.z21[*]' COLUMNS (b int PATH '$')),
+		NESTED PATH '$.a.za[1] ? (@.z21[*] >= ($"x"-1))' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" + 3))' as z22 COLUMNS (a int PATH '$ ? (@ >= ($"y" + 12))')),
+		NESTED PATH '$.a.za[1]' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" +121))' as z21 COLUMNS (c int PATH '$ ? (@ > ($"x" +111))'))
+	)) sub
+;
+select json ( '   1   ' :: json with unique keys ) into json
+;
+SELECT JSON_VALUE(jsonb '1', 'lax $.a' DEFAULT '2' ON EMPTY)
+;
+SELECT sub.* FROM s,
+	(values(23)) x(x),
+	generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y
+	COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[2]' COLUMNS (NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$')),
+		NESTED PATH '$.a.za[1]' COLUMNS (d json PATH '$ ? (@.z21[*] == ($"x" -1))'),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' as z1 COLUMNS (a int PATH '$')),
+		NESTED PATH '$.a.za[1]' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" +121))' as z21 COLUMNS (b int PATH '$ ? (@ > ($"x" +111))' DEFAULT 0 ON EMPTY))
+	)) sub
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING json FORMAT JSON)
+;
+--duplicated column name
+SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' COLUMNS (js2 int path '$', js2 int path '$'))
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' NULL ON EMPTY)
+;
+SELECT JSON_EXISTS(jsonb '{"a": 1, "b": 2}', '$.* ? (@ > $x && @ < $y)' PASSING 0 AS x, 1 AS y)
+;
+SELECT JSON_QUERY(jsonb 'null', '$xy' PASSING 1 AS xyz)
+;
+SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$' AS a
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS a
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+SELECT JSON_QUERY(jsonb'{"rec": "{1,2,3}"}', '$.rec' returning int[] keep quotes)
+;
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int2 error on error)
+;
+-- error
+SELECT JSON_VALUE('{"a": "A"}', '$.a' RETURNING d1 DEFAULT 'C' COLLATE "C" ON EMPTY) = 'a'
+;
+SELECT * FROM JSON_TABLE(NULL::jsonb, '$' COLUMNS (foo int)) bar
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING text FORMAT JSON)
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING jsonb FORMAT JSON)
+;
+SELECT
+	x,
+	JSON_VALUE(
+		jsonb '{"a": 1, "b": 2}',
+		'$.* ? (@ > $x)' PASSING x AS x
+		RETURNING int
+		DEFAULT -1 ON EMPTY
+		DEFAULT -2 ON ERROR
+	) y
+FROM
+	generate_series(0, 2) x
+;
+SELECT JSON_QUERY(jsonb '["1"]', '$[*]' WITH UNCONDITIONAL WRAPPER KEEP QUOTES)
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a char(3) EXISTS PATH '$.a'))
+;
+SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING bytea)
+;
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::oid[]::int[] ON ERROR)
+;
+SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') DEFAULT 1 ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '[1,2]', 'strict $[$off]' PASSING 1 AS off RETURNING int) AS value_with_passing
+;
+SELECT JSON_VALUE(jsonb '1', 'lax $.a' ERROR ON ERROR)
+;
+SELECT JSON_EXISTS(jsonb '1', 'strict $.a' ERROR ON ERROR)
+;
+SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' COLUMNS (js2 int path '$', js2 int path '$'))
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int4 EXISTS PATH '$.a' ERROR ON ERROR))
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text KEEP QUOTES)
+;
+SELECT * FROM JSON_TABLE(jsonb '123', '$'
+	COLUMNS (item int PATH '$', foo int)) bar
+;
+SELECT
+	JSON_QUERY(js, 'strict $[*]') AS "unspec",
+	JSON_QUERY(js, 'strict $[*]' WITHOUT WRAPPER) AS "without",
+	JSON_QUERY(js, 'strict $[*]' WITH CONDITIONAL WRAPPER) AS "with cond",
+	JSON_QUERY(js, 'strict $[*]' WITH UNCONDITIONAL ARRAY WRAPPER) AS "with uncond",
+	JSON_QUERY(js, 'strict $[*]' WITH ARRAY WRAPPER) AS "with"
+FROM
+	(VALUES
+		(jsonb '1'),
+		('[]'),
+		('[null]'),
+		('[12.3]'),
+		('[true]'),
+		('["aaa"]'),
+		('[[1, 2, 3]]'),
+		('[{"a": 1, "b": [2]}]'),
+		('[1, "2", null, [3]]')
+	) foo(js)
+;
+-- Regular "unformatted" columns
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$',
+			"char(4)" char(4) PATH '$',
+			"bool" bool PATH '$',
+			"numeric" numeric PATH '$',
+			"domain" jsonb_test_domain PATH '$',
+			js json PATH '$',
+			jb jsonb PATH '$'
+		)
+	) jt
+	ON true
+;
+-- JSON_TABLE() with alias
+EXPLAIN (COSTS OFF, VERBOSE)
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$'
+	)) json_table_func
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text OMIT QUOTES)
+;
+-- error
+SELECT sub.* FROM s,
+	JSON_TABLE(js, '$' PASSING 32 AS x, 13 AS y COLUMNS (
+		xx int path '$.c',
+		NESTED PATH '$.a.za[1]' columns (NESTED PATH '$.z21[*]' COLUMNS (z21 int path '$?(@ >= $"x")' ERROR ON ERROR))
+	)) sub
+;
+SELECT JSON_VALUE(jsonb '{"d1": "H"}', '$.a2' RETURNING queryfuncs_test_domain DEFAULT '"foo1"'::jsonb::text ON EMPTY)
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT JSON_VALUE(jsonb '1', '$' EMPTY ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING varchar)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'lax $.a' DEFAULT 2 ON ERROR)
+;
+----------
+[SELECT] -- Parent columns xx1, xx appear before NESTED ones
+SELECT sub.* FROM s,
+	(VALUES (23)) x(x), generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y COLUMNS (
+		NESTED PATH '$.a.za[2]' COLUMNS (
+			NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$')),
+			NESTED PATH '$.a.za[1]' columns (d int[] PATH '$.z21'),
+			NESTED PATH '$.a.za[0]' columns (NESTED PATH '$.z1[*]' as z1 COLUMNS (a int PATH  '$')),
+			xx1 int PATH '$.c',
+			NESTED PATH '$.a.za[1]'  columns (NESTED PATH '$.z21[*]' as z21 COLUMNS (b int PATH '$')),
+			xx int PATH '$.c'
+	)) sub
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb'{"rec": "{1,2,3}"}', '$.rec' returning int[] omit quotes)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int PATH 'lax $.a' ERROR ON EMPTY) ERROR ON ERROR) jt
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' KEEP QUOTES ON SCALAR STRING))
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$' RETURNING sqljsonb_int_not_null ERROR ON ERROR)
+;
+----------
+[SELECT|MERGE] WITH m AS (
+    MERGE INTO sq_target t
+    USING sq_source s
+    ON tid = sid
+    WHEN MATCHED AND tid >= 2 THEN
+        UPDATE SET balance = t.balance + delta
+    WHEN NOT MATCHED THEN
+        INSERT (balance, tid) VALUES (balance + delta, sid)
+    WHEN MATCHED AND tid < 2 THEN
+        DELETE
+    RETURNING merge_action() AS action, t.*,
+              CASE merge_action()
+                  WHEN 'INSERT' THEN 'Inserted '||t
+                  WHEN 'UPDATE' THEN 'Added '||delta||' to balance'
+                  WHEN 'DELETE' THEN 'Removed '||t
+              END AS description
+), m2 AS (
+    MERGE INTO sq_target_merge_log l
+    USING m
+    ON l.tid = m.tid
+    WHEN MATCHED THEN
+        UPDATE SET last_change = description
+    WHEN NOT MATCHED THEN
+        INSERT VALUES (m.tid, description)
+    RETURNING action, merge_action() AS log_action, l.*
+)
+SELECT * FROM m2
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '["1"]', '$[*]' RETURNING int FORMAT JSON)
+;
+----------
+[SELECT] VALUES (CAST('1978-07-07 19:38 America/New_York' AS TIMESTAMP WITH TIME ZONE) AT LOCAL)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '{}', '$' ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1234', '$' RETURNING queryfuncs_d_varbit3  DEFAULT '010' ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a json EXISTS PATH '$.a'))
+;
+----------
+[SELECT] SELECT JSON_EXISTS(jsonb '{"a": 1, "b": 2}', '$.* ? (@ > $x)' PASSING 1 AS x)
+;
+----------
+[SELECT] SELECT sub.* FROM s,
+	(VALUES (23)) x(x),
+	generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y
+	COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[1]'
+			COLUMNS (NESTED PATH '$.z21[*]' COLUMNS (b int PATH '$')),
+		NESTED PATH '$.a.za[1] ? (@.z21[*] >= ($"x"-1))' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" + 3))' as z22 COLUMNS (a int PATH '$ ? (@ >= ($"y" + 12))')),
+		NESTED PATH '$.a.za[1]' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" +121))' as z21 COLUMNS (c int PATH '$ ? (@ > ($"x" +111))'))
+	)) sub
+;
+----------
+[SELECT] select json ( '   1   ' :: json with unique keys ) into json
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'lax $.a' DEFAULT '2' ON EMPTY)
+;
+----------
+[SELECT] SELECT sub.* FROM s,
+	(values(23)) x(x),
+	generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y
+	COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[2]' COLUMNS (NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$')),
+		NESTED PATH '$.a.za[1]' COLUMNS (d json PATH '$ ? (@.z21[*] == ($"x" -1))'),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' as z1 COLUMNS (a int PATH '$')),
+		NESTED PATH '$.a.za[1]' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" +121))' as z21 COLUMNS (b int PATH '$ ? (@ > ($"x" +111))' DEFAULT 0 ON EMPTY))
+	)) sub
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING json FORMAT JSON)
+;
+----------
+[SELECT] --duplicated column name
+SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' COLUMNS (js2 int path '$', js2 int path '$'))
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' NULL ON EMPTY)
+;
+----------
+[SELECT] SELECT JSON_EXISTS(jsonb '{"a": 1, "b": 2}', '$.* ? (@ > $x && @ < $y)' PASSING 0 AS x, 1 AS y)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$xy' PASSING 1 AS xyz)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$' AS a
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS a
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb'{"rec": "{1,2,3}"}', '$.rec' returning int[] keep quotes)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int2 error on error)
+;
+----------
+[SELECT] -- error
+SELECT JSON_VALUE('{"a": "A"}', '$.a' RETURNING d1 DEFAULT 'C' COLLATE "C" ON EMPTY) = 'a'
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(NULL::jsonb, '$' COLUMNS (foo int)) bar
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING text FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING jsonb FORMAT JSON)
+;
+----------
+[SELECT] SELECT
+	x,
+	JSON_VALUE(
+		jsonb '{"a": 1, "b": 2}',
+		'$.* ? (@ > $x)' PASSING x AS x
+		RETURNING int
+		DEFAULT -1 ON EMPTY
+		DEFAULT -2 ON ERROR
+	) y
+FROM
+	generate_series(0, 2) x
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '["1"]', '$[*]' WITH UNCONDITIONAL WRAPPER KEEP QUOTES)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a char(3) EXISTS PATH '$.a'))
+;
+----------
+[SELECT] SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING bytea)
+;
+----------
+[SELECT] SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::oid[]::int[] ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') DEFAULT 1 ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '[1,2]', 'strict $[$off]' PASSING 1 AS off RETURNING int) AS value_with_passing
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'lax $.a' ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_EXISTS(jsonb '1', 'strict $.a' ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' COLUMNS (js2 int path '$', js2 int path '$'))
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int4 EXISTS PATH '$.a' ERROR ON ERROR))
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text KEEP QUOTES)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '123', '$'
+	COLUMNS (item int PATH '$', foo int)) bar
+;
+----------
+[SELECT] SELECT
+	JSON_QUERY(js, 'strict $[*]') AS "unspec",
+	JSON_QUERY(js, 'strict $[*]' WITHOUT WRAPPER) AS "without",
+	JSON_QUERY(js, 'strict $[*]' WITH CONDITIONAL WRAPPER) AS "with cond",
+	JSON_QUERY(js, 'strict $[*]' WITH UNCONDITIONAL ARRAY WRAPPER) AS "with uncond",
+	JSON_QUERY(js, 'strict $[*]' WITH ARRAY WRAPPER) AS "with"
+FROM
+	(VALUES
+		(jsonb '1'),
+		('[]'),
+		('[null]'),
+		('[12.3]'),
+		('[true]'),
+		('["aaa"]'),
+		('[[1, 2, 3]]'),
+		('[{"a": 1, "b": [2]}]'),
+		('[1, "2", null, [3]]')
+	) foo(js)
+;
+----------
+[SELECT] -- Regular "unformatted" columns
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$',
+			"char(4)" char(4) PATH '$',
+			"bool" bool PATH '$',
+			"numeric" numeric PATH '$',
+			"domain" jsonb_test_domain PATH '$',
+			js json PATH '$',
+			jb jsonb PATH '$'
+		)
+	) jt
+	ON true
+;
+----------
+[PERFORMANCE] -- JSON_TABLE() with alias
+EXPLAIN (COSTS OFF, VERBOSE)
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$'
+	)) json_table_func
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text OMIT QUOTES)
+;
+----------
+[SELECT] -- error
+SELECT sub.* FROM s,
+	JSON_TABLE(js, '$' PASSING 32 AS x, 13 AS y COLUMNS (
+		xx int path '$.c',
+		NESTED PATH '$.a.za[1]' columns (NESTED PATH '$.z21[*]' COLUMNS (z21 int path '$?(@ >= $"x")' ERROR ON ERROR))
+	)) sub
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '{"d1": "H"}', '$.a2' RETURNING queryfuncs_test_domain DEFAULT '"foo1"'::jsonb::text ON EMPTY)
+;

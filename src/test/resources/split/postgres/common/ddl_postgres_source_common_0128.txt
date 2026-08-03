@@ -1,0 +1,468 @@
+-- create a view as we otherwise have to repeat this query a few times.
+create view v_pagg_test AS
+select
+	y,
+	min(t) AS tmin,max(t) AS tmax,count(distinct t) AS tndistinct,
+	min(b) AS bmin,max(b) AS bmax,count(distinct b) AS bndistinct,
+	min(a) AS amin,max(a) AS amax,count(distinct a) AS andistinct,
+	min(aa) AS aamin,max(aa) AS aamax,count(distinct aa) AS aandistinct
+from (
+	select
+		y,
+		unnest(regexp_split_to_array(a1.t, ','))::int AS t,
+		unnest(regexp_split_to_array(a1.b::text, ',')) AS b,
+		unnest(a1.a) AS a,
+		unnest(a1.aa) AS aa
+	from (
+		select
+			y,
+			string_agg(x::text, ',') AS t,
+			string_agg(x::text::bytea, ',') AS b,
+			array_agg(x) AS a,
+			array_agg(ARRAY[x]) AS aa
+		from pagg_test
+		group by y
+	) a1
+) a2
+group by y
+;
+--
+-- Composite key tests
+--
+create unique index comp_key_index on insertconflicttest(key, fruit)
+;
+-- cleanup
+DROP TABLE mchash
+;
+CREATE FUNCTION gin_compare_prefix_varbit(varbit, varbit, int2, internal)
+RETURNS int4
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+-- Test when parent can produce parallel paths but not any (or some) of its children
+-- (Use one more aggregate to tilt the cost estimates for the plan we want)
+ALTER TABLE pagg_tab_para_p1 SET (parallel_workers = 0)
+;
+CREATE INDEX "hash_i4_partial_index" ON "public"."hash_i4_heap" USING "hash" ("seqno") WHERE ("seqno" = 9999)
+;
+CREATE MATERIALIZED VIEW concur_reindex_matview AS SELECT * FROM concur_reindex_tab
+;
+CREATE VIEW pg_timezone_abbrevs AS
+    SELECT * FROM pg_timezone_abbrevs()
+;
+--
+-- ON CONFLICT: multiranges
+--
+
+TRUNCATE temporal_mltrng
+;
+drop table parted_minmax
+;
+ANALYZE (SKIP_LOCKED) pg_catalog.pg_statistic_ext
+;
+ALTER INDEX concur_exprs_index_expr ALTER COLUMN 1 SET STATISTICS 100
+;
+DROP TABLE writetest
+;
+ANALYZE pg_temp_13.pg_temp_26669_2
+;
+CREATE INDEX async_p3_idx ON async_p3 (a)
+;
+create view rule_v1(x) as select * from (values(1,2)) v(q,w)
+;
+CREATE TABLE "generated_stored_tests"."gtest24" (
+    "a" integer NOT NULL,
+    "b" "generated_stored_tests"."gtestdomain1" GENERATED ALWAYS AS (("a" * 2)) STORED
+)
+;
+VACUUM (FREEZE) pg_catalog.pg_event_trigger
+;
+VACUUM pg_catalog.pg_init_privs
+;
+do $$
+<<outerblock>>
+begin
+  <<innerblock>>
+  begin
+    exit outerblock;
+    raise notice 'should not get here';
+  end;
+  raise notice 'should not get here, either';
+end$$
+;
+CREATE FUNCTION test_stat_func_ifexists() RETURNS VOID LANGUAGE plpgsql AS $$
+    BEGIN
+        PERFORM test_stat_func();
+    EXCEPTION WHEN undefined_function THEN
+    END;$$
+;
+alter table cc1 add column a2 int constraint nn not null
+;
+CREATE SCHEMA sts_sch2
+;
+create trigger loct_br_insert_trigger before insert on loct
+	for each row execute procedure br_insert_trigfunc()
+;
+create table excluded(key int primary key, data text)
+;
+ALTER INDEX pg_toast.pg_toast_28374_index RENAME TO reind_con_toast_idx
+;
+DROP INDEX IF EXISTS mvtest_mvschema.mvtest_drop_idx
+;
+CREATE PROCEDURE cursor_fail_during_rollback()
+ LANGUAGE plpgsql
+AS $$
+  DECLARE id int;
+  BEGIN
+    FOR id IN SELECT 1/(x-1000) FROM generate_series(1,1000) x LOOP
+        INSERT INTO test1 VALUES(id);
+        ROLLBACK;
+    END LOOP;
+  END;
+$$
+;
+create view view_of_joins_2a as select * from tbl1 join tbl1a using (a)
+;
+/*
+ * text search configuration for italian language
+ *
+ * Copyright (c) 2007-2021, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * italian and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY italian_stem
+	(TEMPLATE = snowball, Language = italian , StopWords=italian)
+;
+drop table eifoo cascade
+;
+create rule rr as on update to rule_t1 do instead UPDATE rule_dest trgt
+  SET (f2[1], f1, tag) = (SELECT new.f2, new.f1, 'updated'::varchar)
+  WHERE trgt.f1 = new.f1 RETURNING new.*
+;
+alter table idxpart add exclude USING GIST (a with -|-)
+;
+-- including storage and comments
+CREATE TABLE ctlt1 (a text CHECK (length(a) > 2) PRIMARY KEY, b text)
+;
+--
+-- For fkeys2:
+-- 	(fkey21, fkey22)	--> pkeys (pkey1, pkey2)
+--
+create trigger check_fkeys2_pkey_exist
+	before insert or update on fkeys2
+	for each row
+	execute procedure
+	check_primary_key ('fkey21', 'fkey22', 'pkeys', 'pkey1', 'pkey2')
+;
+drop trigger child1_update_trig on child1
+;
+CREATE FUNCTION btupccmp(upc, ean13)
+	RETURNS int4
+	AS 'btint8cmp'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+CREATE TABLE brin_timestamp_test(a TIMESTAMPTZ)
+;
+CREATE SEQUENCE sequence_testx INCREMENT BY 0
+;
+CREATE FUNCTION sro_trojan() RETURNS trigger LANGUAGE plpgsql AS
+	'BEGIN PERFORM public.unwanted_grant(); RETURN NULL; END'
+;
+create table test_partition partition of test_partitioned for values in (1)
+;
+drop table rp_prefix_test2
+;
+DROP FUNCTION test_fdw_handler()
+;
+-- test externally stored compressed data
+CREATE OR REPLACE FUNCTION large_val() RETURNS TEXT LANGUAGE SQL AS
+'select array_agg(md5(g::text))::text from generate_series(1, 256) g'
+;
+-- clean up
+drop table defer_trig
+;
+CREATE INDEX "onek_hundred" ON "public"."onek" USING "btree" ("hundred")
+;
+CREATE DATABASE template0 IS_TEMPLATE = true ALLOW_CONNECTIONS = false
+;
+-- a child matching parent
+create table child1 partition of parent for values in ('AAA')
+;
+-- procedure 1 requested again in separate statement
+DROP OPERATOR FAMILY alt_opf17 USING btree
+;
+CREATE TABLE x1 (a int)
+;
+------------------------------------------------------------------------------------------
+[CREATE_VIEW(SELECT)] -- create a view as we otherwise have to repeat this query a few times.
+create view v_pagg_test AS
+select
+	y,
+	min(t) AS tmin,max(t) AS tmax,count(distinct t) AS tndistinct,
+	min(b) AS bmin,max(b) AS bmax,count(distinct b) AS bndistinct,
+	min(a) AS amin,max(a) AS amax,count(distinct a) AS andistinct,
+	min(aa) AS aamin,max(aa) AS aamax,count(distinct aa) AS aandistinct
+from (
+	select
+		y,
+		unnest(regexp_split_to_array(a1.t, ','))::int AS t,
+		unnest(regexp_split_to_array(a1.b::text, ',')) AS b,
+		unnest(a1.a) AS a,
+		unnest(a1.aa) AS aa
+	from (
+		select
+			y,
+			string_agg(x::text, ',') AS t,
+			string_agg(x::text::bytea, ',') AS b,
+			array_agg(x) AS a,
+			array_agg(ARRAY[x]) AS aa
+		from pagg_test
+		group by y
+	) a1
+) a2
+group by y
+;
+----------
+[ADD_INDEX] --
+-- Composite key tests
+--
+create unique index comp_key_index on insertconflicttest(key, fruit)
+;
+----------
+[DROP_TABLE] -- cleanup
+DROP TABLE mchash
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gin_compare_prefix_varbit(varbit, varbit, int2, internal)
+RETURNS int4
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+----------
+[ALTER_TABLE] -- Test when parent can produce parallel paths but not any (or some) of its children
+-- (Use one more aggregate to tilt the cost estimates for the plan we want)
+ALTER TABLE pagg_tab_para_p1 SET (parallel_workers = 0)
+;
+----------
+[ADD_INDEX] CREATE INDEX "hash_i4_partial_index" ON "public"."hash_i4_heap" USING "hash" ("seqno") WHERE ("seqno" = 9999)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW concur_reindex_matview AS SELECT * FROM concur_reindex_tab
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW pg_timezone_abbrevs AS
+    SELECT * FROM pg_timezone_abbrevs()
+;
+----------
+[TRUNCATE_TABLE] --
+-- ON CONFLICT: multiranges
+--
+
+TRUNCATE temporal_mltrng
+;
+----------
+[DROP_TABLE] drop table parted_minmax
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) pg_catalog.pg_statistic_ext
+;
+----------
+[ALTER_INDEX|ALTER_COLUMN] ALTER INDEX concur_exprs_index_expr ALTER COLUMN 1 SET STATISTICS 100
+;
+----------
+[DROP_TABLE] DROP TABLE writetest
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_13.pg_temp_26669_2
+;
+----------
+[ADD_INDEX] CREATE INDEX async_p3_idx ON async_p3 (a)
+;
+----------
+[CREATE_VIEW(SELECT)] create view rule_v1(x) as select * from (values(1,2)) v(q,w)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "generated_stored_tests"."gtest24" (
+    "a" integer NOT NULL,
+    "b" "generated_stored_tests"."gtestdomain1" GENERATED ALWAYS AS (("a" * 2)) STORED
+)
+;
+----------
+[ADMIN_TABLE] VACUUM (FREEZE) pg_catalog.pg_event_trigger
+;
+----------
+[ADMIN_TABLE] VACUUM pg_catalog.pg_init_privs
+;
+----------
+[BLOCK] do $$
+<<outerblock>>
+begin
+  <<innerblock>>
+  begin
+    exit outerblock;
+    raise notice 'should not get here';
+  end;
+  raise notice 'should not get here, either';
+end$$
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION test_stat_func_ifexists() RETURNS VOID LANGUAGE plpgsql AS $$
+    BEGIN
+        PERFORM test_stat_func();
+    EXCEPTION WHEN undefined_function THEN
+    END;$$
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] alter table cc1 add column a2 int constraint nn not null
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA sts_sch2
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger loct_br_insert_trigger before insert on loct
+	for each row execute procedure br_insert_trigfunc()
+;
+----------
+[CREATE_TABLE] create table excluded(key int primary key, data text)
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_28374_index RENAME TO reind_con_toast_idx
+;
+----------
+[DROP_INDEX] DROP INDEX IF EXISTS mvtest_mvschema.mvtest_drop_idx
+;
+----------
+[CREATE_PROG_OBJ] CREATE PROCEDURE cursor_fail_during_rollback()
+ LANGUAGE plpgsql
+AS $$
+  DECLARE id int;
+  BEGIN
+    FOR id IN SELECT 1/(x-1000) FROM generate_series(1,1000) x LOOP
+        INSERT INTO test1 VALUES(id);
+        ROLLBACK;
+    END LOOP;
+  END;
+$$
+;
+----------
+[CREATE_VIEW(SELECT)] create view view_of_joins_2a as select * from tbl1 join tbl1a using (a)
+;
+----------
+[CREATE_POLICY] /*
+ * text search configuration for italian language
+ *
+ * Copyright (c) 2007-2021, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * italian and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY italian_stem
+	(TEMPLATE = snowball, Language = italian , StopWords=italian)
+;
+----------
+[DROP_TABLE] drop table eifoo cascade
+;
+----------
+[CREATE_POLICY] create rule rr as on update to rule_t1 do instead UPDATE rule_dest trgt
+  SET (f2[1], f1, tag) = (SELECT new.f2, new.f1, 'updated'::varchar)
+  WHERE trgt.f1 = new.f1 RETURNING new.*
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table idxpart add exclude USING GIST (a with -|-)
+;
+----------
+[CREATE_TABLE] -- including storage and comments
+CREATE TABLE ctlt1 (a text CHECK (length(a) > 2) PRIMARY KEY, b text)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] --
+-- For fkeys2:
+-- 	(fkey21, fkey22)	--> pkeys (pkey1, pkey2)
+--
+create trigger check_fkeys2_pkey_exist
+	before insert or update on fkeys2
+	for each row
+	execute procedure
+	check_primary_key ('fkey21', 'fkey22', 'pkeys', 'pkey1', 'pkey2')
+;
+----------
+[DROP_TRIGGER] drop trigger child1_update_trig on child1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION btupccmp(upc, ean13)
+	RETURNS int4
+	AS 'btint8cmp'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] CREATE TABLE brin_timestamp_test(a TIMESTAMPTZ)
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE sequence_testx INCREMENT BY 0
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION sro_trojan() RETURNS trigger LANGUAGE plpgsql AS
+	'BEGIN PERFORM public.unwanted_grant(); RETURN NULL; END'
+;
+----------
+[CREATE_TABLE] create table test_partition partition of test_partitioned for values in (1)
+;
+----------
+[DROP_TABLE] drop table rp_prefix_test2
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION test_fdw_handler()
+;
+----------
+[CREATE_PROG_OBJ] -- test externally stored compressed data
+CREATE OR REPLACE FUNCTION large_val() RETURNS TEXT LANGUAGE SQL AS
+'select array_agg(md5(g::text))::text from generate_series(1, 256) g'
+;
+----------
+[DROP_TABLE] -- clean up
+drop table defer_trig
+;
+----------
+[ADD_INDEX] CREATE INDEX "onek_hundred" ON "public"."onek" USING "btree" ("hundred")
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE template0 IS_TEMPLATE = true ALLOW_CONNECTIONS = false
+;
+----------
+[CREATE_TABLE] -- a child matching parent
+create table child1 partition of parent for values in ('AAA')
+;
+----------
+[DROP_PROG_OBJ] -- procedure 1 requested again in separate statement
+DROP OPERATOR FAMILY alt_opf17 USING btree
+;
+----------
+[CREATE_TABLE] CREATE TABLE x1 (a int)
+;

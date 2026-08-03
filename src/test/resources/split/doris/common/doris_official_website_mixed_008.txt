@@ -1,0 +1,2175 @@
+-- 1. switch to catalog, use database and query
+SWITCH kudu_ctl;
+USE kudu_db;
+SELECT * FROM kudu_tbl LIMIT 10;
+
+-- 2. use kudu database directly
+USE kudu_ctl.kudu_db;
+SELECT * FROM kudu_tbl LIMIT 10;
+
+-- 3. use full qualified name to query
+SELECT * FROM kudu_ctl.kudu_db.kudu_tbl LIMIT 10;
+-- 1. switch to catalog, use database and query
+SWITCH ls_ctl;
+USE ls_db;
+SELECT * FROM ls_tbl LIMIT 10;
+
+-- 2. use lakesoul database directly
+USE ls_ctl.ls_db;
+SELECT * FROM ls_tbl LIMIT 10;
+
+-- 3. use full qualified name to query
+SELECT * FROM ls_ctl.ls_db.ls_tbl LIMIT 10;
+-- 1. switch to catalog, use database and query
+SWITCH mc_ctl;
+USE mc_ctl;
+SELECT * FROM mc_tbl LIMIT 10;
+
+-- 2. use mc database directly
+USE mc_ctl.mc_db;
+SELECT * FROM mc_tbl LIMIT 10;
+
+-- 3. use full qualified name to query
+SELECT * FROM mc_ctl.mc_db.mc_tbl LIMIT 10;
+-- Create a view based on a TVF
+CREATE VIEW tvf_view AS 
+SELECT * FROM s3(
+    'uri' = 's3://bucket/path/to/tvf_test/test.parquet',
+    'format' = 'parquet',
+    's3.endpoint' = 'https://s3.us-east-1.amazonaws.com',
+    's3.region' = 'us-east-1',
+    's3.access_key' = 'ak',
+    's3.secret_key'='sk'
+);
+
+-- Describe the view as usual
+DESC tvf_view;
+
+-- Query the view as usual
+SELECT * FROM tvf_view;
+
+-- Grant SELECT priv to other user on this view
+GRANT SELECT_PRIV ON db.tvf_view TO other_user;
+-- Create a Doris table
+CREATE TABLE IF NOT EXISTS test_table
+(
+    id int,
+    name varchar(50),
+    age int
+)
+DISTRIBUTED BY HASH(id) BUCKETS 4
+PROPERTIES("replication_num" = "1");
+
+-- 2. Load data into table from TVF
+INSERT INTO test_table (id,name,age)
+SELECT cast(id as INT) as id, name, cast (age as INT) as age
+FROM s3(
+    'uri' = 's3://bucket/path/to/tvf_test/test.parquet',
+    'format' = 'parquet',
+    's3.endpoint' = 'https://s3.us-east-1.amazonaws.com',
+    's3.region' = 'us-east-1',
+    's3.access_key' = 'ak',
+    's3.secret_key'='sk'
+);
+CREATE DATABASE log_db;
+USE log_db;
+
+-- 存算分离模式不需要
+CREATE RESOURCE "log_s3"
+PROPERTIES
+(
+    "type" = "s3",
+    "s3.endpoint" = "your_endpoint_url",
+    "s3.region" = "your_region",
+    "s3.bucket" = "your_bucket",
+    "s3.root.path" = "your_path",
+    "s3.access_key" = "your_ak",
+    "s3.secret_key" = "your_sk"
+);
+
+-- 存算分离模式不需要
+CREATE STORAGE POLICY log_policy_3day
+PROPERTIES(
+    "storage_resource" = "log_s3",
+    "cooldown_ttl" = "259200"
+);
+
+CREATE TABLE log_table
+(
+  `ts` DATETIME,
+  `host` TEXT,
+  `path` TEXT,
+  `message` TEXT,
+  INDEX idx_host (`host`) USING INVERTED,
+  INDEX idx_path (`path`) USING INVERTED,
+  INDEX idx_message (`message`) USING INVERTED PROPERTIES("parser" = "unicode", "support_phrase" = "true")
+)
+ENGINE = OLAP
+DUPLICATE KEY(`ts`)
+PARTITION BY RANGE(`ts`) ()
+DISTRIBUTED BY RANDOM BUCKETS 60
+PROPERTIES (
+  "compression" = "zstd",
+  "compaction_policy" = "time_series",
+  "dynamic_partition.enable" = "true",
+  "dynamic_partition.create_history_partition" = "true",
+  "dynamic_partition.time_unit" = "DAY",
+  "dynamic_partition.start" = "-30",
+  "dynamic_partition.end" = "1",
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.buckets" = "60",
+  "dynamic_partition.replication_num" = "2", -- 存算分离不需要
+  "replication_num" = "2", -- 存算分离不需要
+  "storage_policy" = "log_policy_3day" -- 存算分离不需要
+);
+CREATE DATABASE testleading;
+    USE testleading;
+    
+    create table t1 (c1 int, c11 int) distributed by hash(c1) buckets 3 properties('replication_num' = '1');
+    create table t2 (c2 int, c22 int) distributed by hash(c2) buckets 3 properties('replication_num' = '1');
+    create table t3 (c3 int, c33 int) distributed by hash(c3) buckets 3 properties('replication_num' = '1');
+    create table t4 (c4 int, c44 int) distributed by hash(c4) buckets 3 properties('replication_num' = '1');
+CREATE TABLE IF NOT EXISTS lineitem (
+    l_orderkey    integer not null,
+    l_partkey     integer not null,
+    l_suppkey     integer not null,
+    l_linenumber  integer not null,
+    l_quantity    decimalv3(15,2) not null,
+    l_extendedprice  decimalv3(15,2) not null,
+    l_discount    decimalv3(15,2) not null,
+    l_tax         decimalv3(15,2) not null,
+    l_returnflag  char(1) not null,
+    l_linestatus  char(1) not null,
+    l_shipdate    date not null,
+    l_commitdate  date not null,
+    l_receiptdate date not null,
+    l_shipinstruct char(25) not null,
+    l_shipmode     char(10) not null,
+    l_comment      varchar(44) not null
+    )
+    DUPLICATE KEY(l_orderkey, l_partkey, l_suppkey, l_linenumber)
+    PARTITION BY RANGE(l_shipdate)
+    (FROM ('2023-10-17') TO ('2023-11-01') INTERVAL 1 DAY)
+    DISTRIBUTED BY HASH(l_orderkey) BUCKETS 3;
+
+INSERT INTO lineitem VALUES
+(1, 2, 3, 4, 5.5, 6.5, 7.5, 8.5, 'o', 'k', '2023-10-17', '2023-10-17', '2023-10-17', 'a', 'b', 'yyyyyyyyy'),
+(2, 4, 3, 4, 5.5, 6.5, 7.5, 8.5, 'o', 'k', '2023-10-18', '2023-10-18', '2023-10-18', 'a', 'b', 'yyyyyyyyy'),
+(3, 2, 4, 4, 5.5, 6.5, 7.5, 8.5, 'o', 'k', '2023-10-19', '2023-10-19', '2023-10-19', 'a', 'b', 'yyyyyyyyy');
+
+CREATE TABLE IF NOT EXISTS orders  (
+    o_orderkey       integer not null,
+    o_custkey        integer not null,
+    o_orderstatus    char(1) not null,
+    o_totalprice     decimalv3(15,2) not null,
+    o_orderdate      date not null,
+    o_orderpriority  char(15) not null,
+    o_clerk          char(15) not null,
+    o_shippriority   integer not null,
+    o_comment        varchar(79) not null
+    )
+DUPLICATE KEY(o_orderkey, o_custkey)
+PARTITION BY RANGE(o_orderdate)(
+FROM ('2023-10-17') TO ('2023-11-01') INTERVAL 1 DAY)
+DISTRIBUTED BY HASH(o_orderkey) BUCKETS 3;
+
+INSERT INTO orders VALUES
+(1, 1, 'o', 9.5, '2023-10-17', 'a', 'b', 1, 'yy'),
+(1, 1, 'o', 10.5, '2023-10-18', 'a', 'b', 1, 'yy'),
+(2, 1, 'o', 11.5, '2023-10-19', 'a', 'b', 1, 'yy'),
+(3, 1, 'o', 12.5, '2023-10-19', 'a', 'b', 1, 'yy');
+    
+CREATE TABLE IF NOT EXISTS partsupp (
+      ps_partkey     INTEGER NOT NULL,
+      ps_suppkey     INTEGER NOT NULL,
+      ps_availqty    INTEGER NOT NULL,
+      ps_supplycost  DECIMALV3(15,2)  NOT NULL,
+      ps_comment     VARCHAR(199) NOT NULL 
+    )
+DUPLICATE KEY(ps_partkey, ps_suppkey)
+DISTRIBUTED BY HASH(ps_partkey) BUCKETS 3;
+
+INSERT INTO partsupp VALUES
+(2, 3, 9, 10.01, 'supply1'),
+(4, 3, 10, 11.01, 'supply2'),
+(2, 3, 10, 11.01, 'supply3');
+CREATE TABLE IF NOT EXISTS lineitem (
+    l_orderkey INTEGER NOT NULL, 
+    l_partkey INTEGER NOT NULL, 
+    l_suppkey INTEGER NOT NULL, 
+    l_linenumber INTEGER NOT NULL, 
+    l_ordertime DATETIME NOT NULL, 
+    l_quantity DECIMALV3(15, 2) NOT NULL, 
+    l_extendedprice DECIMALV3(15, 2) NOT NULL, 
+    l_discount DECIMALV3(15, 2) NOT NULL, 
+    l_tax DECIMALV3(15, 2) NOT NULL, 
+    l_returnflag CHAR(1) NOT NULL, 
+    l_linestatus CHAR(1) NOT NULL, 
+    l_shipdate DATE NOT NULL, 
+    l_commitdate DATE NOT NULL, 
+    l_receiptdate DATE NOT NULL, 
+    l_shipinstruct CHAR(25) NOT NULL, 
+    l_shipmode CHAR(10) NOT NULL, 
+    l_comment VARCHAR(44) NOT NULL
+  ) DUPLICATE KEY(
+    l_orderkey, l_partkey, l_suppkey, 
+    l_linenumber
+  ) PARTITION BY RANGE(l_ordertime) (
+    FROM 
+      ('2024-05-01') TO ('2024-06-30') INTERVAL 1 DAY
+  )
+DISTRIBUTED BY HASH(l_orderkey) BUCKETS 3;
+
+INSERT INTO lineitem VALUES      
+(1, 2, 3, 4, '2024-05-01 01:45:05', 5.5, 6.5, 0.1, 8.5, 'o', 'k', '2024-05-01', '2024-05-01', '2024-05-01', 'a', 'b', 'yyyyyyyyy'),    
+(1, 2, 3, 4, '2024-05-15 02:35:05', 5.5, 6.5, 0.15, 8.5, 'o', 'k', '2024-05-15', '2024-05-15', '2024-05-15', 'a', 'b', 'yyyyyyyyy'),     
+(2, 2, 3, 5, '2024-05-25 08:30:06', 5.5, 6.5, 0.2, 8.5, 'o', 'k', '2024-05-25', '2024-05-25', '2024-05-25', 'a', 'b', 'yyyyyyyyy'),     
+(3, 4, 3, 6, '2024-06-02 09:25:07', 5.5, 6.5, 0.3, 8.5, 'o', 'k', '2024-06-02', '2024-06-02', '2024-06-02', 'a', 'b', 'yyyyyyyyy'),     
+(4, 4, 3, 7, '2024-06-15 13:20:09', 5.5, 6.5, 0, 8.5, 'o', 'k', '2024-06-15', '2024-06-15', '2024-06-15', 'a', 'b', 'yyyyyyyyy'),     
+(5, 5, 6, 8, '2024-06-25 15:15:36', 5.5, 6.5, 0.12, 8.5, 'o', 'k', '2024-06-25', '2024-06-25', '2024-06-25', 'a', 'b', 'yyyyyyyyy'),     
+(5, 5, 6, 9, '2024-06-29 21:10:52', 5.5, 6.5, 0.1, 8.5, 'o', 'k', '2024-06-30', '2024-06-30', '2024-06-30', 'a', 'b', 'yyyyyyyyy'),     
+(5, 6, 5, 10, '2024-06-03 22:05:50', 7.5, 8.5, 0.1, 10.5, 'k', 'o', '2024-06-03', '2024-06-03', '2024-06-03', 'c', 'd', 'xxxxxxxxx');     
+  
+CREATE TABLE IF NOT EXISTS partsupp (
+    ps_partkey INTEGER NOT NULL, 
+    ps_suppkey INTEGER NOT NULL, 
+    ps_availqty INTEGER NOT NULL, 
+    ps_supplycost DECIMALV3(15, 2) NOT NULL, 
+    ps_comment VARCHAR(199) NOT NULL
+  )
+DUPLICATE KEY(ps_partkey, ps_suppkey)
+DISTRIBUTED BY HASH(ps_partkey) BUCKETS 3;
+
+
+INSERT INTO partsupp VALUES     
+(2, 3, 9, 10.01, 'supply1'),     
+(4, 3, 9, 10.01, 'supply2'),     
+(5, 6, 9, 10.01, 'supply3'),     
+(6, 5, 10, 11.01, 'supply4');
+-- 物化视图只能在 internal 的 catalog 上创建，切换到内部 catalog
+switch internal;
+create database hive_mv_db;
+use hive_mv_db;
+
+CREATE MATERIALIZED VIEW external_hive_mv
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 12
+AS
+SELECT
+n_name,
+o_orderdate,
+sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM
+customer,
+orders,
+lineitem,
+supplier,
+nation,
+region
+WHERE
+c_custkey = o_custkey
+AND l_orderkey = o_orderkey
+AND l_suppkey = s_suppkey
+AND c_nationkey = s_nationkey
+AND s_nationkey = n_nationkey
+AND n_regionkey = r_regionkey
+AND r_name = 'ASIA'
+GROUP BY
+n_name,
+o_orderdate;
+create table test_table
+   (
+       k1 int, 
+       k2 int, 
+       k3 int, 
+       kx date
+   ) 
+   distributed by hash(k1) 
+   properties("replication_num" = "1");
+   
+   insert into test_table values(1,1,1,1),(3,3,3,3);
+create table d_table (
+      k1 int null,
+      k2 int not null,
+      k3 bigint null,
+      k4 date null
+   )
+   duplicate key (k1,k2,k3)
+   distributed BY hash(k1) buckets 3
+   properties("replication_num" = "1");
+   
+   insert into d_table select 1,1,1,'2020-02-20';
+   insert into d_table select 2,2,2,'2021-02-20';
+   insert into d_table select 3,-3,null,'2022-02-20';
+-- 在当前 Session 打开 SQL Cache, 默认是关闭状态
+set enable_sql_cache=true;
+-- 在当前 Session 关闭 SQL Cache
+set enable_sql_cache=false;
+
+-- 全局打开 SQL Cache, 默认是关闭状态
+set global enable_sql_cache=true;
+-- 全局关闭 SQL Cache
+set global enable_sql_cache=false;
+CREATE TABLE daily_sales
+(store_id INT, sales_date DATE, sales_amount DECIMAL(10, 2))
+PROPERTIES (
+  "replication_num" = "1"
+);
+INSERT INTO daily_sales (store_id, sales_date, sales_amount) VALUES (1, '2023-01-01', 100.00), (1, '2023-01-02', 150.00), (1, '2023-01-03', 200.00), (1, '2023-01-04', 250.00), (1, '2023-01-05', 300.00), (1, '2023-01-06', 350.00), (1, '2023-01-07', 400.00), (1, '2023-01-08', 450.00), (1, '2023-01-09', 500.00), (2, '2023-01-01', 110.00), (2, '2023-01-02', 160.00), (2, '2023-01-03', 210.00), (2, '2023-01-04', 260.00), (2, '2023-01-05', 310.00), (2, '2023-01-06', 360.00), (2, '2023-01-07', 410.00), (2, '2023-01-08', 460.00), (2, '2023-01-09', 510.00);
+
+SELECT
+        store_id,
+        sales_date,
+        sales_amount,
+        AVG(sales_amount) OVER ( PARTITION BY store_id ORDER BY sales_date 
+        ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING ) AS moving_avg_sales
+FROM
+        daily_sales;
+CREATE TABLE class_student_scores (
+    class_id INT,
+    student_id INT,
+    student_name VARCHAR(50),
+    score INT
+)distributed by hash(student_id) properties('replication_num'=1);
+
+INSERT INTO class_student_scores VALUES
+(1, 1, 'Alice', 85),
+(1, 2, 'Bob', 92),
+(1, 3, 'Charlie', 87),
+(2, 4, 'David', 78),
+(2, 5, 'Eve', 95),
+(2, 6, 'Frank', 80),
+(2, 7, 'Grace', 90),
+(2, 8, 'Hannah', 84);
+CREATE DATABASE IF NOT EXISTS doc_tpcds;
+USE doc_tpcds;
+
+CREATE TABLE IF NOT EXISTS item (
+    i_item_sk bigint not null,
+    i_item_id char(16) not null,
+    i_rec_start_date date,
+    i_rec_end_date date,
+    i_item_desc varchar(200),
+    i_current_price decimal(7,2),
+    i_wholesale_cost decimal(7,2),
+    i_brand_id integer,
+    i_brand char(50),
+    i_class_id integer,
+    i_class char(50),
+    i_category_id integer,
+    i_category char(50),
+    i_manufact_id integer,
+    i_manufact char(50),
+    i_size char(20),
+    i_formulation char(20),
+    i_color char(20),
+    i_units char(10),
+    i_container char(10),
+    i_manager_id integer,
+    i_product_name char(50)
+)
+DUPLICATE KEY(i_item_sk)
+DISTRIBUTED BY HASH(i_item_sk) BUCKETS 12
+PROPERTIES (
+  "replication_num" = "1"
+);
+
+CREATE TABLE IF NOT EXISTS store_sales (
+    ss_item_sk bigint not null,
+    ss_ticket_number bigint not null,
+    ss_sold_date_sk bigint,
+    ss_sold_time_sk bigint,
+    ss_customer_sk bigint,
+    ss_cdemo_sk bigint,
+    ss_hdemo_sk bigint,
+    ss_addr_sk bigint,
+    ss_store_sk bigint,
+    ss_promo_sk bigint,
+    ss_quantity integer,
+    ss_wholesale_cost decimal(7,2),
+    ss_list_price decimal(7,2),
+    ss_sales_price decimal(7,2),
+    ss_ext_discount_amt decimal(7,2),
+    ss_ext_sales_price decimal(7,2),
+    ss_ext_wholesale_cost decimal(7,2),
+    ss_ext_list_price decimal(7,2),
+    ss_ext_tax decimal(7,2),
+    ss_coupon_amt decimal(7,2),
+    ss_net_paid decimal(7,2),
+    ss_net_paid_inc_tax decimal(7,2),
+    ss_net_profit decimal(7,2)
+)
+DUPLICATE KEY(ss_item_sk, ss_ticket_number)
+DISTRIBUTED BY HASH(ss_item_sk, ss_ticket_number) BUCKETS 32
+PROPERTIES (
+  "replication_num" = "1"
+);
+
+CREATE TABLE IF NOT EXISTS date_dim (
+    d_date_sk bigint not null,
+    d_date_id char(16) not null,
+    d_date date,
+    d_month_seq integer,
+    d_week_seq integer,
+    d_quarter_seq integer,
+    d_year integer,
+    d_dow integer,
+    d_moy integer,
+    d_dom integer,
+    d_qoy integer,
+    d_fy_year integer,
+    d_fy_quarter_seq integer,
+    d_fy_week_seq integer,
+    d_day_name char(9),
+    d_quarter_name char(6),
+    d_holiday char(1),
+    d_weekend char(1),
+    d_following_holiday char(1),
+    d_first_dom integer,
+    d_last_dom integer,
+    d_same_day_ly integer,
+    d_same_day_lq integer,
+    d_current_day char(1),
+    d_current_week char(1),
+    d_current_month char(1),
+    d_current_quarter char(1),
+    d_current_year char(1)
+)
+DUPLICATE KEY(d_date_sk)
+DISTRIBUTED BY HASH(d_date_sk) BUCKETS 12
+PROPERTIES (
+  "replication_num" = "1"
+);
+
+CREATE TABLE IF NOT EXISTS customer_address (
+    ca_address_sk bigint not null,
+    ca_address_id char(16) not null,
+    ca_street_number char(10),
+    ca_street_name varchar(60),
+    ca_street_type char(15),
+    ca_suite_number char(10),
+    ca_city varchar(60),
+    ca_county varchar(30),
+    ca_state char(2),
+    ca_zip char(10),
+    ca_country varchar(20),
+    ca_gmt_offset decimal(5,2),
+    ca_location_type char(20)
+)
+DUPLICATE KEY(ca_address_sk)
+DISTRIBUTED BY HASH(ca_address_sk) BUCKETS 12
+PROPERTIES (
+  "replication_num" = "1"
+);
+-- setup
+create table cost2(id int, name varchar(20)) distributed by hash(id) buckets 1 properties ("replication_num"="1");
+insert into cost2 values (2,'jack'),(3,'jack');
+-- setup
+create table test_doris_array_agg(c1 int, c2 varchar(20)) distributed by hash(c1) buckets 1 properties ("replication_num"="1");
+insert into test_doris_array_agg values (1,'a'),(1,'b'),(2,'c'),(2,null),(3,null);
+-- setup
+create table test_doris_avg_weighted(k1 int, k2 int) distributed by hash(k1) buckets 1 properties ("replication_num"="1");
+insert into test_doris_avg_weighted values (10,100),(20,200),(30,300),(40,400);
+create table test_bitmap_agg(
+    id int,
+    k0 int,
+    k1 varchar(32),
+    k2 int,
+    k3 int,
+    k4 bigint,
+    k5 varchar(32)
+) properties('replication_num' = '1');
+insert into test_bitmap_agg values
+  (1, 10, '110', 11, 300, 10000000000, '0'),
+  (2, 20, '120', 21, 400, 20000000000, '200000000000000'),
+  (3, 30, '130', 31, 350, 30000000000, '300000000000000'),
+  (4, 40, '140', 41, 500, 40000000000, '18446744073709551616'),
+  (5, 50, '150', 51, 250, 50000000000, '18446744073709551615'),
+  (6, 60, '160', 61, 600, 60000000000, '-1'),
+  (7, 60, '160', 120, 600, 60000000000, NULL);
+-- setup
+create table pv_bitmap(dt int, page int, user_id bitmap bitmap_union) aggregate key(dt,page) distributed by hash(dt) buckets 1 properties ("replication_num"="1");
+insert into pv_bitmap values (1,100,bitmap_from_string('100,200,300')),(2,200,bitmap_from_string('300'));
+-- setup
+create table pv_bitmap(dt int, page int, user_id bitmap bitmap_union) aggregate key(dt,page) distributed by hash(dt) buckets 1 properties ("replication_num"="1");
+insert into pv_bitmap values (1,100,bitmap_from_string('100,200,300')),(1,300,bitmap_from_string('300')),(2,200,bitmap_from_string('300'));
+-- setup
+CREATE TABLE pv_bitmap (
+  dt INT,
+  page VARCHAR(10),
+  user_id BITMAP BITMAP_UNION
+) AGGREGATE KEY(dt, page)
+DISTRIBUTED BY HASH(dt) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO pv_bitmap VALUES
+  (1, '100', to_bitmap(100)),
+  (1, '100', to_bitmap(200)),
+  (1, '100', to_bitmap(300)),
+  (2, '200', to_bitmap(300));
+-- setup
+create table group_bit(value int) distributed by hash(value) buckets 1 properties ("replication_num"="1");
+insert into group_bit values (3),(1),(2),(4);
+-- setup
+create table pv_bitmap(id int, page varchar(10), user_id bitmap bitmap_union) aggregate key(id,page) distributed by hash(id) buckets 1 properties ("replication_num"="1");
+insert into pv_bitmap values (1,'m',bitmap_from_string('4,7,8')),(2,'m',bitmap_from_string('1,3,6,15')),(3,'m',bitmap_from_string('4,7'));
+-- setup
+create table pv_bitmap(dt int, user_id bitmap bitmap_union) aggregate key(dt) distributed by hash(dt) buckets 1 properties ("replication_num"="1");
+insert into pv_bitmap values (4,bitmap_from_string('1,2,3')),(3,bitmap_from_string('1,2,3,4,5'));
+create table nation(
+    n_nationkey int,
+    n_name varchar(32),
+    n_regionkey int
+) properties('replication_num' = '1');
+insert into nation values
+  (0,'ALGERIA',0),(1,'ARGENTINA',1),(2,'BRAZIL',1),(3,'CANADA',1),(4,'EGYPT',4),
+  (5,'ETHIOPIA',0),(6,'FRANCE',3),(7,'GERMANY',3),(8,'INDIA',2),(9,'INDONESIA',2),
+  (10,'IRAN',4),(11,'IRAQ',4),(12,'JAPAN',2),(13,'JORDAN',4),(14,'KENYA',0),
+  (15,'MOROCCO',0),(16,'MOZAMBIQUE',0),(17,'PERU',1),(18,'CHINA',2),(19,'ROMANIA',3),
+  (20,'SAUDI ARABIA',4),(21,'VIETNAM',2),(22,'RUSSIA',3),(23,'UNITED KINGDOM',3),(24,'UNITED STATES',1);
+-- setup
+create table tbl(k1 int, k2 int, k3 int, k4 int) distributed by hash(k1) buckets 1 properties ("replication_num"="1");
+insert into tbl values (0,3,2,100),(1,2,3,4),(4,3,2,1),(3,4,2,1);
+-- 创建示例表
+CREATE TABLE response_times (
+    request_id INT,
+    response_time DECIMAL(10, 2)
+) DUPLICATE KEY(`request_id`)
+DISTRIBUTED BY HASH(`request_id`) BUCKETS AUTO
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+
+-- 插入示例数据
+INSERT INTO response_times VALUES
+(1, 10.5),
+(2, 15.2),
+(3, 20.1),
+(4, 25.8),
+(5, 30.3),
+(6, 35.7),
+(7, 40.2),
+(8, 45.9),
+(9, 50.4),
+(10, 100.6);
+
+-- 使用不同压缩度计算 99 分位数
+SELECT 
+    percentile_approx(response_time, 0.99) as p99_default,          -- 默认压缩度
+    percentile_approx(response_time, 0.99, 2048) as p99_fast,       -- 低压缩度，更快
+    percentile_approx(response_time, 0.99, 10000) as p99_accurate   -- 高压缩度，更精确
+FROM response_times;
+-- 创建示例表
+CREATE TABLE sales_data (
+    id INT,
+    amount DECIMAL(10, 2)
+) DUPLICATE KEY(`id`)
+DISTRIBUTED BY HASH(`id`) BUCKETS AUTO
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+
+-- 插入示例数据
+INSERT INTO sales_data VALUES
+(1, 10.5),
+(2, 15.2),
+(3, 20.1),
+(4, 25.8),
+(5, 30.3),
+(6, 35.7),
+(7, 40.2),
+(8, 45.9),
+(9, 50.4),
+(10, 100.6);
+
+-- 计算多个百分位数
+SELECT percentile_array(amount, [0.25, 0.5, 0.75, 0.9]) as percentiles
+FROM sales_data;
+-- 创建示例表
+CREATE TABLE sales_data
+(
+    product_id INT,
+    sale_price DECIMAL(10, 2)
+) DUPLICATE KEY(`product_id`)
+DISTRIBUTED BY HASH(`product_id`) BUCKETS AUTO
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+
+-- 插入示例数据
+INSERT INTO sales_data VALUES
+(1, 10.00),
+(1, 15.00),
+(1, 20.00),
+(1, 25.00),
+(1, 30.00),
+(1, 35.00),
+(1, 40.00),
+(1, 45.00),
+(1, 50.00),
+(1, 100.00);
+
+-- 计算不同百分位的销售价格
+SELECT 
+    percentile(sale_price, 0.5)  as median_price,     -- 中位数
+    percentile(sale_price, 0.75) as p75_price,        -- 75 分位数
+    percentile(sale_price, 0.90) as p90_price,        -- 90 分位数
+    percentile(sale_price, 0.95) as p95_price,        -- 95 分位数
+    percentile(null, 0.99)       as p99_null          -- null 的 99 分位数
+FROM sales_data;
+-- 创建示例表
+CREATE TABLE response_times (
+    request_id INT,
+    response_time DOUBLE,
+    region STRING
+) DUPLICATE KEY(request_id)
+DISTRIBUTED BY HASH(request_id) BUCKETS AUTO
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+
+-- 插入示例数据
+INSERT INTO response_times VALUES
+(1, 10.5, 'east'),
+(2, 15.2, 'east'),
+(3, 20.1, 'west'),
+(4, 25.8, 'east'),
+(5, 30.3, 'west'),
+(6, 35.7, 'east'),
+(7, 40.2, 'west'),
+(8, 45.9, 'east'),
+(9, 50.4, 'west'),
+(10, 100.6, 'east');
+
+-- 按区域计算响应时间的 50% 分位数
+SELECT 
+    region,
+    QUANTILE_PERCENT(
+        QUANTILE_UNION(
+            TO_QUANTILE_STATE(response_time, 2048)
+        ),
+        0.5
+    ) AS median_response_time
+FROM response_times
+GROUP BY region;
+-- 创建示例表
+CREATE TABLE retention_test(
+    `uid` int COMMENT 'user id', 
+    `date` datetime COMMENT 'date time' 
+) DUPLICATE KEY(uid) 
+DISTRIBUTED BY HASH(uid) BUCKETS AUTO
+PROPERTIES ( 
+    "replication_allocation" = "tag.location.default: 1"
+);
+
+-- 插入示例数据
+INSERT into retention_test values 
+(0, '2022-10-12'),
+(0, '2022-10-13'),
+(0, '2022-10-14'),
+(1, '2022-10-12'),
+(1, '2022-10-13'),
+(2, '2022-10-12');
+
+-- 计算用户留存
+SELECT 
+    uid,     
+    RETENTION(date = '2022-10-12') AS r,
+    RETENTION(date = '2022-10-12', date = '2022-10-13') AS r2,
+    RETENTION(date = '2022-10-12', date = '2022-10-13', date = '2022-10-14') AS r3 
+FROM retention_test 
+GROUP BY uid 
+ORDER BY uid ASC;
+-- 创建示例表
+CREATE TABLE page_visits (
+    page_id INT,
+    user_id INT,
+    visit_date DATE
+) DISTRIBUTED BY HASH(page_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+
+-- 插入测试数据
+INSERT INTO page_visits VALUES
+(1, 101, '2024-01-01'),
+(2, 102, '2024-01-01'),
+(1, 103, '2024-01-01'),
+(3, 101, '2024-01-01'),
+(1, 104, '2024-01-01'),
+(2, 105, '2024-01-01'),
+(1, 106, '2024-01-01'),
+(4, 107, '2024-01-01');
+
+-- 查找访问量最高的前 3 个页面
+SELECT TOPN_ARRAY(page_id, 3) as top_pages
+FROM page_visits;
+-- 创建示例表
+CREATE TABLE product_sales (
+    product_id INT,
+    sale_amount DECIMAL(10,2),
+    sale_date DATE
+) DISTRIBUTED BY HASH(product_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+
+-- 插入测试数据
+INSERT INTO product_sales VALUES
+(1, 100.00, '2024-01-01'),
+(2, 50.00, '2024-01-01'),
+(1, 150.00, '2024-01-01'),
+(3, 75.00, '2024-01-01'),
+(1, 200.00, '2024-01-01'),
+(2, 80.00, '2024-01-01'),
+(1, 120.00, '2024-01-01'),
+(4, 90.00, '2024-01-01');
+
+-- 查找销售额最高的前 3 个产品（按销售金额加权）
+SELECT TOPN_WEIGHTED(product_id, sale_amount, 3) as top_products
+FROM product_sales;
+-- 创建示例表
+CREATE TABLE page_visits (
+    page_id INT,
+    user_id INT,
+    visit_date DATE
+) DISTRIBUTED BY HASH(page_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+
+-- 插入测试数据
+INSERT INTO page_visits VALUES
+(1, 101, '2024-01-01'),
+(2, 102, '2024-01-01'),
+(1, 103, '2024-01-01'),
+(3, 101, '2024-01-01'),
+(1, 104, '2024-01-01'),
+(2, 105, '2024-01-01'),
+(1, 106, '2024-01-01'),
+(4, 107, '2024-01-01');
+
+-- 查找访问量最高的前 3 个页面
+SELECT TOPN(page_id, 3) as top_pages
+FROM page_visits;
+CREATE TABLE events(
+    user_id BIGINT,
+    event_name VARCHAR(64),
+    event_timestamp datetime,
+    phone_brand varchar(64),
+    tab_num int
+) distributed by hash(user_id) buckets 3 properties("replication_num" = "1");
+
+INSERT INTO
+    events
+VALUES
+    (100123, '登录', '2022-05-14 10:01:00', 'HONOR', 1),
+    (100123, '访问', '2022-05-14 10:02:00', 'HONOR', 2),
+    (100123, '登录', '2022-05-14 10:03:00', 'HONOR', 3),
+    (100123, '下单', '2022-05-14 10:04:00', "HONOR", 4),
+    (100123, '付款', '2022-05-14 10:10:00', 'HONOR', 4),
+    (100125, '登录', '2022-05-15 11:00:00', 'XIAOMI', 1),
+    (100125, '访问', '2022-05-15 11:01:00', 'XIAOMI', 2),
+    (100125, '下单', '2022-05-15 11:02:00', 'XIAOMI', 6),
+    (100126, '登录', '2022-05-15 12:00:00', 'IPHONE', 1),
+    (100126, '访问', '2022-05-15 12:01:00', 'HONOR', 2),
+    (100127, '登录', '2022-05-15 11:30:00', 'VIVO', 1),
+    (100127, '访问', '2022-05-15 11:31:00', 'VIVO', 5);
+
+SELECT
+    user_id,
+    window_funnel(
+        3600,
+        "deduplication",
+        event_timestamp,
+        event_name = '登录',
+        event_name = '访问',
+        event_name = '下单',
+        event_name = '付款'
+    ) AS level
+FROM
+    events
+GROUP BY
+    user_id
+order BY
+    user_id;
+CREATE TABLE events(
+    user_id BIGINT,
+    event_name VARCHAR(64),
+    event_timestamp datetime,
+    phone_brand varchar(64),
+    tab_num int
+) distributed by hash(user_id) buckets 3 properties("replication_num" = "1");
+
+INSERT INTO
+    events
+VALUES
+    (100123, '登录', '2022-05-14 10:01:00', 'HONOR', 1),
+    (100123, '访问', '2022-05-14 10:02:00', 'HONOR', 2),
+    (100123, '下单', '2022-05-14 10:03:00', "HONOR", 4),
+    (100123, '登录 2', '2022-05-14 10:04:00', 'HONOR', 3),
+    (100123, '付款', '2022-05-14 10:10:00', 'HONOR', 4),
+    (100125, '登录', '2022-05-15 11:00:00', 'XIAOMI', 1),
+    (100125, '访问', '2022-05-15 11:01:00', 'XIAOMI', 2),
+    (100125, '下单', '2022-05-15 11:02:00', 'XIAOMI', 6),
+    (100126, '登录', '2022-05-15 12:00:00', 'IPHONE', 1),
+    (100126, '访问', '2022-05-15 12:01:00', 'HONOR', 2),
+    (100127, '登录', '2022-05-15 11:30:00', 'VIVO', 1),
+    (100127, '访问', '2022-05-15 11:31:00', 'VIVO', 5);
+
+SELECT
+    user_id,
+    window_funnel(
+        3600,
+        "fixed",
+        event_timestamp,
+        event_name = '登录',
+        event_name = '访问',
+        event_name = '下单',
+        event_name = '付款'
+    ) AS level
+FROM
+    events
+GROUP BY
+    user_id
+order BY
+    user_id;
+CREATE TABLE events(
+    user_id BIGINT,
+    event_name VARCHAR(64),
+    event_timestamp datetime,
+    phone_brand varchar(64),
+    tab_num int
+) distributed by hash(user_id) buckets 3 properties("replication_num" = "1");
+
+INSERT INTO
+    events
+VALUES
+    (100123, '登录', '2022-05-14 10:01:00', 'HONOR', 1),
+    (100123, '访问', '2022-05-14 10:02:00', 'HONOR', 2),
+    (100123, '下单', '2022-05-14 10:04:00', "HONOR", 4),
+    (100123, '付款', '2022-05-14 10:04:00', 'HONOR', 4),
+    (100125, '登录', '2022-05-15 11:00:00', 'XIAOMI', 1),
+    (100125, '访问', '2022-05-15 11:01:00', 'XIAOMI', 2),
+    (100125, '下单', '2022-05-15 11:02:00', 'XIAOMI', 6),
+    (100126, '登录', '2022-05-15 12:00:00', 'IPHONE', 1),
+    (100126, '访问', '2022-05-15 12:01:00', 'HONOR', 2),
+    (100127, '登录', '2022-05-15 11:30:00', 'VIVO', 1),
+    (100127, '访问', '2022-05-15 11:31:00', 'VIVO', 5);
+
+SELECT
+    user_id,
+    window_funnel(
+        3600,
+        "increase",
+        event_timestamp,
+        event_name = '登录',
+        event_name = '访问',
+        event_name = '下单',
+        event_name = '付款'
+    ) AS level
+FROM
+    events
+GROUP BY
+    user_id
+order BY
+    user_id;
+create table array_type_table(
+    k1 INT, 
+    k2 Array<int>
+) 
+duplicate key (k1)
+distributed by hash(k1) buckets 1 
+properties(
+    'replication_num' = '1'
+);
+insert into array_type_table values (0, []), (1, [NULL]), (2, [1, 2, 3]), (3, [1, NULL, 3]);
+select k2, array_avg(k2) from array_type_table;
+CREATE TABLE array_test (
+    id int,
+    col2 ARRAY<INT>,
+    col3 ARRAY<INT>
+)
+duplicate key (id)
+distributed by hash(id) buckets 1
+properties(
+  'replication_num' = '1'
+);
+INSERT INTO array_test (id, col2, col3) VALUES
+(1,[1, 2, 3], [3, 4, 5]),
+(2,[1, NULL, 2], [NULL]),
+(3,[1, 2, 3], NULL),
+(4,[], []);
+
+select col2, col3, array_concat(col2, col3) from array_test;
+-- setup
+create table array_test(id int, c_array1 array<int>, c_array2 array<int>) distributed by hash(id) buckets 1 properties ("replication_num"="1");
+insert into array_test values (1,[1,2,3,4,5],[10,20,-40,80,-100]),(2,[6,7,8],[10,12,13]),(3,[1],[-100]),(4,[1,null,2],[null,3,1]),(5,[],[]),(6,null,null);
+create table array_type_table(
+    k1 INT, 
+    k2 Array<int>
+) 
+duplicate key (k1) 
+distributed by hash(k1) buckets 1 
+properties(
+    'replication_num' = '1'
+);
+insert into array_type_table values (0, []), 
+(1, [NULL]), 
+(2, [1, 2, 3, 4]), 
+(3, [1, NULL, 3, NULL, 5]);
+select k2, array_cum_sum(k2) from array_type_table;
+CREATE TABLE array_type_table (
+   k1 INT,
+   k2 ARRAY<INT>
+)
+duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+INSERT INTO array_type_table (k1, k2) VALUES
+(0, []),
+(1, [NULL]),
+(2, [1, 2, 3]),
+(3, [1, NULL, 3]),
+(4, [0, 1, 2, 3, NULL, 4, 6]),
+(5, [1, 2, 3, 4, 5, 4, 3, 2, 1]),
+(6, [6, 7, 8]);
+select *,array_difference(k2) from array_type_table;
+CREATE TABLE array_test (
+    k1 INT,
+    k2 ARRAY<INT>
+)
+duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+INSERT INTO array_test VALUES
+(1, [1, 2, 3, 4, 5]),
+(2, [6, 7, 8]),
+(3, []),
+(4, NULL),
+(5, [1, 2, 3, 4, 5, 4, 3, 2, 1]),
+(6, [1, 2, 3, NULL]),
+(7, [1, 2, 3, NULL, NULL]);
+select k1, k2, array_distinct(k2) from array_test;
+CREATE TABLE array_test01 (
+   k1 INT,
+   k2 ARRAY<VARCHAR>
+)
+duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+INSERT INTO array_test01 VALUES
+(1, ['a', 'b', 'c', 'd', 'e']),
+(2, ['f', 'g', 'h']),
+(3, ['']),
+(3, [NULL]),
+(5, ['a', 'b', 'c', 'd', 'e', 'a', 'b', 'c']),
+(6, NULL),
+(7, ['a', 'b', NULL]),
+(8, ['a', 'b', NULL, NULL]);
+select k1, k2, array_distinct(k2) from array_test01;
+create table array_type_table(
+    k1 INT, 
+    k2 Array<STRING>
+) 
+duplicate key (k1)
+distributed by hash(k1) buckets 1 
+properties(
+    'replication_num' = '1'
+);
+insert into array_type_table values (0, []), 
+("1", [NULL]), 
+("2", ["1", "2", "3"]), 
+("3", ["1", NULL, "3"]), 
+("4", NULL);
+select k2, array_enumerate(k2) from array_type_table;
+CREATE TABLE array_type_table (
+    k1 INT,
+    k2 ARRAY<INT>,
+    k3 ARRAY<INT>
+)
+duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+INSERT INTO array_type_table VALUES
+(1, [1, 2, 3], [2, 4, 5]),
+(2, [2, 3], [1, 5]),
+(3, [1, 1, 1], [2, 2, 2]);
+select k1,k2,k3,array_except(k2,k3) from array_type_table;
+CREATE TABLE array_type_table_nullable (
+    k1 INT,
+    k2 ARRAY<INT>,
+    k3 ARRAY<INT>
+)
+duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+INSERT INTO array_type_table_nullable VALUES
+(1, [1, NULL, 3], [1, 3, 5]),
+(2, [NULL, NULL, 2], [2, NULL, 4]),
+(3, NULL, [1, 2, 3]);
+select k1,k2,k3,array_except(k2,k3) from array_type_table_nullable;
+CREATE TABLE array_type_table_varchar (
+    k1 INT,
+    k2 ARRAY<VARCHAR>,
+    k3 ARRAY<VARCHAR>
+)
+    duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+INSERT INTO array_type_table_varchar VALUES
+(1, ['hello', 'world', 'c++'], ['I', 'am', 'c++']),
+(2, ['a1', 'equals', 'b1'], ['a2', 'equals', 'b2']),
+(3, ['hasnull', NULL, 'value'], ['nohasnull', 'nonull', 'value']),
+(3, ['hasnull', NULL, 'value'], ['hasnull', NULL, 'value']);
+select k1,k2,k3,array_except(k2,k3) from array_type_table_varchar;
+------------------------------------------------------------------------------------------
+[SWITCH_CATALOG] -- 1. switch to catalog, use database and query
+SWITCH kudu_ctl;
+----------
+[SWITCH_SCHEMA] USE kudu_db;
+----------
+[SELECT] SELECT * FROM kudu_tbl LIMIT 10;
+----------
+[SWITCH_SCHEMA] -- 2. use kudu database directly
+USE kudu_ctl.kudu_db;
+----------
+[SELECT] SELECT * FROM kudu_tbl LIMIT 10;
+----------
+[SELECT] -- 3. use full qualified name to query
+SELECT * FROM kudu_ctl.kudu_db.kudu_tbl LIMIT 10;
+----------
+[SWITCH_CATALOG] -- 1. switch to catalog, use database and query
+SWITCH ls_ctl;
+----------
+[SWITCH_SCHEMA] USE ls_db;
+----------
+[SELECT] SELECT * FROM ls_tbl LIMIT 10;
+----------
+[SWITCH_SCHEMA] -- 2. use lakesoul database directly
+USE ls_ctl.ls_db;
+----------
+[SELECT] SELECT * FROM ls_tbl LIMIT 10;
+----------
+[SELECT] -- 3. use full qualified name to query
+SELECT * FROM ls_ctl.ls_db.ls_tbl LIMIT 10;
+----------
+[SWITCH_CATALOG] -- 1. switch to catalog, use database and query
+SWITCH mc_ctl;
+----------
+[SWITCH_SCHEMA] USE mc_ctl;
+----------
+[SELECT] SELECT * FROM mc_tbl LIMIT 10;
+----------
+[SWITCH_SCHEMA] -- 2. use mc database directly
+USE mc_ctl.mc_db;
+----------
+[SELECT] SELECT * FROM mc_tbl LIMIT 10;
+----------
+[SELECT] -- 3. use full qualified name to query
+SELECT * FROM mc_ctl.mc_db.mc_tbl LIMIT 10;
+----------
+[CREATE_VIEW(SELECT,DATA_IMPORT)] -- Create a view based on a TVF
+CREATE VIEW tvf_view AS 
+SELECT * FROM s3(
+    'uri' = 's3://bucket/path/to/tvf_test/test.parquet',
+    'format' = 'parquet',
+    's3.endpoint' = 'https://s3.us-east-1.amazonaws.com',
+    's3.region' = 'us-east-1',
+    's3.access_key' = 'ak',
+    's3.secret_key'='sk'
+);
+----------
+[METADATA] -- Describe the view as usual
+DESC tvf_view;
+----------
+[SELECT] -- Query the view as usual
+SELECT * FROM tvf_view;
+----------
+[GRANT] -- Grant SELECT priv to other user on this view
+GRANT SELECT_PRIV ON db.tvf_view TO other_user;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- Create a Doris table
+CREATE TABLE IF NOT EXISTS test_table
+(
+    id int,
+    name varchar(50),
+    age int
+)
+DISTRIBUTED BY HASH(id) BUCKETS 4
+PROPERTIES("replication_num" = "1");
+----------
+[INSERT|SELECT|DATA_IMPORT] -- 2. Load data into table from TVF
+INSERT INTO test_table (id,name,age)
+SELECT cast(id as INT) as id, name, cast (age as INT) as age
+FROM s3(
+    'uri' = 's3://bucket/path/to/tvf_test/test.parquet',
+    'format' = 'parquet',
+    's3.endpoint' = 'https://s3.us-east-1.amazonaws.com',
+    's3.region' = 'us-east-1',
+    's3.access_key' = 'ak',
+    's3.secret_key'='sk'
+);
+----------
+[CREATE_SCHEMA] CREATE DATABASE log_db;
+----------
+[SWITCH_SCHEMA] USE log_db;
+----------
+[SYSTEM_SETTING_WRITE] -- 存算分离模式不需要
+CREATE RESOURCE "log_s3"
+PROPERTIES
+(
+    "type" = "s3",
+    "s3.endpoint" = "your_endpoint_url",
+    "s3.region" = "your_region",
+    "s3.bucket" = "your_bucket",
+    "s3.root.path" = "your_path",
+    "s3.access_key" = "your_ak",
+    "s3.secret_key" = "your_sk"
+);
+----------
+[SYSTEM_SETTING_WRITE] -- 存算分离模式不需要
+CREATE STORAGE POLICY log_policy_3day
+PROPERTIES(
+    "storage_resource" = "log_s3",
+    "cooldown_ttl" = "259200"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE log_table
+(
+  `ts` DATETIME,
+  `host` TEXT,
+  `path` TEXT,
+  `message` TEXT,
+  INDEX idx_host (`host`) USING INVERTED,
+  INDEX idx_path (`path`) USING INVERTED,
+  INDEX idx_message (`message`) USING INVERTED PROPERTIES("parser" = "unicode", "support_phrase" = "true")
+)
+ENGINE = OLAP
+DUPLICATE KEY(`ts`)
+PARTITION BY RANGE(`ts`) ()
+DISTRIBUTED BY RANDOM BUCKETS 60
+PROPERTIES (
+  "compression" = "zstd",
+  "compaction_policy" = "time_series",
+  "dynamic_partition.enable" = "true",
+  "dynamic_partition.create_history_partition" = "true",
+  "dynamic_partition.time_unit" = "DAY",
+  "dynamic_partition.start" = "-30",
+  "dynamic_partition.end" = "1",
+  "dynamic_partition.prefix" = "p",
+  "dynamic_partition.buckets" = "60",
+  "dynamic_partition.replication_num" = "2", -- 存算分离不需要
+  "replication_num" = "2", -- 存算分离不需要
+  "storage_policy" = "log_policy_3day" -- 存算分离不需要
+);
+----------
+[CREATE_SCHEMA] CREATE DATABASE testleading;
+----------
+[SWITCH_SCHEMA] USE testleading;
+----------
+[CREATE_TABLE|ADD_COLUMN] create table t1 (c1 int, c11 int) distributed by hash(c1) buckets 3 properties('replication_num' = '1');
+----------
+[CREATE_TABLE|ADD_COLUMN] create table t2 (c2 int, c22 int) distributed by hash(c2) buckets 3 properties('replication_num' = '1');
+----------
+[CREATE_TABLE|ADD_COLUMN] create table t3 (c3 int, c33 int) distributed by hash(c3) buckets 3 properties('replication_num' = '1');
+----------
+[CREATE_TABLE|ADD_COLUMN] create table t4 (c4 int, c44 int) distributed by hash(c4) buckets 3 properties('replication_num' = '1');
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS lineitem (
+    l_orderkey    integer not null,
+    l_partkey     integer not null,
+    l_suppkey     integer not null,
+    l_linenumber  integer not null,
+    l_quantity    decimalv3(15,2) not null,
+    l_extendedprice  decimalv3(15,2) not null,
+    l_discount    decimalv3(15,2) not null,
+    l_tax         decimalv3(15,2) not null,
+    l_returnflag  char(1) not null,
+    l_linestatus  char(1) not null,
+    l_shipdate    date not null,
+    l_commitdate  date not null,
+    l_receiptdate date not null,
+    l_shipinstruct char(25) not null,
+    l_shipmode     char(10) not null,
+    l_comment      varchar(44) not null
+    )
+    DUPLICATE KEY(l_orderkey, l_partkey, l_suppkey, l_linenumber)
+    PARTITION BY RANGE(l_shipdate)
+    (FROM ('2023-10-17') TO ('2023-11-01') INTERVAL 1 DAY)
+    DISTRIBUTED BY HASH(l_orderkey) BUCKETS 3;
+----------
+[INSERT] INSERT INTO lineitem VALUES
+(1, 2, 3, 4, 5.5, 6.5, 7.5, 8.5, 'o', 'k', '2023-10-17', '2023-10-17', '2023-10-17', 'a', 'b', 'yyyyyyyyy'),
+(2, 4, 3, 4, 5.5, 6.5, 7.5, 8.5, 'o', 'k', '2023-10-18', '2023-10-18', '2023-10-18', 'a', 'b', 'yyyyyyyyy'),
+(3, 2, 4, 4, 5.5, 6.5, 7.5, 8.5, 'o', 'k', '2023-10-19', '2023-10-19', '2023-10-19', 'a', 'b', 'yyyyyyyyy');
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS orders  (
+    o_orderkey       integer not null,
+    o_custkey        integer not null,
+    o_orderstatus    char(1) not null,
+    o_totalprice     decimalv3(15,2) not null,
+    o_orderdate      date not null,
+    o_orderpriority  char(15) not null,
+    o_clerk          char(15) not null,
+    o_shippriority   integer not null,
+    o_comment        varchar(79) not null
+    )
+DUPLICATE KEY(o_orderkey, o_custkey)
+PARTITION BY RANGE(o_orderdate)(
+FROM ('2023-10-17') TO ('2023-11-01') INTERVAL 1 DAY)
+DISTRIBUTED BY HASH(o_orderkey) BUCKETS 3;
+----------
+[INSERT] INSERT INTO orders VALUES
+(1, 1, 'o', 9.5, '2023-10-17', 'a', 'b', 1, 'yy'),
+(1, 1, 'o', 10.5, '2023-10-18', 'a', 'b', 1, 'yy'),
+(2, 1, 'o', 11.5, '2023-10-19', 'a', 'b', 1, 'yy'),
+(3, 1, 'o', 12.5, '2023-10-19', 'a', 'b', 1, 'yy');
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS partsupp (
+      ps_partkey     INTEGER NOT NULL,
+      ps_suppkey     INTEGER NOT NULL,
+      ps_availqty    INTEGER NOT NULL,
+      ps_supplycost  DECIMALV3(15,2)  NOT NULL,
+      ps_comment     VARCHAR(199) NOT NULL 
+    )
+DUPLICATE KEY(ps_partkey, ps_suppkey)
+DISTRIBUTED BY HASH(ps_partkey) BUCKETS 3;
+----------
+[INSERT] INSERT INTO partsupp VALUES
+(2, 3, 9, 10.01, 'supply1'),
+(4, 3, 10, 11.01, 'supply2'),
+(2, 3, 10, 11.01, 'supply3');
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS lineitem (
+    l_orderkey INTEGER NOT NULL, 
+    l_partkey INTEGER NOT NULL, 
+    l_suppkey INTEGER NOT NULL, 
+    l_linenumber INTEGER NOT NULL, 
+    l_ordertime DATETIME NOT NULL, 
+    l_quantity DECIMALV3(15, 2) NOT NULL, 
+    l_extendedprice DECIMALV3(15, 2) NOT NULL, 
+    l_discount DECIMALV3(15, 2) NOT NULL, 
+    l_tax DECIMALV3(15, 2) NOT NULL, 
+    l_returnflag CHAR(1) NOT NULL, 
+    l_linestatus CHAR(1) NOT NULL, 
+    l_shipdate DATE NOT NULL, 
+    l_commitdate DATE NOT NULL, 
+    l_receiptdate DATE NOT NULL, 
+    l_shipinstruct CHAR(25) NOT NULL, 
+    l_shipmode CHAR(10) NOT NULL, 
+    l_comment VARCHAR(44) NOT NULL
+  ) DUPLICATE KEY(
+    l_orderkey, l_partkey, l_suppkey, 
+    l_linenumber
+  ) PARTITION BY RANGE(l_ordertime) (
+    FROM 
+      ('2024-05-01') TO ('2024-06-30') INTERVAL 1 DAY
+  )
+DISTRIBUTED BY HASH(l_orderkey) BUCKETS 3;
+----------
+[INSERT] INSERT INTO lineitem VALUES      
+(1, 2, 3, 4, '2024-05-01 01:45:05', 5.5, 6.5, 0.1, 8.5, 'o', 'k', '2024-05-01', '2024-05-01', '2024-05-01', 'a', 'b', 'yyyyyyyyy'),    
+(1, 2, 3, 4, '2024-05-15 02:35:05', 5.5, 6.5, 0.15, 8.5, 'o', 'k', '2024-05-15', '2024-05-15', '2024-05-15', 'a', 'b', 'yyyyyyyyy'),     
+(2, 2, 3, 5, '2024-05-25 08:30:06', 5.5, 6.5, 0.2, 8.5, 'o', 'k', '2024-05-25', '2024-05-25', '2024-05-25', 'a', 'b', 'yyyyyyyyy'),     
+(3, 4, 3, 6, '2024-06-02 09:25:07', 5.5, 6.5, 0.3, 8.5, 'o', 'k', '2024-06-02', '2024-06-02', '2024-06-02', 'a', 'b', 'yyyyyyyyy'),     
+(4, 4, 3, 7, '2024-06-15 13:20:09', 5.5, 6.5, 0, 8.5, 'o', 'k', '2024-06-15', '2024-06-15', '2024-06-15', 'a', 'b', 'yyyyyyyyy'),     
+(5, 5, 6, 8, '2024-06-25 15:15:36', 5.5, 6.5, 0.12, 8.5, 'o', 'k', '2024-06-25', '2024-06-25', '2024-06-25', 'a', 'b', 'yyyyyyyyy'),     
+(5, 5, 6, 9, '2024-06-29 21:10:52', 5.5, 6.5, 0.1, 8.5, 'o', 'k', '2024-06-30', '2024-06-30', '2024-06-30', 'a', 'b', 'yyyyyyyyy'),     
+(5, 6, 5, 10, '2024-06-03 22:05:50', 7.5, 8.5, 0.1, 10.5, 'k', 'o', '2024-06-03', '2024-06-03', '2024-06-03', 'c', 'd', 'xxxxxxxxx');
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS partsupp (
+    ps_partkey INTEGER NOT NULL, 
+    ps_suppkey INTEGER NOT NULL, 
+    ps_availqty INTEGER NOT NULL, 
+    ps_supplycost DECIMALV3(15, 2) NOT NULL, 
+    ps_comment VARCHAR(199) NOT NULL
+  )
+DUPLICATE KEY(ps_partkey, ps_suppkey)
+DISTRIBUTED BY HASH(ps_partkey) BUCKETS 3;
+----------
+[INSERT] INSERT INTO partsupp VALUES     
+(2, 3, 9, 10.01, 'supply1'),     
+(4, 3, 9, 10.01, 'supply2'),     
+(5, 6, 9, 10.01, 'supply3'),     
+(6, 5, 10, 11.01, 'supply4');
+----------
+[SWITCH_CATALOG] -- 物化视图只能在 internal 的 catalog 上创建，切换到内部 catalog
+switch internal;
+----------
+[CREATE_SCHEMA] create database hive_mv_db;
+----------
+[SWITCH_SCHEMA] use hive_mv_db;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW external_hive_mv
+BUILD IMMEDIATE REFRESH AUTO ON MANUAL
+DISTRIBUTED BY RANDOM BUCKETS 12
+AS
+SELECT
+n_name,
+o_orderdate,
+sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM
+customer,
+orders,
+lineitem,
+supplier,
+nation,
+region
+WHERE
+c_custkey = o_custkey
+AND l_orderkey = o_orderkey
+AND l_suppkey = s_suppkey
+AND c_nationkey = s_nationkey
+AND s_nationkey = n_nationkey
+AND n_regionkey = r_regionkey
+AND r_name = 'ASIA'
+GROUP BY
+n_name,
+o_orderdate;
+----------
+[CREATE_TABLE|ADD_COLUMN] create table test_table
+   (
+       k1 int, 
+       k2 int, 
+       k3 int, 
+       kx date
+   ) 
+   distributed by hash(k1) 
+   properties("replication_num" = "1");
+----------
+[INSERT] insert into test_table values(1,1,1,1),(3,3,3,3);
+----------
+[CREATE_TABLE|ADD_COLUMN] create table d_table (
+      k1 int null,
+      k2 int not null,
+      k3 bigint null,
+      k4 date null
+   )
+   duplicate key (k1,k2,k3)
+   distributed BY hash(k1) buckets 3
+   properties("replication_num" = "1");
+----------
+[INSERT|SELECT] insert into d_table select 1,1,1,'2020-02-20';
+----------
+[INSERT|SELECT] insert into d_table select 2,2,2,'2021-02-20';
+----------
+[INSERT|SELECT] insert into d_table select 3,-3,null,'2022-02-20';
+----------
+[SESSION_SETTING_WRITE] -- 在当前 Session 打开 SQL Cache, 默认是关闭状态
+set enable_sql_cache=true;
+----------
+[SESSION_SETTING_WRITE] -- 在当前 Session 关闭 SQL Cache
+set enable_sql_cache=false;
+----------
+[SYSTEM_SETTING_WRITE] -- 全局打开 SQL Cache, 默认是关闭状态
+set global enable_sql_cache=true;
+----------
+[SYSTEM_SETTING_WRITE] -- 全局关闭 SQL Cache
+set global enable_sql_cache=false;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE daily_sales
+(store_id INT, sales_date DATE, sales_amount DECIMAL(10, 2))
+PROPERTIES (
+  "replication_num" = "1"
+);
+----------
+[INSERT] INSERT INTO daily_sales (store_id, sales_date, sales_amount) VALUES (1, '2023-01-01', 100.00), (1, '2023-01-02', 150.00), (1, '2023-01-03', 200.00), (1, '2023-01-04', 250.00), (1, '2023-01-05', 300.00), (1, '2023-01-06', 350.00), (1, '2023-01-07', 400.00), (1, '2023-01-08', 450.00), (1, '2023-01-09', 500.00), (2, '2023-01-01', 110.00), (2, '2023-01-02', 160.00), (2, '2023-01-03', 210.00), (2, '2023-01-04', 260.00), (2, '2023-01-05', 310.00), (2, '2023-01-06', 360.00), (2, '2023-01-07', 410.00), (2, '2023-01-08', 460.00), (2, '2023-01-09', 510.00);
+----------
+[SELECT] SELECT
+        store_id,
+        sales_date,
+        sales_amount,
+        AVG(sales_amount) OVER ( PARTITION BY store_id ORDER BY sales_date 
+        ROWS BETWEEN 3 PRECEDING AND 3 FOLLOWING ) AS moving_avg_sales
+FROM
+        daily_sales;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE class_student_scores (
+    class_id INT,
+    student_id INT,
+    student_name VARCHAR(50),
+    score INT
+)distributed by hash(student_id) properties('replication_num'=1);
+----------
+[INSERT] INSERT INTO class_student_scores VALUES
+(1, 1, 'Alice', 85),
+(1, 2, 'Bob', 92),
+(1, 3, 'Charlie', 87),
+(2, 4, 'David', 78),
+(2, 5, 'Eve', 95),
+(2, 6, 'Frank', 80),
+(2, 7, 'Grace', 90),
+(2, 8, 'Hannah', 84);
+----------
+[CREATE_SCHEMA] CREATE DATABASE IF NOT EXISTS doc_tpcds;
+----------
+[SWITCH_SCHEMA] USE doc_tpcds;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS item (
+    i_item_sk bigint not null,
+    i_item_id char(16) not null,
+    i_rec_start_date date,
+    i_rec_end_date date,
+    i_item_desc varchar(200),
+    i_current_price decimal(7,2),
+    i_wholesale_cost decimal(7,2),
+    i_brand_id integer,
+    i_brand char(50),
+    i_class_id integer,
+    i_class char(50),
+    i_category_id integer,
+    i_category char(50),
+    i_manufact_id integer,
+    i_manufact char(50),
+    i_size char(20),
+    i_formulation char(20),
+    i_color char(20),
+    i_units char(10),
+    i_container char(10),
+    i_manager_id integer,
+    i_product_name char(50)
+)
+DUPLICATE KEY(i_item_sk)
+DISTRIBUTED BY HASH(i_item_sk) BUCKETS 12
+PROPERTIES (
+  "replication_num" = "1"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS store_sales (
+    ss_item_sk bigint not null,
+    ss_ticket_number bigint not null,
+    ss_sold_date_sk bigint,
+    ss_sold_time_sk bigint,
+    ss_customer_sk bigint,
+    ss_cdemo_sk bigint,
+    ss_hdemo_sk bigint,
+    ss_addr_sk bigint,
+    ss_store_sk bigint,
+    ss_promo_sk bigint,
+    ss_quantity integer,
+    ss_wholesale_cost decimal(7,2),
+    ss_list_price decimal(7,2),
+    ss_sales_price decimal(7,2),
+    ss_ext_discount_amt decimal(7,2),
+    ss_ext_sales_price decimal(7,2),
+    ss_ext_wholesale_cost decimal(7,2),
+    ss_ext_list_price decimal(7,2),
+    ss_ext_tax decimal(7,2),
+    ss_coupon_amt decimal(7,2),
+    ss_net_paid decimal(7,2),
+    ss_net_paid_inc_tax decimal(7,2),
+    ss_net_profit decimal(7,2)
+)
+DUPLICATE KEY(ss_item_sk, ss_ticket_number)
+DISTRIBUTED BY HASH(ss_item_sk, ss_ticket_number) BUCKETS 32
+PROPERTIES (
+  "replication_num" = "1"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS date_dim (
+    d_date_sk bigint not null,
+    d_date_id char(16) not null,
+    d_date date,
+    d_month_seq integer,
+    d_week_seq integer,
+    d_quarter_seq integer,
+    d_year integer,
+    d_dow integer,
+    d_moy integer,
+    d_dom integer,
+    d_qoy integer,
+    d_fy_year integer,
+    d_fy_quarter_seq integer,
+    d_fy_week_seq integer,
+    d_day_name char(9),
+    d_quarter_name char(6),
+    d_holiday char(1),
+    d_weekend char(1),
+    d_following_holiday char(1),
+    d_first_dom integer,
+    d_last_dom integer,
+    d_same_day_ly integer,
+    d_same_day_lq integer,
+    d_current_day char(1),
+    d_current_week char(1),
+    d_current_month char(1),
+    d_current_quarter char(1),
+    d_current_year char(1)
+)
+DUPLICATE KEY(d_date_sk)
+DISTRIBUTED BY HASH(d_date_sk) BUCKETS 12
+PROPERTIES (
+  "replication_num" = "1"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS customer_address (
+    ca_address_sk bigint not null,
+    ca_address_id char(16) not null,
+    ca_street_number char(10),
+    ca_street_name varchar(60),
+    ca_street_type char(15),
+    ca_suite_number char(10),
+    ca_city varchar(60),
+    ca_county varchar(30),
+    ca_state char(2),
+    ca_zip char(10),
+    ca_country varchar(20),
+    ca_gmt_offset decimal(5,2),
+    ca_location_type char(20)
+)
+DUPLICATE KEY(ca_address_sk)
+DISTRIBUTED BY HASH(ca_address_sk) BUCKETS 12
+PROPERTIES (
+  "replication_num" = "1"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table cost2(id int, name varchar(20)) distributed by hash(id) buckets 1 properties ("replication_num"="1");
+----------
+[INSERT] insert into cost2 values (2,'jack'),(3,'jack');
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table test_doris_array_agg(c1 int, c2 varchar(20)) distributed by hash(c1) buckets 1 properties ("replication_num"="1");
+----------
+[INSERT] insert into test_doris_array_agg values (1,'a'),(1,'b'),(2,'c'),(2,null),(3,null);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table test_doris_avg_weighted(k1 int, k2 int) distributed by hash(k1) buckets 1 properties ("replication_num"="1");
+----------
+[INSERT] insert into test_doris_avg_weighted values (10,100),(20,200),(30,300),(40,400);
+----------
+[CREATE_TABLE|ADD_COLUMN] create table test_bitmap_agg(
+    id int,
+    k0 int,
+    k1 varchar(32),
+    k2 int,
+    k3 int,
+    k4 bigint,
+    k5 varchar(32)
+) properties('replication_num' = '1');
+----------
+[INSERT] insert into test_bitmap_agg values
+  (1, 10, '110', 11, 300, 10000000000, '0'),
+  (2, 20, '120', 21, 400, 20000000000, '200000000000000'),
+  (3, 30, '130', 31, 350, 30000000000, '300000000000000'),
+  (4, 40, '140', 41, 500, 40000000000, '18446744073709551616'),
+  (5, 50, '150', 51, 250, 50000000000, '18446744073709551615'),
+  (6, 60, '160', 61, 600, 60000000000, '-1'),
+  (7, 60, '160', 120, 600, 60000000000, NULL);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table pv_bitmap(dt int, page int, user_id bitmap bitmap_union) aggregate key(dt,page) distributed by hash(dt) buckets 1 properties ("replication_num"="1");
+----------
+[INSERT] insert into pv_bitmap values (1,100,bitmap_from_string('100,200,300')),(2,200,bitmap_from_string('300'));
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table pv_bitmap(dt int, page int, user_id bitmap bitmap_union) aggregate key(dt,page) distributed by hash(dt) buckets 1 properties ("replication_num"="1");
+----------
+[INSERT] insert into pv_bitmap values (1,100,bitmap_from_string('100,200,300')),(1,300,bitmap_from_string('300')),(2,200,bitmap_from_string('300'));
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE pv_bitmap (
+  dt INT,
+  page VARCHAR(10),
+  user_id BITMAP BITMAP_UNION
+) AGGREGATE KEY(dt, page)
+DISTRIBUTED BY HASH(dt) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO pv_bitmap VALUES
+  (1, '100', to_bitmap(100)),
+  (1, '100', to_bitmap(200)),
+  (1, '100', to_bitmap(300)),
+  (2, '200', to_bitmap(300));
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table group_bit(value int) distributed by hash(value) buckets 1 properties ("replication_num"="1");
+----------
+[INSERT] insert into group_bit values (3),(1),(2),(4);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table pv_bitmap(id int, page varchar(10), user_id bitmap bitmap_union) aggregate key(id,page) distributed by hash(id) buckets 1 properties ("replication_num"="1");
+----------
+[INSERT] insert into pv_bitmap values (1,'m',bitmap_from_string('4,7,8')),(2,'m',bitmap_from_string('1,3,6,15')),(3,'m',bitmap_from_string('4,7'));
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table pv_bitmap(dt int, user_id bitmap bitmap_union) aggregate key(dt) distributed by hash(dt) buckets 1 properties ("replication_num"="1");
+----------
+[INSERT] insert into pv_bitmap values (4,bitmap_from_string('1,2,3')),(3,bitmap_from_string('1,2,3,4,5'));
+----------
+[CREATE_TABLE|ADD_COLUMN] create table nation(
+    n_nationkey int,
+    n_name varchar(32),
+    n_regionkey int
+) properties('replication_num' = '1');
+----------
+[INSERT] insert into nation values
+  (0,'ALGERIA',0),(1,'ARGENTINA',1),(2,'BRAZIL',1),(3,'CANADA',1),(4,'EGYPT',4),
+  (5,'ETHIOPIA',0),(6,'FRANCE',3),(7,'GERMANY',3),(8,'INDIA',2),(9,'INDONESIA',2),
+  (10,'IRAN',4),(11,'IRAQ',4),(12,'JAPAN',2),(13,'JORDAN',4),(14,'KENYA',0),
+  (15,'MOROCCO',0),(16,'MOZAMBIQUE',0),(17,'PERU',1),(18,'CHINA',2),(19,'ROMANIA',3),
+  (20,'SAUDI ARABIA',4),(21,'VIETNAM',2),(22,'RUSSIA',3),(23,'UNITED KINGDOM',3),(24,'UNITED STATES',1);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table tbl(k1 int, k2 int, k3 int, k4 int) distributed by hash(k1) buckets 1 properties ("replication_num"="1");
+----------
+[INSERT] insert into tbl values (0,3,2,100),(1,2,3,4),(4,3,2,1),(3,4,2,1);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- 创建示例表
+CREATE TABLE response_times (
+    request_id INT,
+    response_time DECIMAL(10, 2)
+) DUPLICATE KEY(`request_id`)
+DISTRIBUTED BY HASH(`request_id`) BUCKETS AUTO
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+----------
+[INSERT] -- 插入示例数据
+INSERT INTO response_times VALUES
+(1, 10.5),
+(2, 15.2),
+(3, 20.1),
+(4, 25.8),
+(5, 30.3),
+(6, 35.7),
+(7, 40.2),
+(8, 45.9),
+(9, 50.4),
+(10, 100.6);
+----------
+[SELECT] -- 使用不同压缩度计算 99 分位数
+SELECT 
+    percentile_approx(response_time, 0.99) as p99_default,          -- 默认压缩度
+    percentile_approx(response_time, 0.99, 2048) as p99_fast,       -- 低压缩度，更快
+    percentile_approx(response_time, 0.99, 10000) as p99_accurate   -- 高压缩度，更精确
+FROM response_times;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- 创建示例表
+CREATE TABLE sales_data (
+    id INT,
+    amount DECIMAL(10, 2)
+) DUPLICATE KEY(`id`)
+DISTRIBUTED BY HASH(`id`) BUCKETS AUTO
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+----------
+[INSERT] -- 插入示例数据
+INSERT INTO sales_data VALUES
+(1, 10.5),
+(2, 15.2),
+(3, 20.1),
+(4, 25.8),
+(5, 30.3),
+(6, 35.7),
+(7, 40.2),
+(8, 45.9),
+(9, 50.4),
+(10, 100.6);
+----------
+[SELECT] -- 计算多个百分位数
+SELECT percentile_array(amount, [0.25, 0.5, 0.75, 0.9]) as percentiles
+FROM sales_data;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- 创建示例表
+CREATE TABLE sales_data
+(
+    product_id INT,
+    sale_price DECIMAL(10, 2)
+) DUPLICATE KEY(`product_id`)
+DISTRIBUTED BY HASH(`product_id`) BUCKETS AUTO
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+----------
+[INSERT] -- 插入示例数据
+INSERT INTO sales_data VALUES
+(1, 10.00),
+(1, 15.00),
+(1, 20.00),
+(1, 25.00),
+(1, 30.00),
+(1, 35.00),
+(1, 40.00),
+(1, 45.00),
+(1, 50.00),
+(1, 100.00);
+----------
+[SELECT] -- 计算不同百分位的销售价格
+SELECT 
+    percentile(sale_price, 0.5)  as median_price,     -- 中位数
+    percentile(sale_price, 0.75) as p75_price,        -- 75 分位数
+    percentile(sale_price, 0.90) as p90_price,        -- 90 分位数
+    percentile(sale_price, 0.95) as p95_price,        -- 95 分位数
+    percentile(null, 0.99)       as p99_null          -- null 的 99 分位数
+FROM sales_data;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- 创建示例表
+CREATE TABLE response_times (
+    request_id INT,
+    response_time DOUBLE,
+    region STRING
+) DUPLICATE KEY(request_id)
+DISTRIBUTED BY HASH(request_id) BUCKETS AUTO
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+----------
+[INSERT] -- 插入示例数据
+INSERT INTO response_times VALUES
+(1, 10.5, 'east'),
+(2, 15.2, 'east'),
+(3, 20.1, 'west'),
+(4, 25.8, 'east'),
+(5, 30.3, 'west'),
+(6, 35.7, 'east'),
+(7, 40.2, 'west'),
+(8, 45.9, 'east'),
+(9, 50.4, 'west'),
+(10, 100.6, 'east');
+----------
+[SELECT] -- 按区域计算响应时间的 50% 分位数
+SELECT 
+    region,
+    QUANTILE_PERCENT(
+        QUANTILE_UNION(
+            TO_QUANTILE_STATE(response_time, 2048)
+        ),
+        0.5
+    ) AS median_response_time
+FROM response_times
+GROUP BY region;
+----------
+[CREATE_TABLE|ADD_COLUMN|COMMENT_COLUMN] -- 创建示例表
+CREATE TABLE retention_test(
+    `uid` int COMMENT 'user id', 
+    `date` datetime COMMENT 'date time' 
+) DUPLICATE KEY(uid) 
+DISTRIBUTED BY HASH(uid) BUCKETS AUTO
+PROPERTIES ( 
+    "replication_allocation" = "tag.location.default: 1"
+);
+----------
+[INSERT] -- 插入示例数据
+INSERT into retention_test values 
+(0, '2022-10-12'),
+(0, '2022-10-13'),
+(0, '2022-10-14'),
+(1, '2022-10-12'),
+(1, '2022-10-13'),
+(2, '2022-10-12');
+----------
+[SELECT] -- 计算用户留存
+SELECT 
+    uid,     
+    RETENTION(date = '2022-10-12') AS r,
+    RETENTION(date = '2022-10-12', date = '2022-10-13') AS r2,
+    RETENTION(date = '2022-10-12', date = '2022-10-13', date = '2022-10-14') AS r3 
+FROM retention_test 
+GROUP BY uid 
+ORDER BY uid ASC;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- 创建示例表
+CREATE TABLE page_visits (
+    page_id INT,
+    user_id INT,
+    visit_date DATE
+) DISTRIBUTED BY HASH(page_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+----------
+[INSERT] -- 插入测试数据
+INSERT INTO page_visits VALUES
+(1, 101, '2024-01-01'),
+(2, 102, '2024-01-01'),
+(1, 103, '2024-01-01'),
+(3, 101, '2024-01-01'),
+(1, 104, '2024-01-01'),
+(2, 105, '2024-01-01'),
+(1, 106, '2024-01-01'),
+(4, 107, '2024-01-01');
+----------
+[SELECT] -- 查找访问量最高的前 3 个页面
+SELECT TOPN_ARRAY(page_id, 3) as top_pages
+FROM page_visits;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- 创建示例表
+CREATE TABLE product_sales (
+    product_id INT,
+    sale_amount DECIMAL(10,2),
+    sale_date DATE
+) DISTRIBUTED BY HASH(product_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+----------
+[INSERT] -- 插入测试数据
+INSERT INTO product_sales VALUES
+(1, 100.00, '2024-01-01'),
+(2, 50.00, '2024-01-01'),
+(1, 150.00, '2024-01-01'),
+(3, 75.00, '2024-01-01'),
+(1, 200.00, '2024-01-01'),
+(2, 80.00, '2024-01-01'),
+(1, 120.00, '2024-01-01'),
+(4, 90.00, '2024-01-01');
+----------
+[SELECT] -- 查找销售额最高的前 3 个产品（按销售金额加权）
+SELECT TOPN_WEIGHTED(product_id, sale_amount, 3) as top_products
+FROM product_sales;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- 创建示例表
+CREATE TABLE page_visits (
+    page_id INT,
+    user_id INT,
+    visit_date DATE
+) DISTRIBUTED BY HASH(page_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+----------
+[INSERT] -- 插入测试数据
+INSERT INTO page_visits VALUES
+(1, 101, '2024-01-01'),
+(2, 102, '2024-01-01'),
+(1, 103, '2024-01-01'),
+(3, 101, '2024-01-01'),
+(1, 104, '2024-01-01'),
+(2, 105, '2024-01-01'),
+(1, 106, '2024-01-01'),
+(4, 107, '2024-01-01');
+----------
+[SELECT] -- 查找访问量最高的前 3 个页面
+SELECT TOPN(page_id, 3) as top_pages
+FROM page_visits;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE events(
+    user_id BIGINT,
+    event_name VARCHAR(64),
+    event_timestamp datetime,
+    phone_brand varchar(64),
+    tab_num int
+) distributed by hash(user_id) buckets 3 properties("replication_num" = "1");
+----------
+[INSERT] INSERT INTO
+    events
+VALUES
+    (100123, '登录', '2022-05-14 10:01:00', 'HONOR', 1),
+    (100123, '访问', '2022-05-14 10:02:00', 'HONOR', 2),
+    (100123, '登录', '2022-05-14 10:03:00', 'HONOR', 3),
+    (100123, '下单', '2022-05-14 10:04:00', "HONOR", 4),
+    (100123, '付款', '2022-05-14 10:10:00', 'HONOR', 4),
+    (100125, '登录', '2022-05-15 11:00:00', 'XIAOMI', 1),
+    (100125, '访问', '2022-05-15 11:01:00', 'XIAOMI', 2),
+    (100125, '下单', '2022-05-15 11:02:00', 'XIAOMI', 6),
+    (100126, '登录', '2022-05-15 12:00:00', 'IPHONE', 1),
+    (100126, '访问', '2022-05-15 12:01:00', 'HONOR', 2),
+    (100127, '登录', '2022-05-15 11:30:00', 'VIVO', 1),
+    (100127, '访问', '2022-05-15 11:31:00', 'VIVO', 5);
+----------
+[SELECT] SELECT
+    user_id,
+    window_funnel(
+        3600,
+        "deduplication",
+        event_timestamp,
+        event_name = '登录',
+        event_name = '访问',
+        event_name = '下单',
+        event_name = '付款'
+    ) AS level
+FROM
+    events
+GROUP BY
+    user_id
+order BY
+    user_id;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE events(
+    user_id BIGINT,
+    event_name VARCHAR(64),
+    event_timestamp datetime,
+    phone_brand varchar(64),
+    tab_num int
+) distributed by hash(user_id) buckets 3 properties("replication_num" = "1");
+----------
+[INSERT] INSERT INTO
+    events
+VALUES
+    (100123, '登录', '2022-05-14 10:01:00', 'HONOR', 1),
+    (100123, '访问', '2022-05-14 10:02:00', 'HONOR', 2),
+    (100123, '下单', '2022-05-14 10:03:00', "HONOR", 4),
+    (100123, '登录 2', '2022-05-14 10:04:00', 'HONOR', 3),
+    (100123, '付款', '2022-05-14 10:10:00', 'HONOR', 4),
+    (100125, '登录', '2022-05-15 11:00:00', 'XIAOMI', 1),
+    (100125, '访问', '2022-05-15 11:01:00', 'XIAOMI', 2),
+    (100125, '下单', '2022-05-15 11:02:00', 'XIAOMI', 6),
+    (100126, '登录', '2022-05-15 12:00:00', 'IPHONE', 1),
+    (100126, '访问', '2022-05-15 12:01:00', 'HONOR', 2),
+    (100127, '登录', '2022-05-15 11:30:00', 'VIVO', 1),
+    (100127, '访问', '2022-05-15 11:31:00', 'VIVO', 5);
+----------
+[SELECT] SELECT
+    user_id,
+    window_funnel(
+        3600,
+        "fixed",
+        event_timestamp,
+        event_name = '登录',
+        event_name = '访问',
+        event_name = '下单',
+        event_name = '付款'
+    ) AS level
+FROM
+    events
+GROUP BY
+    user_id
+order BY
+    user_id;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE events(
+    user_id BIGINT,
+    event_name VARCHAR(64),
+    event_timestamp datetime,
+    phone_brand varchar(64),
+    tab_num int
+) distributed by hash(user_id) buckets 3 properties("replication_num" = "1");
+----------
+[INSERT] INSERT INTO
+    events
+VALUES
+    (100123, '登录', '2022-05-14 10:01:00', 'HONOR', 1),
+    (100123, '访问', '2022-05-14 10:02:00', 'HONOR', 2),
+    (100123, '下单', '2022-05-14 10:04:00', "HONOR", 4),
+    (100123, '付款', '2022-05-14 10:04:00', 'HONOR', 4),
+    (100125, '登录', '2022-05-15 11:00:00', 'XIAOMI', 1),
+    (100125, '访问', '2022-05-15 11:01:00', 'XIAOMI', 2),
+    (100125, '下单', '2022-05-15 11:02:00', 'XIAOMI', 6),
+    (100126, '登录', '2022-05-15 12:00:00', 'IPHONE', 1),
+    (100126, '访问', '2022-05-15 12:01:00', 'HONOR', 2),
+    (100127, '登录', '2022-05-15 11:30:00', 'VIVO', 1),
+    (100127, '访问', '2022-05-15 11:31:00', 'VIVO', 5);
+----------
+[SELECT] SELECT
+    user_id,
+    window_funnel(
+        3600,
+        "increase",
+        event_timestamp,
+        event_name = '登录',
+        event_name = '访问',
+        event_name = '下单',
+        event_name = '付款'
+    ) AS level
+FROM
+    events
+GROUP BY
+    user_id
+order BY
+    user_id;
+----------
+[CREATE_TABLE|ADD_COLUMN] create table array_type_table(
+    k1 INT, 
+    k2 Array<int>
+) 
+duplicate key (k1)
+distributed by hash(k1) buckets 1 
+properties(
+    'replication_num' = '1'
+);
+----------
+[INSERT] insert into array_type_table values (0, []), (1, [NULL]), (2, [1, 2, 3]), (3, [1, NULL, 3]);
+----------
+[SELECT] select k2, array_avg(k2) from array_type_table;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE array_test (
+    id int,
+    col2 ARRAY<INT>,
+    col3 ARRAY<INT>
+)
+duplicate key (id)
+distributed by hash(id) buckets 1
+properties(
+  'replication_num' = '1'
+);
+----------
+[INSERT] INSERT INTO array_test (id, col2, col3) VALUES
+(1,[1, 2, 3], [3, 4, 5]),
+(2,[1, NULL, 2], [NULL]),
+(3,[1, 2, 3], NULL),
+(4,[], []);
+----------
+[SELECT] select col2, col3, array_concat(col2, col3) from array_test;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table array_test(id int, c_array1 array<int>, c_array2 array<int>) distributed by hash(id) buckets 1 properties ("replication_num"="1");
+----------
+[INSERT] insert into array_test values (1,[1,2,3,4,5],[10,20,-40,80,-100]),(2,[6,7,8],[10,12,13]),(3,[1],[-100]),(4,[1,null,2],[null,3,1]),(5,[],[]),(6,null,null);
+----------
+[CREATE_TABLE|ADD_COLUMN] create table array_type_table(
+    k1 INT, 
+    k2 Array<int>
+) 
+duplicate key (k1) 
+distributed by hash(k1) buckets 1 
+properties(
+    'replication_num' = '1'
+);
+----------
+[INSERT] insert into array_type_table values (0, []), 
+(1, [NULL]), 
+(2, [1, 2, 3, 4]), 
+(3, [1, NULL, 3, NULL, 5]);
+----------
+[SELECT] select k2, array_cum_sum(k2) from array_type_table;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE array_type_table (
+   k1 INT,
+   k2 ARRAY<INT>
+)
+duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+----------
+[INSERT] INSERT INTO array_type_table (k1, k2) VALUES
+(0, []),
+(1, [NULL]),
+(2, [1, 2, 3]),
+(3, [1, NULL, 3]),
+(4, [0, 1, 2, 3, NULL, 4, 6]),
+(5, [1, 2, 3, 4, 5, 4, 3, 2, 1]),
+(6, [6, 7, 8]);
+----------
+[SELECT] select *,array_difference(k2) from array_type_table;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE array_test (
+    k1 INT,
+    k2 ARRAY<INT>
+)
+duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+----------
+[INSERT] INSERT INTO array_test VALUES
+(1, [1, 2, 3, 4, 5]),
+(2, [6, 7, 8]),
+(3, []),
+(4, NULL),
+(5, [1, 2, 3, 4, 5, 4, 3, 2, 1]),
+(6, [1, 2, 3, NULL]),
+(7, [1, 2, 3, NULL, NULL]);
+----------
+[SELECT] select k1, k2, array_distinct(k2) from array_test;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE array_test01 (
+   k1 INT,
+   k2 ARRAY<VARCHAR>
+)
+duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+----------
+[INSERT] INSERT INTO array_test01 VALUES
+(1, ['a', 'b', 'c', 'd', 'e']),
+(2, ['f', 'g', 'h']),
+(3, ['']),
+(3, [NULL]),
+(5, ['a', 'b', 'c', 'd', 'e', 'a', 'b', 'c']),
+(6, NULL),
+(7, ['a', 'b', NULL]),
+(8, ['a', 'b', NULL, NULL]);
+----------
+[SELECT] select k1, k2, array_distinct(k2) from array_test01;
+----------
+[CREATE_TABLE|ADD_COLUMN] create table array_type_table(
+    k1 INT, 
+    k2 Array<STRING>
+) 
+duplicate key (k1)
+distributed by hash(k1) buckets 1 
+properties(
+    'replication_num' = '1'
+);
+----------
+[INSERT] insert into array_type_table values (0, []), 
+("1", [NULL]), 
+("2", ["1", "2", "3"]), 
+("3", ["1", NULL, "3"]), 
+("4", NULL);
+----------
+[SELECT] select k2, array_enumerate(k2) from array_type_table;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE array_type_table (
+    k1 INT,
+    k2 ARRAY<INT>,
+    k3 ARRAY<INT>
+)
+duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+----------
+[INSERT] INSERT INTO array_type_table VALUES
+(1, [1, 2, 3], [2, 4, 5]),
+(2, [2, 3], [1, 5]),
+(3, [1, 1, 1], [2, 2, 2]);
+----------
+[SELECT] select k1,k2,k3,array_except(k2,k3) from array_type_table;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE array_type_table_nullable (
+    k1 INT,
+    k2 ARRAY<INT>,
+    k3 ARRAY<INT>
+)
+duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+----------
+[INSERT] INSERT INTO array_type_table_nullable VALUES
+(1, [1, NULL, 3], [1, 3, 5]),
+(2, [NULL, NULL, 2], [2, NULL, 4]),
+(3, NULL, [1, 2, 3]);
+----------
+[SELECT] select k1,k2,k3,array_except(k2,k3) from array_type_table_nullable;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE array_type_table_varchar (
+    k1 INT,
+    k2 ARRAY<VARCHAR>,
+    k3 ARRAY<VARCHAR>
+)
+    duplicate key (k1)
+distributed by hash(k1) buckets 1
+properties(
+  'replication_num' = '1'
+);
+----------
+[INSERT] INSERT INTO array_type_table_varchar VALUES
+(1, ['hello', 'world', 'c++'], ['I', 'am', 'c++']),
+(2, ['a1', 'equals', 'b1'], ['a2', 'equals', 'b2']),
+(3, ['hasnull', NULL, 'value'], ['nohasnull', 'nonull', 'value']),
+(3, ['hasnull', NULL, 'value'], ['hasnull', NULL, 'value']);
+----------
+[SELECT] select k1,k2,k3,array_except(k2,k3) from array_type_table_varchar;

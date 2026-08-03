@@ -1,0 +1,332 @@
+SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' FORMAT JSON RETURNING text))
+;
+SELECT JSON_OBJECT('code' VALUE 'P123', 'title': 'Jaws' RETURNING jsonb)
+;
+SELECT JSON_ARRAY(RETURNING bytea)
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v ABSENT ON NULL)
+OVER (ORDER BY k)
+FROM (VALUES (1,1), (1,null), (2,2)) a(k,v)
+;
+SELECT JSON_OBJECT(
+	'a': '123',
+	1.23: 123,
+	'c': json '[ 1,true,{ } ]',
+	'd': jsonb '{ "x" : 123.45 }'
+)
+;
+SELECT JSON_ARRAY(SELECT i, i FROM (VALUES (1)) foo(i))
+;
+SELECT test_slru_page_exists(0x1234500000000)
+;
+SELECT xmlserialize(CONTENT  '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+--SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i) NULL ON NULL);
+--SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i) NULL ON NULL RETURNING jsonb);
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (3), (1), (NULL), (2)) foo(i) ORDER BY i)
+;
+WITH uuidts AS (
+    SELECT y, ts as ts, lag(ts) OVER (ORDER BY y) AS prev_ts
+    FROM (SELECT y, uuid_extract_timestamp(uuidv7((y || ' years')::interval)) AS ts
+        FROM generate_series(1970 - extract(year from now())::int, 10888 - extract(year from now())::int) y)
+)
+SELECT y, ts, prev_ts FROM uuidts WHERE ts < prev_ts
+;
+SELECT
+	JSON_OBJECTAGG(i: i),
+--	JSON_OBJECTAGG(i VALUE i),
+--	JSON_OBJECTAGG(KEY i VALUE i),
+	JSON_OBJECTAGG(i: i RETURNING jsonb)
+FROM
+	generate_series(1, 5) i
+;
+SELECT JSON_OBJECT(RETURNING bytea FORMAT JSON)
+;
+-- JSON_OBJECTAGG()
+SELECT	JSON_OBJECTAGG('key': 1) IS NULL,
+		JSON_OBJECTAGG('key': 1 RETURNING jsonb) IS NULL
+WHERE FALSE
+;
+SELECT JSON_ARRAY(NULL, NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+SELECT JSON_OBJECT(RETURNING text)
+;
+SELECT 0x12345678::int4::bytea AS "\x12345678", (-0x12345678)::int4::bytea AS "\xedcba988"
+;
+with test1 as (select * from table1) select * from (with test2 as (select * from table2) select * from test2)
+;
+SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' RETURNING text))
+;
+SELECT JSON_OBJECT('a': 2::text)
+;
+-- error
+
+-- Subselects without aliases
+
+SELECT count FROM (SELECT COUNT(DISTINCT name) FROM road)
+;
+SELECT NULL::json IS JSON
+;
+SELECT JSON_OBJECT('a' || 2: 1)
+;
+select x, lag(x, 1) over (order by x), lead(x, 3) over (order by x)
+from (select x::numeric as x from generate_series(1,10) x)
+;
+SELECT JSON_ARRAYAGG(JSON_ARRAY(i, i + 1 RETURNING text) FORMAT JSON NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (2)) AS t(i)
+;
+SELECT JSON_OBJECTAGG(NULL: 1 RETURNING jsonb)
+;
+explain (analyze,buffers off,costs off) select sum(n) over(partition by m) from (SELECT n < 3 as m, n from generate_series(1,2500) a(n))
+;
+-- Reading page not in buffer with read-only
+SELECT test_slru_page_readonly(0x1234500000001)
+;
+SELECT NULL::text IS JSON
+;
+SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+SELECT xmlserialize(DOCUMENT '<foo><bar></bar></foo>' AS text INDENT)
+;
+SELECT xmlserialize(DOCUMENT '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+SELECT js IS JSON ARRAY WITH UNIQUE KEYS AS array_unique,
+       js IS JSON ARRAY WITHOUT UNIQUE KEYS AS array_without_unique,
+       js IS NOT JSON OBJECT AS not_object
+FROM (VALUES ('[{"a":"1"}, {"b":"2","b":"3"}]')) AS foo(js)
+;
+SELECT JSON_ARRAYAGG(i ORDER BY i DESC RETURNING jsonb) FROM (VALUES (1), (2), (NULL), (3)) AS t(i)
+;
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (3), (1), (NULL), (2)) foo(i) ORDER BY i)
+;
+EXPLAIN (COSTS OFF) MERGE INTO stats_track_tab USING (SELECT id FROM generate_series(1, 10) id) ON x = id
+  WHEN MATCHED THEN UPDATE SET x = id
+  WHEN NOT MATCHED THEN INSERT (x) VALUES (id)
+;
+SELECT JSON_OBJECT(RETURNING jsonb)
+;
+SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': stable_one() RETURNING text) FORMAT JSON)
+;
+SELECT JSON_OBJECT(1: 1, '1': NULL ABSENT ON NULL WITH UNIQUE)
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': stable_one() RETURNING text) FORMAT JSON)
+;
+SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+SELECT 1_000.5e0_1
+;
+-- indent non singly-rooted xml
+SELECT xmlserialize(DOCUMENT '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+SELECT NULL IS NOT JSON
+;
+select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+SELECT count(test_slru_page_write(a, 'Test SLRU 64-bit'))
+  FROM generate_series(0x1234500000001, 0x1234500000030, 1) as a
+;
+SELECT 0x1122334455667788::int8::bytea AS "\x1122334455667788",
+       (-0x1122334455667788)::int8::bytea AS "\xeeddccbbaa998878"
+;
+SELECT JSON_OBJECT('a' VALUE 2::text)
+;
+SELECT JSON_OBJECT(('a' || 2) VALUE 1)
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' FORMAT JSON RETURNING text))
+;
+----------
+[SELECT] SELECT JSON_OBJECT('code' VALUE 'P123', 'title': 'Jaws' RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING bytea)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+----------
+[SELECT] SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v ABSENT ON NULL)
+OVER (ORDER BY k)
+FROM (VALUES (1,1), (1,null), (2,2)) a(k,v)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(
+	'a': '123',
+	1.23: 123,
+	'c': json '[ 1,true,{ } ]',
+	'd': jsonb '{ "x" : 123.45 }'
+)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT i, i FROM (VALUES (1)) foo(i))
+;
+----------
+[SELECT] SELECT test_slru_page_exists(0x1234500000000)
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] --SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i) NULL ON NULL);
+--SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i) NULL ON NULL RETURNING jsonb);
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (3), (1), (NULL), (2)) foo(i) ORDER BY i)
+;
+----------
+[SELECT] WITH uuidts AS (
+    SELECT y, ts as ts, lag(ts) OVER (ORDER BY y) AS prev_ts
+    FROM (SELECT y, uuid_extract_timestamp(uuidv7((y || ' years')::interval)) AS ts
+        FROM generate_series(1970 - extract(year from now())::int, 10888 - extract(year from now())::int) y)
+)
+SELECT y, ts, prev_ts FROM uuidts WHERE ts < prev_ts
+;
+----------
+[SELECT] SELECT
+	JSON_OBJECTAGG(i: i),
+--	JSON_OBJECTAGG(i VALUE i),
+--	JSON_OBJECTAGG(KEY i VALUE i),
+	JSON_OBJECTAGG(i: i RETURNING jsonb)
+FROM
+	generate_series(1, 5) i
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING bytea FORMAT JSON)
+;
+----------
+[SELECT] -- JSON_OBJECTAGG()
+SELECT	JSON_OBJECTAGG('key': 1) IS NULL,
+		JSON_OBJECTAGG('key': 1 RETURNING jsonb) IS NULL
+WHERE FALSE
+;
+----------
+[SELECT] SELECT JSON_ARRAY(NULL, NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING text)
+;
+----------
+[SELECT] SELECT 0x12345678::int4::bytea AS "\x12345678", (-0x12345678)::int4::bytea AS "\xedcba988"
+;
+----------
+[SELECT] with test1 as (select * from table1) select * from (with test2 as (select * from table2) select * from test2)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' RETURNING text))
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': 2::text)
+;
+----------
+[SELECT] -- error
+
+-- Subselects without aliases
+
+SELECT count FROM (SELECT COUNT(DISTINCT name) FROM road)
+;
+----------
+[SELECT] SELECT NULL::json IS JSON
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a' || 2: 1)
+;
+----------
+[SELECT] select x, lag(x, 1) over (order by x), lead(x, 3) over (order by x)
+from (select x::numeric as x from generate_series(1,10) x)
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(JSON_ARRAY(i, i + 1 RETURNING text) FORMAT JSON NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (2)) AS t(i)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(NULL: 1 RETURNING jsonb)
+;
+----------
+[SELECT] explain (analyze,buffers off,costs off) select sum(n) over(partition by m) from (SELECT n < 3 as m, n from generate_series(1,2500) a(n))
+;
+----------
+[SELECT] -- Reading page not in buffer with read-only
+SELECT test_slru_page_readonly(0x1234500000001)
+;
+----------
+[SELECT] SELECT NULL::text IS JSON
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT '<foo><bar></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] SELECT js IS JSON ARRAY WITH UNIQUE KEYS AS array_unique,
+       js IS JSON ARRAY WITHOUT UNIQUE KEYS AS array_without_unique,
+       js IS NOT JSON OBJECT AS not_object
+FROM (VALUES ('[{"a":"1"}, {"b":"2","b":"3"}]')) AS foo(js)
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(i ORDER BY i DESC RETURNING jsonb) FROM (VALUES (1), (2), (NULL), (3)) AS t(i)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT i FROM (VALUES (3), (1), (NULL), (2)) foo(i) ORDER BY i)
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF) MERGE INTO stats_track_tab USING (SELECT id FROM generate_series(1, 10) id) ON x = id
+  WHEN MATCHED THEN UPDATE SET x = id
+  WHEN NOT MATCHED THEN INSERT (x) VALUES (id)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': stable_one() RETURNING text) FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1: 1, '1': NULL ABSENT ON NULL WITH UNIQUE)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': stable_one() RETURNING text) FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+----------
+[SELECT] SELECT 1_000.5e0_1
+;
+----------
+[SELECT] -- indent non singly-rooted xml
+SELECT xmlserialize(DOCUMENT '<foo>73</foo><bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] SELECT NULL IS NOT JSON
+;
+----------
+[SELECT] select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+----------
+[SELECT] SELECT count(test_slru_page_write(a, 'Test SLRU 64-bit'))
+  FROM generate_series(0x1234500000001, 0x1234500000030, 1) as a
+;
+----------
+[SELECT] SELECT 0x1122334455667788::int8::bytea AS "\x1122334455667788",
+       (-0x1122334455667788)::int8::bytea AS "\xeeddccbbaa998878"
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a' VALUE 2::text)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(('a' || 2) VALUE 1)
+;

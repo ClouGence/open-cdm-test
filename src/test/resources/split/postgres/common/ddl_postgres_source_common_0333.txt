@@ -1,0 +1,546 @@
+CREATE AGGREGATE alt_agg1 (
+  sfunc1 = int4pl, basetype = int4, stype1 = int4, initcond = 100
+)
+;
+ALTER TABLE ONLY "public"."spgist_unlogged_tbl" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."spgist_unlogged_tbl_id_seq"'::"regclass")
+;
+CREATE SCHEMA "regress_rls_schema"
+;
+DROP FUNCTION leakproof(anyelement)
+;
+CREATE VIEW _pg_foreign_data_wrappers AS
+    SELECT w.oid,
+           w.fdwowner,
+           w.fdwoptions,
+           CAST(current_database() AS sql_identifier) AS foreign_data_wrapper_catalog,
+           CAST(fdwname AS sql_identifier) AS foreign_data_wrapper_name,
+           CAST(u.rolname AS sql_identifier) AS authorization_identifier,
+           CAST('c' AS character_data) AS foreign_data_wrapper_language
+    FROM pg_foreign_data_wrapper w, pg_authid u
+    WHERE u.oid = w.fdwowner
+          AND (pg_has_role(fdwowner, 'USAGE')
+               OR has_foreign_data_wrapper_privilege(w.oid, 'USAGE'))
+;
+CREATE TABLE brin_insert_optimization (a int)
+;
+ANALYZE public.rtest_order1
+;
+-- Misc N-dimensional functions
+
+CREATE FUNCTION cube_subset(cube, int4[])
+RETURNS cube
+AS '$libdir/cube'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+VACUUM (ANALYZE) pg_catalog.pg_attribute
+;
+CREATE TABLE s2.t2 (
+				i INTEGER,
+				b BOX,
+				ia int4[],
+				ir int4range,
+				t TEXT
+			)
+;
+CREATE OPERATOR CLASS ismn13_ops DEFAULT
+	FOR TYPE ismn13 USING hash FAMILY isn_ops AS
+	OPERATOR 1  =,
+	FUNCTION 1  hashismn13(ismn13)
+;
+CREATE INDEX dummy_test_idx ON dummy_test_tab
+  USING dummy_index_am (i)
+;
+ALTER TABLE pg_toast.pg_toast_30363 RENAME TO reind_con_toast
+;
+-- data modification
+CREATE TABLE fewmore AS SELECT generate_series(1,3) AS data
+;
+CREATE TABLE "public"."gtest25" (
+    "a" integer NOT NULL,
+    "b" integer GENERATED ALWAYS AS (("a" * 3)) STORED,
+    "c" integer DEFAULT 42,
+    "x" integer GENERATED ALWAYS AS (("c" * 4)) STORED,
+    "d" double precision DEFAULT 101,
+    "y" double precision GENERATED ALWAYS AS (("d" * (4)::double precision)) STORED
+)
+;
+ALTER INDEX pg_toast.pg_toast_28341_index RENAME TO reind_con_toast_idx
+;
+DROP POLICY pp1 ON part_document
+;
+VACUUM brin_iso
+;
+CREATE SCHEMA test_func_dep3
+;
+create temp table p_t1_1 partition of p_t1 for values in(1)
+;
+CREATE INDEX enumidx ON enumtmp USING gist ( a )
+;
+ANALYZE pg_temp_9.pg_temp_25621_2
+;
+VACUUM (PARALLEL 2) pg_catalog.pg_trigger
+;
+ANALYZE public.beta_pos_p3
+;
+ALTER TABLE fprt2 ATTACH PARTITION ftprt2_p1 FOR VALUES FROM (0) TO (250)
+;
+CREATE TABLE part2 PARTITION OF parted FOR VALUES IN (2)
+;
+VACUUM (SKIP_LOCKED) pg_catalog.pg_largeobject
+;
+-- Clean up.
+DROP TABLE hash_split_heap
+;
+CREATE FUNCTION "public"."table_succeed"("r" "anyrange") RETURNS TABLE("l" "anyelement", "u" "anyelement")
+    LANGUAGE "sql"
+    AS $_$ select lower($1), upper($1) $_$
+;
+CREATE SUBSCRIPTION tap_sub
+	CONNECTION 'port=29945 host=/tmp/xYnqv8rppW dbname=postgres application_name=tap_sub'
+	PUBLICATION tap_pub
+	WITH (streaming = on, two_phase = on)
+;
+DO $x$
+DECLARE
+	r record;
+	r2 record;
+	cond text;
+	idx_ctids tid[];
+	ss_ctids tid[];
+	count int;
+	plan_ok bool;
+	plan_line text;
+BEGIN
+	FOR r IN SELECT colname, oper, typ, value[ordinality], matches[ordinality] FROM brinopers_multi, unnest(op) WITH ORDINALITY AS oper LOOP
+
+		-- prepare the condition
+		IF r.value IS NULL THEN
+			cond := format('%I %s %L', r.colname, r.oper, r.value);
+		ELSE
+			cond := format('%I %s %L::%s', r.colname, r.oper, r.value, r.typ);
+		END IF;
+
+		-- run the query using the brin index
+		SET enable_seqscan = 0;
+		SET enable_bitmapscan = 1;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest_multi WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Bitmap Heap Scan on brintest_multi%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get bitmap indexscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest_multi WHERE %s $y$, cond)
+			INTO idx_ctids;
+
+		-- run the query using a seqscan
+		SET enable_seqscan = 1;
+		SET enable_bitmapscan = 0;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest_multi WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Seq Scan on brintest_multi%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get seqscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest_multi WHERE %s $y$, cond)
+			INTO ss_ctids;
+
+		-- make sure both return the same results
+		count := array_length(idx_ctids, 1);
+
+		IF NOT (count = array_length(ss_ctids, 1) AND
+				idx_ctids @> ss_ctids AND
+				idx_ctids <@ ss_ctids) THEN
+			-- report the results of each scan to make the differences obvious
+			RAISE WARNING 'something not right in %: count %', r, count;
+			SET enable_seqscan = 1;
+			SET enable_bitmapscan = 0;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest_multi WHERE ' || cond LOOP
+				RAISE NOTICE 'seqscan: %', r2;
+			END LOOP;
+
+			SET enable_seqscan = 0;
+			SET enable_bitmapscan = 1;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest_multi WHERE ' || cond LOOP
+				RAISE NOTICE 'bitmapscan: %', r2;
+			END LOOP;
+		END IF;
+
+		-- make sure we found expected number of matches
+		IF count != r.matches THEN RAISE WARNING 'unexpected number of results % for %', count, r; END IF;
+	END LOOP;
+END;
+$x$
+;
+DROP CONVERSION IF EXISTS test_conversion_exists
+;
+create table t1()
+;
+CREATE TABLE clustertest (key int PRIMARY KEY)
+;
+CREATE TABLE addr_nsp.gentable (
+    a serial primary key CONSTRAINT a_chk CHECK (a > 0),
+    b text DEFAULT 'hello'
+)
+;
+create table s1.p2_2 partition of s1.p2 for values in (4, 5, 6)
+;
+CREATE INDEX onek_unique1 ON onek USING btree(unique1 int4_ops)
+;
+ALTER TABLE ONLY list_parted2 ALTER b DROP NOT NULL
+;
+alter aggregate my_percentile_disc(float8 ORDER BY anyelement)
+  rename to test_percentile_disc
+;
+DROP SCHEMA test_ns_schema_2 CASCADE
+;
+create function returnssetofholes() returns setof has_hole language plpgsql as
+$$
+declare r record;
+  h has_hole;
+begin
+  return next h;
+  r := (1,2);
+  h := (3,4);
+  return next r;
+  return next h;
+  return next row(5,6);
+  return next row(7,8)::has_hole;
+  return query select 9, 10;
+end$$
+;
+VACUUM (SKIP_DATABASE_STATS) pg_catalog.pg_foreign_server
+;
+alter type insenum add value 'i13' before 'L2'
+;
+VACUUM (INDEX_CLEANUP FALSE) pg_catalog.pg_description
+;
+--     Case3 (R = N) && (B = A)
+--     ------------------------
+--     S    tf1
+--     -------
+--     N    N
+-- should CREATE
+CREATE AGGREGATE myaggn01a(*) (SFUNC = stfnp, STYPE = int4[],
+  FINALFUNC = ffnp, INITCOND = '{}')
+;
+DROP TABLESPACE regress_tblspace
+;
+create function simple1.simpletarget(int) returns int language plpgsql
+as $$begin return $1; end$$
+;
+DROP TABLE m
+;
+create table event_trigger_fire2 (a int)
+;
+CREATE TABLE quad_box_tbl_ord_seq2 AS
+SELECT rank() OVER (ORDER BY b <-> point '123,456') n, b <-> point '123,456' dist, id
+FROM quad_box_tbl WHERE b <@ box '((200,300),(500,600))'
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE AGGREGATE alt_agg1 (
+  sfunc1 = int4pl, basetype = int4, stype1 = int4, initcond = 100
+)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE ONLY "public"."spgist_unlogged_tbl" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."spgist_unlogged_tbl_id_seq"'::"regclass")
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA "regress_rls_schema"
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION leakproof(anyelement)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW _pg_foreign_data_wrappers AS
+    SELECT w.oid,
+           w.fdwowner,
+           w.fdwoptions,
+           CAST(current_database() AS sql_identifier) AS foreign_data_wrapper_catalog,
+           CAST(fdwname AS sql_identifier) AS foreign_data_wrapper_name,
+           CAST(u.rolname AS sql_identifier) AS authorization_identifier,
+           CAST('c' AS character_data) AS foreign_data_wrapper_language
+    FROM pg_foreign_data_wrapper w, pg_authid u
+    WHERE u.oid = w.fdwowner
+          AND (pg_has_role(fdwowner, 'USAGE')
+               OR has_foreign_data_wrapper_privilege(w.oid, 'USAGE'))
+;
+----------
+[CREATE_TABLE] CREATE TABLE brin_insert_optimization (a int)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.rtest_order1
+;
+----------
+[CREATE_PROG_OBJ] -- Misc N-dimensional functions
+
+CREATE FUNCTION cube_subset(cube, int4[])
+RETURNS cube
+AS '$libdir/cube'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[ADMIN_TABLE] VACUUM (ANALYZE) pg_catalog.pg_attribute
+;
+----------
+[CREATE_TABLE] CREATE TABLE s2.t2 (
+				i INTEGER,
+				b BOX,
+				ia int4[],
+				ir int4range,
+				t TEXT
+			)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR CLASS ismn13_ops DEFAULT
+	FOR TYPE ismn13 USING hash FAMILY isn_ops AS
+	OPERATOR 1  =,
+	FUNCTION 1  hashismn13(ismn13)
+;
+----------
+[ADD_INDEX] CREATE INDEX dummy_test_idx ON dummy_test_tab
+  USING dummy_index_am (i)
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_30363 RENAME TO reind_con_toast
+;
+----------
+[CREATE_TABLE|SELECT] -- data modification
+CREATE TABLE fewmore AS SELECT generate_series(1,3) AS data
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."gtest25" (
+    "a" integer NOT NULL,
+    "b" integer GENERATED ALWAYS AS (("a" * 3)) STORED,
+    "c" integer DEFAULT 42,
+    "x" integer GENERATED ALWAYS AS (("c" * 4)) STORED,
+    "d" double precision DEFAULT 101,
+    "y" double precision GENERATED ALWAYS AS (("d" * (4)::double precision)) STORED
+)
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_28341_index RENAME TO reind_con_toast_idx
+;
+----------
+[DROP_POLICY] DROP POLICY pp1 ON part_document
+;
+----------
+[ADMIN_TABLE] VACUUM brin_iso
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA test_func_dep3
+;
+----------
+[CREATE_TABLE] create temp table p_t1_1 partition of p_t1 for values in(1)
+;
+----------
+[ADD_INDEX] CREATE INDEX enumidx ON enumtmp USING gist ( a )
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_9.pg_temp_25621_2
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 2) pg_catalog.pg_trigger
+;
+----------
+[ADMIN_TABLE] ANALYZE public.beta_pos_p3
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE fprt2 ATTACH PARTITION ftprt2_p1 FOR VALUES FROM (0) TO (250)
+;
+----------
+[CREATE_TABLE] CREATE TABLE part2 PARTITION OF parted FOR VALUES IN (2)
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_LOCKED) pg_catalog.pg_largeobject
+;
+----------
+[DROP_TABLE] -- Clean up.
+DROP TABLE hash_split_heap
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."table_succeed"("r" "anyrange") RETURNS TABLE("l" "anyelement", "u" "anyelement")
+    LANGUAGE "sql"
+    AS $_$ select lower($1), upper($1) $_$
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION tap_sub
+	CONNECTION 'port=29945 host=/tmp/xYnqv8rppW dbname=postgres application_name=tap_sub'
+	PUBLICATION tap_pub
+	WITH (streaming = on, two_phase = on)
+;
+----------
+[BLOCK] DO $x$
+DECLARE
+	r record;
+	r2 record;
+	cond text;
+	idx_ctids tid[];
+	ss_ctids tid[];
+	count int;
+	plan_ok bool;
+	plan_line text;
+BEGIN
+	FOR r IN SELECT colname, oper, typ, value[ordinality], matches[ordinality] FROM brinopers_multi, unnest(op) WITH ORDINALITY AS oper LOOP
+
+		-- prepare the condition
+		IF r.value IS NULL THEN
+			cond := format('%I %s %L', r.colname, r.oper, r.value);
+		ELSE
+			cond := format('%I %s %L::%s', r.colname, r.oper, r.value, r.typ);
+		END IF;
+
+		-- run the query using the brin index
+		SET enable_seqscan = 0;
+		SET enable_bitmapscan = 1;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest_multi WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Bitmap Heap Scan on brintest_multi%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get bitmap indexscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest_multi WHERE %s $y$, cond)
+			INTO idx_ctids;
+
+		-- run the query using a seqscan
+		SET enable_seqscan = 1;
+		SET enable_bitmapscan = 0;
+
+		plan_ok := false;
+		FOR plan_line IN EXECUTE format($y$EXPLAIN SELECT array_agg(ctid) FROM brintest_multi WHERE %s $y$, cond) LOOP
+			IF plan_line LIKE '%Seq Scan on brintest_multi%' THEN
+				plan_ok := true;
+			END IF;
+		END LOOP;
+		IF NOT plan_ok THEN
+			RAISE WARNING 'did not get seqscan plan for %', r;
+		END IF;
+
+		EXECUTE format($y$SELECT array_agg(ctid) FROM brintest_multi WHERE %s $y$, cond)
+			INTO ss_ctids;
+
+		-- make sure both return the same results
+		count := array_length(idx_ctids, 1);
+
+		IF NOT (count = array_length(ss_ctids, 1) AND
+				idx_ctids @> ss_ctids AND
+				idx_ctids <@ ss_ctids) THEN
+			-- report the results of each scan to make the differences obvious
+			RAISE WARNING 'something not right in %: count %', r, count;
+			SET enable_seqscan = 1;
+			SET enable_bitmapscan = 0;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest_multi WHERE ' || cond LOOP
+				RAISE NOTICE 'seqscan: %', r2;
+			END LOOP;
+
+			SET enable_seqscan = 0;
+			SET enable_bitmapscan = 1;
+			FOR r2 IN EXECUTE 'SELECT ' || r.colname || ' FROM brintest_multi WHERE ' || cond LOOP
+				RAISE NOTICE 'bitmapscan: %', r2;
+			END LOOP;
+		END IF;
+
+		-- make sure we found expected number of matches
+		IF count != r.matches THEN RAISE WARNING 'unexpected number of results % for %', count, r; END IF;
+	END LOOP;
+END;
+$x$
+;
+----------
+[DROP_POLICY] DROP CONVERSION IF EXISTS test_conversion_exists
+;
+----------
+[CREATE_TABLE] create table t1()
+;
+----------
+[CREATE_TABLE] CREATE TABLE clustertest (key int PRIMARY KEY)
+;
+----------
+[CREATE_TABLE] CREATE TABLE addr_nsp.gentable (
+    a serial primary key CONSTRAINT a_chk CHECK (a > 0),
+    b text DEFAULT 'hello'
+)
+;
+----------
+[CREATE_TABLE] create table s1.p2_2 partition of s1.p2 for values in (4, 5, 6)
+;
+----------
+[ADD_INDEX] CREATE INDEX onek_unique1 ON onek USING btree(unique1 int4_ops)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE ONLY list_parted2 ALTER b DROP NOT NULL
+;
+----------
+[RENAME_PROG_OBJ] alter aggregate my_percentile_disc(float8 ORDER BY anyelement)
+  rename to test_percentile_disc
+;
+----------
+[DROP_SCHEMA] DROP SCHEMA test_ns_schema_2 CASCADE
+;
+----------
+[CREATE_PROG_OBJ] create function returnssetofholes() returns setof has_hole language plpgsql as
+$$
+declare r record;
+  h has_hole;
+begin
+  return next h;
+  r := (1,2);
+  h := (3,4);
+  return next r;
+  return next h;
+  return next row(5,6);
+  return next row(7,8)::has_hole;
+  return query select 9, 10;
+end$$
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS) pg_catalog.pg_foreign_server
+;
+----------
+[ALTER_TYPE] alter type insenum add value 'i13' before 'L2'
+;
+----------
+[ADMIN_TABLE] VACUUM (INDEX_CLEANUP FALSE) pg_catalog.pg_description
+;
+----------
+[CREATE_PROG_OBJ] --     Case3 (R = N) && (B = A)
+--     ------------------------
+--     S    tf1
+--     -------
+--     N    N
+-- should CREATE
+CREATE AGGREGATE myaggn01a(*) (SFUNC = stfnp, STYPE = int4[],
+  FINALFUNC = ffnp, INITCOND = '{}')
+;
+----------
+[DROP_TABLESPACE] DROP TABLESPACE regress_tblspace
+;
+----------
+[CREATE_PROG_OBJ] create function simple1.simpletarget(int) returns int language plpgsql
+as $$begin return $1; end$$
+;
+----------
+[DROP_TABLE] DROP TABLE m
+;
+----------
+[CREATE_TABLE] create table event_trigger_fire2 (a int)
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE quad_box_tbl_ord_seq2 AS
+SELECT rank() OVER (ORDER BY b <-> point '123,456') n, b <-> point '123,456' dist, id
+FROM quad_box_tbl WHERE b <@ box '((200,300),(500,600))'
+;

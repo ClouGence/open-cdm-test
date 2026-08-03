@@ -1,0 +1,2176 @@
+SELECT * FROM store_sales
+ORDER BY ss_sold_date_sk DESC, ss_sold_time_sk DESC, ss_item_sk DESC
+LIMIT 100
+;
+SELECT * FROM store_sales
+ORDER BY ss_sold_date_sk DESC, ss_sold_time_sk DESC, ss_item_sk DESC, ss_customer_sk DESC
+LIMIT 100
+;
+WITH
+  frequent_ss_items AS (
+   SELECT
+     substr(i_item_desc, 1, 30) itemdesc
+   , i_item_sk item_sk
+   , d_date solddate
+   , count(*) cnt
+   FROM
+     store_sales
+   , date_dim
+   , item
+   WHERE (ss_sold_date_sk = d_date_sk)
+      AND (ss_item_sk = i_item_sk)
+      AND (d_year IN (2000   , (2000 + 1)   , (2000 + 2)   , (2000 + 3)))
+   GROUP BY substr(i_item_desc, 1, 30), i_item_sk, d_date
+   HAVING (count(*) > 4)
+)
+, max_store_sales AS (
+   SELECT max(csales) tpcds_cmax
+   FROM
+     (
+      SELECT
+        c_customer_sk
+      , sum((ss_quantity * ss_sales_price)) csales
+      FROM
+        store_sales
+      , customer
+      , date_dim
+      WHERE (ss_customer_sk = c_customer_sk)
+         AND (ss_sold_date_sk = d_date_sk)
+         AND (d_year IN (2000      , (2000 + 1)      , (2000 + 2)      , (2000 + 3)))
+      GROUP BY c_customer_sk
+   ) x
+)
+, best_ss_customer AS (
+   SELECT
+     c_customer_sk
+   , sum((ss_quantity * ss_sales_price)) ssales
+   FROM
+     store_sales
+   , customer
+   WHERE (ss_customer_sk = c_customer_sk)
+   GROUP BY c_customer_sk
+   HAVING (sum((ss_quantity * ss_sales_price)) > ((50 / CAST('100.0' AS DECIMAL(5,1))) * (
+            SELECT *
+            FROM
+              max_store_sales
+         )))
+)
+SELECT sum(sales)
+FROM
+  (
+   SELECT (cs_quantity * cs_list_price) sales
+   FROM
+     catalog_sales
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (cs_sold_date_sk = d_date_sk)
+      AND (cs_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (cs_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+UNION ALL    SELECT (ws_quantity * ws_list_price) sales
+   FROM
+     web_sales
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (ws_sold_date_sk = d_date_sk)
+      AND (ws_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (ws_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+) y
+LIMIT 100
+;
+WITH
+  frequent_ss_items AS (
+   SELECT
+     substr(i_item_desc, 1, 30) itemdesc
+   , i_item_sk item_sk
+   , d_date solddate
+   , count(*) cnt
+   FROM
+     store_sales
+   , date_dim
+   , item
+   WHERE (ss_sold_date_sk = d_date_sk)
+      AND (ss_item_sk = i_item_sk)
+      AND (d_year IN (2000   , (2000 + 1)   , (2000 + 2)   , (2000 + 3)))
+   GROUP BY substr(i_item_desc, 1, 30), i_item_sk, d_date
+   HAVING (count(*) > 4)
+)
+, max_store_sales AS (
+   SELECT max(csales) tpcds_cmax
+   FROM
+     (
+      SELECT
+        c_customer_sk
+      , sum((ss_quantity * ss_sales_price)) csales
+      FROM
+        store_sales
+      , customer
+      , date_dim
+      WHERE (ss_customer_sk = c_customer_sk)
+         AND (ss_sold_date_sk = d_date_sk)
+         AND (d_year IN (2000      , (2000 + 1)      , (2000 + 2)      , (2000 + 3)))
+      GROUP BY c_customer_sk
+   ) x
+)
+, best_ss_customer AS (
+   SELECT
+     c_customer_sk
+   , sum((ss_quantity * ss_sales_price)) ssales
+   FROM
+     store_sales
+   , customer
+   WHERE (ss_customer_sk = c_customer_sk)
+   GROUP BY c_customer_sk
+   HAVING (sum((ss_quantity * ss_sales_price)) > ((50 / CAST('100.0' AS DECIMAL(5,1))) * (
+            SELECT *
+            FROM
+              max_store_sales
+         )))
+)
+SELECT
+  c_last_name
+, c_first_name
+, sales
+FROM
+  (
+   SELECT
+     c_last_name
+   , c_first_name
+   , sum((cs_quantity * cs_list_price)) sales
+   FROM
+     catalog_sales
+   , customer
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (cs_sold_date_sk = d_date_sk)
+      AND (cs_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (cs_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+      AND (cs_bill_customer_sk = c_customer_sk)
+   GROUP BY c_last_name, c_first_name
+UNION ALL    SELECT
+     c_last_name
+   , c_first_name
+   , sum((ws_quantity * ws_list_price)) sales
+   FROM
+     web_sales
+   , customer
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (ws_sold_date_sk = d_date_sk)
+      AND (ws_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (ws_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+      AND (ws_bill_customer_sk = c_customer_sk)
+   GROUP BY c_last_name, c_first_name
+) z 
+ORDER BY c_last_name ASC, c_first_name ASC, sales ASC
+LIMIT 100
+;
+SELECT 
+sum(cs_ext_discount_amt) 'excess discount amount'
+FROM
+  catalog_sales
+, item
+, date_dim
+WHERE (i_manufact_id = 977)
+   AND (i_item_sk = cs_item_sk)
+   AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+   AND (d_date_sk = cs_sold_date_sk)
+   AND (cs_ext_discount_amt > (
+      SELECT (CAST('1.3' AS DECIMAL(2,1)) * avg(cs_ext_discount_amt))
+      FROM
+        catalog_sales
+      , date_dim
+      WHERE (cs_item_sk = i_item_sk)
+         AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+         AND (d_date_sk = cs_sold_date_sk)
+   ))
+LIMIT 100
+;
+SELECT 
+sum(ws_ext_discount_amt) 'Excess Discount Amount'
+FROM
+  web_sales
+, item
+, date_dim
+WHERE (i_manufact_id = 350)
+   AND (i_item_sk = ws_item_sk)
+   AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+   AND (d_date_sk = ws_sold_date_sk)
+   AND (ws_ext_discount_amt > (
+      SELECT (CAST('1.3' AS DECIMAL(2,1)) * avg(ws_ext_discount_amt))
+      FROM
+        web_sales
+      , date_dim
+      WHERE (ws_item_sk = i_item_sk)
+         AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+         AND (d_date_sk = ws_sold_date_sk)
+   ))
+ORDER BY sum(ws_ext_discount_amt) ASC
+LIMIT 100
+;
+select /*+ SET_VAR(query_timeout = 600) */ ref_1.`i_product_name` as c0, ref_0.`i_category_id` as c1, ref_0.`i_formulation` as c2, ref_0.`i_manager_id` as c3, ref_0.`i_product_name` as c4, ref_1.`i_product_name` as c5, ref_0.`i_size` as c6, avg( cast(42 as int)) over (partition by ref_1.`i_product_name`,ref_1.`i_product_name` order by ref_1.`i_product_name`,ref_1.`i_product_name`) as c7, ref_0.`i_brand` as c8 from regression_test_tpcds_sf1_unique_ck_p1.item as ref_0 inner join regression_test_tpcds_sf1_unique_ck_p1.item as ref_1 on (ref_0.`i_item_desc` = ref_1.`i_product_name` ) where ref_0.`i_product_name` IN ( (select `i_item_id` from regression_test_tpcds_sf1_unique_ck_p1.item limit 187) ) order by ref_0.`i_current_price`
+;
+select /*+ SET_VAR(query_timeout = 600) */ ref_1.`i_product_name` as c0, ref_0.`i_category_id` as c1, ref_0.`i_formulation` as c2, ref_0.`i_manager_id` as c3, ref_0.`i_product_name` as c4, ref_1.`i_product_name` as c5, ref_0.`i_size` as c6, avg( cast(42 as int)) over (partition by ref_1.`i_product_name`,ref_1.`i_product_name` order by ref_1.`i_product_name`,ref_1.`i_product_name`) as c7, ref_0.`i_brand` as c8 from regression_test_tpcds_sf1_unique_p1.item as ref_0 inner join regression_test_tpcds_sf1_unique_p1.item as ref_1 on (ref_0.`i_item_desc` = ref_1.`i_product_name` ) where ref_0.`i_product_name` IN ( (select `i_item_id` from regression_test_tpcds_sf1_unique_p1.item limit 187) ) order by ref_0.`i_current_price`
+;
+-- tables: lineitem
+SELECT
+  l_returnflag,
+  l_linestatus,
+  sum(l_quantity)                                       AS sum_qty,
+  sum(l_extendedprice)                                  AS sum_base_price,
+  sum(l_extendedprice * (1 - l_discount))               AS sum_disc_price,
+  sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
+  avg(l_quantity)                                       AS avg_qty,
+  avg(l_extendedprice)                                  AS avg_price,
+  avg(l_discount)                                       AS avg_disc,
+  count(*)                                              AS count_order
+FROM
+  lineitem
+WHERE
+  l_shipdate <= DATE '1998-12-01' - INTERVAL '90' DAY
+GROUP BY
+l_returnflag,
+l_linestatus
+ORDER BY
+l_returnflag,
+l_linestatus
+;
+-- tables: part,supplier,partsupp,nation,region
+SELECT
+  s_acctbal,
+  s_name,
+  n_name,
+  p_partkey,
+  p_mfgr,
+  s_address,
+  s_phone,
+  s_comment
+FROM
+  part,
+  supplier,
+  partsupp,
+  nation,
+  region
+WHERE
+  p_partkey = ps_partkey
+  AND s_suppkey = ps_suppkey
+  AND p_size = 15
+  AND p_type LIKE '%BRASS'
+  AND s_nationkey = n_nationkey
+  AND n_regionkey = r_regionkey
+  AND r_name = 'EUROPE'
+  AND ps_supplycost = (
+    SELECT min(ps_supplycost)
+    FROM
+      partsupp, supplier,
+      nation, region
+    WHERE
+      p_partkey = ps_partkey
+      AND s_suppkey = ps_suppkey
+      AND s_nationkey = n_nationkey
+      AND n_regionkey = r_regionkey
+      AND r_name = 'EUROPE'
+  )
+ORDER BY
+  s_acctbal DESC,
+  n_name,
+  s_name,
+  p_partkey
+LIMIT 100
+;
+-- tables: customer,orders,lineitem
+SELECT
+  l_orderkey,
+  sum(l_extendedprice * (1 - l_discount)) AS revenue,
+  o_orderdate,
+  o_shippriority
+FROM
+  customer,
+  orders,
+  lineitem
+WHERE
+  c_mktsegment = 'BUILDING'
+  AND c_custkey = o_custkey
+  AND l_orderkey = o_orderkey
+  AND o_orderdate < DATE '1995-03-15'
+  AND l_shipdate > DATE '1995-03-15'
+GROUP BY
+  l_orderkey,
+  o_orderdate,
+  o_shippriority
+ORDER BY
+  revenue DESC,
+  o_orderdate
+LIMIT 10
+;
+-- tables: orders,lineitem
+SELECT
+  o_orderpriority,
+  count(*) AS order_count
+FROM orders
+WHERE
+  o_orderdate >= DATE '1993-07-01'
+  AND o_orderdate < DATE '1993-07-01' + INTERVAL '3' MONTH
+AND EXISTS (
+SELECT *
+FROM lineitem
+WHERE
+l_orderkey = o_orderkey
+AND l_commitdate < l_receiptdate
+)
+GROUP BY
+o_orderpriority
+ORDER BY
+o_orderpriority
+;
+-- tables: customer,orders,lineitem,supplier,nation,region
+SELECT
+  n_name,
+  sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM
+  customer,
+  orders,
+  lineitem,
+  supplier,
+  nation,
+  region
+WHERE
+  c_custkey = o_custkey
+  AND l_orderkey = o_orderkey
+  AND l_suppkey = s_suppkey
+  AND c_nationkey = s_nationkey
+  AND s_nationkey = n_nationkey
+  AND n_regionkey = r_regionkey
+  AND r_name = 'ASIA'
+  AND o_orderdate >= DATE '1994-01-01'
+  AND o_orderdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+GROUP BY
+n_name
+ORDER BY
+revenue DESC
+;
+-- tables: lineitem
+
+SELECT sum(l_extendedprice * l_discount) AS revenue
+FROM
+  lineitem
+WHERE
+  l_shipdate >= DATE '1994-01-01'
+  AND l_shipdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+AND l_discount BETWEEN 0.06 - 0.01 AND .06 + 0.01
+AND l_quantity < 24
+;
+-- tables: supplier,lineitem,orders,customer,nation
+SELECT
+  supp_nation,
+  cust_nation,
+  l_year,
+  sum(volume) AS revenue
+FROM (
+       SELECT
+         n1.n_name                          AS supp_nation,
+         n2.n_name                          AS cust_nation,
+         extract(YEAR FROM l_shipdate)      AS l_year,
+         l_extendedprice * (1 - l_discount) AS volume
+       FROM
+         supplier,
+         lineitem,
+         orders,
+         customer,
+         nation n1,
+         nation n2
+       WHERE
+         s_suppkey = l_suppkey
+         AND o_orderkey = l_orderkey
+         AND c_custkey = o_custkey
+         AND s_nationkey = n1.n_nationkey
+         AND c_nationkey = n2.n_nationkey
+         AND (
+           (n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY')
+           OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE')
+         )
+         AND l_shipdate BETWEEN DATE '1995-01-01' AND DATE '1996-12-31'
+     ) AS shipping
+GROUP BY
+  supp_nation,
+  cust_nation,
+  l_year
+ORDER BY
+  supp_nation,
+  cust_nation,
+  l_year
+;
+-- tables: part,supplier,lineitem,orders,customer,nation,region
+SELECT
+  o_year,
+  sum(CASE
+      WHEN nation = 'BRAZIL'
+        THEN volume
+      ELSE 0
+      END) / sum(volume) AS mkt_share
+FROM (
+       SELECT
+         extract(YEAR FROM o_orderdate)     AS o_year,
+         l_extendedprice * (1 - l_discount) AS volume,
+         n2.n_name                          AS nation
+       FROM
+         part,
+         supplier,
+         lineitem,
+         orders,
+         customer,
+         nation n1,
+         nation n2,
+         region
+       WHERE
+         p_partkey = l_partkey
+         AND s_suppkey = l_suppkey
+         AND l_orderkey = o_orderkey
+         AND o_custkey = c_custkey
+         AND c_nationkey = n1.n_nationkey
+         AND n1.n_regionkey = r_regionkey
+         AND r_name = 'AMERICA'
+         AND s_nationkey = n2.n_nationkey
+         AND o_orderdate BETWEEN DATE '1995-01-01' AND DATE '1996-12-31'
+         AND p_type = 'ECONOMY ANODIZED STEEL'
+     ) AS all_nations
+GROUP BY
+  o_year
+ORDER BY
+  o_year
+;
+-- tables: part,supplier,lineitem,partsupp,orders,nation
+SELECT
+  nation,
+  o_year,
+  sum(amount) AS sum_profit
+FROM (
+       SELECT
+         n_name                                                          AS nation,
+         extract(YEAR FROM o_orderdate)                                  AS o_year,
+         l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity AS amount
+       FROM
+         part,
+         supplier,
+         lineitem,
+         partsupp,
+         orders,
+         nation
+       WHERE
+         s_suppkey = l_suppkey
+         AND ps_suppkey = l_suppkey
+         AND ps_partkey = l_partkey
+         AND p_partkey = l_partkey
+         AND o_orderkey = l_orderkey
+         AND s_nationkey = n_nationkey
+         AND p_name LIKE '%green%'
+     ) AS profit
+GROUP BY
+  nation,
+  o_year
+ORDER BY
+  nation,
+  o_year DESC
+;
+-- tables: customer,orders,lineitem,nation
+SELECT
+  c_custkey,
+  c_name,
+  sum(l_extendedprice * (1 - l_discount)) AS revenue,
+  c_acctbal,
+  n_name,
+  c_address,
+  c_phone,
+  c_comment
+FROM
+  customer,
+  orders,
+  lineitem,
+  nation
+WHERE
+  c_custkey = o_custkey
+  AND l_orderkey = o_orderkey
+  AND o_orderdate >= DATE '1993-10-01'
+  AND o_orderdate < DATE '1993-10-01' + INTERVAL '3' MONTH
+  AND l_returnflag = 'R'
+  AND c_nationkey = n_nationkey
+GROUP BY
+  c_custkey,
+  c_name,
+  c_acctbal,
+  c_phone,
+  n_name,
+  c_address,
+  c_comment
+ORDER BY
+  revenue DESC
+LIMIT 20
+;
+-- tables: partsupp,supplier,nation
+SELECT
+  ps_partkey,
+  sum(ps_supplycost * ps_availqty) AS value
+FROM
+  partsupp,
+  supplier,
+  nation
+WHERE
+  ps_suppkey = s_suppkey
+  AND s_nationkey = n_nationkey
+  AND n_name = 'GERMANY'
+GROUP BY
+  ps_partkey
+HAVING
+  sum(ps_supplycost * ps_availqty) > (
+    SELECT sum(ps_supplycost * ps_availqty) * 0.0001
+    FROM
+      partsupp,
+      supplier,
+      nation
+    WHERE
+      ps_suppkey = s_suppkey
+      AND s_nationkey = n_nationkey
+      AND n_name = 'GERMANY'
+  )
+ORDER BY
+  value DESC
+;
+-- tables: orders,lineitem
+SELECT
+  l_shipmode,
+  sum(CASE
+      WHEN o_orderpriority = '1-URGENT'
+           OR o_orderpriority = '2-HIGH'
+        THEN 1
+      ELSE 0
+      END) AS high_line_count,
+  sum(CASE
+      WHEN o_orderpriority <> '1-URGENT'
+           AND o_orderpriority <> '2-HIGH'
+        THEN 1
+      ELSE 0
+      END) AS low_line_count
+FROM
+  orders,
+  lineitem
+WHERE
+  o_orderkey = l_orderkey
+  AND l_shipmode IN ('MAIL', 'SHIP')
+  AND l_commitdate < l_receiptdate
+  AND l_shipdate < l_commitdate
+  AND l_receiptdate >= DATE '1994-01-01'
+  AND l_receiptdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+GROUP BY
+  l_shipmode
+ORDER BY
+  l_shipmode
+;
+-- tables: customer
+SELECT
+  c_count,
+  count(*) AS custdist
+FROM (
+       SELECT
+         c_custkey,
+         count(o_orderkey) AS c_count
+       FROM
+         customer
+         LEFT OUTER JOIN orders ON
+                                  c_custkey = o_custkey
+                                  AND o_comment NOT LIKE '%special%requests%'
+       GROUP BY
+         c_custkey
+     ) AS c_orders
+GROUP BY
+  c_count
+ORDER BY
+  custdist DESC,
+  c_count DESC
+;
+-- tables: lineitem,part
+SELECT 100.00 * sum(CASE
+                    WHEN p_type LIKE 'PROMO%'
+                      THEN l_extendedprice * (1 - l_discount)
+                    ELSE 0
+                    END) / sum(l_extendedprice * (1 - l_discount)) AS promo_revenue
+FROM
+  lineitem,
+  part
+WHERE
+  l_partkey = p_partkey
+  AND l_shipdate >= DATE '1995-09-01'
+  AND l_shipdate < DATE '1995-09-01' + INTERVAL '1' MONTH
+;
+-- tables: lineitem,supplier
+SELECT
+  s_suppkey,
+  s_name,
+  s_address,
+  s_phone,
+  total_revenue
+FROM
+  supplier,
+  revenue1
+WHERE
+  s_suppkey = supplier_no
+  AND total_revenue = (
+    SELECT max(total_revenue)
+    FROM
+      revenue1
+  )
+ORDER BY
+  s_suppkey;
+-- tables: partsupp,part,supplier
+SELECT
+  p_brand,
+  p_type,
+  p_size,
+  count(DISTINCT ps_suppkey) AS supplier_cnt
+FROM
+  partsupp,
+  part
+WHERE
+  p_partkey = ps_partkey
+  AND p_brand <> 'Brand#45'
+  AND p_type NOT LIKE 'MEDIUM POLISHED%'
+  AND p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
+  AND ps_suppkey NOT IN (
+    SELECT s_suppkey
+    FROM
+      supplier
+    WHERE
+      s_comment LIKE '%Customer%Complaints%'
+  )
+GROUP BY
+  p_brand,
+  p_type,
+  p_size
+ORDER BY
+  supplier_cnt DESC,
+  p_brand,
+  p_type,
+  p_size
+;
+-- tables: lineitem,part
+SELECT sum(l_extendedprice) / 7.0 AS avg_yearly
+FROM
+  lineitem,
+  part
+WHERE
+  p_partkey = l_partkey
+  AND p_brand = 'Brand#23'
+  AND p_container = 'MED BOX'
+  AND l_quantity < (
+    SELECT 0.2 * avg(l_quantity)
+    FROM
+      lineitem
+    WHERE
+      l_partkey = p_partkey
+  )
+;
+-- tables: customer,orders,lineitem
+SELECT
+  c_name,
+  c_custkey,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice,
+  sum(l_quantity)
+FROM
+  customer,
+  orders,
+  lineitem
+WHERE
+  o_orderkey IN (
+    SELECT l_orderkey
+    FROM
+      lineitem
+    GROUP BY
+      l_orderkey
+    HAVING
+      sum(l_quantity) > 300
+  )
+  AND c_custkey = o_custkey
+  AND o_orderkey = l_orderkey
+GROUP BY
+  c_name,
+  c_custkey,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice
+ORDER BY
+  o_totalprice DESC,
+  o_orderdate
+LIMIT 100
+;
+-- tables: lineitem,part
+SELECT sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM
+  lineitem,
+  part
+WHERE
+  (
+    p_partkey = l_partkey
+    AND p_brand = 'Brand#12'
+    AND p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
+    AND l_quantity >= 1 AND l_quantity <= 1 + 10
+    AND p_size BETWEEN 1 AND 5
+    AND l_shipmode IN ('AIR', 'AIR REG')
+    AND l_shipinstruct = 'DELIVER IN PERSON'
+  )
+  OR
+  (
+    p_partkey = l_partkey
+    AND p_brand = 'Brand#23'
+    AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
+    AND l_quantity >= 10 AND l_quantity <= 10 + 10
+    AND p_size BETWEEN 1 AND 10
+    AND l_shipmode IN ('AIR', 'AIR REG')
+    AND l_shipinstruct = 'DELIVER IN PERSON'
+  )
+  OR
+  (
+    p_partkey = l_partkey
+    AND p_brand = 'Brand#34'
+    AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
+    AND l_quantity >= 20 AND l_quantity <= 20 + 10
+    AND p_size BETWEEN 1 AND 15
+    AND l_shipmode IN ('AIR', 'AIR REG')
+    AND l_shipinstruct = 'DELIVER IN PERSON'
+  )
+;
+-- tables: supplier,nation,partsupp,lineitem,part
+SELECT
+  s_name,
+  s_address
+FROM
+  supplier, nation
+WHERE
+  s_suppkey IN (
+    SELECT ps_suppkey
+    FROM
+      partsupp
+    WHERE
+      ps_partkey IN (
+        SELECT p_partkey
+        FROM
+          part
+        WHERE
+          p_name LIKE 'forest%'
+      )
+      AND ps_availqty > (
+        SELECT 0.5 * sum(l_quantity)
+        FROM
+          lineitem
+        WHERE
+          l_partkey = ps_partkey
+          AND l_suppkey = ps_suppkey
+          AND l_shipdate >= date('1994-01-01')
+          AND l_shipdate < date('1994-01-01') + interval '1' YEAR
+)
+)
+AND s_nationkey = n_nationkey
+AND n_name = 'CANADA'
+ORDER BY s_name
+;
+-- tables: supplier,lineitem,orders,nation
+SELECT
+  s_name,
+  count(*) AS numwait
+FROM
+  supplier,
+  lineitem l1,
+  orders,
+  nation
+WHERE
+  s_suppkey = l1.l_suppkey
+  AND o_orderkey = l1.l_orderkey
+  AND o_orderstatus = 'F'
+  AND l1.l_receiptdate > l1.l_commitdate
+  AND exists(
+    SELECT *
+    FROM
+      lineitem l2
+    WHERE
+      l2.l_orderkey = l1.l_orderkey
+      AND l2.l_suppkey <> l1.l_suppkey
+  )
+  AND NOT exists(
+    SELECT *
+    FROM
+      lineitem l3
+    WHERE
+      l3.l_orderkey = l1.l_orderkey
+      AND l3.l_suppkey <> l1.l_suppkey
+      AND l3.l_receiptdate > l3.l_commitdate
+  )
+  AND s_nationkey = n_nationkey
+  AND n_name = 'SAUDI ARABIA'
+GROUP BY
+  s_name
+ORDER BY
+  numwait DESC,
+  s_name
+LIMIT 100
+;
+-- tables: orders,customer
+SELECT
+  cntrycode,
+  count(*)       AS numcust,
+  sum(c_acctbal) AS totacctbal
+FROM (
+       SELECT
+         substr(c_phone, 1, 2) AS cntrycode,
+         c_acctbal
+       FROM
+         customer
+       WHERE
+         substr(c_phone, 1, 2) IN
+         ('13', '31', '23', '29', '30', '18', '17')
+         AND c_acctbal > (
+           SELECT avg(c_acctbal)
+           FROM
+             customer
+           WHERE
+             c_acctbal > 0.00
+             AND substr(c_phone, 1, 2) IN
+                 ('13', '31', '23', '29', '30', '18', '17')
+         )
+         AND NOT exists(
+           SELECT *
+           FROM
+             orders
+           WHERE
+             o_custkey = c_custkey
+         )
+     ) AS custsale
+GROUP BY
+  cntrycode
+ORDER BY
+  cntrycode
+;
+-- tables: lineitem,supplier
+WITH revenue1 AS(
+  SELECT
+    l_suppkey AS supplier_no,
+    sum(l_extendedprice * (1 - l_discount)) AS total_revenue
+  FROM
+    lineitem
+  WHERE
+    l_shipdate >= DATE '1996-01-01'
+    AND l_shipdate < DATE '1996-01-01' + INTERVAL '3' MONTH
+  GROUP BY l_suppkey)
+
+SELECT
+  s_suppkey,
+  s_name,
+  s_address,
+  s_phone,
+  total_revenue
+FROM
+  supplier,
+  revenue1
+WHERE
+  s_suppkey = supplier_no
+  AND total_revenue = (
+    SELECT max(total_revenue)
+    FROM revenue1
+  )
+ORDER BY
+  s_suppkey
+;
+-- tables: lineitem
+SELECT
+
+  l_returnflag,
+  l_linestatus,
+  sum(l_quantity)                                       AS sum_qty,
+  sum(l_extendedprice)                                  AS sum_base_price,
+  sum(l_extendedprice * (1 - l_discount))               AS sum_disc_price,
+  sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
+  avg(l_quantity)                                       AS avg_qty,
+  avg(l_extendedprice)                                  AS avg_price,
+  avg(l_discount)                                       AS avg_disc,
+  count(*)                                              AS count_order
+FROM
+  lineitem
+WHERE
+  l_shipdate <= DATE '1998-12-01' - INTERVAL '90' DAY
+GROUP BY
+l_returnflag,
+l_linestatus
+ORDER BY
+l_returnflag,
+l_linestatus
+;
+-- tables: supplier,lineitem,orders,nation
+select
+s_name, count(*) as numwait
+from orders join
+(
+  select * from
+  lineitem l2 right semi join
+  (
+    select * from
+    lineitem l3 right anti join
+    (
+      select * from
+      lineitem l1 join
+      (
+        select * from
+        supplier join nation
+        where s_nationkey = n_nationkey
+          and n_name = 'SAUDI ARABIA'
+      ) t1
+      where t1.s_suppkey = l1.l_suppkey and l1.l_receiptdate > l1.l_commitdate
+    ) t2
+    on l3.l_orderkey = t2.l_orderkey and l3.l_suppkey <> t2.l_suppkey and l3.l_receiptdate > l3.l_commitdate
+  ) t3
+  on l2.l_orderkey = t3.l_orderkey and l2.l_suppkey <> t3.l_suppkey
+) t4
+on o_orderkey = t4.l_orderkey and o_orderstatus = 'F'
+group by
+    t4.s_name
+order by
+    numwait desc,
+    t4.s_name
+limit 100;
+-- tables: part,supplier,partsupp,nation,region
+
+SELECT
+  s_acctbal,
+  s_name,
+  n_name,
+  p_partkey,
+  p_mfgr,
+  s_address,
+  s_phone,
+  s_comment
+FROM
+  part,
+  supplier,
+  partsupp,
+  nation,
+  region
+WHERE
+  p_partkey = ps_partkey
+  AND s_suppkey = ps_suppkey
+  AND p_size = 15
+  AND p_type LIKE '%BRASS'
+  AND s_nationkey = n_nationkey
+  AND n_regionkey = r_regionkey
+  AND r_name = 'EUROPE'
+  AND ps_supplycost = (
+    SELECT min(ps_supplycost)
+    FROM
+      partsupp, supplier,
+      nation, region
+    WHERE
+      p_partkey = ps_partkey
+      AND s_suppkey = ps_suppkey
+      AND s_nationkey = n_nationkey
+      AND n_regionkey = r_regionkey
+      AND r_name = 'EUROPE'
+  )
+ORDER BY
+  s_acctbal DESC,
+  n_name,
+  s_name,
+  p_partkey
+LIMIT 100
+;
+SELECT
+  s_suppkey,
+  s_name,
+  s_address,
+  s_phone,
+  total_revenue
+FROM
+  supplier,
+  revenue1
+WHERE
+  s_suppkey = supplier_no
+  AND total_revenue = (
+    SELECT max(total_revenue)
+    FROM
+      revenue1
+  )
+ORDER BY
+  s_suppkey;
+-- tables: supplier,lineitem,orders,nation
+SELECT /*+SEV_VAR(batch_size=3)*/
+  l1.l_orderkey okey,
+  l1.l_suppkey  skey
+FROM
+  regression_test_tpch_unique_sql_zstd_bucket1_p0.lineitem l1
+WHERE
+  l1.l_receiptdate > l1.l_commitdate
+  AND l1.L_ORDERKEY < 10000
+  AND NOT exists(
+    SELECT *
+    FROM
+      regression_test_tpch_unique_sql_zstd_bucket1_p0.lineitem l3
+    WHERE
+      l3.l_orderkey = l1.l_orderkey
+      AND l3.l_suppkey <> l1.l_suppkey
+      AND l3.l_receiptdate > l3.l_commitdate
+      AND l3.L_ORDERKEY < 10000
+  )
+ORDER BY
+  okey, skey
+;
+SELECT COUNT(DISTINCT n_regionkey), COUNT(DISTINCT n_name), MIN(DISTINCT n_nationkey) FROM nation
+;
+SELECT COUNT(DISTINCT n_regionkey), COUNT(DISTINCT n_regionkey) FROM nation
+;
+SELECT COUNT(DISTINCT n_regionkey), COUNT(*) FROM nation
+;
+SELECT DISTINCT n_regionkey FROM nation
+;
+SELECT n_regionkey, COUNT(DISTINCT n_name) FROM nation
+GROUP BY n_regionkey
+HAVING n_regionkey < 4
+;
+SELECT DISTINCT r_name FROM region
+;
+SELECT DISTINCT n_regionkey FROM nation ORDER BY n_regionkey
+;
+select count(*), count(n_regionkey), min(n_regionkey), max(n_regionkey), sum(n_regionkey) from nation
+;
+select n_regionkey, count(*) from nation group by 1 having sum(n_regionkey) > 5 and sum(n_regionkey) < 20
+;
+select n_regionkey, count(*), sum(n_nationkey) from nation group by 1
+;
+select count(*), sum(n_nationkey) from nation where 1=2 group by n_regionkey
+;
+select n_regionkey, count(*), sum(n_regionkey) from nation where n_regionkey > 2 group by 1
+;
+select count(*), sum(n_nationkey) from nation where 1=2
+;
+select 2 from nation group by 1;
+select "oneline" from nation group by "I am a const, but not to be removed";
+select a from (select "abc" as a, '1' as b) T  group by b, a;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT * FROM store_sales
+ORDER BY ss_sold_date_sk DESC, ss_sold_time_sk DESC, ss_item_sk DESC
+LIMIT 100
+----------
+[SELECT] SELECT * FROM store_sales
+ORDER BY ss_sold_date_sk DESC, ss_sold_time_sk DESC, ss_item_sk DESC, ss_customer_sk DESC
+LIMIT 100
+----------
+[SELECT] WITH
+  frequent_ss_items AS (
+   SELECT
+     substr(i_item_desc, 1, 30) itemdesc
+   , i_item_sk item_sk
+   , d_date solddate
+   , count(*) cnt
+   FROM
+     store_sales
+   , date_dim
+   , item
+   WHERE (ss_sold_date_sk = d_date_sk)
+      AND (ss_item_sk = i_item_sk)
+      AND (d_year IN (2000   , (2000 + 1)   , (2000 + 2)   , (2000 + 3)))
+   GROUP BY substr(i_item_desc, 1, 30), i_item_sk, d_date
+   HAVING (count(*) > 4)
+)
+, max_store_sales AS (
+   SELECT max(csales) tpcds_cmax
+   FROM
+     (
+      SELECT
+        c_customer_sk
+      , sum((ss_quantity * ss_sales_price)) csales
+      FROM
+        store_sales
+      , customer
+      , date_dim
+      WHERE (ss_customer_sk = c_customer_sk)
+         AND (ss_sold_date_sk = d_date_sk)
+         AND (d_year IN (2000      , (2000 + 1)      , (2000 + 2)      , (2000 + 3)))
+      GROUP BY c_customer_sk
+   ) x
+)
+, best_ss_customer AS (
+   SELECT
+     c_customer_sk
+   , sum((ss_quantity * ss_sales_price)) ssales
+   FROM
+     store_sales
+   , customer
+   WHERE (ss_customer_sk = c_customer_sk)
+   GROUP BY c_customer_sk
+   HAVING (sum((ss_quantity * ss_sales_price)) > ((50 / CAST('100.0' AS DECIMAL(5,1))) * (
+            SELECT *
+            FROM
+              max_store_sales
+         )))
+)
+SELECT sum(sales)
+FROM
+  (
+   SELECT (cs_quantity * cs_list_price) sales
+   FROM
+     catalog_sales
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (cs_sold_date_sk = d_date_sk)
+      AND (cs_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (cs_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+UNION ALL    SELECT (ws_quantity * ws_list_price) sales
+   FROM
+     web_sales
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (ws_sold_date_sk = d_date_sk)
+      AND (ws_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (ws_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+) y
+LIMIT 100
+----------
+[SELECT] WITH
+  frequent_ss_items AS (
+   SELECT
+     substr(i_item_desc, 1, 30) itemdesc
+   , i_item_sk item_sk
+   , d_date solddate
+   , count(*) cnt
+   FROM
+     store_sales
+   , date_dim
+   , item
+   WHERE (ss_sold_date_sk = d_date_sk)
+      AND (ss_item_sk = i_item_sk)
+      AND (d_year IN (2000   , (2000 + 1)   , (2000 + 2)   , (2000 + 3)))
+   GROUP BY substr(i_item_desc, 1, 30), i_item_sk, d_date
+   HAVING (count(*) > 4)
+)
+, max_store_sales AS (
+   SELECT max(csales) tpcds_cmax
+   FROM
+     (
+      SELECT
+        c_customer_sk
+      , sum((ss_quantity * ss_sales_price)) csales
+      FROM
+        store_sales
+      , customer
+      , date_dim
+      WHERE (ss_customer_sk = c_customer_sk)
+         AND (ss_sold_date_sk = d_date_sk)
+         AND (d_year IN (2000      , (2000 + 1)      , (2000 + 2)      , (2000 + 3)))
+      GROUP BY c_customer_sk
+   ) x
+)
+, best_ss_customer AS (
+   SELECT
+     c_customer_sk
+   , sum((ss_quantity * ss_sales_price)) ssales
+   FROM
+     store_sales
+   , customer
+   WHERE (ss_customer_sk = c_customer_sk)
+   GROUP BY c_customer_sk
+   HAVING (sum((ss_quantity * ss_sales_price)) > ((50 / CAST('100.0' AS DECIMAL(5,1))) * (
+            SELECT *
+            FROM
+              max_store_sales
+         )))
+)
+SELECT
+  c_last_name
+, c_first_name
+, sales
+FROM
+  (
+   SELECT
+     c_last_name
+   , c_first_name
+   , sum((cs_quantity * cs_list_price)) sales
+   FROM
+     catalog_sales
+   , customer
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (cs_sold_date_sk = d_date_sk)
+      AND (cs_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (cs_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+      AND (cs_bill_customer_sk = c_customer_sk)
+   GROUP BY c_last_name, c_first_name
+UNION ALL    SELECT
+     c_last_name
+   , c_first_name
+   , sum((ws_quantity * ws_list_price)) sales
+   FROM
+     web_sales
+   , customer
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (ws_sold_date_sk = d_date_sk)
+      AND (ws_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (ws_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+      AND (ws_bill_customer_sk = c_customer_sk)
+   GROUP BY c_last_name, c_first_name
+) z 
+ORDER BY c_last_name ASC, c_first_name ASC, sales ASC
+LIMIT 100
+----------
+[SELECT] SELECT 
+sum(cs_ext_discount_amt) 'excess discount amount'
+FROM
+  catalog_sales
+, item
+, date_dim
+WHERE (i_manufact_id = 977)
+   AND (i_item_sk = cs_item_sk)
+   AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+   AND (d_date_sk = cs_sold_date_sk)
+   AND (cs_ext_discount_amt > (
+      SELECT (CAST('1.3' AS DECIMAL(2,1)) * avg(cs_ext_discount_amt))
+      FROM
+        catalog_sales
+      , date_dim
+      WHERE (cs_item_sk = i_item_sk)
+         AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+         AND (d_date_sk = cs_sold_date_sk)
+   ))
+LIMIT 100
+----------
+[SELECT] SELECT 
+sum(ws_ext_discount_amt) 'Excess Discount Amount'
+FROM
+  web_sales
+, item
+, date_dim
+WHERE (i_manufact_id = 350)
+   AND (i_item_sk = ws_item_sk)
+   AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+   AND (d_date_sk = ws_sold_date_sk)
+   AND (ws_ext_discount_amt > (
+      SELECT (CAST('1.3' AS DECIMAL(2,1)) * avg(ws_ext_discount_amt))
+      FROM
+        web_sales
+      , date_dim
+      WHERE (ws_item_sk = i_item_sk)
+         AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+         AND (d_date_sk = ws_sold_date_sk)
+   ))
+ORDER BY sum(ws_ext_discount_amt) ASC
+LIMIT 100
+----------
+[SELECT] select /*+ SET_VAR(query_timeout = 600) */ ref_1.`i_product_name` as c0, ref_0.`i_category_id` as c1, ref_0.`i_formulation` as c2, ref_0.`i_manager_id` as c3, ref_0.`i_product_name` as c4, ref_1.`i_product_name` as c5, ref_0.`i_size` as c6, avg( cast(42 as int)) over (partition by ref_1.`i_product_name`,ref_1.`i_product_name` order by ref_1.`i_product_name`,ref_1.`i_product_name`) as c7, ref_0.`i_brand` as c8 from regression_test_tpcds_sf1_unique_ck_p1.item as ref_0 inner join regression_test_tpcds_sf1_unique_ck_p1.item as ref_1 on (ref_0.`i_item_desc` = ref_1.`i_product_name` ) where ref_0.`i_product_name` IN ( (select `i_item_id` from regression_test_tpcds_sf1_unique_ck_p1.item limit 187) ) order by ref_0.`i_current_price`
+----------
+[SELECT] select /*+ SET_VAR(query_timeout = 600) */ ref_1.`i_product_name` as c0, ref_0.`i_category_id` as c1, ref_0.`i_formulation` as c2, ref_0.`i_manager_id` as c3, ref_0.`i_product_name` as c4, ref_1.`i_product_name` as c5, ref_0.`i_size` as c6, avg( cast(42 as int)) over (partition by ref_1.`i_product_name`,ref_1.`i_product_name` order by ref_1.`i_product_name`,ref_1.`i_product_name`) as c7, ref_0.`i_brand` as c8 from regression_test_tpcds_sf1_unique_p1.item as ref_0 inner join regression_test_tpcds_sf1_unique_p1.item as ref_1 on (ref_0.`i_item_desc` = ref_1.`i_product_name` ) where ref_0.`i_product_name` IN ( (select `i_item_id` from regression_test_tpcds_sf1_unique_p1.item limit 187) ) order by ref_0.`i_current_price`
+----------
+[SELECT] -- tables: lineitem
+SELECT
+  l_returnflag,
+  l_linestatus,
+  sum(l_quantity)                                       AS sum_qty,
+  sum(l_extendedprice)                                  AS sum_base_price,
+  sum(l_extendedprice * (1 - l_discount))               AS sum_disc_price,
+  sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
+  avg(l_quantity)                                       AS avg_qty,
+  avg(l_extendedprice)                                  AS avg_price,
+  avg(l_discount)                                       AS avg_disc,
+  count(*)                                              AS count_order
+FROM
+  lineitem
+WHERE
+  l_shipdate <= DATE '1998-12-01' - INTERVAL '90' DAY
+GROUP BY
+l_returnflag,
+l_linestatus
+ORDER BY
+l_returnflag,
+l_linestatus
+----------
+[SELECT] -- tables: part,supplier,partsupp,nation,region
+SELECT
+  s_acctbal,
+  s_name,
+  n_name,
+  p_partkey,
+  p_mfgr,
+  s_address,
+  s_phone,
+  s_comment
+FROM
+  part,
+  supplier,
+  partsupp,
+  nation,
+  region
+WHERE
+  p_partkey = ps_partkey
+  AND s_suppkey = ps_suppkey
+  AND p_size = 15
+  AND p_type LIKE '%BRASS'
+  AND s_nationkey = n_nationkey
+  AND n_regionkey = r_regionkey
+  AND r_name = 'EUROPE'
+  AND ps_supplycost = (
+    SELECT min(ps_supplycost)
+    FROM
+      partsupp, supplier,
+      nation, region
+    WHERE
+      p_partkey = ps_partkey
+      AND s_suppkey = ps_suppkey
+      AND s_nationkey = n_nationkey
+      AND n_regionkey = r_regionkey
+      AND r_name = 'EUROPE'
+  )
+ORDER BY
+  s_acctbal DESC,
+  n_name,
+  s_name,
+  p_partkey
+LIMIT 100
+----------
+[SELECT] -- tables: customer,orders,lineitem
+SELECT
+  l_orderkey,
+  sum(l_extendedprice * (1 - l_discount)) AS revenue,
+  o_orderdate,
+  o_shippriority
+FROM
+  customer,
+  orders,
+  lineitem
+WHERE
+  c_mktsegment = 'BUILDING'
+  AND c_custkey = o_custkey
+  AND l_orderkey = o_orderkey
+  AND o_orderdate < DATE '1995-03-15'
+  AND l_shipdate > DATE '1995-03-15'
+GROUP BY
+  l_orderkey,
+  o_orderdate,
+  o_shippriority
+ORDER BY
+  revenue DESC,
+  o_orderdate
+LIMIT 10
+----------
+[SELECT] -- tables: orders,lineitem
+SELECT
+  o_orderpriority,
+  count(*) AS order_count
+FROM orders
+WHERE
+  o_orderdate >= DATE '1993-07-01'
+  AND o_orderdate < DATE '1993-07-01' + INTERVAL '3' MONTH
+AND EXISTS (
+SELECT *
+FROM lineitem
+WHERE
+l_orderkey = o_orderkey
+AND l_commitdate < l_receiptdate
+)
+GROUP BY
+o_orderpriority
+ORDER BY
+o_orderpriority
+----------
+[SELECT] -- tables: customer,orders,lineitem,supplier,nation,region
+SELECT
+  n_name,
+  sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM
+  customer,
+  orders,
+  lineitem,
+  supplier,
+  nation,
+  region
+WHERE
+  c_custkey = o_custkey
+  AND l_orderkey = o_orderkey
+  AND l_suppkey = s_suppkey
+  AND c_nationkey = s_nationkey
+  AND s_nationkey = n_nationkey
+  AND n_regionkey = r_regionkey
+  AND r_name = 'ASIA'
+  AND o_orderdate >= DATE '1994-01-01'
+  AND o_orderdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+GROUP BY
+n_name
+ORDER BY
+revenue DESC
+----------
+[SELECT] SELECT sum(l_extendedprice * l_discount) AS revenue
+FROM
+  lineitem
+WHERE
+  l_shipdate >= DATE '1994-01-01'
+  AND l_shipdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+AND l_discount BETWEEN 0.06 - 0.01 AND .06 + 0.01
+AND l_quantity < 24
+----------
+[SELECT] -- tables: supplier,lineitem,orders,customer,nation
+SELECT
+  supp_nation,
+  cust_nation,
+  l_year,
+  sum(volume) AS revenue
+FROM (
+       SELECT
+         n1.n_name                          AS supp_nation,
+         n2.n_name                          AS cust_nation,
+         extract(YEAR FROM l_shipdate)      AS l_year,
+         l_extendedprice * (1 - l_discount) AS volume
+       FROM
+         supplier,
+         lineitem,
+         orders,
+         customer,
+         nation n1,
+         nation n2
+       WHERE
+         s_suppkey = l_suppkey
+         AND o_orderkey = l_orderkey
+         AND c_custkey = o_custkey
+         AND s_nationkey = n1.n_nationkey
+         AND c_nationkey = n2.n_nationkey
+         AND (
+           (n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY')
+           OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE')
+         )
+         AND l_shipdate BETWEEN DATE '1995-01-01' AND DATE '1996-12-31'
+     ) AS shipping
+GROUP BY
+  supp_nation,
+  cust_nation,
+  l_year
+ORDER BY
+  supp_nation,
+  cust_nation,
+  l_year
+----------
+[SELECT] -- tables: part,supplier,lineitem,orders,customer,nation,region
+SELECT
+  o_year,
+  sum(CASE
+      WHEN nation = 'BRAZIL'
+        THEN volume
+      ELSE 0
+      END) / sum(volume) AS mkt_share
+FROM (
+       SELECT
+         extract(YEAR FROM o_orderdate)     AS o_year,
+         l_extendedprice * (1 - l_discount) AS volume,
+         n2.n_name                          AS nation
+       FROM
+         part,
+         supplier,
+         lineitem,
+         orders,
+         customer,
+         nation n1,
+         nation n2,
+         region
+       WHERE
+         p_partkey = l_partkey
+         AND s_suppkey = l_suppkey
+         AND l_orderkey = o_orderkey
+         AND o_custkey = c_custkey
+         AND c_nationkey = n1.n_nationkey
+         AND n1.n_regionkey = r_regionkey
+         AND r_name = 'AMERICA'
+         AND s_nationkey = n2.n_nationkey
+         AND o_orderdate BETWEEN DATE '1995-01-01' AND DATE '1996-12-31'
+         AND p_type = 'ECONOMY ANODIZED STEEL'
+     ) AS all_nations
+GROUP BY
+  o_year
+ORDER BY
+  o_year
+----------
+[SELECT] -- tables: part,supplier,lineitem,partsupp,orders,nation
+SELECT
+  nation,
+  o_year,
+  sum(amount) AS sum_profit
+FROM (
+       SELECT
+         n_name                                                          AS nation,
+         extract(YEAR FROM o_orderdate)                                  AS o_year,
+         l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity AS amount
+       FROM
+         part,
+         supplier,
+         lineitem,
+         partsupp,
+         orders,
+         nation
+       WHERE
+         s_suppkey = l_suppkey
+         AND ps_suppkey = l_suppkey
+         AND ps_partkey = l_partkey
+         AND p_partkey = l_partkey
+         AND o_orderkey = l_orderkey
+         AND s_nationkey = n_nationkey
+         AND p_name LIKE '%green%'
+     ) AS profit
+GROUP BY
+  nation,
+  o_year
+ORDER BY
+  nation,
+  o_year DESC
+----------
+[SELECT] -- tables: customer,orders,lineitem,nation
+SELECT
+  c_custkey,
+  c_name,
+  sum(l_extendedprice * (1 - l_discount)) AS revenue,
+  c_acctbal,
+  n_name,
+  c_address,
+  c_phone,
+  c_comment
+FROM
+  customer,
+  orders,
+  lineitem,
+  nation
+WHERE
+  c_custkey = o_custkey
+  AND l_orderkey = o_orderkey
+  AND o_orderdate >= DATE '1993-10-01'
+  AND o_orderdate < DATE '1993-10-01' + INTERVAL '3' MONTH
+  AND l_returnflag = 'R'
+  AND c_nationkey = n_nationkey
+GROUP BY
+  c_custkey,
+  c_name,
+  c_acctbal,
+  c_phone,
+  n_name,
+  c_address,
+  c_comment
+ORDER BY
+  revenue DESC
+LIMIT 20
+----------
+[SELECT] -- tables: partsupp,supplier,nation
+SELECT
+  ps_partkey,
+  sum(ps_supplycost * ps_availqty) AS value
+FROM
+  partsupp,
+  supplier,
+  nation
+WHERE
+  ps_suppkey = s_suppkey
+  AND s_nationkey = n_nationkey
+  AND n_name = 'GERMANY'
+GROUP BY
+  ps_partkey
+HAVING
+  sum(ps_supplycost * ps_availqty) > (
+    SELECT sum(ps_supplycost * ps_availqty) * 0.0001
+    FROM
+      partsupp,
+      supplier,
+      nation
+    WHERE
+      ps_suppkey = s_suppkey
+      AND s_nationkey = n_nationkey
+      AND n_name = 'GERMANY'
+  )
+ORDER BY
+  value DESC
+----------
+[SELECT] -- tables: orders,lineitem
+SELECT
+  l_shipmode,
+  sum(CASE
+      WHEN o_orderpriority = '1-URGENT'
+           OR o_orderpriority = '2-HIGH'
+        THEN 1
+      ELSE 0
+      END) AS high_line_count,
+  sum(CASE
+      WHEN o_orderpriority <> '1-URGENT'
+           AND o_orderpriority <> '2-HIGH'
+        THEN 1
+      ELSE 0
+      END) AS low_line_count
+FROM
+  orders,
+  lineitem
+WHERE
+  o_orderkey = l_orderkey
+  AND l_shipmode IN ('MAIL', 'SHIP')
+  AND l_commitdate < l_receiptdate
+  AND l_shipdate < l_commitdate
+  AND l_receiptdate >= DATE '1994-01-01'
+  AND l_receiptdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+GROUP BY
+  l_shipmode
+ORDER BY
+  l_shipmode
+----------
+[SELECT] -- tables: customer
+SELECT
+  c_count,
+  count(*) AS custdist
+FROM (
+       SELECT
+         c_custkey,
+         count(o_orderkey) AS c_count
+       FROM
+         customer
+         LEFT OUTER JOIN orders ON
+                                  c_custkey = o_custkey
+                                  AND o_comment NOT LIKE '%special%requests%'
+       GROUP BY
+         c_custkey
+     ) AS c_orders
+GROUP BY
+  c_count
+ORDER BY
+  custdist DESC,
+  c_count DESC
+----------
+[SELECT] -- tables: lineitem,part
+SELECT 100.00 * sum(CASE
+                    WHEN p_type LIKE 'PROMO%'
+                      THEN l_extendedprice * (1 - l_discount)
+                    ELSE 0
+                    END) / sum(l_extendedprice * (1 - l_discount)) AS promo_revenue
+FROM
+  lineitem,
+  part
+WHERE
+  l_partkey = p_partkey
+  AND l_shipdate >= DATE '1995-09-01'
+  AND l_shipdate < DATE '1995-09-01' + INTERVAL '1' MONTH
+----------
+[SELECT] -- tables: lineitem,supplier
+SELECT
+  s_suppkey,
+  s_name,
+  s_address,
+  s_phone,
+  total_revenue
+FROM
+  supplier,
+  revenue1
+WHERE
+  s_suppkey = supplier_no
+  AND total_revenue = (
+    SELECT max(total_revenue)
+    FROM
+      revenue1
+  )
+ORDER BY
+  s_suppkey;
+----------
+[SELECT] -- tables: partsupp,part,supplier
+SELECT
+  p_brand,
+  p_type,
+  p_size,
+  count(DISTINCT ps_suppkey) AS supplier_cnt
+FROM
+  partsupp,
+  part
+WHERE
+  p_partkey = ps_partkey
+  AND p_brand <> 'Brand#45'
+  AND p_type NOT LIKE 'MEDIUM POLISHED%'
+  AND p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
+  AND ps_suppkey NOT IN (
+    SELECT s_suppkey
+    FROM
+      supplier
+    WHERE
+      s_comment LIKE '%Customer%Complaints%'
+  )
+GROUP BY
+  p_brand,
+  p_type,
+  p_size
+ORDER BY
+  supplier_cnt DESC,
+  p_brand,
+  p_type,
+  p_size
+----------
+[SELECT] -- tables: lineitem,part
+SELECT sum(l_extendedprice) / 7.0 AS avg_yearly
+FROM
+  lineitem,
+  part
+WHERE
+  p_partkey = l_partkey
+  AND p_brand = 'Brand#23'
+  AND p_container = 'MED BOX'
+  AND l_quantity < (
+    SELECT 0.2 * avg(l_quantity)
+    FROM
+      lineitem
+    WHERE
+      l_partkey = p_partkey
+  )
+----------
+[SELECT] -- tables: customer,orders,lineitem
+SELECT
+  c_name,
+  c_custkey,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice,
+  sum(l_quantity)
+FROM
+  customer,
+  orders,
+  lineitem
+WHERE
+  o_orderkey IN (
+    SELECT l_orderkey
+    FROM
+      lineitem
+    GROUP BY
+      l_orderkey
+    HAVING
+      sum(l_quantity) > 300
+  )
+  AND c_custkey = o_custkey
+  AND o_orderkey = l_orderkey
+GROUP BY
+  c_name,
+  c_custkey,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice
+ORDER BY
+  o_totalprice DESC,
+  o_orderdate
+LIMIT 100
+----------
+[SELECT] -- tables: lineitem,part
+SELECT sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM
+  lineitem,
+  part
+WHERE
+  (
+    p_partkey = l_partkey
+    AND p_brand = 'Brand#12'
+    AND p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
+    AND l_quantity >= 1 AND l_quantity <= 1 + 10
+    AND p_size BETWEEN 1 AND 5
+    AND l_shipmode IN ('AIR', 'AIR REG')
+    AND l_shipinstruct = 'DELIVER IN PERSON'
+  )
+  OR
+  (
+    p_partkey = l_partkey
+    AND p_brand = 'Brand#23'
+    AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
+    AND l_quantity >= 10 AND l_quantity <= 10 + 10
+    AND p_size BETWEEN 1 AND 10
+    AND l_shipmode IN ('AIR', 'AIR REG')
+    AND l_shipinstruct = 'DELIVER IN PERSON'
+  )
+  OR
+  (
+    p_partkey = l_partkey
+    AND p_brand = 'Brand#34'
+    AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
+    AND l_quantity >= 20 AND l_quantity <= 20 + 10
+    AND p_size BETWEEN 1 AND 15
+    AND l_shipmode IN ('AIR', 'AIR REG')
+    AND l_shipinstruct = 'DELIVER IN PERSON'
+  )
+----------
+[SELECT] -- tables: supplier,nation,partsupp,lineitem,part
+SELECT
+  s_name,
+  s_address
+FROM
+  supplier, nation
+WHERE
+  s_suppkey IN (
+    SELECT ps_suppkey
+    FROM
+      partsupp
+    WHERE
+      ps_partkey IN (
+        SELECT p_partkey
+        FROM
+          part
+        WHERE
+          p_name LIKE 'forest%'
+      )
+      AND ps_availqty > (
+        SELECT 0.5 * sum(l_quantity)
+        FROM
+          lineitem
+        WHERE
+          l_partkey = ps_partkey
+          AND l_suppkey = ps_suppkey
+          AND l_shipdate >= date('1994-01-01')
+          AND l_shipdate < date('1994-01-01') + interval '1' YEAR
+)
+)
+AND s_nationkey = n_nationkey
+AND n_name = 'CANADA'
+ORDER BY s_name
+----------
+[SELECT] -- tables: supplier,lineitem,orders,nation
+SELECT
+  s_name,
+  count(*) AS numwait
+FROM
+  supplier,
+  lineitem l1,
+  orders,
+  nation
+WHERE
+  s_suppkey = l1.l_suppkey
+  AND o_orderkey = l1.l_orderkey
+  AND o_orderstatus = 'F'
+  AND l1.l_receiptdate > l1.l_commitdate
+  AND exists(
+    SELECT *
+    FROM
+      lineitem l2
+    WHERE
+      l2.l_orderkey = l1.l_orderkey
+      AND l2.l_suppkey <> l1.l_suppkey
+  )
+  AND NOT exists(
+    SELECT *
+    FROM
+      lineitem l3
+    WHERE
+      l3.l_orderkey = l1.l_orderkey
+      AND l3.l_suppkey <> l1.l_suppkey
+      AND l3.l_receiptdate > l3.l_commitdate
+  )
+  AND s_nationkey = n_nationkey
+  AND n_name = 'SAUDI ARABIA'
+GROUP BY
+  s_name
+ORDER BY
+  numwait DESC,
+  s_name
+LIMIT 100
+----------
+[SELECT] -- tables: orders,customer
+SELECT
+  cntrycode,
+  count(*)       AS numcust,
+  sum(c_acctbal) AS totacctbal
+FROM (
+       SELECT
+         substr(c_phone, 1, 2) AS cntrycode,
+         c_acctbal
+       FROM
+         customer
+       WHERE
+         substr(c_phone, 1, 2) IN
+         ('13', '31', '23', '29', '30', '18', '17')
+         AND c_acctbal > (
+           SELECT avg(c_acctbal)
+           FROM
+             customer
+           WHERE
+             c_acctbal > 0.00
+             AND substr(c_phone, 1, 2) IN
+                 ('13', '31', '23', '29', '30', '18', '17')
+         )
+         AND NOT exists(
+           SELECT *
+           FROM
+             orders
+           WHERE
+             o_custkey = c_custkey
+         )
+     ) AS custsale
+GROUP BY
+  cntrycode
+ORDER BY
+  cntrycode
+----------
+[SELECT] -- tables: lineitem,supplier
+WITH revenue1 AS(
+  SELECT
+    l_suppkey AS supplier_no,
+    sum(l_extendedprice * (1 - l_discount)) AS total_revenue
+  FROM
+    lineitem
+  WHERE
+    l_shipdate >= DATE '1996-01-01'
+    AND l_shipdate < DATE '1996-01-01' + INTERVAL '3' MONTH
+  GROUP BY l_suppkey)
+
+SELECT
+  s_suppkey,
+  s_name,
+  s_address,
+  s_phone,
+  total_revenue
+FROM
+  supplier,
+  revenue1
+WHERE
+  s_suppkey = supplier_no
+  AND total_revenue = (
+    SELECT max(total_revenue)
+    FROM revenue1
+  )
+ORDER BY
+  s_suppkey
+----------
+[SELECT] -- tables: lineitem
+SELECT
+
+  l_returnflag,
+  l_linestatus,
+  sum(l_quantity)                                       AS sum_qty,
+  sum(l_extendedprice)                                  AS sum_base_price,
+  sum(l_extendedprice * (1 - l_discount))               AS sum_disc_price,
+  sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
+  avg(l_quantity)                                       AS avg_qty,
+  avg(l_extendedprice)                                  AS avg_price,
+  avg(l_discount)                                       AS avg_disc,
+  count(*)                                              AS count_order
+FROM
+  lineitem
+WHERE
+  l_shipdate <= DATE '1998-12-01' - INTERVAL '90' DAY
+GROUP BY
+l_returnflag,
+l_linestatus
+ORDER BY
+l_returnflag,
+l_linestatus
+----------
+[SELECT] -- tables: supplier,lineitem,orders,nation
+select
+s_name, count(*) as numwait
+from orders join
+(
+  select * from
+  lineitem l2 right semi join
+  (
+    select * from
+    lineitem l3 right anti join
+    (
+      select * from
+      lineitem l1 join
+      (
+        select * from
+        supplier join nation
+        where s_nationkey = n_nationkey
+          and n_name = 'SAUDI ARABIA'
+      ) t1
+      where t1.s_suppkey = l1.l_suppkey and l1.l_receiptdate > l1.l_commitdate
+    ) t2
+    on l3.l_orderkey = t2.l_orderkey and l3.l_suppkey <> t2.l_suppkey and l3.l_receiptdate > l3.l_commitdate
+  ) t3
+  on l2.l_orderkey = t3.l_orderkey and l2.l_suppkey <> t3.l_suppkey
+) t4
+on o_orderkey = t4.l_orderkey and o_orderstatus = 'F'
+group by
+    t4.s_name
+order by
+    numwait desc,
+    t4.s_name
+limit 100;
+----------
+[SELECT] SELECT
+  s_acctbal,
+  s_name,
+  n_name,
+  p_partkey,
+  p_mfgr,
+  s_address,
+  s_phone,
+  s_comment
+FROM
+  part,
+  supplier,
+  partsupp,
+  nation,
+  region
+WHERE
+  p_partkey = ps_partkey
+  AND s_suppkey = ps_suppkey
+  AND p_size = 15
+  AND p_type LIKE '%BRASS'
+  AND s_nationkey = n_nationkey
+  AND n_regionkey = r_regionkey
+  AND r_name = 'EUROPE'
+  AND ps_supplycost = (
+    SELECT min(ps_supplycost)
+    FROM
+      partsupp, supplier,
+      nation, region
+    WHERE
+      p_partkey = ps_partkey
+      AND s_suppkey = ps_suppkey
+      AND s_nationkey = n_nationkey
+      AND n_regionkey = r_regionkey
+      AND r_name = 'EUROPE'
+  )
+ORDER BY
+  s_acctbal DESC,
+  n_name,
+  s_name,
+  p_partkey
+LIMIT 100
+----------
+[SELECT] SELECT
+  s_suppkey,
+  s_name,
+  s_address,
+  s_phone,
+  total_revenue
+FROM
+  supplier,
+  revenue1
+WHERE
+  s_suppkey = supplier_no
+  AND total_revenue = (
+    SELECT max(total_revenue)
+    FROM
+      revenue1
+  )
+ORDER BY
+  s_suppkey;
+----------
+[SELECT] -- tables: supplier,lineitem,orders,nation
+SELECT /*+SEV_VAR(batch_size=3)*/
+  l1.l_orderkey okey,
+  l1.l_suppkey  skey
+FROM
+  regression_test_tpch_unique_sql_zstd_bucket1_p0.lineitem l1
+WHERE
+  l1.l_receiptdate > l1.l_commitdate
+  AND l1.L_ORDERKEY < 10000
+  AND NOT exists(
+    SELECT *
+    FROM
+      regression_test_tpch_unique_sql_zstd_bucket1_p0.lineitem l3
+    WHERE
+      l3.l_orderkey = l1.l_orderkey
+      AND l3.l_suppkey <> l1.l_suppkey
+      AND l3.l_receiptdate > l3.l_commitdate
+      AND l3.L_ORDERKEY < 10000
+  )
+ORDER BY
+  okey, skey
+----------
+[SELECT] SELECT COUNT(DISTINCT n_regionkey), COUNT(DISTINCT n_name), MIN(DISTINCT n_nationkey) FROM nation
+----------
+[SELECT] SELECT COUNT(DISTINCT n_regionkey), COUNT(DISTINCT n_regionkey) FROM nation
+----------
+[SELECT] SELECT COUNT(DISTINCT n_regionkey), COUNT(*) FROM nation
+----------
+[SELECT] SELECT DISTINCT n_regionkey FROM nation
+----------
+[SELECT] SELECT n_regionkey, COUNT(DISTINCT n_name) FROM nation
+GROUP BY n_regionkey
+HAVING n_regionkey < 4
+----------
+[SELECT] SELECT DISTINCT r_name FROM region
+----------
+[SELECT] SELECT DISTINCT n_regionkey FROM nation ORDER BY n_regionkey
+----------
+[SELECT] select count(*), count(n_regionkey), min(n_regionkey), max(n_regionkey), sum(n_regionkey) from nation
+----------
+[SELECT] select n_regionkey, count(*) from nation group by 1 having sum(n_regionkey) > 5 and sum(n_regionkey) < 20
+----------
+[SELECT] select n_regionkey, count(*), sum(n_nationkey) from nation group by 1
+----------
+[SELECT] select count(*), sum(n_nationkey) from nation where 1=2 group by n_regionkey
+----------
+[SELECT] select n_regionkey, count(*), sum(n_regionkey) from nation where n_regionkey > 2 group by 1
+----------
+[SELECT] select count(*), sum(n_nationkey) from nation where 1=2
+----------
+[SELECT] select 2 from nation group by 1;
+----------
+[SELECT] select "oneline" from nation group by "I am a const, but not to be removed";
+----------
+[SELECT] select a from (select "abc" as a, '1' as b) T  group by b, a;

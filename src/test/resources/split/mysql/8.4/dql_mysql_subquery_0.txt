@@ -1,0 +1,874 @@
+SELECT grp,MAX(rn) AS max_rn,SUM(MAX(rn)) OVER (ORDER BY grp) AS cumulative_max FROM (SELECT grp,ROW_NUMBER() OVER (PARTITION BY grp ORDER BY val,id) AS rn FROM split_agg_combo.t) AS ranked GROUP BY grp HAVING MAX(rn)>1 ORDER BY grp;
+WITH ranked AS (SELECT id,grp,val,DENSE_RANK() OVER (PARTITION BY grp ORDER BY val DESC) AS rnk FROM split_agg_combo.t) SELECT grp,MAX(rnk) AS depth,SUM(val) AS total FROM ranked GROUP BY grp HAVING MAX(rnk)>=1 ORDER BY grp;
+SELECT o.id,o.grp,ROW_NUMBER() OVER (PARTITION BY o.grp ORDER BY (SELECT MAX(i.val) FROM split_agg_combo.t2 AS i WHERE i.grp=o.grp),o.id) AS rn FROM split_agg_combo.t AS o ORDER BY o.grp,rn;
+SELECT grp,AVG(val) AS avg_val,RANK() OVER (ORDER BY AVG(val)) AS avg_rank,SUM(COUNT(*)) OVER () AS all_rows FROM split_agg_combo.t GROUP BY grp HAVING COUNT(*)>0 ORDER BY grp;
+
+
+
+SELECT o.id,CASE WHEN EXISTS (SELECT 1 FROM split_cross84.inner_t AS i WHERE i.grp=o.grp AND i.val>(SELECT AVG(d.val) FROM split_cross84.inner_t AS d WHERE d.grp=o.grp)) THEN COALESCE((SELECT MAX(m.val) FROM split_cross84.inner_t AS m WHERE m.grp=o.grp),0) ELSE 0 END AS score,agg.total FROM split_cross84.outer_t AS o LEFT JOIN (SELECT grp,SUM(val) AS total FROM split_cross84.inner_t GROUP BY grp HAVING SUM(val)>(SELECT AVG(x.val) FROM split_cross84.inner_t AS x)) AS agg ON agg.grp=o.grp AND agg.total>(SELECT COALESCE(MIN(y.val),0) FROM split_cross84.inner_t AS y WHERE y.grp=o.grp) WHERE o.id IN (SELECT i.id FROM split_cross84.inner_t AS i WHERE EXISTS (SELECT 1 FROM split_cross84.outer_t AS deep WHERE deep.id=i.id AND deep.val<i.val)) ORDER BY CASE WHEN agg.total IS NULL THEN 1 ELSE 0 END,score DESC LIMIT 0,10;
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT d.x, d.g FROM (SELECT id, grp FROM t) AS d(x, g) ORDER BY d.x;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT * FROM (SELECT a INTO @codex_load_audit_v FROM codex_load_audit_s.t) AS codex_load_audit_d;
+
+
+
+
+
+
+
+
+
+SELECT * FROM (SELECT * FROM split_derived_80early.t1 INTERSECT ALL SELECT * FROM split_derived_80early.t1 ORDER BY a,b LIMIT 2) AS d;
+SELECT * FROM (SELECT * FROM split_derived_80early.t1 EXCEPT ALL SELECT * FROM split_derived_80early.t1 LIMIT 2) AS d;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT MIN(table1.col1),(SELECT 'a' FROM t) FROM t AS table1 LEFT JOIN (SELECT * FROM t) AS table2 ON TRUE WHERE table2.col2 < ALL (SELECT REGEXP_LIKE(NULL,s1.col1) FROM t AS s1 JOIN t ON TRUE);
+
+SELECT id FROM qa_t1 EXCEPT ALL (SELECT id FROM qa_t2 EXCEPT ALL SELECT id FROM qa_t3);
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT t.id, d.total FROM t LEFT JOIN LATERAL (SELECT SUM(t2.val) AS total FROM t2 WHERE t2.grp = t.grp) AS d ON TRUE ORDER BY t.id;
+SELECT t.id, d.best FROM t JOIN LATERAL (SELECT MAX(i.val) AS best FROM t2 AS i WHERE i.grp = t.grp AND EXISTS (SELECT 1 FROM t2 AS deep WHERE deep.id = i.id AND deep.val >= t.id)) AS d ON TRUE ORDER BY t.id;
+SELECT t.id, jt.x FROM t JOIN JSON_TABLE(t.doc, '$[*]' COLUMNS (x INT PATH '$')) AS jt ON TRUE ORDER BY t.id, jt.x;
+SELECT split_nested84.add_two((SELECT val FROM split_nested84_b.t WHERE id=1),o.val) AS total FROM split_nested84.t AS o ORDER BY o.id;
+SELECT split_nested84.add_two((SELECT split_nested84.add_two((SELECT d.val FROM split_nested84_b.t AS d WHERE d.id=i.id),i.val) FROM split_nested84.t AS i WHERE i.id=o.id),o.val) AS nested_total FROM split_nested84.t AS o ORDER BY o.id;
+SELECT EXISTS(TABLE t1);
+SELECT 1 IN (TABLE t1);
+SELECT * FROM (TABLE t1) AS d;
+SELECT EXISTS(VALUES ROW(1));
+SELECT 1 IN (VALUES ROW(1), ROW(2));
+SELECT * FROM (VALUES ROW(1, 2), ROW(3, 4)) AS v(a, b);
+SELECT (TABLE t1);
+SELECT (VALUES ROW(1));
+SELECT (SELECT 1 WHERE 1);
+SELECT * FROM (SELECT 1 WHERE 1) AS d;
+SELECT 1 IN (SELECT 1 WHERE 1);
+SELECT (SELECT 1 GROUP BY 1);
+SELECT (SELECT 1 HAVING 1);
+SELECT (SELECT 1,2 WHERE FALSE UNION SELECT 1,2 WHERE FALSE) IN (SELECT 1,2);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT 1 FROM t1 WHERE f1 IN (SELECT MIN(f2) FROM (t1 AS t2) WHERE NOT EXISTS (SELECT ROW_NUMBER() OVER () FROM t1 AS t3 WHERE 1=t2.f2));
+
+
+
+
+
+
+
+
+
+SELECT ANY_VALUE(ANY_VALUE(i)+i),(SELECT i FROM split_scalar80_b.def_t),SUM(i) FROM split_scalar80_b.def_t;
+SELECT q1.id,(SELECT SUM(q2.id) OVER win FROM split_scalar_corr_a.r AS q2 WINDOW win AS(ORDER BY q1.id) LIMIT 1) FROM split_scalar_corr_a.q AS q1;
+SELECT (SELECT SUM(q2.id) OVER() FROM split_scalar_corr_a.r AS q2 WHERE q2.id=q1.id) AS aa,q1.v FROM split_scalar_corr_a.q AS q1 GROUP BY aa,q1.v;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT * FROM split_scalar80_a.t1 AS t1 WHERE t1.a>(SELECT COUNT(a) FROM split_scalar80_a.t2 EXCEPT SELECT 1);
+SELECT * FROM split_scalar80_a.t1 AS t1 WHERE t1.a>((SELECT COUNT(a) FROM split_scalar80_a.t2 GROUP BY a LIMIT 2) INTERSECT ALL SELECT 1);
+SELECT AVG(a) OVER () AS avg_value,a+(SELECT SUM(a)+(SELECT COUNT(a) FROM split_scalar80_a.t1) FROM (SELECT * FROM split_scalar80_a.t1) AS t11) AS scalar_value FROM split_scalar80_a.t2;
+SELECT (WITH RECURSIVE dt(a) AS (SELECT t1.a UNION ALL SELECT a+1 FROM dt WHERE a<10) SELECT t1.a*CONCAT(COUNT(*),'.',FLOOR(AVG(dt.a))) FROM dt) AS subq FROM split_scalar80_a.t1 AS t1;
+SELECT derived0.cnct FROM split_scalar80_a.t1 AS t1 LEFT JOIN LATERAL (WITH RECURSIVE dt(a) AS (SELECT t1.a UNION ALL SELECT a+1 FROM dt WHERE a<10) SELECT t1.a*CONCAT(COUNT(*),'.',FLOOR(AVG(dt.a))) AS cnct FROM dt) AS derived0 ON TRUE;
+SELECT AVG(d2.avg_us) OVER ()+3,d2.avg_us,SUM(d2.avg_us) OVER ()+3,IFNULL(SUM(d1.cnt)/NULLIF((SELECT COUNT(*) FROM split_scalar80_b.digest),0),0) AS percentile FROM split_scalar80_b.digest AS d1 JOIN split_scalar80_b.digest AS d2 ON d1.avg_us<=d2.avg_us GROUP BY d2.avg_us HAVING IFNULL(SUM(d1.cnt)/NULLIF((SELECT COUNT(*) FROM split_scalar80_b.digest),0),0)>0.95 ORDER BY percentile LIMIT 1;
+SELECT COUNT(country),SUM(funds),country,(SELECT SUM(funds) FROM split_scalar80_b.school),ROW_NUMBER() OVER (ORDER BY STDDEV_POP(funds)) FROM split_scalar80_b.school GROUP BY country HAVING AVG(funds)>0 ORDER BY SUM(ABS(funds));
+SELECT d2.v FROM (SELECT * FROM split_scalar80_d.q) AS d1 JOIN (SELECT * FROM split_scalar80_d.q) AS d2 JOIN split_scalar80_d.q AS q1 ON d2.v<(SELECT MAX(q2.v) FROM split_scalar80_d.q AS q2) ON TRUE;
+SELECT SUM(q1.v),ROW_NUMBER() OVER(PARTITION BY q1.v),(SELECT MIN(q2.v) FROM split_scalar80_f.q AS q2) FROM split_scalar80_f.q AS q1;
+SELECT SUM(q1.v),ROW_NUMBER() OVER(),(SELECT MIN(q2.v) FROM split_scalar80_f.q AS q2) FROM split_scalar80_f.q AS q1 ORDER BY q1.v;
+SELECT SUM(q1.v),SUM(q1.v) OVER(),q1.v,(SELECT MIN(q2.v) FROM split_scalar80_f.q AS q2) AS sq FROM split_scalar80_f.q AS q1 ORDER BY q1.v;
+SELECT COUNT(*),(SELECT 1 FROM split_scalar80_f.q AS q2) FROM split_scalar80_f.q AS q1,(SELECT 1 FROM split_scalar80_f.q AS q3) AS d,split_scalar80_f.q AS q4 ORDER BY ROW_NUMBER() OVER(ORDER BY -q4.v);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT q1.d AS field1,(SELECT SUM(q2.v) FROM split_scalar80_f.q AS q2 RIGHT JOIN split_scalar80_f.q AS q3 ON 1) AS field2,GROUPING(LOG(q1.v)) AS field3 FROM split_scalar80_f.q AS q1 JOIN split_scalar80_f.q AS q4 ON 1 WHERE q4.id IN(SELECT q5.s FROM split_scalar80_f.q AS q5) GROUP BY field1,field2,LOG(q1.v) WITH ROLLUP ORDER BY q1.dt,field1,field2,LOG(q1.v);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT v >=ALL (SELECT val FROM it) AS b,SUM((SELECT b)) OVER () AS s FROM ot;
+SELECT v >=ALL (SELECT val FROM it) AS b,SUM((SELECT b)) OVER (PARTITION BY (SELECT b)) AS s FROM ot;
+SELECT 1 WHERE 2 >ANY (SELECT val FROM it);
+SELECT * FROM ot WHERE v >ALL (SELECT MAX(val) OVER () FROM it);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT 1 WHERE (SELECT 1 FROM split_subquery_bugs_mid.c1 LEFT JOIN split_subquery_bugs_mid.c1 AS t2 ON 'f' IN (SELECT f1 FROM split_subquery_bugs_mid.c1) WHERE EXISTS (SELECT * FROM split_subquery_bugs_mid.c1 LEFT JOIN split_subquery_bugs_mid.c1 AS t3 ON t3.f1='a'));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT 1 FROM split_subquery_bugs_860.alias_t AS table2 LEFT JOIN (SELECT 'c') AS table3(f1) ON table3.f1=table2.f1 WHERE table2.f1 IN (SELECT 1 FROM (SELECT 1314830897) AS t1(pk) WHERE t1.pk<=ANY(SELECT 5)) AND FALSE;
+SELECT * FROM split_subquery_bugs_860.lat AS upper_t JOIN LATERAL (SELECT DISTINCT ROW_NUMBER() OVER () AS rn FROM split_subquery_bugs_860.lat WHERE lat.a>upper_t.a) AS der;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT 1 FROM split_subquery_bugs_1550.rx_t WHERE a NOT IN (SELECT 1 FROM split_subquery_bugs_1550.rx_t AS t2 LEFT JOIN split_subquery_bugs_1550.rx_t AS t3 ON (t2.a=t3.a OR 0 IN (SELECT REGEXP_LIKE(a,'') FROM split_subquery_bugs_1550.rx_t)));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT CAST(NULL<ANY (VALUES ROW(1),ROW(2)) AS SIGNED);
+SELECT 1 WHERE 7 IN (SELECT COUNT(*) FROM split_subquery_bugs_delta.count_t AS t1,split_subquery_bugs_delta.count_t AS t2 WHERE t1.x=t2.x AND t1.x<t2.x);
+SELECT 1 AS x FROM split_subquery_bugs_delta.table_t WHERE i IN (SELECT i FROM (TABLE split_subquery_bugs_delta.table_t) AS dt WHERE i<2) GROUP BY x WITH ROLLUP;
+SELECT 1 AS col FROM (SELECT 1) AS y(y) JOIN (SELECT 1) AS z(z) ON (SELECT 1 FROM (SELECT 1) AS x(x) HAVING 1 IN (SELECT MIN(x.x) FROM (SELECT 1) AS w(w))) WHERE 1=2;
+SELECT f1 FROM rank_t WHERE (f1=ANY(SELECT f1 FROM rank_t)) OR (f1 IN (SELECT RANK() OVER () FROM rank_t));
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT 1 FROM split_table_derived.t1 WHERE NOT EXISTS(VALUES ROW(1),ROW(2));
+SELECT a FROM split_table_derived.t1 WHERE EXISTS(VALUES ROW(1),ROW(2));
+SELECT 1 FROM (SELECT 5) AS d(c0) WHERE EXISTS(VALUES ROW(1),ROW(2));
+SELECT a FROM split_table_derived.t1 WHERE EXISTS(VALUES ROW(1),ROW(2) LIMIT 1 OFFSET 2);
+SELECT a FROM split_table_derived.t1 WHERE EXISTS(VALUES ROW(1),ROW(2) LIMIT 0);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+SELECT * FROM ((VALUES ROW(1,1),ROW(2,2) ORDER BY column_0 LIMIT 2) ORDER BY column_1 LIMIT 1) AS v;
+SELECT * FROM (SELECT a,b FROM t1 INTERSECT ALL SELECT a,b FROM t3) AS x JOIN t2 ON x.a=t2.a AND x.b=t2.b ORDER BY 1,2;
+SELECT * FROM (SELECT a,b FROM t1 EXCEPT ALL SELECT a,b FROM t3) AS x JOIN t2 ON x.a=t2.a AND x.b=t2.b ORDER BY 1,2;
+SELECT * FROM (SELECT i FROM s2 INTERSECT SELECT i FROM s2 ORDER BY i) AS x WHERE i<5;
+
+
+
+SELECT o.id FROM t1 AS o
+WHERE EXISTS (
+    SELECT 1 FROM DUAL
+    WHERE o.id IS NOT NULL
+    GROUP BY 1
+    HAVING COUNT(*) > 0
+    ORDER BY 1
+    LIMIT 1
+    FOR UPDATE
+)
+ORDER BY o.id
+LIMIT 5;
+SELECT COUNT(*) WHERE (SELECT 1 FROM (SELECT COUNT(*) FROM codex_native_dql.t AS t1,codex_native_dql.t AS t2 WHERE t1.x=t2.x) AS dt);
+------------------------------------------------------------------------------------------
+[SELECT] SELECT grp,MAX(rn) AS max_rn,SUM(MAX(rn)) OVER (ORDER BY grp) AS cumulative_max FROM (SELECT grp,ROW_NUMBER() OVER (PARTITION BY grp ORDER BY val,id) AS rn FROM split_agg_combo.t) AS ranked GROUP BY grp HAVING MAX(rn)>1 ORDER BY grp;
+----------
+[SELECT] WITH ranked AS (SELECT id,grp,val,DENSE_RANK() OVER (PARTITION BY grp ORDER BY val DESC) AS rnk FROM split_agg_combo.t) SELECT grp,MAX(rnk) AS depth,SUM(val) AS total FROM ranked GROUP BY grp HAVING MAX(rnk)>=1 ORDER BY grp;
+----------
+[SELECT] SELECT o.id,o.grp,ROW_NUMBER() OVER (PARTITION BY o.grp ORDER BY (SELECT MAX(i.val) FROM split_agg_combo.t2 AS i WHERE i.grp=o.grp),o.id) AS rn FROM split_agg_combo.t AS o ORDER BY o.grp,rn;
+----------
+[SELECT] SELECT grp,AVG(val) AS avg_val,RANK() OVER (ORDER BY AVG(val)) AS avg_rank,SUM(COUNT(*)) OVER () AS all_rows FROM split_agg_combo.t GROUP BY grp HAVING COUNT(*)>0 ORDER BY grp;
+----------
+[SELECT] SELECT o.id,CASE WHEN EXISTS (SELECT 1 FROM split_cross84.inner_t AS i WHERE i.grp=o.grp AND i.val>(SELECT AVG(d.val) FROM split_cross84.inner_t AS d WHERE d.grp=o.grp)) THEN COALESCE((SELECT MAX(m.val) FROM split_cross84.inner_t AS m WHERE m.grp=o.grp),0) ELSE 0 END AS score,agg.total FROM split_cross84.outer_t AS o LEFT JOIN (SELECT grp,SUM(val) AS total FROM split_cross84.inner_t GROUP BY grp HAVING SUM(val)>(SELECT AVG(x.val) FROM split_cross84.inner_t AS x)) AS agg ON agg.grp=o.grp AND agg.total>(SELECT COALESCE(MIN(y.val),0) FROM split_cross84.inner_t AS y WHERE y.grp=o.grp) WHERE o.id IN (SELECT i.id FROM split_cross84.inner_t AS i WHERE EXISTS (SELECT 1 FROM split_cross84.outer_t AS deep WHERE deep.id=i.id AND deep.val<i.val)) ORDER BY CASE WHEN agg.total IS NULL THEN 1 ELSE 0 END,score DESC LIMIT 0,10;
+----------
+[SELECT] SELECT d.x, d.g FROM (SELECT id, grp FROM t) AS d(x, g) ORDER BY d.x;
+----------
+[SELECT|SESSION_VARIABLE_RW] SELECT * FROM (SELECT a INTO @codex_load_audit_v FROM codex_load_audit_s.t) AS codex_load_audit_d;
+----------
+[SELECT] SELECT * FROM (SELECT * FROM split_derived_80early.t1 INTERSECT ALL SELECT * FROM split_derived_80early.t1 ORDER BY a,b LIMIT 2) AS d;
+----------
+[SELECT] SELECT * FROM (SELECT * FROM split_derived_80early.t1 EXCEPT ALL SELECT * FROM split_derived_80early.t1 LIMIT 2) AS d;
+----------
+[SELECT] SELECT MIN(table1.col1),(SELECT 'a' FROM t) FROM t AS table1 LEFT JOIN (SELECT * FROM t) AS table2 ON TRUE WHERE table2.col2 < ALL (SELECT REGEXP_LIKE(NULL,s1.col1) FROM t AS s1 JOIN t ON TRUE);
+----------
+[SELECT] SELECT id FROM qa_t1 EXCEPT ALL (SELECT id FROM qa_t2 EXCEPT ALL SELECT id FROM qa_t3);
+----------
+[SELECT] SELECT t.id, d.total FROM t LEFT JOIN LATERAL (SELECT SUM(t2.val) AS total FROM t2 WHERE t2.grp = t.grp) AS d ON TRUE ORDER BY t.id;
+----------
+[SELECT] SELECT t.id, d.best FROM t JOIN LATERAL (SELECT MAX(i.val) AS best FROM t2 AS i WHERE i.grp = t.grp AND EXISTS (SELECT 1 FROM t2 AS deep WHERE deep.id = i.id AND deep.val >= t.id)) AS d ON TRUE ORDER BY t.id;
+----------
+[SELECT] SELECT t.id, jt.x FROM t JOIN JSON_TABLE(t.doc, '$[*]' COLUMNS (x INT PATH '$')) AS jt ON TRUE ORDER BY t.id, jt.x;
+----------
+[SELECT|CALL_PROG_OBJ] SELECT split_nested84.add_two((SELECT val FROM split_nested84_b.t WHERE id=1),o.val) AS total FROM split_nested84.t AS o ORDER BY o.id;
+----------
+[SELECT|CALL_PROG_OBJ] SELECT split_nested84.add_two((SELECT split_nested84.add_two((SELECT d.val FROM split_nested84_b.t AS d WHERE d.id=i.id),i.val) FROM split_nested84.t AS i WHERE i.id=o.id),o.val) AS nested_total FROM split_nested84.t AS o ORDER BY o.id;
+----------
+[SELECT] SELECT EXISTS(TABLE t1);
+----------
+[SELECT] SELECT 1 IN (TABLE t1);
+----------
+[SELECT] SELECT * FROM (TABLE t1) AS d;
+----------
+[SELECT] SELECT EXISTS(VALUES ROW(1));
+----------
+[SELECT] SELECT 1 IN (VALUES ROW(1), ROW(2));
+----------
+[SELECT] SELECT * FROM (VALUES ROW(1, 2), ROW(3, 4)) AS v(a, b);
+----------
+[SELECT] SELECT (TABLE t1);
+----------
+[SELECT] SELECT (VALUES ROW(1));
+----------
+[SELECT] SELECT (SELECT 1 WHERE 1);
+----------
+[SELECT] SELECT * FROM (SELECT 1 WHERE 1) AS d;
+----------
+[SELECT] SELECT 1 IN (SELECT 1 WHERE 1);
+----------
+[SELECT] SELECT (SELECT 1 GROUP BY 1);
+----------
+[SELECT] SELECT (SELECT 1 HAVING 1);
+----------
+[SELECT] SELECT (SELECT 1,2 WHERE FALSE UNION SELECT 1,2 WHERE FALSE) IN (SELECT 1,2);
+----------
+[SELECT] SELECT 1 FROM t1 WHERE f1 IN (SELECT MIN(f2) FROM (t1 AS t2) WHERE NOT EXISTS (SELECT ROW_NUMBER() OVER () FROM t1 AS t3 WHERE 1=t2.f2));
+----------
+[SELECT] SELECT ANY_VALUE(ANY_VALUE(i)+i),(SELECT i FROM split_scalar80_b.def_t),SUM(i) FROM split_scalar80_b.def_t;
+----------
+[SELECT] SELECT q1.id,(SELECT SUM(q2.id) OVER win FROM split_scalar_corr_a.r AS q2 WINDOW win AS(ORDER BY q1.id) LIMIT 1) FROM split_scalar_corr_a.q AS q1;
+----------
+[SELECT] SELECT (SELECT SUM(q2.id) OVER() FROM split_scalar_corr_a.r AS q2 WHERE q2.id=q1.id) AS aa,q1.v FROM split_scalar_corr_a.q AS q1 GROUP BY aa,q1.v;
+----------
+[SELECT] SELECT * FROM split_scalar80_a.t1 AS t1 WHERE t1.a>(SELECT COUNT(a) FROM split_scalar80_a.t2 EXCEPT SELECT 1);
+----------
+[SELECT] SELECT * FROM split_scalar80_a.t1 AS t1 WHERE t1.a>((SELECT COUNT(a) FROM split_scalar80_a.t2 GROUP BY a LIMIT 2) INTERSECT ALL SELECT 1);
+----------
+[SELECT] SELECT AVG(a) OVER () AS avg_value,a+(SELECT SUM(a)+(SELECT COUNT(a) FROM split_scalar80_a.t1) FROM (SELECT * FROM split_scalar80_a.t1) AS t11) AS scalar_value FROM split_scalar80_a.t2;
+----------
+[SELECT] SELECT (WITH RECURSIVE dt(a) AS (SELECT t1.a UNION ALL SELECT a+1 FROM dt WHERE a<10) SELECT t1.a*CONCAT(COUNT(*),'.',FLOOR(AVG(dt.a))) FROM dt) AS subq FROM split_scalar80_a.t1 AS t1;
+----------
+[SELECT] SELECT derived0.cnct FROM split_scalar80_a.t1 AS t1 LEFT JOIN LATERAL (WITH RECURSIVE dt(a) AS (SELECT t1.a UNION ALL SELECT a+1 FROM dt WHERE a<10) SELECT t1.a*CONCAT(COUNT(*),'.',FLOOR(AVG(dt.a))) AS cnct FROM dt) AS derived0 ON TRUE;
+----------
+[SELECT] SELECT AVG(d2.avg_us) OVER ()+3,d2.avg_us,SUM(d2.avg_us) OVER ()+3,IFNULL(SUM(d1.cnt)/NULLIF((SELECT COUNT(*) FROM split_scalar80_b.digest),0),0) AS percentile FROM split_scalar80_b.digest AS d1 JOIN split_scalar80_b.digest AS d2 ON d1.avg_us<=d2.avg_us GROUP BY d2.avg_us HAVING IFNULL(SUM(d1.cnt)/NULLIF((SELECT COUNT(*) FROM split_scalar80_b.digest),0),0)>0.95 ORDER BY percentile LIMIT 1;
+----------
+[SELECT] SELECT COUNT(country),SUM(funds),country,(SELECT SUM(funds) FROM split_scalar80_b.school),ROW_NUMBER() OVER (ORDER BY STDDEV_POP(funds)) FROM split_scalar80_b.school GROUP BY country HAVING AVG(funds)>0 ORDER BY SUM(ABS(funds));
+----------
+[SELECT] SELECT d2.v FROM (SELECT * FROM split_scalar80_d.q) AS d1 JOIN (SELECT * FROM split_scalar80_d.q) AS d2 JOIN split_scalar80_d.q AS q1 ON d2.v<(SELECT MAX(q2.v) FROM split_scalar80_d.q AS q2) ON TRUE;
+----------
+[SELECT] SELECT SUM(q1.v),ROW_NUMBER() OVER(PARTITION BY q1.v),(SELECT MIN(q2.v) FROM split_scalar80_f.q AS q2) FROM split_scalar80_f.q AS q1;
+----------
+[SELECT] SELECT SUM(q1.v),ROW_NUMBER() OVER(),(SELECT MIN(q2.v) FROM split_scalar80_f.q AS q2) FROM split_scalar80_f.q AS q1 ORDER BY q1.v;
+----------
+[SELECT] SELECT SUM(q1.v),SUM(q1.v) OVER(),q1.v,(SELECT MIN(q2.v) FROM split_scalar80_f.q AS q2) AS sq FROM split_scalar80_f.q AS q1 ORDER BY q1.v;
+----------
+[SELECT] SELECT COUNT(*),(SELECT 1 FROM split_scalar80_f.q AS q2) FROM split_scalar80_f.q AS q1,(SELECT 1 FROM split_scalar80_f.q AS q3) AS d,split_scalar80_f.q AS q4 ORDER BY ROW_NUMBER() OVER(ORDER BY -q4.v);
+----------
+[SELECT] SELECT q1.d AS field1,(SELECT SUM(q2.v) FROM split_scalar80_f.q AS q2 RIGHT JOIN split_scalar80_f.q AS q3 ON 1) AS field2,GROUPING(LOG(q1.v)) AS field3 FROM split_scalar80_f.q AS q1 JOIN split_scalar80_f.q AS q4 ON 1 WHERE q4.id IN(SELECT q5.s FROM split_scalar80_f.q AS q5) GROUP BY field1,field2,LOG(q1.v) WITH ROLLUP ORDER BY q1.dt,field1,field2,LOG(q1.v);
+----------
+[SELECT] SELECT v >=ALL (SELECT val FROM it) AS b,SUM((SELECT b)) OVER () AS s FROM ot;
+----------
+[SELECT] SELECT v >=ALL (SELECT val FROM it) AS b,SUM((SELECT b)) OVER (PARTITION BY (SELECT b)) AS s FROM ot;
+----------
+[SELECT] SELECT 1 WHERE 2 >ANY (SELECT val FROM it);
+----------
+[SELECT] SELECT * FROM ot WHERE v >ALL (SELECT MAX(val) OVER () FROM it);
+----------
+[SELECT] SELECT 1 WHERE (SELECT 1 FROM split_subquery_bugs_mid.c1 LEFT JOIN split_subquery_bugs_mid.c1 AS t2 ON 'f' IN (SELECT f1 FROM split_subquery_bugs_mid.c1) WHERE EXISTS (SELECT * FROM split_subquery_bugs_mid.c1 LEFT JOIN split_subquery_bugs_mid.c1 AS t3 ON t3.f1='a'));
+----------
+[SELECT] SELECT 1 FROM split_subquery_bugs_860.alias_t AS table2 LEFT JOIN (SELECT 'c') AS table3(f1) ON table3.f1=table2.f1 WHERE table2.f1 IN (SELECT 1 FROM (SELECT 1314830897) AS t1(pk) WHERE t1.pk<=ANY(SELECT 5)) AND FALSE;
+----------
+[SELECT] SELECT * FROM split_subquery_bugs_860.lat AS upper_t JOIN LATERAL (SELECT DISTINCT ROW_NUMBER() OVER () AS rn FROM split_subquery_bugs_860.lat WHERE lat.a>upper_t.a) AS der;
+----------
+[SELECT] SELECT 1 FROM split_subquery_bugs_1550.rx_t WHERE a NOT IN (SELECT 1 FROM split_subquery_bugs_1550.rx_t AS t2 LEFT JOIN split_subquery_bugs_1550.rx_t AS t3 ON (t2.a=t3.a OR 0 IN (SELECT REGEXP_LIKE(a,'') FROM split_subquery_bugs_1550.rx_t)));
+----------
+[SELECT] SELECT CAST(NULL<ANY (VALUES ROW(1),ROW(2)) AS SIGNED);
+----------
+[SELECT] SELECT 1 WHERE 7 IN (SELECT COUNT(*) FROM split_subquery_bugs_delta.count_t AS t1,split_subquery_bugs_delta.count_t AS t2 WHERE t1.x=t2.x AND t1.x<t2.x);
+----------
+[SELECT] SELECT 1 AS x FROM split_subquery_bugs_delta.table_t WHERE i IN (SELECT i FROM (TABLE split_subquery_bugs_delta.table_t) AS dt WHERE i<2) GROUP BY x WITH ROLLUP;
+----------
+[SELECT] SELECT 1 AS col FROM (SELECT 1) AS y(y) JOIN (SELECT 1) AS z(z) ON (SELECT 1 FROM (SELECT 1) AS x(x) HAVING 1 IN (SELECT MIN(x.x) FROM (SELECT 1) AS w(w))) WHERE 1=2;
+----------
+[SELECT] SELECT f1 FROM rank_t WHERE (f1=ANY(SELECT f1 FROM rank_t)) OR (f1 IN (SELECT RANK() OVER () FROM rank_t));
+----------
+[SELECT] SELECT 1 FROM split_table_derived.t1 WHERE NOT EXISTS(VALUES ROW(1),ROW(2));
+----------
+[SELECT] SELECT a FROM split_table_derived.t1 WHERE EXISTS(VALUES ROW(1),ROW(2));
+----------
+[SELECT] SELECT 1 FROM (SELECT 5) AS d(c0) WHERE EXISTS(VALUES ROW(1),ROW(2));
+----------
+[SELECT] SELECT a FROM split_table_derived.t1 WHERE EXISTS(VALUES ROW(1),ROW(2) LIMIT 1 OFFSET 2);
+----------
+[SELECT] SELECT a FROM split_table_derived.t1 WHERE EXISTS(VALUES ROW(1),ROW(2) LIMIT 0);
+----------
+[SELECT] SELECT * FROM ((VALUES ROW(1,1),ROW(2,2) ORDER BY column_0 LIMIT 2) ORDER BY column_1 LIMIT 1) AS v;
+----------
+[SELECT] SELECT * FROM (SELECT a,b FROM t1 INTERSECT ALL SELECT a,b FROM t3) AS x JOIN t2 ON x.a=t2.a AND x.b=t2.b ORDER BY 1,2;
+----------
+[SELECT] SELECT * FROM (SELECT a,b FROM t1 EXCEPT ALL SELECT a,b FROM t3) AS x JOIN t2 ON x.a=t2.a AND x.b=t2.b ORDER BY 1,2;
+----------
+[SELECT] SELECT * FROM (SELECT i FROM s2 INTERSECT SELECT i FROM s2 ORDER BY i) AS x WHERE i<5;
+----------
+[SELECT|QUERY_LOCK] SELECT o.id FROM t1 AS o
+WHERE EXISTS (
+    SELECT 1 FROM DUAL
+    WHERE o.id IS NOT NULL
+    GROUP BY 1
+    HAVING COUNT(*) > 0
+    ORDER BY 1
+    LIMIT 1
+    FOR UPDATE
+)
+ORDER BY o.id
+LIMIT 5;
+----------
+[SELECT] SELECT COUNT(*) WHERE (SELECT 1 FROM (SELECT COUNT(*) FROM codex_native_dql.t AS t1,codex_native_dql.t AS t2 WHERE t1.x=t2.x) AS dt);

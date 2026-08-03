@@ -1,0 +1,394 @@
+--
+-- Test for multilevel page deletion
+--
+CREATE TABLE delete_test_table (a bigint, b bigint, c bigint, d bigint)
+;
+CREATE FUNCTION split_trigger_probe.audit_row()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO split_trigger_probe.account_audit(id, action, new_balance)
+        VALUES (NEW.id, TG_ARGV[0], NEW.balance);
+        RETURN NEW;
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO split_trigger_probe.account_audit(id, action, old_balance, new_balance)
+        VALUES (NEW.id, TG_ARGV[0], OLD.balance, NEW.balance);
+        RETURN NEW;
+    ELSIF TG_OP = 'DELETE' THEN
+        INSERT INTO split_trigger_probe.account_audit(id, action, old_balance)
+        VALUES (OLD.id, TG_ARGV[0], OLD.balance);
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$
+;
+create table asptab (id int primary key) partition by range (id)
+;
+DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_table
+;
+-- COPY
+CREATE TABLE copy_stats (a int, b int)
+;
+-- Vacuum freeze to change the xids encountered in subsequent tests
+VACUUM (FREEZE, DISABLE_PAGE_SKIPPING) heaptest
+;
+ALTER INDEX pg_toast.pg_toast_27733_index RENAME TO reind_con_toast_idx
+;
+CREATE PUBLICATION pub_mix_4 FOR ALL TABLES
+;
+-- Clean up
+DROP FOREIGN TABLE ftable
+;
+DROP TABLE rls_part
+;
+VACUUM (INDEX_CLEANUP FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_constraint
+;
+/*
+ * 7. Check various AMs. All but btree, gist and spgist must fail.
+ */
+CREATE TABLE tbl (c1 int,c2 int, c3 box, c4 box)
+;
+ANALYZE public.idxpart21
+;
+ALTER FOREIGN TABLE ft1 SET TABLESPACE ts
+;
+--
+-- Check that volatile quals aren't pushed down past a set-returning function;
+-- while a nonvolatile qual can be, if it doesn't reference the SRF.
+--
+create function tattle(x int, y int) returns bool
+volatile language plpgsql as $$
+begin
+  raise notice 'x = %, y = %', x, y;
+  return x > y;
+end$$
+;
+DROP SCHEMA IF EXISTS my_schema_1 CASCADE
+;
+CREATE TABLE "regress_indexing"."pk52" (
+    "a" integer CONSTRAINT "pk_a_not_null" NOT NULL
+)
+;
+CREATE TABLE reloptions_test2(i INT) WITH (fillfactor=30, fillfactor=40)
+;
+create table inh_fk_1 (a int primary key)
+;
+VACUUM (SKIP_DATABASE_STATS, SKIP_LOCKED) pg_catalog.pg_attrdef
+;
+do $$ declare x foo.bar%rowtype; begin end $$
+;
+VACUUM (TRUNCATE FALSE) pg_catalog.pg_statistic_ext
+;
+alter database abc is_template true
+;
+ALTER TABLE split_alter_table.base_table NO FORCE ROW LEVEL SECURITY
+;
+DROP FUNCTION testns.foo()
+;
+ALTER TYPE test_type2 RENAME ATTRIBUTE a TO aa
+;
+CREATE FOREIGN TABLE "x 6" (
+  c1 integer OPTIONS (column_name 'c1'),
+  c2 integer OPTIONS (column_name 'c2') GENERATED ALWAYS AS ((c1 * 2)) STORED
+) SERVER loopback
+OPTIONS (schema_name 'import_source', table_name 'x 6')
+;
+ALTER TEXT SEARCH CONFIGURATION portuguese ADD MAPPING
+    FOR asciiword, hword_asciipart, asciihword
+	WITH portuguese_stem
+;
+CREATE PROCEDURE ptest6a(inout a anyelement, inout b anyelement)
+LANGUAGE SQL
+AS $$
+SELECT $1, $1;
+$$
+;
+CREATE TABLE pagg_tab3 (a text, c text collate case_insensitive) PARTITION BY LIST(c collate "C")
+;
+DROP TABLE width_bucket_test
+;
+--
+-- Check ordering of =ANY indexqual results (bug in 9.2.0)
+--
+
+vacuum tenk1
+;
+ANALYZE pg_catalog.pg_transform
+;
+VACUUM (PROCESS_TOAST FALSE) pg_catalog.pg_ts_config_map
+;
+CREATE OPERATOR ^@ (
+        LEFTARG = ltxtquery,
+	RIGHTARG = _ltree,
+	PROCEDURE = _ltxtq_rexec,
+        COMMUTATOR = '^@',
+        RESTRICT = contsel,
+	JOIN = contjoinsel
+)
+;
+create table s_2c3e24b36890b0d31aeca286e84c6471 as (
+    SELECT DISTINCT ON (sn) sn, num01 FROM "s_f73e29e1c9830041f1bdfa8_2c3e24b36890b0d31aeca286e84c6471"
+ )
+;
+CREATE TABLE hash_parted2 (a int) PARTITION BY HASH(a)
+;
+create table mc2p0 partition of mc2p for values from (minvalue, minvalue) to (1, minvalue)
+;
+-- test case where the partitioning operator is a SQL function whose
+-- evaluation results in the table's relcache being rebuilt partway through
+-- the execution of an ATTACH PARTITION command
+create function at_test_sql_partop (int4, int4) returns int language sql
+as $$ select case when $1 = $2 then 0 when $1 > $2 then 1 else -1 end; $$
+;
+ANALYZE rls_tbl
+;
+create function int8alias1in(cstring) returns int8alias1
+  strict immutable language internal as 'int8in'
+;
+-- failure: second partition has replica identity (c), which si not in column list
+ALTER TABLE testpub_tbl8 ATTACH PARTITION testpub_tbl8_1 FOR VALUES WITH (modulus 2, remainder 1)
+;
+ALTER OPERATOR FAMILY alt_nsp6.alt_opf6 USING btree ADD OPERATOR 1 < (int4, int2)
+;
+ALTER FUNCTION gbt_cash_union(internal, internal) PARALLEL SAFE
+;
+-- ok
+ALTER INDEX dummy_test_idx SET (option_real = true)
+;
+drop routine f1(), p1()
+;
+CREATE FUNCTION split_part( citext, citext, int ) RETURNS TEXT AS $$
+    SELECT (pg_catalog.regexp_split_to_array( $1::pg_catalog.text, pg_catalog.regexp_replace($2::pg_catalog.text, '([^a-zA-Z_0-9])', E'\\\\\\1', 'g'), 'i'))[$3];
+$$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+;
+alter table pg_class alter column relname drop not null
+;
+CREATE TABLE def_part (LIKE list_parted INCLUDING CONSTRAINTS)
+;
+drop table t1, t2
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] --
+-- Test for multilevel page deletion
+--
+CREATE TABLE delete_test_table (a bigint, b bigint, c bigint, d bigint)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION split_trigger_probe.audit_row()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO split_trigger_probe.account_audit(id, action, new_balance)
+        VALUES (NEW.id, TG_ARGV[0], NEW.balance);
+        RETURN NEW;
+    ELSIF TG_OP = 'UPDATE' THEN
+        INSERT INTO split_trigger_probe.account_audit(id, action, old_balance, new_balance)
+        VALUES (NEW.id, TG_ARGV[0], OLD.balance, NEW.balance);
+        RETURN NEW;
+    ELSIF TG_OP = 'DELETE' THEN
+        INSERT INTO split_trigger_probe.account_audit(id, action, old_balance)
+        VALUES (OLD.id, TG_ARGV[0], OLD.balance);
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$
+;
+----------
+[CREATE_TABLE] create table asptab (id int primary key) partition by range (id)
+;
+----------
+[DROP_TRIGGER] DROP TRIGGER IF EXISTS test_trigger_exists ON no_such_table
+;
+----------
+[CREATE_TABLE] -- COPY
+CREATE TABLE copy_stats (a int, b int)
+;
+----------
+[ADMIN_TABLE] -- Vacuum freeze to change the xids encountered in subsequent tests
+VACUUM (FREEZE, DISABLE_PAGE_SKIPPING) heaptest
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_27733_index RENAME TO reind_con_toast_idx
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_mix_4 FOR ALL TABLES
+;
+----------
+[DROP_TABLE] -- Clean up
+DROP FOREIGN TABLE ftable
+;
+----------
+[DROP_TABLE] DROP TABLE rls_part
+;
+----------
+[ADMIN_TABLE] VACUUM (INDEX_CLEANUP FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_constraint
+;
+----------
+[CREATE_TABLE] /*
+ * 7. Check various AMs. All but btree, gist and spgist must fail.
+ */
+CREATE TABLE tbl (c1 int,c2 int, c3 box, c4 box)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.idxpart21
+;
+----------
+[ALTER_TABLE] ALTER FOREIGN TABLE ft1 SET TABLESPACE ts
+;
+----------
+[CREATE_PROG_OBJ] --
+-- Check that volatile quals aren't pushed down past a set-returning function;
+-- while a nonvolatile qual can be, if it doesn't reference the SRF.
+--
+create function tattle(x int, y int) returns bool
+volatile language plpgsql as $$
+begin
+  raise notice 'x = %, y = %', x, y;
+  return x > y;
+end$$
+;
+----------
+[DROP_SCHEMA] DROP SCHEMA IF EXISTS my_schema_1 CASCADE
+;
+----------
+[CREATE_TABLE] CREATE TABLE "regress_indexing"."pk52" (
+    "a" integer CONSTRAINT "pk_a_not_null" NOT NULL
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE reloptions_test2(i INT) WITH (fillfactor=30, fillfactor=40)
+;
+----------
+[CREATE_TABLE] create table inh_fk_1 (a int primary key)
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, SKIP_LOCKED) pg_catalog.pg_attrdef
+;
+----------
+[BLOCK] do $$ declare x foo.bar%rowtype; begin end $$
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) pg_catalog.pg_statistic_ext
+;
+----------
+[ALTER_CATALOG] alter database abc is_template true
+;
+----------
+[ALTER_TABLE] ALTER TABLE split_alter_table.base_table NO FORCE ROW LEVEL SECURITY
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION testns.foo()
+;
+----------
+[ALTER_TYPE] ALTER TYPE test_type2 RENAME ATTRIBUTE a TO aa
+;
+----------
+[CREATE_TABLE] CREATE FOREIGN TABLE "x 6" (
+  c1 integer OPTIONS (column_name 'c1'),
+  c2 integer OPTIONS (column_name 'c2') GENERATED ALWAYS AS ((c1 * 2)) STORED
+) SERVER loopback
+OPTIONS (schema_name 'import_source', table_name 'x 6')
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION portuguese ADD MAPPING
+    FOR asciiword, hword_asciipart, asciihword
+	WITH portuguese_stem
+;
+----------
+[CREATE_PROG_OBJ] CREATE PROCEDURE ptest6a(inout a anyelement, inout b anyelement)
+LANGUAGE SQL
+AS $$
+SELECT $1, $1;
+$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE pagg_tab3 (a text, c text collate case_insensitive) PARTITION BY LIST(c collate "C")
+;
+----------
+[DROP_TABLE] DROP TABLE width_bucket_test
+;
+----------
+[ADMIN_TABLE] --
+-- Check ordering of =ANY indexqual results (bug in 9.2.0)
+--
+
+vacuum tenk1
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_catalog.pg_transform
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_TOAST FALSE) pg_catalog.pg_ts_config_map
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR ^@ (
+        LEFTARG = ltxtquery,
+	RIGHTARG = _ltree,
+	PROCEDURE = _ltxtq_rexec,
+        COMMUTATOR = '^@',
+        RESTRICT = contsel,
+	JOIN = contjoinsel
+)
+;
+----------
+[CREATE_TABLE|SELECT] create table s_2c3e24b36890b0d31aeca286e84c6471 as (
+    SELECT DISTINCT ON (sn) sn, num01 FROM "s_f73e29e1c9830041f1bdfa8_2c3e24b36890b0d31aeca286e84c6471"
+ )
+;
+----------
+[CREATE_TABLE] CREATE TABLE hash_parted2 (a int) PARTITION BY HASH(a)
+;
+----------
+[CREATE_TABLE] create table mc2p0 partition of mc2p for values from (minvalue, minvalue) to (1, minvalue)
+;
+----------
+[CREATE_PROG_OBJ] -- test case where the partitioning operator is a SQL function whose
+-- evaluation results in the table's relcache being rebuilt partway through
+-- the execution of an ATTACH PARTITION command
+create function at_test_sql_partop (int4, int4) returns int language sql
+as $$ select case when $1 = $2 then 0 when $1 > $2 then 1 else -1 end; $$
+;
+----------
+[ADMIN_TABLE] ANALYZE rls_tbl
+;
+----------
+[CREATE_PROG_OBJ] create function int8alias1in(cstring) returns int8alias1
+  strict immutable language internal as 'int8in'
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- failure: second partition has replica identity (c), which si not in column list
+ALTER TABLE testpub_tbl8 ATTACH PARTITION testpub_tbl8_1 FOR VALUES WITH (modulus 2, remainder 1)
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY alt_nsp6.alt_opf6 USING btree ADD OPERATOR 1 < (int4, int2)
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_cash_union(internal, internal) PARALLEL SAFE
+;
+----------
+[ALTER_INDEX] -- ok
+ALTER INDEX dummy_test_idx SET (option_real = true)
+;
+----------
+[DROP_PROG_OBJ] drop routine f1(), p1()
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION split_part( citext, citext, int ) RETURNS TEXT AS $$
+    SELECT (pg_catalog.regexp_split_to_array( $1::pg_catalog.text, pg_catalog.regexp_replace($2::pg_catalog.text, '([^a-zA-Z_0-9])', E'\\\\\\1', 'g'), 'i'))[$3];
+$$ LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table pg_class alter column relname drop not null
+;
+----------
+[CREATE_TABLE] CREATE TABLE def_part (LIKE list_parted INCLUDING CONSTRAINTS)
+;
+----------
+[DROP_TABLE] drop table t1, t2
+;

@@ -1,0 +1,58 @@
+EXECUTE dumpFunc('18426')
+;
+-- test column-level privileges when involved with DELETE
+SET SESSION AUTHORIZATION regress_priv_user1
+;
+LOCK TABLE fkpart5.fk1 IN ACCESS SHARE MODE
+;
+ALTER SUBSCRIPTION sub2 REFRESH PUBLICATION
+;
+COPY (DELETE FROM split_copy_ext.copy_target WHERE id = 4 RETURNING id, payload) TO STDOUT WITH (FORMAT csv, HEADER true)
+;
+-- rolled back transaction
+BEGIN
+;
+-- Can update from a self-join, but only if FOR UPDATE says which to use
+BEGIN
+;
+-- fails
+ROLLBACK
+;
+EXECUTE dumpFunc('34205')
+;
+EXECUTE dumpFunc('16734')
+;
+------------------------------------------------------------------------------------------
+[UNSAFE] EXECUTE dumpFunc('18426')
+;
+----------
+[SWITCH_USER] -- test column-level privileges when involved with DELETE
+SET SESSION AUTHORIZATION regress_priv_user1
+;
+----------
+[SESSION_LOCK] LOCK TABLE fkpart5.fk1 IN ACCESS SHARE MODE
+;
+----------
+[ADMIN_PUB_SUB] ALTER SUBSCRIPTION sub2 REFRESH PUBLICATION
+;
+----------
+[DATA_EXPORT|DELETE] COPY (DELETE FROM split_copy_ext.copy_target WHERE id = 4 RETURNING id, payload) TO STDOUT WITH (FORMAT csv, HEADER true)
+;
+----------
+[TRANSACTION] -- rolled back transaction
+BEGIN
+;
+----------
+[TRANSACTION] -- Can update from a self-join, but only if FOR UPDATE says which to use
+BEGIN
+;
+----------
+[TRANSACTION] -- fails
+ROLLBACK
+;
+----------
+[UNSAFE] EXECUTE dumpFunc('34205')
+;
+----------
+[UNSAFE] EXECUTE dumpFunc('16734')
+;

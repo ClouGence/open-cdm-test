@@ -1,0 +1,66 @@
+deallocate "stmt1"
+;
+-- security invoker view permissions
+
+SET SESSION AUTHORIZATION regress_view_user1
+;
+EXECUTE dumpAgg('35683')
+;
+-- single-batch with rescan, parallel-aware
+savepoint settings
+;
+LOCK TABLE "public"."fk_partitioned_fk_5_1" IN ACCESS SHARE MODE
+;
+-- UNIQUE or PRIMARY KEY constraint violation DOES reveal presence of row
+SET SESSION AUTHORIZATION regress_rls_bob
+;
+LOCK TABLE "public"."wslot" IN ACCESS SHARE MODE
+;
+-- Test handling of cast cache inside DO blocks
+-- (to check the original crash case, this must be a cast not previously
+-- used in this session)
+
+begin
+;
+COPY pt FROM '/src/contrib/file_fdw/data/list2.bad' with (format 'csv', delimiter ',')
+;
+EXECUTE dumpAgg('31918')
+;
+------------------------------------------------------------------------------------------
+[UNSAFE] deallocate "stmt1"
+;
+----------
+[SWITCH_USER] -- security invoker view permissions
+
+SET SESSION AUTHORIZATION regress_view_user1
+;
+----------
+[UNSAFE] EXECUTE dumpAgg('35683')
+;
+----------
+[TRANSACTION] -- single-batch with rescan, parallel-aware
+savepoint settings
+;
+----------
+[SESSION_LOCK] LOCK TABLE "public"."fk_partitioned_fk_5_1" IN ACCESS SHARE MODE
+;
+----------
+[SWITCH_USER] -- UNIQUE or PRIMARY KEY constraint violation DOES reveal presence of row
+SET SESSION AUTHORIZATION regress_rls_bob
+;
+----------
+[SESSION_LOCK] LOCK TABLE "public"."wslot" IN ACCESS SHARE MODE
+;
+----------
+[TRANSACTION] -- Test handling of cast cache inside DO blocks
+-- (to check the original crash case, this must be a cast not previously
+-- used in this session)
+
+begin
+;
+----------
+[DATA_IMPORT] COPY pt FROM '/src/contrib/file_fdw/data/list2.bad' with (format 'csv', delimiter ',')
+;
+----------
+[UNSAFE] EXECUTE dumpAgg('31918')
+;

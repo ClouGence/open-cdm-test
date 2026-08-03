@@ -1,0 +1,1378 @@
+CREATE TABLE simple_point (  id INT,  wkb STRING) ;
+INSERT INTO simple_point VALUES(1,'\x01010000005f07ce19515e5e4097ff907efb3a3f40');
+
+create table simple_point(id int, wkb VARCHAR(255));
+INSERT INTO simple_point VALUES(1,'\x01010000005f07ce19515e5e4097ff907efb3a3f40');
+CREATE TABLE `map_table` (
+      `k` INT NOT NULL,
+      `map_varchar_int` MAP<VARCHAR(10), INT>,
+      `map_int_varchar` MAP<INT, VARCHAR(10)>,
+      `map_varchar_varchar` MAP<VARCHAR(10), VARCHAR(10)>
+    ) ENGINE=OLAP
+    DUPLICATE KEY(`k`)
+    DISTRIBUTED BY HASH(`k`) BUCKETS 1
+    PROPERTIES (
+        "replication_num" = "1"
+    );
+
+    ALTER TABLE map_table MODIFY COLUMN map_varchar_int MAP<VARCHAR(20), INT>;
+
+    ALTER TABLE map_table MODIFY COLUMN map_int_varchar MAP<INT, VARCHAR(20)>;
+
+    ALTER TABLE map_table MODIFY COLUMN map_varchar_varchar MAP<VARCHAR(20), VARCHAR(20)>;
+CREATE TABLE struct_table (
+      `k` INT NOT NULL,
+      `struct_varchar` STRUCT<name: VARCHAR(10), age: INT>
+  ) ENGINE=OLAP
+  DUPLICATE KEY(`k`)
+  DISTRIBUTED BY HASH(`k`) BUCKETS 1
+  PROPERTIES (
+      "replication_num" = "1"
+  );
+
+  ALTER TABLE struct_table MODIFY COLUMN struct_varchar STRUCT<name: VARCHAR(20), age: INT>;
+CREATE TABLE struct_table (
+      `k` INT NOT NULL,
+      `struct_varchar` STRUCT<name: VARCHAR(10), age: INT>
+  ) ENGINE=OLAP
+  DUPLICATE KEY(`k`)
+  DISTRIBUTED BY HASH(`k`) BUCKETS 1
+  PROPERTIES (
+      "replication_num" = "1"
+  );
+
+  -- Add a subcolumn at the end
+  ALTER TABLE struct_table MODIFY COLUMN struct_varchar STRUCT<name: VARCHAR(10), age: INT, id: INT>;
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT,
+    INDEX idx_v(v) USING INVERTED PROPERTIES("parser" = "english")
+);
+
+-- All subpaths inherit the english parser
+SELECT * FROM tbl WHERE v['id_1'] MATCH 'Doris';
+SELECT * FROM tbl WHERE v['id_2'] MATCH 'Apache';
+-- VARIANT itself cannot be indexed as a whole
+   SELECT * FROM tbl WHERE v MATCH 'Doris';
+
+   -- If whole-JSON search is needed, store a duplicate STRING column and index it
+   CREATE TABLE IF NOT EXISTS tbl (
+       k BIGINT,
+       v VARIANT,
+       v_str STRING,
+       INDEX idx_v_str(v_str) USING INVERTED PROPERTIES("parser" = "english")
+   );
+   SELECT * FROM tbl WHERE v_str MATCH 'Doris';
+CREATE TABLE example_table (
+  id INT,
+  data_variant VARIANT
+);
+SELECT * FROM example_table WHERE data_variant LIKE '%doris%';
+
+-- Better: keep the original JSON string for whole-object matching
+CREATE TABLE example_table (
+  id INT,
+  data_string STRING,
+  data_variant VARIANT
+);
+SELECT * FROM example_table WHERE data_string LIKE '%doris%';
+SET describe_extend_variant_column = true;
+DESC variant_tbl;
+-- Insert sample data
+INSERT INTO event_log VALUES
+    ('2025-01-01 10:00:00', 1001, 'click', '{"page": "home", "user_id": 42, "duration_ms": 320}'),
+    ('2025-01-01 10:00:01', 1002, 'purchase', '{"item": "widget", "price": 9.99, "user_id": 42}'),
+    ('2025-01-01 10:00:02', 1003, 'click', '{"page": "search", "user_id": 99, "query": "doris variant"}');
+
+-- Verify data
+SELECT payload['user_id'], payload['page'] FROM event_log;
+
+-- Check Subcolumnization results
+SET describe_extend_variant_column = true;
+DESC event_log;
+
+-- Check per-row types
+SELECT variant_type(payload) FROM event_log;
+CREATE TABLE support_tickets (
+    ticket_id      BIGINT,
+    customer_name  VARCHAR(100),
+    subject        VARCHAR(200),
+    details        TEXT
+)
+DUPLICATE KEY(ticket_id)
+DISTRIBUTED BY HASH(ticket_id) BUCKETS 5
+PROPERTIES (
+    "replication_num" = "1"
+);
+
+INSERT INTO support_tickets VALUES
+(1, 'Alice', 'Login Failure', 'Cannot log in after password reset. Tried clearing cache and different browsers.'),
+(2, 'Bob', 'Login Failure', 'Same problem as Alice. Also seeing 502 errors on the SSO page.'),
+(3, 'Carol', 'Payment Declined', 'Credit card charged twice but order still shows pending.'),
+(4, 'Dave', 'Slow Dashboard', 'Dashboard takes >30 seconds to load since the last release.'),
+(5, 'Eve', 'Login Failure', 'Getting redirected back to login after entering 2FA code.');
+CREATE TABLE product_reviews (
+    review_id   BIGINT,
+    product_id  BIGINT,
+    rating      TINYINT,
+    comment     STRING
+)
+DUPLICATE KEY(review_id)
+DISTRIBUTED BY HASH(product_id) BUCKETS 10
+PROPERTIES (
+    "replication_num" = "1"
+);
+
+INSERT INTO product_reviews VALUES
+(1, 1001, 5, '鞋子尺码刚好，穿着舒服，颜色也好看，物流很快！'),
+(2, 1001, 4, '质量不错，就是鞋底有点硬，需要磨合几天。'),
+(3, 1001, 3, '外观和图片一样，但收到时有轻微胶味。'),
+(4, 1002, 5, '杯子小巧，出汁快，清洗也方便，上班带着刚好。'),
+(5, 1002, 3, '声音有点大，不过能接受，充满电只能榨 5 杯。'),
+(6, 1002, 2, '用了两周就充不进电，售后换货流程太慢。'),
+(7, 1003, 5, '面料透气不闷热，袖口设计很贴心，UPF50+ 确实晒不黑。'),
+(8, 1003, 4, '颜色好看，但拉链有点卡顿，需要用力。'),
+(9, 1004, 5, '降噪给力，地铁里也能安静听歌，续航一周充一次。');
+SET default_ai_resource = 'ai_resource_name';
+SELECT
+    product_id,
+    AI_AGG(
+        comment,
+        '请把多条用户评价总结成一句话，突出买家最关心的优点和缺点，控制在50字以内。'
+    ) AS 评价摘要
+FROM product_reviews
+GROUP BY product_id;
+-- setup
+create table t1(
+        k1 int,
+        k_string varchar(100),
+        k_decimal decimal(10, 2)
+) distributed by hash (k1) buckets 1
+properties ("replication_num"="1");
+insert into t1 values 
+    (1, 'apple', 10.01),
+    (1, 'banana', 20.02),
+    (2, 'orange', 30.03),
+    (2, null, null),
+    (3, null, null);
+-- setup
+create table t1(
+        k1 int,
+        k_string varchar(100),
+        k_tinyint tinyint
+) distributed by hash (k1) buckets 1
+properties ("replication_num"="1");
+insert into t1 values 
+    (1, 'apple', 10),
+    (1, 'banana', 20),
+    (1, 'apple', 10),
+    (2, 'orange', 30),
+    (2, 'orange', 40),
+    (2, 'grape', 50),
+    (3, null, null);
+-- setup
+CREATE TABLE test_doris_array_agg (
+	c1 INT,
+	c2 INT
+) DISTRIBUTED BY HASH(c1) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO test_doris_array_agg VALUES (1, 10), (1, 20), (1, 30), (2, 100), (2, 200), (3, NULL);
+-- setup
+CREATE TABLE map_agg_example (
+    id INT,
+    m MAP<INT, INT>,
+    md MAP<STRING, DECIMAL(10, 2)>
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+INSERT INTO map_agg_example VALUES
+    (1, MAP(1, 10, 2, 20), MAP('a', 1.20, 'b', 2.30)),
+    (1, MAP(2, 5, 3, 30), MAP('b', 3.70, 'c', 4.00)),
+    (2, MAP(1, 7, 4, NULL), MAP('a', NULL, 'c', 5.50)),
+    (2, CAST(MAP() AS MAP<INT, INT>), CAST(MAP() AS MAP<STRING, DECIMAL(10, 2)>));
+-- setup
+create table t1(
+        k1 int,
+        k2 int,
+        k3 decimal(10, 2),
+        k4 double,
+        category varchar(50)
+) distributed by hash (k1) buckets 1
+properties ("replication_num"="1");
+insert into t1 values 
+    (10, 100, 5.5, 1.0, 'A'),
+    (20, 200, 10.0, 2.0, 'A'),
+    (30, 300, 15.5, 3.0, 'B'),
+    (40, 400, 20.0, 4.0, 'B'),
+    (50, 0, 25.0, 0.0, 'C'),
+    (60, 600, 30.0, 5.0, 'C');
+-- setup
+create table t1(
+        k_tinyint tinyint,
+        k_smallint smallint,
+        k_int int,
+        k_bigint bigint,
+        k_largeint largeint,
+        k_double double,
+        k_decimal decimalv3(10, 5),
+        k_null_int int
+) distributed by hash (k_int) buckets 1
+properties ("replication_num"="1");
+insert into t1 values 
+    (1, 10, 100, 1000, 10000, 1.1, 222.222, null),
+    (2, 20, 200, 2000, 20000, 2.2, 444.444, null),
+    (3, 30, 300, 3000, 30000, 3.3, null, null);
+-- setup
+CREATE TABLE test_bitmap_agg (
+    id INT,
+    k0 INT,
+    k1 INT,
+    k2 INT,
+    k3 INT,
+    k4 BIGINT,
+    k5 VARCHAR(32)
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO test_bitmap_agg VALUES
+    (1, 10, 110, 11, 300, 10000000000, '0'),
+    (2, 20, 120, 21, 400, 20000000000, '200000000000000'),
+    (3, 30, 130, 31, 350, 30000000000, '300000000000000'),
+    (4, 40, 140, 41, 500, 40000000000, '18446744073709551616'),
+    (5, 50, 150, 51, 250, 50000000000, '18446744073709551615'),
+    (6, 60, 160, 61, 600, 60000000000, '-1'),
+    (7, 60, 160, 120, 600, 60000000000, NULL);
+-- setup
+CREATE TABLE user_tags (
+	tag VARCHAR(20),
+	date DATETIME,
+	user_id BITMAP bitmap_union
+) AGGREGATE KEY(tag, date) DISTRIBUTED BY HASH(tag) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO user_tags VALUES
+	('A', '2020-05-18', to_bitmap(1)),
+	('A', '2020-05-18', to_bitmap(2)),
+	('A', '2020-05-19', to_bitmap(2)),
+	('A', '2020-05-19', to_bitmap(3)),
+	('B', '2020-05-18', to_bitmap(4)),
+	('B', '2020-05-19', to_bitmap(4)),
+	('B', '2020-05-19', to_bitmap(5));
+-- setup
+CREATE TABLE pv_bitmap (
+    dt INT,
+    page INT,
+    user_id BITMAP
+) DISTRIBUTED BY HASH(dt) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO pv_bitmap VALUES
+    (1, 100, to_bitmap(100)),
+    (1, 100, to_bitmap(200)),
+    (1, 100, to_bitmap(300)),
+    (2, 200, to_bitmap(300));
+-- setup
+CREATE TABLE pv_bitmap (
+    dt INT,
+    page INT,
+    user_id BITMAP
+) DISTRIBUTED BY HASH(dt) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO pv_bitmap VALUES
+    (1, 100, to_bitmap(100)),
+    (1, 100, to_bitmap(200)),
+    (1, 100, to_bitmap(300)),
+    (1, 300, to_bitmap(300)),
+    (2, 200, to_bitmap(300));
+-- setup
+CREATE TABLE pv_bitmap (
+  dt INT,
+  page INT,
+  user_id BITMAP
+) DISTRIBUTED BY HASH(dt) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO pv_bitmap VALUES
+  (1, 100, to_bitmap(100)),
+  (1, 100, to_bitmap(200)),
+  (1, 100, to_bitmap(300)),
+  (2, 200, to_bitmap(300));
+CREATE TABLE IF NOT EXISTS test_boolean_agg (
+     id INT,
+     c1 BOOLEAN,
+     c2 BOOLEAN,
+     c3 BOOLEAN,
+     c4 BOOLEAN
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1"); 
+
+INSERT INTO test_boolean_agg (id, c1, c2, c3, c4) values 
+(1, true, true, true, false),
+(2, true, false, false, false),
+(3, true, true, false, false),
+(4, true, false, false, false);
+CREATE TABLE test_numeric_and_null (
+    id INT,
+    c_int INT,
+    c_float FLOAT,
+    c_decimal DECIMAL(10,2),
+    c_bool BOOLEAN
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+INSERT INTO test_numeric_and_null (id, c_int, c_float, c_decimal, c_bool) VALUES
+(1, 1, 1.0, NULL, NULL),
+(2, 0, NULL, 0.00, NULL),
+(3, 1, 3.14, 1.00, NULL),
+(4, 0, 1.0, 0.00, NULL),
+(5, NULL, NULL, NULL, NULL);
+CREATE TABLE test_numeric_or_null (
+    id INT,
+    c_int INT,
+    c_float FLOAT,
+    c_decimal DECIMAL(10,2),
+    c_bool BOOLEAN
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+INSERT INTO test_numeric_or_null (id, c_int, c_float, c_decimal, c_bool) VALUES
+(1, 1, 1.0, NULL, NULL),
+(2, 0, NULL, 0.00, NULL),
+(3, 1, 3.14, 1.00, NULL),
+(4, 0, 1.0, 0.00, NULL),
+(5, NULL, NULL, NULL, NULL);
+-- setup
+CREATE TABLE collect_list_test (
+	k1 INT,
+	k2 INT,
+	k3 STRING
+) DISTRIBUTED BY HASH(k1) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO collect_list_test VALUES (1, 10, 'a'), (1, 20, 'b'), (1, 30, 'c'), (2, 100, 'x'), (2, 200, 'y'), (3, NULL, NULL);
+-- setup
+CREATE TABLE collect_set_test (
+	k1 INT,
+	k2 INT,
+	k3 STRING
+) DISTRIBUTED BY HASH(k1) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO collect_set_test VALUES (1, 10, 'a'), (1, 20, 'b'), (1, 10, 'a'), (2, 100, 'x'), (2, 200, 'y'), (3, NULL, NULL);
+-- setup
+create table test_corr(
+    id int,
+    k1 double,
+    k2 double
+) distributed by hash (id) buckets 1
+properties ("replication_num"="1");
+
+insert into test_corr values 
+    (1, 20, 22),
+    (1, 10, 20),
+    (2, 36, 21),
+    (2, 30, 22),
+    (2, 25, 20),
+    (3, 25, NULL),
+    (4, 25, 21),
+    (4, 25, 22),
+    (4, 25, 20);
+-- setup
+CREATE TABLE map_agg_example (
+    id INT,
+    m MAP<INT, INT>,
+    ms MAP<INT, STRING>
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+INSERT INTO map_agg_example VALUES
+    (1, MAP(1, 10, 2, 20), MAP(1, 'b', 2, 'x')),
+    (1, MAP(2, 5, 3, 30), MAP(1, 'a', 3, NULL)),
+    (2, MAP(1, 7, 4, NULL), MAP(2, 'z')),
+    (2, CAST(MAP() AS MAP<INT, INT>), CAST(MAP() AS MAP<INT, STRING>));
+-- setup
+create table test_count(
+    id int,
+    name varchar(20),
+    sex int
+) distributed by hash(id) buckets 1
+properties ("replication_num"="1");
+
+insert into test_count values
+    (1, '1', 1),
+    (2, '2', 1),
+    (3, '3', 1),
+    (4, '0', 1),
+    (4, '4', 1),
+    (5, NULL, 1);
+
+create table test_insert(
+    id int,
+    name varchar(20),
+    sex int
+) distributed by hash(id) buckets 1
+properties ("replication_num"="1");
+
+insert into test_insert values
+    (1, '1', 1),
+    (2, '2', 1),
+    (3, '3', 1),
+    (4, '0', 1),
+    (4, '4', 1),
+    (5, NULL, 1);
+-- setup
+create table baseall(
+    id int,
+    x double,
+    y double
+) distributed by hash(id) buckets 1
+properties ("replication_num"="1");
+
+insert into baseall values
+    (1, 1.0, 2.0),
+    (2, 2.0, 3.0),
+    (3, 3.0, 4.0),
+    (4, 4.0, NULL),
+    (5, NULL, 5.0);
+-- setup
+CREATE TABLE test_datasketches_hll_union_agg_tbl (
+    id INT,
+    sk STRING
+)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+-- The sketch bytes are inserted via Base64 decoding.
+INSERT INTO test_datasketches_hll_union_agg_tbl VALUES
+    (1, from_base64('AgEHCAMIBwjL18IEK/L7BoYv+Q11gWYHgbxdBntl5gj8LUIK')),
+    (2, from_base64('AwEHCAUIAAkKAAAAIjvrBcS1nwfGGWoEyHokBO8t9wc1qTEENkcJB7hWqQxZf9QNnuSbGA==')),
+    (3, NULL);
+-- setup
+create table temparature_data (
+    id int,
+    temp double,
+    ts double
+) distributed by hash (id) buckets 1
+properties ("replication_num"="1");
+
+insert into temparature_data values
+    (1, 10, 1),
+    (2, 20, 2),
+    (3, 30, 3);
+-- setup
+create table sensor_data (
+    sensor_id int,
+    reading double,
+    ts double
+) distributed by hash (sensor_id) buckets 1
+properties ("replication_num"="1");
+
+insert into sensor_data values
+    (1, 10, 1),
+    (1, 20, 2),
+    (2, 100, 1),
+    (2, 200, 2);
+-- setup
+create table null_test (
+    id int,
+    val double,
+    ts double
+) distributed by hash (id) buckets 1
+properties ("replication_num"="1");
+
+insert into null_test values
+    (1, 10, 1),
+    (2, null, 2),
+    (3, 20, 3);
+-- setup
+create table time_series (
+    ts double,
+    val double
+) distributed by hash (ts) buckets 1
+properties ("replication_num"="1");
+
+insert into time_series values (0, 10), (1, 10), (2, 10);
+-- setup
+CREATE TABLE group_array_intersect_test (
+    id INT,
+    c_array_string ARRAY<STRING>
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO group_array_intersect_test VALUES
+    (1, ['a', 'b', 'c', 'd', 'e']),
+    (2, ['a', 'b']),
+    (3, ['a', null]);
+-- setup
+CREATE TABLE group_array_union_test (
+	id INT,
+	c_array_string ARRAY<STRING>
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO group_array_union_test VALUES
+	(1, ['a', 'b', 'c', 'd', 'e']),
+	(2, ['a', 'b']),
+	(3, ['a', null]),
+	(4, NULL);
+-- setup
+create table group_bit(
+    value int
+) distributed by hash(value) buckets 1
+properties ("replication_num"="1");
+
+insert into group_bit values
+    (3),
+    (1),
+    (2),
+    (4),
+    (NULL);
+-- setup
+CREATE TABLE pv_bitmap (
+	page varchar(10),
+	user_id BITMAP
+) DISTRIBUTED BY HASH(page) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO pv_bitmap VALUES
+	('m', to_bitmap(4)),
+	('m', to_bitmap(7)),
+	('m', to_bitmap(8)),
+	('m', to_bitmap(1)),
+	('m', to_bitmap(3)),
+	('m', to_bitmap(6)),
+	('m', to_bitmap(15)),
+	('m', to_bitmap(4)),
+	('m', to_bitmap(7));
+-- setup
+create table test(
+    value varchar(10)
+) distributed by hash(value) buckets 1
+properties ("replication_num"="1");
+
+insert into test values
+    ("a"),
+    ("b"),
+    ("c"),
+    ("c");
+-- setup
+CREATE TABLE histogram_test (
+    c_int INT,
+    c_float FLOAT,
+    c_string VARCHAR(20)
+) DISTRIBUTED BY HASH(c_int) BUCKETS 1
+PROPERTIES ("replication_num"="1");
+
+INSERT INTO histogram_test VALUES
+    (1, 0.1, 'str1'),
+    (2, 0.2, 'str2'),
+    (3, 0.8, 'str3'),
+    (4, 0.9, 'str4'),
+    (5, 1.0, 'str5'),
+    (6, 1.0, 'str6'),
+    (NULL, NULL, 'str7');
+-- setup
+create table test_uv(
+    id int,
+    uv_set string
+) distributed by hash(id) buckets 1
+properties ("replication_num"="1");
+insert into test_uv values
+    (1, ('a')),
+    (1, ('b')),
+    (2, ('c')),
+    (2, ('d')),
+    (3, null);
+-- setup
+CREATE TABLE pv_bitmap (
+	dt INT,
+	user_id BITMAP,
+	city STRING
+) DISTRIBUTED BY HASH(dt) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO pv_bitmap VALUES
+	(20250801, to_bitmap(1), 'beijing'),
+	(20250801, to_bitmap(2), 'beijing'),
+	(20250801, to_bitmap(3), 'shanghai'),
+	(20250802, to_bitmap(3), 'beijing'),
+	(20250802, to_bitmap(4), 'shanghai'),
+	(20250802, to_bitmap(5), 'shenzhen');
+-- setup
+create table statistic_test(
+    tag int,
+    val1 double,
+    val2 double
+) distributed by hash(tag) buckets 1
+properties ("replication_num"="1");
+insert into statistic_test values
+    (1, -10, -10),
+    (2, -20, null),
+    (3, 100, null),
+    (4, 100, null),
+    (5, 1000, 1000);
+-- setup
+create table histogram_test(
+  a int
+) distributed by hash(a) buckets 1
+properties ("replication_num"="1");
+insert into histogram_test values
+  (0), (1), (2), (3), (4), (5), (6), (7), (8), (9), (10), (11), (null);
+-- setup
+CREATE TABLE nation (
+    n_nationkey INT,
+    n_name STRING,
+    n_regionkey INT
+) DISTRIBUTED BY HASH(n_nationkey) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+INSERT INTO nation VALUES
+    (0, 'ALGERIA', 0),
+    (1, 'ARGENTINA', 1),
+    (2, 'BRAZIL', 1),
+    (3, 'CANADA', 1);
+-- setup
+create table tbl(
+    k1 int,
+    k2 int,
+    arr ARRAY<INT>,
+    mp MAP<STRING, INT>,
+    st STRUCT<a: INT, b: STRING>,
+) distributed by hash(k1) buckets 1
+properties ("replication_num"="1");
+insert into tbl values
+    (0, 100, [1,2,3], {"x": 1, "y": 4}, NAMED_STRUCT("a", 1, "b", "x")),
+    (1, 4,   [5, 6],  {"x": 2, "y": 3}, NAMED_STRUCT("a", 2, "b", "y")),
+    (4, 1,   [7],     {"x": 3, "y": 2}, NAMED_STRUCT("a", 3, "b", "z")),
+    (3, 1,   [8],     {"x": 4, "y": 1}, NAMED_STRUCT("a", 4, "b", "r"));
+-- setup
+create table t1(
+        k1 int,
+        k_string varchar(100),
+        k_decimal decimal(10, 2),
+        k_array array<int>
+) distributed by hash (k1) buckets 1
+properties ("replication_num"="1");
+insert into t1 values 
+    (1, 'apple', 10.01, [10, 20, 30]),
+    (1, 'banana', 20.02, [10, 20]),
+    (2, 'orange', 30.03, [10, 20, 40]),
+    (2, null, null, [10, 20, null]),
+    (3, null, null, null);
+------------------------------------------------------------------------------------------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE simple_point (  id INT,  wkb STRING)
+----------
+[INSERT] INSERT INTO simple_point VALUES(1,'\x01010000005f07ce19515e5e4097ff907efb3a3f40');
+----------
+[CREATE_TABLE|ADD_COLUMN] create table simple_point(id int, wkb VARCHAR(255));
+----------
+[INSERT] INSERT INTO simple_point VALUES(1,'\x01010000005f07ce19515e5e4097ff907efb3a3f40');
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE `map_table` (
+      `k` INT NOT NULL,
+      `map_varchar_int` MAP<VARCHAR(10), INT>,
+      `map_int_varchar` MAP<INT, VARCHAR(10)>,
+      `map_varchar_varchar` MAP<VARCHAR(10), VARCHAR(10)>
+    ) ENGINE=OLAP
+    DUPLICATE KEY(`k`)
+    DISTRIBUTED BY HASH(`k`) BUCKETS 1
+    PROPERTIES (
+        "replication_num" = "1"
+    );
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE map_table MODIFY COLUMN map_varchar_int MAP<VARCHAR(20), INT>;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE map_table MODIFY COLUMN map_int_varchar MAP<INT, VARCHAR(20)>;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE map_table MODIFY COLUMN map_varchar_varchar MAP<VARCHAR(20), VARCHAR(20)>;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE struct_table (
+      `k` INT NOT NULL,
+      `struct_varchar` STRUCT<name: VARCHAR(10), age: INT>
+  ) ENGINE=OLAP
+  DUPLICATE KEY(`k`)
+  DISTRIBUTED BY HASH(`k`) BUCKETS 1
+  PROPERTIES (
+      "replication_num" = "1"
+  );
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE struct_table MODIFY COLUMN struct_varchar STRUCT<name: VARCHAR(20), age: INT>;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE struct_table (
+      `k` INT NOT NULL,
+      `struct_varchar` STRUCT<name: VARCHAR(10), age: INT>
+  ) ENGINE=OLAP
+  DUPLICATE KEY(`k`)
+  DISTRIBUTED BY HASH(`k`) BUCKETS 1
+  PROPERTIES (
+      "replication_num" = "1"
+  );
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE struct_table MODIFY COLUMN struct_varchar STRUCT<name: VARCHAR(10), age: INT, id: INT>;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT,
+    INDEX idx_v(v) USING INVERTED PROPERTIES("parser" = "english")
+);
+----------
+[SELECT] -- All subpaths inherit the english parser
+SELECT * FROM tbl WHERE v['id_1'] MATCH 'Doris';
+----------
+[SELECT] SELECT * FROM tbl WHERE v['id_2'] MATCH 'Apache';
+----------
+[SELECT] SELECT * FROM tbl WHERE v MATCH 'Doris';
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE IF NOT EXISTS tbl (
+       k BIGINT,
+       v VARIANT,
+       v_str STRING,
+       INDEX idx_v_str(v_str) USING INVERTED PROPERTIES("parser" = "english")
+   );
+----------
+[SELECT] SELECT * FROM tbl WHERE v_str MATCH 'Doris';
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE example_table (
+  id INT,
+  data_variant VARIANT
+);
+----------
+[SELECT] SELECT * FROM example_table WHERE data_variant LIKE '%doris%';
+----------
+[CREATE_TABLE|ADD_COLUMN] -- Better: keep the original JSON string for whole-object matching
+CREATE TABLE example_table (
+  id INT,
+  data_string STRING,
+  data_variant VARIANT
+);
+----------
+[SELECT] SELECT * FROM example_table WHERE data_string LIKE '%doris%';
+----------
+[SESSION_SETTING_WRITE] SET describe_extend_variant_column = true;
+----------
+[METADATA] DESC variant_tbl;
+----------
+[INSERT] -- Insert sample data
+INSERT INTO event_log VALUES
+    ('2025-01-01 10:00:00', 1001, 'click', '{"page": "home", "user_id": 42, "duration_ms": 320}'),
+    ('2025-01-01 10:00:01', 1002, 'purchase', '{"item": "widget", "price": 9.99, "user_id": 42}'),
+    ('2025-01-01 10:00:02', 1003, 'click', '{"page": "search", "user_id": 99, "query": "doris variant"}');
+----------
+[SELECT] -- Verify data
+SELECT payload['user_id'], payload['page'] FROM event_log;
+----------
+[SESSION_SETTING_WRITE] -- Check Subcolumnization results
+SET describe_extend_variant_column = true;
+----------
+[METADATA] DESC event_log;
+----------
+[SELECT] -- Check per-row types
+SELECT variant_type(payload) FROM event_log;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE support_tickets (
+    ticket_id      BIGINT,
+    customer_name  VARCHAR(100),
+    subject        VARCHAR(200),
+    details        TEXT
+)
+DUPLICATE KEY(ticket_id)
+DISTRIBUTED BY HASH(ticket_id) BUCKETS 5
+PROPERTIES (
+    "replication_num" = "1"
+);
+----------
+[INSERT] INSERT INTO support_tickets VALUES
+(1, 'Alice', 'Login Failure', 'Cannot log in after password reset. Tried clearing cache and different browsers.'),
+(2, 'Bob', 'Login Failure', 'Same problem as Alice. Also seeing 502 errors on the SSO page.'),
+(3, 'Carol', 'Payment Declined', 'Credit card charged twice but order still shows pending.'),
+(4, 'Dave', 'Slow Dashboard', 'Dashboard takes >30 seconds to load since the last release.'),
+(5, 'Eve', 'Login Failure', 'Getting redirected back to login after entering 2FA code.');
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE product_reviews (
+    review_id   BIGINT,
+    product_id  BIGINT,
+    rating      TINYINT,
+    comment     STRING
+)
+DUPLICATE KEY(review_id)
+DISTRIBUTED BY HASH(product_id) BUCKETS 10
+PROPERTIES (
+    "replication_num" = "1"
+);
+----------
+[INSERT] INSERT INTO product_reviews VALUES
+(1, 1001, 5, '鞋子尺码刚好，穿着舒服，颜色也好看，物流很快！'),
+(2, 1001, 4, '质量不错，就是鞋底有点硬，需要磨合几天。'),
+(3, 1001, 3, '外观和图片一样，但收到时有轻微胶味。'),
+(4, 1002, 5, '杯子小巧，出汁快，清洗也方便，上班带着刚好。'),
+(5, 1002, 3, '声音有点大，不过能接受，充满电只能榨 5 杯。'),
+(6, 1002, 2, '用了两周就充不进电，售后换货流程太慢。'),
+(7, 1003, 5, '面料透气不闷热，袖口设计很贴心，UPF50+ 确实晒不黑。'),
+(8, 1003, 4, '颜色好看，但拉链有点卡顿，需要用力。'),
+(9, 1004, 5, '降噪给力，地铁里也能安静听歌，续航一周充一次。');
+----------
+[SESSION_SETTING_WRITE] SET default_ai_resource = 'ai_resource_name';
+----------
+[SELECT] SELECT
+    product_id,
+    AI_AGG(
+        comment,
+        '请把多条用户评价总结成一句话，突出买家最关心的优点和缺点，控制在50字以内。'
+    ) AS 评价摘要
+FROM product_reviews
+GROUP BY product_id;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table t1(
+        k1 int,
+        k_string varchar(100),
+        k_decimal decimal(10, 2)
+) distributed by hash (k1) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into t1 values 
+    (1, 'apple', 10.01),
+    (1, 'banana', 20.02),
+    (2, 'orange', 30.03),
+    (2, null, null),
+    (3, null, null);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table t1(
+        k1 int,
+        k_string varchar(100),
+        k_tinyint tinyint
+) distributed by hash (k1) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into t1 values 
+    (1, 'apple', 10),
+    (1, 'banana', 20),
+    (1, 'apple', 10),
+    (2, 'orange', 30),
+    (2, 'orange', 40),
+    (2, 'grape', 50),
+    (3, null, null);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE test_doris_array_agg (
+	c1 INT,
+	c2 INT
+) DISTRIBUTED BY HASH(c1) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO test_doris_array_agg VALUES (1, 10), (1, 20), (1, 30), (2, 100), (2, 200), (3, NULL);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE map_agg_example (
+    id INT,
+    m MAP<INT, INT>,
+    md MAP<STRING, DECIMAL(10, 2)>
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO map_agg_example VALUES
+    (1, MAP(1, 10, 2, 20), MAP('a', 1.20, 'b', 2.30)),
+    (1, MAP(2, 5, 3, 30), MAP('b', 3.70, 'c', 4.00)),
+    (2, MAP(1, 7, 4, NULL), MAP('a', NULL, 'c', 5.50)),
+    (2, CAST(MAP() AS MAP<INT, INT>), CAST(MAP() AS MAP<STRING, DECIMAL(10, 2)>));
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table t1(
+        k1 int,
+        k2 int,
+        k3 decimal(10, 2),
+        k4 double,
+        category varchar(50)
+) distributed by hash (k1) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into t1 values 
+    (10, 100, 5.5, 1.0, 'A'),
+    (20, 200, 10.0, 2.0, 'A'),
+    (30, 300, 15.5, 3.0, 'B'),
+    (40, 400, 20.0, 4.0, 'B'),
+    (50, 0, 25.0, 0.0, 'C'),
+    (60, 600, 30.0, 5.0, 'C');
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table t1(
+        k_tinyint tinyint,
+        k_smallint smallint,
+        k_int int,
+        k_bigint bigint,
+        k_largeint largeint,
+        k_double double,
+        k_decimal decimalv3(10, 5),
+        k_null_int int
+) distributed by hash (k_int) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into t1 values 
+    (1, 10, 100, 1000, 10000, 1.1, 222.222, null),
+    (2, 20, 200, 2000, 20000, 2.2, 444.444, null),
+    (3, 30, 300, 3000, 30000, 3.3, null, null);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE test_bitmap_agg (
+    id INT,
+    k0 INT,
+    k1 INT,
+    k2 INT,
+    k3 INT,
+    k4 BIGINT,
+    k5 VARCHAR(32)
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO test_bitmap_agg VALUES
+    (1, 10, 110, 11, 300, 10000000000, '0'),
+    (2, 20, 120, 21, 400, 20000000000, '200000000000000'),
+    (3, 30, 130, 31, 350, 30000000000, '300000000000000'),
+    (4, 40, 140, 41, 500, 40000000000, '18446744073709551616'),
+    (5, 50, 150, 51, 250, 50000000000, '18446744073709551615'),
+    (6, 60, 160, 61, 600, 60000000000, '-1'),
+    (7, 60, 160, 120, 600, 60000000000, NULL);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE user_tags (
+	tag VARCHAR(20),
+	date DATETIME,
+	user_id BITMAP bitmap_union
+) AGGREGATE KEY(tag, date) DISTRIBUTED BY HASH(tag) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO user_tags VALUES
+	('A', '2020-05-18', to_bitmap(1)),
+	('A', '2020-05-18', to_bitmap(2)),
+	('A', '2020-05-19', to_bitmap(2)),
+	('A', '2020-05-19', to_bitmap(3)),
+	('B', '2020-05-18', to_bitmap(4)),
+	('B', '2020-05-19', to_bitmap(4)),
+	('B', '2020-05-19', to_bitmap(5));
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE pv_bitmap (
+    dt INT,
+    page INT,
+    user_id BITMAP
+) DISTRIBUTED BY HASH(dt) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO pv_bitmap VALUES
+    (1, 100, to_bitmap(100)),
+    (1, 100, to_bitmap(200)),
+    (1, 100, to_bitmap(300)),
+    (2, 200, to_bitmap(300));
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE pv_bitmap (
+    dt INT,
+    page INT,
+    user_id BITMAP
+) DISTRIBUTED BY HASH(dt) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO pv_bitmap VALUES
+    (1, 100, to_bitmap(100)),
+    (1, 100, to_bitmap(200)),
+    (1, 100, to_bitmap(300)),
+    (1, 300, to_bitmap(300)),
+    (2, 200, to_bitmap(300));
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE pv_bitmap (
+  dt INT,
+  page INT,
+  user_id BITMAP
+) DISTRIBUTED BY HASH(dt) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO pv_bitmap VALUES
+  (1, 100, to_bitmap(100)),
+  (1, 100, to_bitmap(200)),
+  (1, 100, to_bitmap(300)),
+  (2, 200, to_bitmap(300));
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS test_boolean_agg (
+     id INT,
+     c1 BOOLEAN,
+     c2 BOOLEAN,
+     c3 BOOLEAN,
+     c4 BOOLEAN
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO test_boolean_agg (id, c1, c2, c3, c4) values 
+(1, true, true, true, false),
+(2, true, false, false, false),
+(3, true, true, false, false),
+(4, true, false, false, false);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE test_numeric_and_null (
+    id INT,
+    c_int INT,
+    c_float FLOAT,
+    c_decimal DECIMAL(10,2),
+    c_bool BOOLEAN
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO test_numeric_and_null (id, c_int, c_float, c_decimal, c_bool) VALUES
+(1, 1, 1.0, NULL, NULL),
+(2, 0, NULL, 0.00, NULL),
+(3, 1, 3.14, 1.00, NULL),
+(4, 0, 1.0, 0.00, NULL),
+(5, NULL, NULL, NULL, NULL);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE test_numeric_or_null (
+    id INT,
+    c_int INT,
+    c_float FLOAT,
+    c_decimal DECIMAL(10,2),
+    c_bool BOOLEAN
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO test_numeric_or_null (id, c_int, c_float, c_decimal, c_bool) VALUES
+(1, 1, 1.0, NULL, NULL),
+(2, 0, NULL, 0.00, NULL),
+(3, 1, 3.14, 1.00, NULL),
+(4, 0, 1.0, 0.00, NULL),
+(5, NULL, NULL, NULL, NULL);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE collect_list_test (
+	k1 INT,
+	k2 INT,
+	k3 STRING
+) DISTRIBUTED BY HASH(k1) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO collect_list_test VALUES (1, 10, 'a'), (1, 20, 'b'), (1, 30, 'c'), (2, 100, 'x'), (2, 200, 'y'), (3, NULL, NULL);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE collect_set_test (
+	k1 INT,
+	k2 INT,
+	k3 STRING
+) DISTRIBUTED BY HASH(k1) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO collect_set_test VALUES (1, 10, 'a'), (1, 20, 'b'), (1, 10, 'a'), (2, 100, 'x'), (2, 200, 'y'), (3, NULL, NULL);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table test_corr(
+    id int,
+    k1 double,
+    k2 double
+) distributed by hash (id) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into test_corr values 
+    (1, 20, 22),
+    (1, 10, 20),
+    (2, 36, 21),
+    (2, 30, 22),
+    (2, 25, 20),
+    (3, 25, NULL),
+    (4, 25, 21),
+    (4, 25, 22),
+    (4, 25, 20);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE map_agg_example (
+    id INT,
+    m MAP<INT, INT>,
+    ms MAP<INT, STRING>
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO map_agg_example VALUES
+    (1, MAP(1, 10, 2, 20), MAP(1, 'b', 2, 'x')),
+    (1, MAP(2, 5, 3, 30), MAP(1, 'a', 3, NULL)),
+    (2, MAP(1, 7, 4, NULL), MAP(2, 'z')),
+    (2, CAST(MAP() AS MAP<INT, INT>), CAST(MAP() AS MAP<INT, STRING>));
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table test_count(
+    id int,
+    name varchar(20),
+    sex int
+) distributed by hash(id) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into test_count values
+    (1, '1', 1),
+    (2, '2', 1),
+    (3, '3', 1),
+    (4, '0', 1),
+    (4, '4', 1),
+    (5, NULL, 1);
+----------
+[CREATE_TABLE|ADD_COLUMN] create table test_insert(
+    id int,
+    name varchar(20),
+    sex int
+) distributed by hash(id) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into test_insert values
+    (1, '1', 1),
+    (2, '2', 1),
+    (3, '3', 1),
+    (4, '0', 1),
+    (4, '4', 1),
+    (5, NULL, 1);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table baseall(
+    id int,
+    x double,
+    y double
+) distributed by hash(id) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into baseall values
+    (1, 1.0, 2.0),
+    (2, 2.0, 3.0),
+    (3, 3.0, 4.0),
+    (4, 4.0, NULL),
+    (5, NULL, 5.0);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE test_datasketches_hll_union_agg_tbl (
+    id INT,
+    sk STRING
+)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] -- The sketch bytes are inserted via Base64 decoding.
+INSERT INTO test_datasketches_hll_union_agg_tbl VALUES
+    (1, from_base64('AgEHCAMIBwjL18IEK/L7BoYv+Q11gWYHgbxdBntl5gj8LUIK')),
+    (2, from_base64('AwEHCAUIAAkKAAAAIjvrBcS1nwfGGWoEyHokBO8t9wc1qTEENkcJB7hWqQxZf9QNnuSbGA==')),
+    (3, NULL);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table temparature_data (
+    id int,
+    temp double,
+    ts double
+) distributed by hash (id) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into temparature_data values
+    (1, 10, 1),
+    (2, 20, 2),
+    (3, 30, 3);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table sensor_data (
+    sensor_id int,
+    reading double,
+    ts double
+) distributed by hash (sensor_id) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into sensor_data values
+    (1, 10, 1),
+    (1, 20, 2),
+    (2, 100, 1),
+    (2, 200, 2);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table null_test (
+    id int,
+    val double,
+    ts double
+) distributed by hash (id) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into null_test values
+    (1, 10, 1),
+    (2, null, 2),
+    (3, 20, 3);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table time_series (
+    ts double,
+    val double
+) distributed by hash (ts) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into time_series values (0, 10), (1, 10), (2, 10);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE group_array_intersect_test (
+    id INT,
+    c_array_string ARRAY<STRING>
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO group_array_intersect_test VALUES
+    (1, ['a', 'b', 'c', 'd', 'e']),
+    (2, ['a', 'b']),
+    (3, ['a', null]);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE group_array_union_test (
+	id INT,
+	c_array_string ARRAY<STRING>
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO group_array_union_test VALUES
+	(1, ['a', 'b', 'c', 'd', 'e']),
+	(2, ['a', 'b']),
+	(3, ['a', null]),
+	(4, NULL);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table group_bit(
+    value int
+) distributed by hash(value) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into group_bit values
+    (3),
+    (1),
+    (2),
+    (4),
+    (NULL);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE pv_bitmap (
+	page varchar(10),
+	user_id BITMAP
+) DISTRIBUTED BY HASH(page) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO pv_bitmap VALUES
+	('m', to_bitmap(4)),
+	('m', to_bitmap(7)),
+	('m', to_bitmap(8)),
+	('m', to_bitmap(1)),
+	('m', to_bitmap(3)),
+	('m', to_bitmap(6)),
+	('m', to_bitmap(15)),
+	('m', to_bitmap(4)),
+	('m', to_bitmap(7));
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table test(
+    value varchar(10)
+) distributed by hash(value) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into test values
+    ("a"),
+    ("b"),
+    ("c"),
+    ("c");
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE histogram_test (
+    c_int INT,
+    c_float FLOAT,
+    c_string VARCHAR(20)
+) DISTRIBUTED BY HASH(c_int) BUCKETS 1
+PROPERTIES ("replication_num"="1");
+----------
+[INSERT] INSERT INTO histogram_test VALUES
+    (1, 0.1, 'str1'),
+    (2, 0.2, 'str2'),
+    (3, 0.8, 'str3'),
+    (4, 0.9, 'str4'),
+    (5, 1.0, 'str5'),
+    (6, 1.0, 'str6'),
+    (NULL, NULL, 'str7');
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table test_uv(
+    id int,
+    uv_set string
+) distributed by hash(id) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into test_uv values
+    (1, ('a')),
+    (1, ('b')),
+    (2, ('c')),
+    (2, ('d')),
+    (3, null);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE pv_bitmap (
+	dt INT,
+	user_id BITMAP,
+	city STRING
+) DISTRIBUTED BY HASH(dt) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO pv_bitmap VALUES
+	(20250801, to_bitmap(1), 'beijing'),
+	(20250801, to_bitmap(2), 'beijing'),
+	(20250801, to_bitmap(3), 'shanghai'),
+	(20250802, to_bitmap(3), 'beijing'),
+	(20250802, to_bitmap(4), 'shanghai'),
+	(20250802, to_bitmap(5), 'shenzhen');
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table statistic_test(
+    tag int,
+    val1 double,
+    val2 double
+) distributed by hash(tag) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into statistic_test values
+    (1, -10, -10),
+    (2, -20, null),
+    (3, 100, null),
+    (4, 100, null),
+    (5, 1000, 1000);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table histogram_test(
+  a int
+) distributed by hash(a) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into histogram_test values
+  (0), (1), (2), (3), (4), (5), (6), (7), (8), (9), (10), (11), (null);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+CREATE TABLE nation (
+    n_nationkey INT,
+    n_name STRING,
+    n_regionkey INT
+) DISTRIBUTED BY HASH(n_nationkey) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO nation VALUES
+    (0, 'ALGERIA', 0),
+    (1, 'ARGENTINA', 1),
+    (2, 'BRAZIL', 1),
+    (3, 'CANADA', 1);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table tbl(
+    k1 int,
+    k2 int,
+    arr ARRAY<INT>,
+    mp MAP<STRING, INT>,
+    st STRUCT<a: INT, b: STRING>,
+) distributed by hash(k1) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into tbl values
+    (0, 100, [1,2,3], {"x": 1, "y": 4}, NAMED_STRUCT("a", 1, "b", "x")),
+    (1, 4,   [5, 6],  {"x": 2, "y": 3}, NAMED_STRUCT("a", 2, "b", "y")),
+    (4, 1,   [7],     {"x": 3, "y": 2}, NAMED_STRUCT("a", 3, "b", "z")),
+    (3, 1,   [8],     {"x": 4, "y": 1}, NAMED_STRUCT("a", 4, "b", "r"));
+----------
+[CREATE_TABLE|ADD_COLUMN] -- setup
+create table t1(
+        k1 int,
+        k_string varchar(100),
+        k_decimal decimal(10, 2),
+        k_array array<int>
+) distributed by hash (k1) buckets 1
+properties ("replication_num"="1");
+----------
+[INSERT] insert into t1 values 
+    (1, 'apple', 10.01, [10, 20, 30]),
+    (1, 'banana', 20.02, [10, 20]),
+    (2, 'orange', 30.03, [10, 20, 40]),
+    (2, null, null, [10, 20, null]),
+    (3, null, null, null);

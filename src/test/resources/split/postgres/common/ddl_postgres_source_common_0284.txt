@@ -1,0 +1,566 @@
+ALTER TYPE test_typex DROP ATTRIBUTE a CASCADE
+;
+--
+-- Make sure that cross matching of attribute opclass/collation does not occur
+--
+create unique index cross_match on insertconflicttest(lower(fruit) collate "C", upper(fruit) text_pattern_ops)
+;
+CREATE OPERATOR CLASS "public"."part_test_text_ops"
+    FOR TYPE "text" USING "hash" FAMILY "public"."part_test_text_ops" AS
+    OPERATOR 1 =("text","text") ,
+    FUNCTION 2 ("text", "text") "public"."part_hashtext_length"("text",bigint)
+;
+CREATE TABLE tststats.t (a int, b int, c text)
+;
+VACUUM (PARALLEL 0) information_schema.sql_implementation_info
+;
+ALTER TABLE ONLY "public"."prt1" ATTACH PARTITION "public"."prt1_p3" DEFAULT
+;
+CREATE TABLE pgss_extend_tab (a int, b text)
+;
+DROP TABLE pg_temp_2.pg_temp_30214_2, pg_temp_2.pg_temp_30214
+;
+CREATE TABLE test30 (a int, b char(3) COLLATE case_insensitive) PARTITION BY LIST (b)
+;
+ALTER OPERATOR <= (cube, cube) SET (
+	RESTRICT = scalarlesel, JOIN = scalarlejoinsel
+)
+;
+CREATE SEQUENCE sequence_testx OWNED BY pg_class_oid_index.oid
+;
+VACUUM (PROCESS_TOAST FALSE) pg_catalog.pg_partitioned_table
+;
+CREATE OPERATOR ~* (
+    PROCEDURE = texticregexeq,
+    LEFTARG   = citext,
+    RIGHTARG  = citext,
+    NEGATOR   = !~*,
+    RESTRICT  = icregexeqsel,
+    JOIN      = icregexeqjoinsel
+)
+;
+CREATE FUNCTION hstore_to_plperl(val internal) RETURNS internal
+LANGUAGE C STRICT IMMUTABLE
+AS '$libdir/hstore_plperl'
+;
+--
+-- OPR_SANITY
+-- Sanity checks for common errors in making operator/procedure system tables:
+-- pg_operator, pg_proc, pg_cast, pg_conversion, pg_aggregate, pg_am,
+-- pg_amop, pg_amproc, pg_opclass, pg_opfamily, pg_index.
+--
+-- Every test failure in this file should be closely inspected.
+-- The description of the failing test should be read carefully before
+-- adjusting the expected output.  In most cases, the queries should
+-- not find *any* matching entries.
+--
+-- NB: we assume the oidjoins test will have caught any dangling links,
+-- that is OID or REGPROC fields that are not zero and do not match some
+-- row in the linked-to table.  However, if we want to enforce that a link
+-- field can't be 0, we have to check it here.
+--
+-- NB: run this test earlier than the create_operator test, because
+-- that test creates some bogus operators...
+
+
+-- Helper functions to deal with cases where binary-coercible matches are
+-- allowed.
+
+-- This should match IsBinaryCoercible() in parse_coerce.c.
+-- It doesn't currently know about some cases, notably domains, anyelement,
+-- anynonarray, anyenum, or record, but it doesn't need to (yet).
+create function binary_coercible(oid, oid) returns bool as $$
+begin
+  if $1 = $2 then return true; end if;
+  if EXISTS(select 1 from pg_catalog.pg_cast where
+            castsource = $1 and casttarget = $2 and
+            castmethod = 'b' and castcontext = 'i')
+  then return true; end if;
+  if $2 = 'pg_catalog.any'::pg_catalog.regtype then return true; end if;
+  if $2 = 'pg_catalog.anyarray'::pg_catalog.regtype then
+    if EXISTS(select 1 from pg_catalog.pg_type where
+              oid = $1 and typelem != 0 and typlen = -1)
+    then return true; end if;
+  end if;
+  if $2 = 'pg_catalog.anyrange'::pg_catalog.regtype then
+    if (select typtype from pg_catalog.pg_type where oid = $1) = 'r'
+    then return true; end if;
+  end if;
+  return false;
+end
+$$ language plpgsql strict stable
+;
+alter domain di drop constraint pos
+;
+CREATE FUNCTION "public"."transition_table_level1_ri_parent_del_func"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+  DECLARE n bigint;
+  BEGIN
+    PERFORM FROM p JOIN transition_table_level2 c ON c.parent_no = p.level1_no;
+    IF FOUND THEN
+      RAISE EXCEPTION 'RI error';
+    END IF;
+    RETURN NULL;
+  END;
+$$
+;
+alter database abc set datestyle to default
+;
+CREATE OPERATOR #*# (
+   rightarg = SETOF int8,
+   procedure = factorial
+)
+;
+-- CREATE OPERATOR CLASS without FAMILY clause should report
+-- both CREATE OPERATOR FAMILY and CREATE OPERATOR CLASS
+CREATE OPERATOR CLASS evttrigopclass FOR TYPE int USING btree AS STORAGE int
+;
+drop table pp, cc
+;
+CREATE FUNCTION "public"."f1_times_10"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$ begin new.f1 := new.f1 * 10; return new; end $$
+;
+CREATE FUNCTION gbt_macad_penalty(internal,internal,internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+create index on idxpart(c)
+;
+CREATE TABLE "public"."num_input_test" (
+    "n1" numeric
+)
+;
+CREATE FUNCTION gen_salt(text)
+RETURNS text
+AS '$libdir/pgcrypto', 'pg_gen_salt'
+LANGUAGE C VOLATILE STRICT PARALLEL SAFE
+;
+ALTER TABLE ctlt1 ALTER COLUMN a SET STORAGE MAIN
+;
+-- Test for proper cleanup at subtransaction exit.  This example
+-- exposed a bug in PG 8.2.
+
+CREATE FUNCTION leaker_1(fail BOOL) RETURNS INTEGER AS $$
+DECLARE
+  v_var INTEGER;
+BEGIN
+  BEGIN
+    v_var := (leaker_2(fail)).error_code;
+  EXCEPTION
+    WHEN others THEN RETURN 0;
+  END;
+  RETURN 1;
+END;
+$$ LANGUAGE plpgsql
+;
+CREATE TRIGGER "tg_backlink_a" AFTER INSERT OR DELETE OR UPDATE ON "public"."wslot" FOR EACH ROW EXECUTE FUNCTION "public"."tg_backlink_a"('WS')
+;
+-- Failure with non-hash index
+CREATE INDEX test_hash_a_btree ON test_hash USING btree (a)
+;
+ALTER FUNCTION gbt_enum_fetch(internal) PARALLEL SAFE
+;
+-- ordinality vs. views
+create temporary view vw_ord as select * from (values (1)) v(n) join rngfunct(1) with ordinality as z(a,b,ord) on (n=ord)
+;
+-- Also try inheritance added after table creation
+CREATE TABLE notnull_tbl1_child2 (c int, b int, a int)
+;
+create temp table y (y1 int, y2 int)
+;
+CREATE TRIGGER "gtest12_01" BEFORE INSERT OR UPDATE ON "generated_virtual_tests"."gtest26" FOR EACH ROW EXECUTE FUNCTION "generated_virtual_tests"."gtest_trigger_func"()
+;
+--
+-- Matching citext to text.
+--
+
+CREATE FUNCTION texticlike(citext, text)
+RETURNS bool AS 'texticlike'
+LANGUAGE internal IMMUTABLE STRICT PARALLEL SAFE
+;
+ALTER DATABASE "pl_regression" SET lc_time TO 'C'
+;
+-- add a primary key constraint
+alter table atacc1 add constraint atacc_test1 primary key (test)
+;
+-- trying to specify modulus and remainder for range partitioned table
+CREATE TABLE fail_part PARTITION OF range_parted FOR VALUES WITH (MODULUS 10, REMAINDER 1)
+;
+CREATE TABLE "public"."constr_child3" (
+    "a" integer CONSTRAINT "constr_parent2_a_not_null" NOT NULL
+)
+;
+create function tg_hslot_bd() returns trigger as '
+declare
+    hubrec	record;
+begin
+    select into hubrec * from Hub where name = old.hubname;
+    if not found then
+        return old;
+    end if;
+    if old.slotno > hubrec.nslots then
+        return old;
+    end if;
+    raise exception ''no manual manipulation of HSlot'';
+end;
+' language plpgsql
+;
+ANALYZE (SKIP_LOCKED) pg_catalog.pg_authid
+;
+CREATE FUNCTION "public"."explain_memoize"("query" "text", "hide_hitmiss" boolean) RETURNS SETOF "text"
+    LANGUAGE "plpgsql"
+    AS $$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off, buffers off) %s',
+            query)
+    loop
+        if hide_hitmiss = true then
+                ln := regexp_replace(ln, 'Hits: 0', 'Hits: Zero');
+                ln := regexp_replace(ln, 'Hits: \d+', 'Hits: N');
+                ln := regexp_replace(ln, 'Misses: 0', 'Misses: Zero');
+                ln := regexp_replace(ln, 'Misses: \d+', 'Misses: N');
+        end if;
+        ln := regexp_replace(ln, 'Evictions: 0', 'Evictions: Zero');
+        ln := regexp_replace(ln, 'Evictions: \d+', 'Evictions: N');
+        ln := regexp_replace(ln, 'Memory Usage: \d+', 'Memory Usage: N');
+        ln := regexp_replace(ln, 'Heap Fetches: \d+', 'Heap Fetches: N');
+        ln := regexp_replace(ln, 'loops=\d+', 'loops=N');
+        ln := regexp_replace(ln, 'Index Searches: \d+', 'Index Searches: N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+CREATE EXTENSION test_custom_rmgrs
+;
+CREATE TABLE rf_tbl_abcd_part_pk_1 (b int, a int PRIMARY KEY)
+;
+ANALYZE pg_temp_18.pg_temp_26864_2
+;
+do $$
+declare x record not null := null;  -- fail
+begin
+  raise notice 'x = %', x;
+end$$
+;
+VACUUM (TRUNCATE FALSE) pg_catalog.pg_am
+;
+create table child_35_40 partition of child_30_40
+   for values from (35) to (40)
+;
+CREATE TABLE t1 (a int)
+;
+------------------------------------------------------------------------------------------
+[ALTER_TYPE] ALTER TYPE test_typex DROP ATTRIBUTE a CASCADE
+;
+----------
+[ADD_INDEX] --
+-- Make sure that cross matching of attribute opclass/collation does not occur
+--
+create unique index cross_match on insertconflicttest(lower(fruit) collate "C", upper(fruit) text_pattern_ops)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR CLASS "public"."part_test_text_ops"
+    FOR TYPE "text" USING "hash" FAMILY "public"."part_test_text_ops" AS
+    OPERATOR 1 =("text","text") ,
+    FUNCTION 2 ("text", "text") "public"."part_hashtext_length"("text",bigint)
+;
+----------
+[CREATE_TABLE] CREATE TABLE tststats.t (a int, b int, c text)
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 0) information_schema.sql_implementation_info
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "public"."prt1" ATTACH PARTITION "public"."prt1_p3" DEFAULT
+;
+----------
+[CREATE_TABLE] CREATE TABLE pgss_extend_tab (a int, b text)
+;
+----------
+[DROP_TABLE] DROP TABLE pg_temp_2.pg_temp_30214_2, pg_temp_2.pg_temp_30214
+;
+----------
+[CREATE_TABLE] CREATE TABLE test30 (a int, b char(3) COLLATE case_insensitive) PARTITION BY LIST (b)
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR <= (cube, cube) SET (
+	RESTRICT = scalarlesel, JOIN = scalarlejoinsel
+)
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE sequence_testx OWNED BY pg_class_oid_index.oid
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_TOAST FALSE) pg_catalog.pg_partitioned_table
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR ~* (
+    PROCEDURE = texticregexeq,
+    LEFTARG   = citext,
+    RIGHTARG  = citext,
+    NEGATOR   = !~*,
+    RESTRICT  = icregexeqsel,
+    JOIN      = icregexeqjoinsel
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION hstore_to_plperl(val internal) RETURNS internal
+LANGUAGE C STRICT IMMUTABLE
+AS '$libdir/hstore_plperl'
+;
+----------
+[CREATE_PROG_OBJ] --
+-- OPR_SANITY
+-- Sanity checks for common errors in making operator/procedure system tables:
+-- pg_operator, pg_proc, pg_cast, pg_conversion, pg_aggregate, pg_am,
+-- pg_amop, pg_amproc, pg_opclass, pg_opfamily, pg_index.
+--
+-- Every test failure in this file should be closely inspected.
+-- The description of the failing test should be read carefully before
+-- adjusting the expected output.  In most cases, the queries should
+-- not find *any* matching entries.
+--
+-- NB: we assume the oidjoins test will have caught any dangling links,
+-- that is OID or REGPROC fields that are not zero and do not match some
+-- row in the linked-to table.  However, if we want to enforce that a link
+-- field can't be 0, we have to check it here.
+--
+-- NB: run this test earlier than the create_operator test, because
+-- that test creates some bogus operators...
+
+
+-- Helper functions to deal with cases where binary-coercible matches are
+-- allowed.
+
+-- This should match IsBinaryCoercible() in parse_coerce.c.
+-- It doesn't currently know about some cases, notably domains, anyelement,
+-- anynonarray, anyenum, or record, but it doesn't need to (yet).
+create function binary_coercible(oid, oid) returns bool as $$
+begin
+  if $1 = $2 then return true; end if;
+  if EXISTS(select 1 from pg_catalog.pg_cast where
+            castsource = $1 and casttarget = $2 and
+            castmethod = 'b' and castcontext = 'i')
+  then return true; end if;
+  if $2 = 'pg_catalog.any'::pg_catalog.regtype then return true; end if;
+  if $2 = 'pg_catalog.anyarray'::pg_catalog.regtype then
+    if EXISTS(select 1 from pg_catalog.pg_type where
+              oid = $1 and typelem != 0 and typlen = -1)
+    then return true; end if;
+  end if;
+  if $2 = 'pg_catalog.anyrange'::pg_catalog.regtype then
+    if (select typtype from pg_catalog.pg_type where oid = $1) = 'r'
+    then return true; end if;
+  end if;
+  return false;
+end
+$$ language plpgsql strict stable
+;
+----------
+[ALTER_TYPE] alter domain di drop constraint pos
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."transition_table_level1_ri_parent_del_func"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$
+  DECLARE n bigint;
+  BEGIN
+    PERFORM FROM p JOIN transition_table_level2 c ON c.parent_no = p.level1_no;
+    IF FOUND THEN
+      RAISE EXCEPTION 'RI error';
+    END IF;
+    RETURN NULL;
+  END;
+$$
+;
+----------
+[ALTER_CATALOG] alter database abc set datestyle to default
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR #*# (
+   rightarg = SETOF int8,
+   procedure = factorial
+)
+;
+----------
+[CREATE_PROG_OBJ] -- CREATE OPERATOR CLASS without FAMILY clause should report
+-- both CREATE OPERATOR FAMILY and CREATE OPERATOR CLASS
+CREATE OPERATOR CLASS evttrigopclass FOR TYPE int USING btree AS STORAGE int
+;
+----------
+[DROP_TABLE] drop table pp, cc
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."f1_times_10"() RETURNS "trigger"
+    LANGUAGE "plpgsql"
+    AS $$ begin new.f1 := new.f1 * 10; return new; end $$
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_macad_penalty(internal,internal,internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[ADD_INDEX] create index on idxpart(c)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."num_input_test" (
+    "n1" numeric
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gen_salt(text)
+RETURNS text
+AS '$libdir/pgcrypto', 'pg_gen_salt'
+LANGUAGE C VOLATILE STRICT PARALLEL SAFE
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE ctlt1 ALTER COLUMN a SET STORAGE MAIN
+;
+----------
+[CREATE_PROG_OBJ] -- Test for proper cleanup at subtransaction exit.  This example
+-- exposed a bug in PG 8.2.
+
+CREATE FUNCTION leaker_1(fail BOOL) RETURNS INTEGER AS $$
+DECLARE
+  v_var INTEGER;
+BEGIN
+  BEGIN
+    v_var := (leaker_2(fail)).error_code;
+  EXCEPTION
+    WHEN others THEN RETURN 0;
+  END;
+  RETURN 1;
+END;
+$$ LANGUAGE plpgsql
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER "tg_backlink_a" AFTER INSERT OR DELETE OR UPDATE ON "public"."wslot" FOR EACH ROW EXECUTE FUNCTION "public"."tg_backlink_a"('WS')
+;
+----------
+[ADD_INDEX] -- Failure with non-hash index
+CREATE INDEX test_hash_a_btree ON test_hash USING btree (a)
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_enum_fetch(internal) PARALLEL SAFE
+;
+----------
+[CREATE_VIEW(SELECT)] -- ordinality vs. views
+create temporary view vw_ord as select * from (values (1)) v(n) join rngfunct(1) with ordinality as z(a,b,ord) on (n=ord)
+;
+----------
+[CREATE_TABLE] -- Also try inheritance added after table creation
+CREATE TABLE notnull_tbl1_child2 (c int, b int, a int)
+;
+----------
+[CREATE_TABLE] create temp table y (y1 int, y2 int)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER "gtest12_01" BEFORE INSERT OR UPDATE ON "generated_virtual_tests"."gtest26" FOR EACH ROW EXECUTE FUNCTION "generated_virtual_tests"."gtest_trigger_func"()
+;
+----------
+[CREATE_PROG_OBJ] --
+-- Matching citext to text.
+--
+
+CREATE FUNCTION texticlike(citext, text)
+RETURNS bool AS 'texticlike'
+LANGUAGE internal IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[ALTER_CATALOG] ALTER DATABASE "pl_regression" SET lc_time TO 'C'
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] -- add a primary key constraint
+alter table atacc1 add constraint atacc_test1 primary key (test)
+;
+----------
+[CREATE_TABLE] -- trying to specify modulus and remainder for range partitioned table
+CREATE TABLE fail_part PARTITION OF range_parted FOR VALUES WITH (MODULUS 10, REMAINDER 1)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."constr_child3" (
+    "a" integer CONSTRAINT "constr_parent2_a_not_null" NOT NULL
+)
+;
+----------
+[CREATE_PROG_OBJ] create function tg_hslot_bd() returns trigger as '
+declare
+    hubrec	record;
+begin
+    select into hubrec * from Hub where name = old.hubname;
+    if not found then
+        return old;
+    end if;
+    if old.slotno > hubrec.nslots then
+        return old;
+    end if;
+    raise exception ''no manual manipulation of HSlot'';
+end;
+' language plpgsql
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) pg_catalog.pg_authid
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."explain_memoize"("query" "text", "hide_hitmiss" boolean) RETURNS SETOF "text"
+    LANGUAGE "plpgsql"
+    AS $$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off, buffers off) %s',
+            query)
+    loop
+        if hide_hitmiss = true then
+                ln := regexp_replace(ln, 'Hits: 0', 'Hits: Zero');
+                ln := regexp_replace(ln, 'Hits: \d+', 'Hits: N');
+                ln := regexp_replace(ln, 'Misses: 0', 'Misses: Zero');
+                ln := regexp_replace(ln, 'Misses: \d+', 'Misses: N');
+        end if;
+        ln := regexp_replace(ln, 'Evictions: 0', 'Evictions: Zero');
+        ln := regexp_replace(ln, 'Evictions: \d+', 'Evictions: N');
+        ln := regexp_replace(ln, 'Memory Usage: \d+', 'Memory Usage: N');
+        ln := regexp_replace(ln, 'Heap Fetches: \d+', 'Heap Fetches: N');
+        ln := regexp_replace(ln, 'loops=\d+', 'loops=N');
+        ln := regexp_replace(ln, 'Index Searches: \d+', 'Index Searches: N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+----------
+[CREATE_LIBRARY] CREATE EXTENSION test_custom_rmgrs
+;
+----------
+[CREATE_TABLE] CREATE TABLE rf_tbl_abcd_part_pk_1 (b int, a int PRIMARY KEY)
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_18.pg_temp_26864_2
+;
+----------
+[BLOCK] do $$
+declare x record not null := null;  -- fail
+begin
+  raise notice 'x = %', x;
+end$$
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) pg_catalog.pg_am
+;
+----------
+[CREATE_TABLE] create table child_35_40 partition of child_30_40
+   for values from (35) to (40)
+;
+----------
+[CREATE_TABLE] CREATE TABLE t1 (a int)
+;

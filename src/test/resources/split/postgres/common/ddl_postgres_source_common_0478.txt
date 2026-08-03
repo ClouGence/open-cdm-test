@@ -1,0 +1,702 @@
+ALTER TABLE test_add_column
+	ADD COLUMN c2 integer, -- fail because c2 already exists
+	ADD COLUMN c3 integer primary key
+;
+ALTER INDEX pg_toast.pg_toast_30857_index RENAME TO reind_con_toast_idx
+;
+VACUUM (TRUNCATE FALSE) pg_catalog.pg_tablespace
+;
+create or replace function compos() returns compostype as $$
+declare
+  v compostype;
+begin
+  v := (1, 'hello');
+  return v;
+end;
+$$ language plpgsql
+;
+DROP OPERATOR FAMILY alt_opf18 USING btree
+;
+-- validate!
+CREATE TABLE quuux2 (a int, b text)
+;
+DROP VIEW dummy_seclabel_view1
+;
+VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_operator
+;
+ALTER TABLE pg_temp_11.pg_temp_41207_2 ADD COLUMN newdata pg_temp_11.pg_temp_41207
+;
+ALTER TABLE ONLY "fkpart4"."droppk1"
+    ADD CONSTRAINT "droppk1_pkey" PRIMARY KEY ("a")
+;
+VACUUM (DISABLE_PAGE_SKIPPING, SKIP_DATABASE_STATS) pg_catalog.pg_am
+;
+CREATE VIEW aliased_view_3 AS
+  select * from tt1
+    where exists (select 1 from tx1 a2 where tt1.f1 = a2.x1)
+;
+DROP TABLE ext_cine_tab2
+;
+DROP TABLE vtype2
+;
+-- Test foreign-key checks
+CREATE TABLE trunc_b (a int REFERENCES truncate_a)
+;
+CREATE FUNCTION "public"."interpt_pp"("path", "path") RETURNS "point"
+    LANGUAGE "c" STRICT
+    AS '/src/src/test/regress/regress.so', 'interpt_pp'
+;
+-- Exercise the "skip fetch" Bitmap Heap Scan optimization when candidate
+-- tuples are discarded. This may occur when:
+--   1. A join doesn't require all inner tuples to be scanned for each outer
+--      tuple, and
+--   2. The inner side is scanned using a bitmap heap scan, and
+--   3. The bitmap heap scan is eligible for the "skip fetch" optimization.
+--      This optimization is usable when no data from the underlying table is
+--      needed. Use a temp table so it is only visible to this backend and
+--      vacuum may reliably mark all blocks in the table all visible in the
+--      visibility map.
+CREATE TEMP TABLE skip_fetch (a INT, b INT) WITH (fillfactor=10)
+;
+create temp table float_table (float_col float8)
+;
+DROP TABLE regress_roleoption.t4
+;
+DROP TABLE trans_abc
+;
+CREATE TABLE "public"."attach_parted_part1" (
+    "a" integer,
+    "b" integer
+)
+;
+DROP INDEX concur_reindex_ind
+;
+CREATE TABLE test_tab (a int primary key, b text, c timestamptz DEFAULT now(), d bigint DEFAULT 999)
+;
+CALL test_proc6(2, NEW.a, NEW.a)
+;
+ALTER OPERATOR FAMILY alt_opf4 USING btree ADD FUNCTION 6 btint42cmp(int4, int2)
+;
+drop schema abc
+;
+ALTER OPERATOR === (boolean, real) SET (NEGATOR = @!=)
+;
+--
+-- Input syntax
+--
+
+CREATE TABLE num_input_test (n1 numeric)
+;
+CREATE TABLE split_pub18_a.accounts_extra (
+    id integer PRIMARY KEY,
+    amount integer NOT NULL
+)
+;
+create function rtest_viewfunc1(int4) returns int4 as
+	'select count(*)::int4 from rtest_view2 where a = $1'
+	language sql
+;
+CREATE UNIQUE INDEX ON upserttest((blurt_and_lock(key)))
+;
+VACUUM ANALYZE emp
+;
+CREATE TABLE "public"."cmdata3" (
+    "f1" "text"
+)
+;
+-- New function for pg_stat_statements_reset introduced, still
+-- restricted for non-superusers.
+AlTER EXTENSION pg_stat_statements UPDATE TO '1.7'
+;
+create table part_bac (b int not null, a int not null, c int not null) partition by list (b)
+;
+alter table anothertab alter column atcol1 type integer
+;
+CREATE DATABASE dropme_db1 WITH TABLESPACE dropme_ts1
+;
+CREATE TABLE rf_tbl_abcd_nopk(a int, b int, c int, d int)
+;
+ALTER TABLE ONLY "public"."regress_constr_partitioned" ATTACH PARTITION "public"."regress_constr_partition1" FOR VALUES IN (1)
+;
+CREATE FUNCTION plpgsql_function_trigger_1()
+  RETURNS TRIGGER
+  LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN NEW;
+END;
+$$
+;
+VACUUM pg_catalog.pg_parameter_acl
+;
+ALTER DOMAIN split_domain_type_next.int_list_domain SET SCHEMA public
+;
+-- function to wait for counters to advance
+create function wait_for_stats() returns void as $$
+declare
+  start_time timestamptz := clock_timestamp();
+  updated1 bool;
+  updated2 bool;
+  updated3 bool;
+  updated4 bool;
+begin
+  -- we don't want to wait forever; loop will exit after 30 seconds
+  for i in 1 .. 300 loop
+
+    -- With parallel query, the seqscan and indexscan on tenk2 might be done
+    -- in parallel worker processes, which will send their stats counters
+    -- asynchronously to what our own session does.  So we must check for
+    -- those counts to be registered separately from the update counts.
+
+    -- check to see if seqscan has been sensed
+    SELECT (st.seq_scan >= pr.seq_scan + 1) INTO updated1
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if indexscan has been sensed
+    SELECT (st.idx_scan >= pr.idx_scan + 1) INTO updated2
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if all updates have been sensed
+    SELECT (n_tup_ins > 0) INTO updated3
+      FROM pg_stat_user_tables WHERE relname='trunc_stats_test4';
+
+    -- We must also check explicitly that pg_stat_get_snapshot_timestamp has
+    -- advanced, because that comes from the global stats file which might
+    -- be older than the per-DB stats file we got the other values from.
+    SELECT (pr.snap_ts < pg_stat_get_snapshot_timestamp()) INTO updated4
+      FROM prevstats AS pr;
+
+    exit when updated1 and updated2 and updated3 and updated4;
+
+    -- wait a little
+    perform pg_sleep_for('100 milliseconds');
+
+    -- reset stats snapshot so we can test again
+    perform pg_stat_clear_snapshot();
+
+  end loop;
+
+  -- report time waited in postmaster log (where it won't change test output)
+  raise log 'wait_for_stats delayed % seconds',
+    extract(epoch from clock_timestamp() - start_time);
+end
+$$ language plpgsql
+;
+-- default normalization form is NFC, per SQL standard
+CREATE OR REPLACE FUNCTION
+  "normalize"(text, text DEFAULT 'NFC')
+RETURNS text
+LANGUAGE internal
+STRICT IMMUTABLE PARALLEL SAFE
+AS 'unicode_normalize_func'
+;
+DROP TABLE hash_heap_float4 CASCADE
+;
+create table inh_nn2 () inherits (inh_nn1)
+;
+CREATE VIEW ro_view11 AS SELECT b1.a, b2.b FROM base_tbl b1, base_tbl b2
+;
+create type aggtype as (a integer, b integer, c text)
+;
+CREATE VIEW columns AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+           CAST(a.attname AS sql_identifier) AS column_name,
+           CAST(a.attnum AS cardinal_number) AS ordinal_position,
+           CAST(CASE WHEN a.attgenerated = '' THEN pg_get_expr(ad.adbin, ad.adrelid) END AS character_data) AS column_default,
+           CAST(CASE WHEN a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) THEN 'NO' ELSE 'YES' END
+             AS yes_or_no)
+             AS is_nullable,
+
+           CAST(
+             CASE WHEN t.typtype = 'd' THEN
+               CASE WHEN bt.typelem <> 0 AND bt.typlen = -1 THEN 'ARRAY'
+                    WHEN nbt.nspname = 'pg_catalog' THEN format_type(t.typbasetype, null)
+                    ELSE 'USER-DEFINED' END
+             ELSE
+               CASE WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                    WHEN nt.nspname = 'pg_catalog' THEN format_type(a.atttypid, null)
+                    ELSE 'USER-DEFINED' END
+             END
+             AS character_data)
+             AS data_type,
+
+           CAST(
+             _pg_char_max_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_maximum_length,
+
+           CAST(
+             _pg_char_octet_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_octet_length,
+
+           CAST(
+             _pg_numeric_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision,
+
+           CAST(
+             _pg_numeric_precision_radix(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision_radix,
+
+           CAST(
+             _pg_numeric_scale(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_scale,
+
+           CAST(
+             _pg_datetime_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS datetime_precision,
+
+           CAST(
+             _pg_interval_type(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS character_data)
+             AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+
+           CAST(CASE WHEN t.typtype = 'd' THEN current_database() ELSE null END
+             AS sql_identifier) AS domain_catalog,
+           CAST(CASE WHEN t.typtype = 'd' THEN nt.nspname ELSE null END
+             AS sql_identifier) AS domain_schema,
+           CAST(CASE WHEN t.typtype = 'd' THEN t.typname ELSE null END
+             AS sql_identifier) AS domain_name,
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(coalesce(nbt.nspname, nt.nspname) AS sql_identifier) AS udt_schema,
+           CAST(coalesce(bt.typname, t.typname) AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(a.attnum AS sql_identifier) AS dtd_identifier,
+           CAST('NO' AS yes_or_no) AS is_self_referencing,
+
+           CAST(CASE WHEN a.attidentity IN ('a', 'd') THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_identity,
+           CAST(CASE a.attidentity WHEN 'a' THEN 'ALWAYS' WHEN 'd' THEN 'BY DEFAULT' END AS character_data) AS identity_generation,
+           CAST(seq.seqstart AS character_data) AS identity_start,
+           CAST(seq.seqincrement AS character_data) AS identity_increment,
+           CAST(seq.seqmax AS character_data) AS identity_maximum,
+           CAST(seq.seqmin AS character_data) AS identity_minimum,
+           CAST(CASE WHEN seq.seqcycle THEN 'YES' ELSE 'NO' END AS yes_or_no) AS identity_cycle,
+
+           CAST(CASE WHEN a.attgenerated <> '' THEN 'ALWAYS' ELSE 'NEVER' END AS character_data) AS is_generated,
+           CAST(CASE WHEN a.attgenerated <> '' THEN pg_get_expr(ad.adbin, ad.adrelid) END AS character_data) AS generation_expression,
+
+           CAST(CASE WHEN c.relkind IN ('r', 'p') OR
+                          (c.relkind IN ('v', 'f') AND
+                           pg_column_is_updatable(c.oid, a.attnum, false))
+                THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_updatable
+
+    FROM (pg_attribute a LEFT JOIN pg_attrdef ad ON attrelid = adrelid AND attnum = adnum)
+         JOIN (pg_class c JOIN pg_namespace nc ON (c.relnamespace = nc.oid)) ON a.attrelid = c.oid
+         JOIN (pg_type t JOIN pg_namespace nt ON (t.typnamespace = nt.oid)) ON a.atttypid = t.oid
+         LEFT JOIN (pg_type bt JOIN pg_namespace nbt ON (bt.typnamespace = nbt.oid))
+           ON (t.typtype = 'd' AND t.typbasetype = bt.oid)
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON a.attcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+         LEFT JOIN (pg_depend dep JOIN pg_sequence seq ON (dep.classid = 'pg_class'::regclass AND dep.objid = seq.seqrelid AND dep.deptype = 'i'))
+           ON (dep.refclassid = 'pg_class'::regclass AND dep.refobjid = c.oid AND dep.refobjsubid = a.attnum)
+
+    WHERE (NOT pg_is_other_temp_schema(nc.oid))
+
+          AND a.attnum > 0 AND NOT a.attisdropped
+          AND c.relkind IN ('r', 'v', 'f', 'p')
+
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_column_privilege(c.oid, a.attnum,
+                                       'SELECT, INSERT, UPDATE, REFERENCES'))
+;
+CREATE TABLE gtest_err_6a (a int PRIMARY KEY, b bool GENERATED ALWAYS AS (xmin <> 37) STORED)
+;
+------------------------------------------------------------------------------------------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE test_add_column
+	ADD COLUMN c2 integer, -- fail because c2 already exists
+	ADD COLUMN c3 integer primary key
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_30857_index RENAME TO reind_con_toast_idx
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) pg_catalog.pg_tablespace
+;
+----------
+[CREATE_PROG_OBJ] create or replace function compos() returns compostype as $$
+declare
+  v compostype;
+begin
+  v := (1, 'hello');
+  return v;
+end;
+$$ language plpgsql
+;
+----------
+[DROP_PROG_OBJ] DROP OPERATOR FAMILY alt_opf18 USING btree
+;
+----------
+[CREATE_TABLE] -- validate!
+CREATE TABLE quuux2 (a int, b text)
+;
+----------
+[DROP_VIEW] DROP VIEW dummy_seclabel_view1
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_operator
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE pg_temp_11.pg_temp_41207_2 ADD COLUMN newdata pg_temp_11.pg_temp_41207
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "fkpart4"."droppk1"
+    ADD CONSTRAINT "droppk1_pkey" PRIMARY KEY ("a")
+;
+----------
+[ADMIN_TABLE] VACUUM (DISABLE_PAGE_SKIPPING, SKIP_DATABASE_STATS) pg_catalog.pg_am
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW aliased_view_3 AS
+  select * from tt1
+    where exists (select 1 from tx1 a2 where tt1.f1 = a2.x1)
+;
+----------
+[DROP_TABLE] DROP TABLE ext_cine_tab2
+;
+----------
+[DROP_TABLE] DROP TABLE vtype2
+;
+----------
+[CREATE_TABLE] -- Test foreign-key checks
+CREATE TABLE trunc_b (a int REFERENCES truncate_a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."interpt_pp"("path", "path") RETURNS "point"
+    LANGUAGE "c" STRICT
+    AS '/src/src/test/regress/regress.so', 'interpt_pp'
+;
+----------
+[CREATE_TABLE] -- Exercise the "skip fetch" Bitmap Heap Scan optimization when candidate
+-- tuples are discarded. This may occur when:
+--   1. A join doesn't require all inner tuples to be scanned for each outer
+--      tuple, and
+--   2. The inner side is scanned using a bitmap heap scan, and
+--   3. The bitmap heap scan is eligible for the "skip fetch" optimization.
+--      This optimization is usable when no data from the underlying table is
+--      needed. Use a temp table so it is only visible to this backend and
+--      vacuum may reliably mark all blocks in the table all visible in the
+--      visibility map.
+CREATE TEMP TABLE skip_fetch (a INT, b INT) WITH (fillfactor=10)
+;
+----------
+[CREATE_TABLE] create temp table float_table (float_col float8)
+;
+----------
+[DROP_TABLE] DROP TABLE regress_roleoption.t4
+;
+----------
+[DROP_TABLE] DROP TABLE trans_abc
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."attach_parted_part1" (
+    "a" integer,
+    "b" integer
+)
+;
+----------
+[DROP_INDEX] DROP INDEX concur_reindex_ind
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_tab (a int primary key, b text, c timestamptz DEFAULT now(), d bigint DEFAULT 999)
+;
+----------
+[CALL_PROG_OBJ] CALL test_proc6(2, NEW.a, NEW.a)
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY alt_opf4 USING btree ADD FUNCTION 6 btint42cmp(int4, int2)
+;
+----------
+[DROP_SCHEMA] drop schema abc
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR === (boolean, real) SET (NEGATOR = @!=)
+;
+----------
+[CREATE_TABLE] --
+-- Input syntax
+--
+
+CREATE TABLE num_input_test (n1 numeric)
+;
+----------
+[CREATE_TABLE] CREATE TABLE split_pub18_a.accounts_extra (
+    id integer PRIMARY KEY,
+    amount integer NOT NULL
+)
+;
+----------
+[CREATE_PROG_OBJ] create function rtest_viewfunc1(int4) returns int4 as
+	'select count(*)::int4 from rtest_view2 where a = $1'
+	language sql
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX ON upserttest((blurt_and_lock(key)))
+;
+----------
+[ADMIN_TABLE] VACUUM ANALYZE emp
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."cmdata3" (
+    "f1" "text"
+)
+;
+----------
+[ALTER_LIBRARY] -- New function for pg_stat_statements_reset introduced, still
+-- restricted for non-superusers.
+AlTER EXTENSION pg_stat_statements UPDATE TO '1.7'
+;
+----------
+[CREATE_TABLE] create table part_bac (b int not null, a int not null, c int not null) partition by list (b)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table anothertab alter column atcol1 type integer
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE dropme_db1 WITH TABLESPACE dropme_ts1
+;
+----------
+[CREATE_TABLE] CREATE TABLE rf_tbl_abcd_nopk(a int, b int, c int, d int)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "public"."regress_constr_partitioned" ATTACH PARTITION "public"."regress_constr_partition1" FOR VALUES IN (1)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION plpgsql_function_trigger_1()
+  RETURNS TRIGGER
+  LANGUAGE plpgsql
+AS $$
+BEGIN
+  RETURN NEW;
+END;
+$$
+;
+----------
+[ADMIN_TABLE] VACUUM pg_catalog.pg_parameter_acl
+;
+----------
+[ALTER_TYPE] ALTER DOMAIN split_domain_type_next.int_list_domain SET SCHEMA public
+;
+----------
+[CREATE_PROG_OBJ] -- function to wait for counters to advance
+create function wait_for_stats() returns void as $$
+declare
+  start_time timestamptz := clock_timestamp();
+  updated1 bool;
+  updated2 bool;
+  updated3 bool;
+  updated4 bool;
+begin
+  -- we don't want to wait forever; loop will exit after 30 seconds
+  for i in 1 .. 300 loop
+
+    -- With parallel query, the seqscan and indexscan on tenk2 might be done
+    -- in parallel worker processes, which will send their stats counters
+    -- asynchronously to what our own session does.  So we must check for
+    -- those counts to be registered separately from the update counts.
+
+    -- check to see if seqscan has been sensed
+    SELECT (st.seq_scan >= pr.seq_scan + 1) INTO updated1
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if indexscan has been sensed
+    SELECT (st.idx_scan >= pr.idx_scan + 1) INTO updated2
+      FROM pg_stat_user_tables AS st, pg_class AS cl, prevstats AS pr
+     WHERE st.relname='tenk2' AND cl.relname='tenk2';
+
+    -- check to see if all updates have been sensed
+    SELECT (n_tup_ins > 0) INTO updated3
+      FROM pg_stat_user_tables WHERE relname='trunc_stats_test4';
+
+    -- We must also check explicitly that pg_stat_get_snapshot_timestamp has
+    -- advanced, because that comes from the global stats file which might
+    -- be older than the per-DB stats file we got the other values from.
+    SELECT (pr.snap_ts < pg_stat_get_snapshot_timestamp()) INTO updated4
+      FROM prevstats AS pr;
+
+    exit when updated1 and updated2 and updated3 and updated4;
+
+    -- wait a little
+    perform pg_sleep_for('100 milliseconds');
+
+    -- reset stats snapshot so we can test again
+    perform pg_stat_clear_snapshot();
+
+  end loop;
+
+  -- report time waited in postmaster log (where it won't change test output)
+  raise log 'wait_for_stats delayed % seconds',
+    extract(epoch from clock_timestamp() - start_time);
+end
+$$ language plpgsql
+;
+----------
+[CREATE_PROG_OBJ] -- default normalization form is NFC, per SQL standard
+CREATE OR REPLACE FUNCTION
+  "normalize"(text, text DEFAULT 'NFC')
+RETURNS text
+LANGUAGE internal
+STRICT IMMUTABLE PARALLEL SAFE
+AS 'unicode_normalize_func'
+;
+----------
+[DROP_TABLE] DROP TABLE hash_heap_float4 CASCADE
+;
+----------
+[CREATE_TABLE] create table inh_nn2 () inherits (inh_nn1)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW ro_view11 AS SELECT b1.a, b2.b FROM base_tbl b1, base_tbl b2
+;
+----------
+[CREATE_TYPE] create type aggtype as (a integer, b integer, c text)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW columns AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+           CAST(a.attname AS sql_identifier) AS column_name,
+           CAST(a.attnum AS cardinal_number) AS ordinal_position,
+           CAST(CASE WHEN a.attgenerated = '' THEN pg_get_expr(ad.adbin, ad.adrelid) END AS character_data) AS column_default,
+           CAST(CASE WHEN a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) THEN 'NO' ELSE 'YES' END
+             AS yes_or_no)
+             AS is_nullable,
+
+           CAST(
+             CASE WHEN t.typtype = 'd' THEN
+               CASE WHEN bt.typelem <> 0 AND bt.typlen = -1 THEN 'ARRAY'
+                    WHEN nbt.nspname = 'pg_catalog' THEN format_type(t.typbasetype, null)
+                    ELSE 'USER-DEFINED' END
+             ELSE
+               CASE WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                    WHEN nt.nspname = 'pg_catalog' THEN format_type(a.atttypid, null)
+                    ELSE 'USER-DEFINED' END
+             END
+             AS character_data)
+             AS data_type,
+
+           CAST(
+             _pg_char_max_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_maximum_length,
+
+           CAST(
+             _pg_char_octet_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_octet_length,
+
+           CAST(
+             _pg_numeric_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision,
+
+           CAST(
+             _pg_numeric_precision_radix(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision_radix,
+
+           CAST(
+             _pg_numeric_scale(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_scale,
+
+           CAST(
+             _pg_datetime_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS datetime_precision,
+
+           CAST(
+             _pg_interval_type(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS character_data)
+             AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+
+           CAST(CASE WHEN t.typtype = 'd' THEN current_database() ELSE null END
+             AS sql_identifier) AS domain_catalog,
+           CAST(CASE WHEN t.typtype = 'd' THEN nt.nspname ELSE null END
+             AS sql_identifier) AS domain_schema,
+           CAST(CASE WHEN t.typtype = 'd' THEN t.typname ELSE null END
+             AS sql_identifier) AS domain_name,
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(coalesce(nbt.nspname, nt.nspname) AS sql_identifier) AS udt_schema,
+           CAST(coalesce(bt.typname, t.typname) AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(a.attnum AS sql_identifier) AS dtd_identifier,
+           CAST('NO' AS yes_or_no) AS is_self_referencing,
+
+           CAST(CASE WHEN a.attidentity IN ('a', 'd') THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_identity,
+           CAST(CASE a.attidentity WHEN 'a' THEN 'ALWAYS' WHEN 'd' THEN 'BY DEFAULT' END AS character_data) AS identity_generation,
+           CAST(seq.seqstart AS character_data) AS identity_start,
+           CAST(seq.seqincrement AS character_data) AS identity_increment,
+           CAST(seq.seqmax AS character_data) AS identity_maximum,
+           CAST(seq.seqmin AS character_data) AS identity_minimum,
+           CAST(CASE WHEN seq.seqcycle THEN 'YES' ELSE 'NO' END AS yes_or_no) AS identity_cycle,
+
+           CAST(CASE WHEN a.attgenerated <> '' THEN 'ALWAYS' ELSE 'NEVER' END AS character_data) AS is_generated,
+           CAST(CASE WHEN a.attgenerated <> '' THEN pg_get_expr(ad.adbin, ad.adrelid) END AS character_data) AS generation_expression,
+
+           CAST(CASE WHEN c.relkind IN ('r', 'p') OR
+                          (c.relkind IN ('v', 'f') AND
+                           pg_column_is_updatable(c.oid, a.attnum, false))
+                THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_updatable
+
+    FROM (pg_attribute a LEFT JOIN pg_attrdef ad ON attrelid = adrelid AND attnum = adnum)
+         JOIN (pg_class c JOIN pg_namespace nc ON (c.relnamespace = nc.oid)) ON a.attrelid = c.oid
+         JOIN (pg_type t JOIN pg_namespace nt ON (t.typnamespace = nt.oid)) ON a.atttypid = t.oid
+         LEFT JOIN (pg_type bt JOIN pg_namespace nbt ON (bt.typnamespace = nbt.oid))
+           ON (t.typtype = 'd' AND t.typbasetype = bt.oid)
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON a.attcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+         LEFT JOIN (pg_depend dep JOIN pg_sequence seq ON (dep.classid = 'pg_class'::regclass AND dep.objid = seq.seqrelid AND dep.deptype = 'i'))
+           ON (dep.refclassid = 'pg_class'::regclass AND dep.refobjid = c.oid AND dep.refobjsubid = a.attnum)
+
+    WHERE (NOT pg_is_other_temp_schema(nc.oid))
+
+          AND a.attnum > 0 AND NOT a.attisdropped
+          AND c.relkind IN ('r', 'v', 'f', 'p')
+
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_column_privilege(c.oid, a.attnum,
+                                       'SELECT, INSERT, UPDATE, REFERENCES'))
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_err_6a (a int PRIMARY KEY, b bool GENERATED ALWAYS AS (xmin <> 37) STORED)
+;

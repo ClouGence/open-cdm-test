@@ -1,0 +1,404 @@
+explain (verbose, costs off)
+with recursive test as (
+  select 1 as x
+  union all
+  select x + 1
+  from test
+) search depth first by x set y
+select * from test limit 5
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+select * from search_graph order by seq
+;
+SELECT test_slru_page_readonly(0x1234500000001)
+;
+SELECT JSON_ARRAY(RETURNING text FORMAT JSON ENCODING UTF8)
+;
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int4 error on error)
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+WITH merge_source_cte AS MATERIALIZED (SELECT 15 a, 'merge_source_cte val' b)
+MERGE INTO m USING (select * from merge_source_cte) o ON m.k=o.a
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || merge_source_cte.*::text || ' merge update' FROM merge_source_cte WHERE a = 15)
+WHEN NOT MATCHED THEN INSERT VALUES(o.a, o.b || (SELECT merge_source_cte.*::text || ' merge insert' FROM merge_source_cte))
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON('123' FORMAT JSON)
+;
+SELECT SUBSTRING('abcdefg' SIMILAR 'a|b#"%#"g' ESCAPE '#') AS "bcdef"
+;
+SELECT JSON_VALUE(jsonb '1', 'strict $.a' DEFAULT 'error' ON ERROR)
+;
+explain (verbose, costs off)
+select t4.a from sj t1
+	join sj t2 on t1.a = t2.a
+	join lateral (select t3.a from sj t3, (select t1.a) offset 0) t4 on true
+;
+/*
+SELECT JSON_OBJECT(
+	'a': '123',
+	KEY 1.23 VALUE 123,
+	'c' VALUE json '[1, true, {}]'
+);
+*/
+SELECT JSON_OBJECT('a': '123', 'b': JSON_OBJECT('a': 111, 'b': 'aaa'))
+;
+select json_object ( returning text format json )
+;
+SELECT JSON_ARRAY(RETURNING jsonb FORMAT JSON)
+;
+SELECT JSON_QUERY(jsonb '[3,4]', '$[*]' RETURNING anyarray EMPTY OBJECT ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING json)
+;
+SELECT JSON_VALUE(jsonb 'null', '$a' PASSING point ' (1, 2 )' AS a RETURNING point)
+;
+EXPLAIN (costs off)
+MERGE INTO rw_view1 t
+  USING (SELECT * FROM generate_series(1,5)) AS s(a) ON t.a = s.a
+  WHEN NOT MATCHED BY SOURCE THEN DELETE
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING bytea FORMAT JSON)
+;
+SELECT JSON_OBJECT(1: 1, '2': NULL, '1': 1 ABSENT ON NULL WITH UNIQUE)
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING char(3) OMIT QUOTES ERROR ON ERROR)
+;
+-- T581 regular expression substring (with SQL's bizarre regexp syntax)
+SELECT SUBSTRING('abcdefg' SIMILAR 'a#"(b_d)#"%' ESCAPE '#') AS "bcd"
+;
+-- various syntax errors
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by foo, tar set seq
+select * from search_graph
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT '1' IS JSON AS "any", ('1' || i) IS JSON SCALAR AS "scalar", '[]' IS NOT JSON ARRAY AS "array", '{}' IS JSON OBJECT WITH UNIQUE AS "object" FROM generate_series(1, 3) i
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' EMPTY ARRAY ON EMPTY)
+;
+SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2 ERROR ON ERROR)
+;
+SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$' AS a
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS n_a
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+SELECT JSON_VALUE(jsonb '[1,2]', 'strict $[*]' DEFAULT 9 ON ERROR) AS default_on_error
+;
+SELECT JSON_VALUE(jsonb '1', 'lax $.a' ERROR ON EMPTY DEFAULT '3' ON ERROR)
+;
+EXPLAIN (COSTS OFF, FORMAT JSON, VERBOSE)
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$'
+	)) json_table_func
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text OMIT QUOTES ON SCALAR STRING)
+;
+SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2_chk ERROR ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1.23', '$' RETURNING int)
+;
+SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE x.t = 'one'
+;
+SELECT SUBSTRING('abcdefg' SIMILAR NULL ESCAPE '#') IS NULL AS "True"
+;
+explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+SELECT JSON_EXISTS(jsonb '{"key1":[1,2,3]}', 'strict $.key1[*] ? (@ > $x)' PASSING 2 AS x) AS has_gt_x
+;
+EXPLAIN (COSTS OFF) WITH a AS (SELECT 4) MERGE INTO stats_track_tab
+  USING (SELECT id FROM generate_series(1, 10) id) ON x = id
+  WHEN MATCHED THEN UPDATE SET x = id
+  WHEN NOT MATCHED THEN INSERT (x) VALUES (id)
+;
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int true on empty))
+;
+SELECT JSON_VALUE(jsonb '"1.23"', '$' RETURNING int ERROR ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '{"a": 1}', '$.b' RETURNING sqljsonb_int_not_null ERROR ON EMPTY ERROR ON ERROR)
+;
+explain (costs off) select * from lparted_by_int2 where a = 100_000_000_000_000
+;
+-- Should fail
+SELECT JSON_ARRAY(SELECT FROM (VALUES (1)) foo(i))
+;
+-- CYCLE clause
+
+explain (verbose, costs off)
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select * from search_graph
+;
+SELECT JSON_VALUE(jsonb '1',  '$.a' RETURNING sqljsonb_int_not_null DEFAULT 2 ON EMPTY ERROR ON ERROR)
+;
+SELECT -0b10000000000000000000000000000000
+;
+SELECT JSON_OBJECT('foo': NULL::jsonb FORMAT JSON ENCODING UTF8)
+;
+select json_value('{"a": 1.234}', '$.a' returning int error on error)
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text KEEP QUOTES ON SCALAR STRING)
+;
+-- No match should return NULL
+SELECT SUBSTRING('abcdefg' SIMILAR '#"(b_d)#"%' ESCAPE '#') IS NULL AS "True"
+;
+------------------------------------------------------------------------------------------
+[PERFORMANCE] explain (verbose, costs off)
+with recursive test as (
+  select 1 as x
+  union all
+  select x + 1
+  from test
+) search depth first by x set y
+select * from test limit 5
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+select * from search_graph order by seq
+;
+----------
+[SELECT] SELECT test_slru_page_readonly(0x1234500000001)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING text FORMAT JSON ENCODING UTF8)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int4 error on error)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+WITH merge_source_cte AS MATERIALIZED (SELECT 15 a, 'merge_source_cte val' b)
+MERGE INTO m USING (select * from merge_source_cte) o ON m.k=o.a
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || merge_source_cte.*::text || ' merge update' FROM merge_source_cte WHERE a = 15)
+WHEN NOT MATCHED THEN INSERT VALUES(o.a, o.b || (SELECT merge_source_cte.*::text || ' merge insert' FROM merge_source_cte))
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON('123' FORMAT JSON)
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR 'a|b#"%#"g' ESCAPE '#') AS "bcdef"
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'strict $.a' DEFAULT 'error' ON ERROR)
+;
+----------
+[PERFORMANCE] explain (verbose, costs off)
+select t4.a from sj t1
+	join sj t2 on t1.a = t2.a
+	join lateral (select t3.a from sj t3, (select t1.a) offset 0) t4 on true
+;
+----------
+[SELECT] /*
+SELECT JSON_OBJECT(
+	'a': '123',
+	KEY 1.23 VALUE 123,
+	'c' VALUE json '[1, true, {}]'
+);
+*/
+SELECT JSON_OBJECT('a': '123', 'b': JSON_OBJECT('a': 111, 'b': 'aaa'))
+;
+----------
+[SELECT] select json_object ( returning text format json )
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING jsonb FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[3,4]', '$[*]' RETURNING anyarray EMPTY OBJECT ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING json)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$a' PASSING point ' (1, 2 )' AS a RETURNING point)
+;
+----------
+[PERFORMANCE] EXPLAIN (costs off)
+MERGE INTO rw_view1 t
+  USING (SELECT * FROM generate_series(1,5)) AS s(a) ON t.a = s.a
+  WHEN NOT MATCHED BY SOURCE THEN DELETE
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING bytea FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1: 1, '2': NULL, '1': 1 ABSENT ON NULL WITH UNIQUE)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING char(3) OMIT QUOTES ERROR ON ERROR)
+;
+----------
+[SELECT] -- T581 regular expression substring (with SQL's bizarre regexp syntax)
+SELECT SUBSTRING('abcdefg' SIMILAR 'a#"(b_d)#"%' ESCAPE '#') AS "bcd"
+;
+----------
+[SELECT] -- various syntax errors
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by foo, tar set seq
+select * from search_graph
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT '1' IS JSON AS "any", ('1' || i) IS JSON SCALAR AS "scalar", '[]' IS NOT JSON ARRAY AS "array", '{}' IS JSON OBJECT WITH UNIQUE AS "object" FROM generate_series(1, 3) i
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' EMPTY ARRAY ON EMPTY)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2 ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$' AS a
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS n_a
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '[1,2]', 'strict $[*]' DEFAULT 9 ON ERROR) AS default_on_error
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'lax $.a' ERROR ON EMPTY DEFAULT '3' ON ERROR)
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF, FORMAT JSON, VERBOSE)
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$'
+	)) json_table_func
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text OMIT QUOTES ON SCALAR STRING)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2_chk ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1.23', '$' RETURNING int)
+;
+----------
+[SELECT] SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE x.t = 'one'
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR NULL ESCAPE '#') IS NULL AS "True"
+;
+----------
+[PERFORMANCE] explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON_EXISTS(jsonb '{"key1":[1,2,3]}', 'strict $.key1[*] ? (@ > $x)' PASSING 2 AS x) AS has_gt_x
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF) WITH a AS (SELECT 4) MERGE INTO stats_track_tab
+  USING (SELECT id FROM generate_series(1, 10) id) ON x = id
+  WHEN MATCHED THEN UPDATE SET x = id
+  WHEN NOT MATCHED THEN INSERT (x) VALUES (id)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int true on empty))
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"1.23"', '$' RETURNING int ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '{"a": 1}', '$.b' RETURNING sqljsonb_int_not_null ERROR ON EMPTY ERROR ON ERROR)
+;
+----------
+[PERFORMANCE] explain (costs off) select * from lparted_by_int2 where a = 100_000_000_000_000
+;
+----------
+[SELECT] -- Should fail
+SELECT JSON_ARRAY(SELECT FROM (VALUES (1)) foo(i))
+;
+----------
+[PERFORMANCE] -- CYCLE clause
+
+explain (verbose, costs off)
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select * from search_graph
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1',  '$.a' RETURNING sqljsonb_int_not_null DEFAULT 2 ON EMPTY ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT -0b10000000000000000000000000000000
+;
+----------
+[SELECT] SELECT JSON_OBJECT('foo': NULL::jsonb FORMAT JSON ENCODING UTF8)
+;
+----------
+[SELECT] select json_value('{"a": 1.234}', '$.a' returning int error on error)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text KEEP QUOTES ON SCALAR STRING)
+;
+----------
+[SELECT] -- No match should return NULL
+SELECT SUBSTRING('abcdefg' SIMILAR '#"(b_d)#"%' ESCAPE '#') IS NULL AS "True"
+;

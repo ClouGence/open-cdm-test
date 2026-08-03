@@ -1,0 +1,1239 @@
+[doris_official_website_alter_table_002__alter_table__0001]
+sql:
+-- 维度表：数据量小，变动不大，设置 1 年 TTL 确保常驻缓存
+ALTER TABLE dimension_table SET ("file_cache_ttl_seconds" = "31536000");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0002]
+sql:
+-- 事实表：每日全量导入，设置 1 天 TTL 与导入周期对齐
+ALTER TABLE fact_table SET ("file_cache_ttl_seconds" = "86400");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0003]
+sql:
+-- Range 分区：LESS THAN 形式
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0004]
+sql:
+-- Range 分区：固定区间形式
+ALTER TABLE tbl2 ADD TEMPORARY PARTITION tp1 VALUES [("2020-01-01"), ("2020-02-01"));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:16) /test/1/catalog1/schema1/tbl2/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0005]
+sql:
+-- Range 分区：自定义副本数与分桶
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0006]
+sql:
+-- List 分区：单列枚举
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:16) /test/1/catalog1/schema1/tbl3/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0007]
+sql:
+-- List 分区：多列枚举
+ALTER TABLE tbl4 ADD TEMPORARY PARTITION tp1 VALUES IN ((1, "Beijing"), (1, "Shanghai"));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:16) /test/1/catalog1/schema1/tbl4/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0008]
+sql:
+-- List 分区：自定义副本数与分桶
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:16) /test/1/catalog1/schema1/tbl3/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0009]
+sql:
+-- 等数量替换
+ALTER TABLE tbl1 REPLACE PARTITION (p1) WITH TEMPORARY PARTITION (tp1);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0010]
+sql:
+-- 多对多替换
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2, tp3);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0011]
+sql:
+-- 替换并指定参数
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2)
+PROPERTIES (
+    "strict_range" = "false",
+    "use_temp_partition_name" = "true"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0012]
+sql:
+ALTER TABLE example_db.my_table ADD PARTITION p3 VALUES LESS THAN ('30');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0013]
+sql:
+-- 原表建表时使用 BUCKETS AUTO
+ALTER TABLE example_db.my_auto_auto_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:41) /test/1/catalog1/example_db/my_auto_auto_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0014]
+sql:
+ALTER TABLE example_db.my_auto_auto_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:41) /test/1/catalog1/example_db/my_auto_auto_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0015]
+sql:
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 4;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0016]
+sql:
+ALTER TABLE example_db.my_table ADD PARTITION p2 VALUES LESS THAN ('20');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0017]
+sql:
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0018]
+sql:
+ALTER TABLE example_db.my_table ADD PARTITION p3 VALUES LESS THAN ('30');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0019]
+sql:
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 6;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0020]
+sql:
+ALTER TABLE example_db.my_table ADD PARTITION p4 VALUES LESS THAN ('40');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0021]
+sql:
+-- 将会失败，错误信息："Cannot change default bucket number of colocate table"
+ALTER TABLE example_db.my_colocate_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:40) /test/1/catalog1/example_db/my_colocate_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0022]
+sql:
+-- 将会失败，错误信息："Only support change partitioned table's distribution"
+ALTER TABLE example_db.my_unpartitioned_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:45) /test/1/catalog1/example_db/my_unpartitioned_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0023]
+sql:
+-- 原表使用 HASH 分桶，改为 RANDOM 将会失败
+-- 错误信息："Cannot change distribution type"
+ALTER TABLE example_db.my_hash_table MODIFY DISTRIBUTION DISTRIBUTED BY RANDOM BUCKETS 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(3:12~3:36) /test/1/catalog1/example_db/my_hash_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0024]
+sql:
+-- 原表使用 HASH(k1)，改为 HASH(k2) 将会失败
+-- 错误信息："Cannot assign hash distribution with different distribution cols"
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k2) BUCKETS 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(3:12~3:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0025]
+sql:
+ALTER TABLE example_db.my_table ADD PARTITIONS FROM (1) TO (100) INTERVAL 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0026]
+sql:
+ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 YEAR;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0027]
+sql:
+ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 MONTH;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0028]
+sql:
+ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 WEEK;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0029]
+sql:
+ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 DAY;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0030]
+sql:
+ALTER TABLE example_db.my_table set (
+  "dynamic_partition.enable" = "true", 
+  "dynamic_partition.time_unit" = "DAY", 
+  "dynamic_partition.end" = "3", 
+  "dynamic_partition.prefix" = "p", 
+  "dynamic_partition.buckets" = "32"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0031]
+sql:
+ALTER TABLE example_db.my_table SET (
+  "bloom_filter_columns"="k1,k2,k3"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0032]
+sql:
+ALTER TABLE example_db.my_table
+DROP COLUMN col2
+PROPERTIES (
+  "bloom_filter_columns"="k1,k2,k3"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0033]
+sql:
+ALTER TABLE example_db.my_table set (
+  "distribution_type" = "random"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0034]
+sql:
+ALTER TABLE example_db.my_table set (
+  "dynamic_partition.enable" = "false"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0035]
+sql:
+ALTER TABLE tbl1 REPLACE WITH TABLE tbl2 PROPERTIES('swap' = 'true')
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0036]
+sql:
+ALTER TABLE tbl1 REPLACE WITH TABLE tbl2 PROPERTIES('swap' = 'false')
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0037]
+sql:
+ALTER TABLE tbl1 SET ("dynamic_partition.enable"="true")
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0038]
+sql:
+ALTER TABLE tbl1
+ADD COLUMN k4 INT default "1" to rollup1,
+ADD COLUMN k4 INT default "1" to rollup2,
+ADD COLUMN k5 INT default "1" to rollup2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0039]
+sql:
+alter table example_tbl modify column k3 varchar(50) key null comment 'to 50'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:23) /test/1/catalog1/schema1/example_tbl/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0040]
+sql:
+ALTER TABLE table1 ADD COLUMN uv BIGINT SUM DEFAULT '0' after pv;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:18) /test/1/catalog1/schema1/table1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0041]
+sql:
+ALTER TABLE table1 ADD ROLLUP rollup_city(citycode, pv);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0042]
+sql:
+ALTER TABLE site_visit ADD ROLLUP rollup_city(city, pv);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0043]
+sql:
+ALTER TABLE session_data ADD ROLLUP rollup_brower(brower,province,ip,url) DUPLICATE KEY(brower,province);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0044]
+sql:
+ALTER TABLE example_db.my_table
+ADD COLUMN new_col INT KEY DEFAULT "0" AFTER col1
+TO example_rollup_index;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0045]
+sql:
+ALTER TABLE example_db.my_table   
+ADD COLUMN new_col INT DEFAULT "0" AFTER col1    
+TO example_rollup_index;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0046]
+sql:
+ALTER TABLE example_db.my_table   
+ADD COLUMN new_col INT SUM DEFAULT "0" AFTER col1    
+TO example_rollup_index;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0047]
+sql:
+ALTER TABLE example_db.my_table
+ADD COLUMN (col1 INT DEFAULT "1", col2 FLOAT SUM DEFAULT "2.3")
+TO example_rollup_index;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0048]
+sql:
+ALTER TABLE example_db.my_table
+DROP COLUMN col2
+FROM example_rollup_index;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0049]
+sql:
+ALTER TABLE example_db.my_table 
+MODIFY COLUMN col1 BIGINT KEY DEFAULT "1" AFTER col2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0050]
+sql:
+ALTER TABLE example_db.my_table 
+MODIFY COLUMN val1 VARCHAR(64) REPLACE DEFAULT "abc";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0051]
+sql:
+ALTER TABLE example_db.my_table
+ORDER BY (k3,k1,k2,v2,v1)
+FROM example_rollup_index;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0052]
+sql:
+ALTER TABLE example_db.my_table
+ADD COLUMN v2 INT MAX DEFAULT "0" AFTER k2 TO example_rollup_index,
+ORDER BY (k3,k1,k2,v2,v1) FROM example_rollup_index;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0053]
+sql:
+ALTER TABLE example_db.mysql_table SET ("replication_num" = "2");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0054]
+sql:
+ALTER TABLE example_db.mysql_table SET ("default.replication_num" = "2");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0055]
+sql:
+ALTER TABLE example_db.mysql_table SET ("replication_allocation" = "tag.location.tag1: 1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0056]
+sql:
+ALTER TABLE example_db.mysql_table SET ("default.replication_allocation" = "tag.location.tag1: 1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0057]
+sql:
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0058]
+sql:
+ALTER TABLE tbl2 ADD TEMPORARY PARTITION tp1 VALUES [("2020-01-01"), ("2020-02-01"));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl2/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0059]
+sql:
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0060]
+sql:
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl3/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0061]
+sql:
+ALTER TABLE tbl4 ADD TEMPORARY PARTITION tp1 VALUES IN ((1, "Beijing"), (1, "Shanghai"));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl4/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0062]
+sql:
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl3/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0063]
+sql:
+ALTER TABLE test_table1
+SET ( 'min_load_replica_num' = '1');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0064]
+sql:
+ALTER TABLE create_table_not_have_policy set ("storage_policy" = "test_policy");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0065]
+sql:
+ALTER TABLE create_table_partition MODIFY PARTITION (*) SET("storage_policy"="test_policy");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:34) /test/1/catalog1/schema1/create_table_partition/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0066]
+sql:
+ALTER TABLE example_range_tbl ADD  PARTITION p201704 VALUES LESS THAN("2020-05-01") DISTRIBUTED BY HASH(`user_id`) BUCKETS 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:29) /test/1/catalog1/schema1/example_range_tbl/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0067]
+sql:
+ALTER TABLE example_db.my_table
+ADD COLUMN (c1 INT DEFAULT "1", c2 FLOAT SUM DEFAULT "0")
+TO example_rollup_index;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0068]
+sql:
+ALTER TABLE example_db.my_table
+DROP COLUMN col3
+FROM example_rollup_index;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0069]
+sql:
+ALTER TABLE example_db.my_table 
+MODIFY COLUMN col5 VARCHAR(64) REPLACE DEFAULT "abc";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0070]
+sql:
+ALTER TABLE example_db.my_table
+MODIFY COLUMN col3 varchar(50) KEY NULL comment 'to 50'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0071]
+sql:
+ALTER TABLE example_db.my_table
+ADD COLUMN v2 INT MAX DEFAULT "0" TO example_rollup_index,
+ORDER BY (k3,k1,k2,v2,v1) FROM example_rollup_index;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0072]
+sql:
+ALTER TABLE tbl1 REPLACE PARTITION (p1) WITH TEMPORARY PARTITION (tp1);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0073]
+sql:
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2, tp3);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0074]
+sql:
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2)
+PROPERTIES (
+  "strict_range" = "false",
+  "use_temp_partition_name" = "true"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:16) /test/1/catalog1/schema1/tbl1/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0075]
+sql:
+ALTER TABLE example_db.my_table SET (
+    "bloom_filter_columns"="k1,k2,k3"
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0076]
+sql:
+ALTER TABLE example_db.my_table
+  DROP COLUMN col2
+  PROPERTIES (
+    "bloom_filter_columns"="k1,k2,k3"
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:31) /test/1/catalog1/example_db/my_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0077]
+sql:
+ALTER TABLE example_db.my_table set (
+    "distribution_type" = "random"
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}
+
+----------
+[doris_official_website_alter_table_002__alter_table__0078]
+sql:
+ALTER TABLE example_db.my_table set (
+    "dynamic_partition.enable" = "false"
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": []
+}

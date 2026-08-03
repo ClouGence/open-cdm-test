@@ -1,0 +1,163 @@
+[performance__common_tidb_upstream_multi_column_index_best_practices_md_0_000]
+sql:
+-- Query 3: Overlapping price ranges
+EXPLAIN FORMAT = "brief"
+    SELECT * FROM listings
+    WHERE (city = 'New York' AND bedrooms = 2 AND price >= 1000 AND price < 2000)
+       OR (city = 'New York' AND bedrooms = 2 AND price >= 1500 AND price < 2500);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(3:18~3:26) /test/1/catalog1/schema1/listings/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_multi_column_index_best_practices_md_0_001]
+sql:
+-- Query 1: Find listings with price < 2000
+EXPLAIN FORMAT = "brief" SELECT * FROM listings WHERE price < 2000;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(2:39~2:47) /test/1/catalog1/schema1/listings/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_multi_column_index_best_practices_md_0_002]
+sql:
+-- Query 5: Conjunctive conditions on (a1, b1)
+EXPLAIN FORMAT = "brief"
+    SELECT * FROM t1
+    WHERE (a1, b1) > (1, 10) AND (a1, b1) < (10, 20);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(3:18~3:20) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_multi_column_index_best_practices_md_0_003]
+sql:
+-- Query 4: Non-overlapping ranges for different cities
+EXPLAIN FORMAT = "brief"
+    SELECT * FROM listings
+    WHERE
+        (city = 'San Francisco' AND bedrooms = 1 AND price >= 1500 AND price < 2500)
+     OR (city = 'San Diego' AND bedrooms = 1 AND price >= 1000 AND price < 1500);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(3:18~3:26) /test/1/catalog1/schema1/listings/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_multi_column_index_best_practices_md_0_004]
+sql:
+CREATE TABLE listings (
+    listing_id INT PRIMARY KEY AUTO_INCREMENT,
+    city VARCHAR(100) NOT NULL,
+    bedrooms INT NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    availability_date DATE NOT NULL
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:21) /test/1/catalog1/schema1/listings/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Constraint(2:19~2:30) /test/1/catalog1/schema1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_multi_column_index_best_practices_md_0_005]
+sql:
+CREATE TABLE t1 (
+    a1 INT,
+    b1 INT,
+    c1 INT,
+    KEY iab (a1,b1)
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(5:8~5:11) /test/1/catalog1/schema1/iab/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:15) /test/1/catalog1/schema1/t1/"
+    },
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[add_index__common_tidb_upstream_multi_column_index_best_practices_md_0_006]
+sql:
+CREATE INDEX idx_city_bedrooms_price ON listings (city, bedrooms, price);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADD_INDEX": [
+    {
+      "subject": "Index(1:13~1:36) /test/1/catalog1/schema1/idx_city_bedrooms_price/",
+      "action" : "CREATE",
+      "target" : "Table(1:40~1:48) /test/1/catalog1/schema1/listings/"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_multi_column_index_best_practices_md_0_007]
+sql:
+-- Query 2: Find two-bedroom listings in San Francisco under $2,000
+EXPLAIN FORMAT = "brief"
+    SELECT * FROM listings
+    WHERE city = 'San Francisco' AND bedrooms = 2 AND price < 2000;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(3:18~3:26) /test/1/catalog1/schema1/listings/",
+      "action" : "READ"
+    }
+  ]
+}

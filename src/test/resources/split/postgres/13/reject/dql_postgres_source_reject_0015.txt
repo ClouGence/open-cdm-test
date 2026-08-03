@@ -1,0 +1,336 @@
+-- Behavior when a RETURNING type has typmod != -1
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING char(3) ERROR ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$[*]' RETURNING jsonb EMPTY OBJECT ON ERROR)
+;
+-- Fine with OMIT QUOTES
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int2 omit quotes error on error)
+;
+SELECT JSON_QUERY(NULL FORMAT JSON, '$')
+;
+-- Test using casts in DEFAULT .. ON ERROR expression
+SELECT * FROM JSON_TABLE(jsonb '{"d1": "H"}', '$'
+    COLUMNS (js1 jsonb_test_domain PATH '$.a2' DEFAULT '"foo1"'::jsonb::text ON EMPTY))
+;
+SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' as js2 COLUMNS (js2 int path '$'))
+;
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int DEFAULT (SELECT '"1"')::jsonb ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' OMIT QUOTES ERROR ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int4 error on error)
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON('123' FORMAT JSON)
+;
+SELECT JSON_VALUE(jsonb '1', 'strict $.a' DEFAULT 'error' ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '[3,4]', '$[*]' RETURNING anyarray EMPTY OBJECT ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING json)
+;
+SELECT JSON_VALUE(jsonb 'null', '$a' PASSING point ' (1, 2 )' AS a RETURNING point)
+;
+EXPLAIN (costs off)
+MERGE INTO rw_view1 t
+  USING (SELECT * FROM generate_series(1,5)) AS s(a) ON t.a = s.a
+  WHEN NOT MATCHED BY SOURCE THEN DELETE
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING bytea FORMAT JSON)
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING char(3) OMIT QUOTES ERROR ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' EMPTY ARRAY ON EMPTY)
+;
+SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2 ERROR ON ERROR)
+;
+SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$' AS a
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS n_a
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+SELECT JSON_VALUE(jsonb '[1,2]', 'strict $[*]' DEFAULT 9 ON ERROR) AS default_on_error
+;
+SELECT JSON_VALUE(jsonb '1', 'lax $.a' ERROR ON EMPTY DEFAULT '3' ON ERROR)
+;
+EXPLAIN (COSTS OFF, FORMAT JSON, VERBOSE)
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$'
+	)) json_table_func
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text OMIT QUOTES ON SCALAR STRING)
+;
+SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2_chk ERROR ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1.23', '$' RETURNING int)
+;
+explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+SELECT JSON_EXISTS(jsonb '{"key1":[1,2,3]}', 'strict $.key1[*] ? (@ > $x)' PASSING 2 AS x) AS has_gt_x
+;
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int true on empty))
+;
+SELECT JSON_VALUE(jsonb '"1.23"', '$' RETURNING int ERROR ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '{"a": 1}', '$.b' RETURNING sqljsonb_int_not_null ERROR ON EMPTY ERROR ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1',  '$.a' RETURNING sqljsonb_int_not_null DEFAULT 2 ON EMPTY ERROR ON ERROR)
+;
+select json_value('{"a": 1.234}', '$.a' returning int error on error)
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text KEEP QUOTES ON SCALAR STRING)
+;
+select json_value('{"a": "1.234"}', '$.a' returning int error on error)
+;
+SELECT *
+FROM
+	(VALUES ('1'), ('"err"')) vals(js)
+		LEFT OUTER JOIN
+	JSON_TABLE(vals.js::jsonb, '$' COLUMNS (a int PATH '$' ERROR ON ERROR)) jt
+		ON true
+;
+SELECT JSON('{"a":123, "b":[true,"foo"]}' WITH UNIQUE KEYS)
+;
+SELECT JSON_EXISTS(jsonb '{"a": 1, "b": 2}', '$.* ? (@ > $x && @ < $y)' PASSING 0 AS x, 2 AS y)
+;
+SELECT JSON_QUERY(jsonb '["1"]', '$[*]' WITHOUT WRAPPER KEEP QUOTES)
+;
+-- error
+SELECT JSON_VALUE('{"a": "A"}', '$.c' RETURNING d1 DEFAULT 'A' COLLATE "C" ON EMPTY) = 'a'
+;
+SELECT JSON_VALUE(jsonb '[1,2]', '$[*]' DEFAULT '0' ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '1', '$' TRUE ON ERROR)
+;
+-- JSON_TABLE: WRAPPER/QUOTES clauses on scalar columns
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' KEEP QUOTES ON SCALAR STRING))
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a jsonb EXISTS PATH '$.a'))
+;
+SELECT JSON_VALUE(jsonb '"aaa"', '$' RETURNING int DEFAULT 111 ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '[3,4]', '$[*]' RETURNING bigint[] EMPTY OBJECT ON ERROR)
+;
+-- Check the cases where a coercion-related expression is masking an
+-- unsupported expressions
+
+-- CoerceViaIO
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int DEFAULT (SELECT '"1"')::jsonb ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '123', '$' RETURNING queryfuncs_char2_chk DEFAULT '1' ON ERROR)
+;
+SELECT * FROM JSON_TABLE(
+  jsonb '{"a":[1,2,3]}',
+  'strict $.missing[*]'
+  COLUMNS (item int PATH '$')
+  EMPTY ON ERROR
+) AS jt
+;
+------------------------------------------------------------------------------------------
+[SELECT] -- Behavior when a RETURNING type has typmod != -1
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING char(3) ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$[*]' RETURNING jsonb EMPTY OBJECT ON ERROR)
+;
+----------
+[SELECT] -- Fine with OMIT QUOTES
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int2 omit quotes error on error)
+;
+----------
+[SELECT] SELECT JSON_QUERY(NULL FORMAT JSON, '$')
+;
+----------
+[SELECT] -- Test using casts in DEFAULT .. ON ERROR expression
+SELECT * FROM JSON_TABLE(jsonb '{"d1": "H"}', '$'
+    COLUMNS (js1 jsonb_test_domain PATH '$.a2' DEFAULT '"foo1"'::jsonb::text ON EMPTY))
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' as js2 COLUMNS (js2 int path '$'))
+;
+----------
+[SELECT] SELECT JSON_QUERY('"a"', '$.a'  RETURNING int DEFAULT (SELECT '"1"')::jsonb ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' OMIT QUOTES ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING int4 error on error)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON('123' FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'strict $.a' DEFAULT 'error' ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[3,4]', '$[*]' RETURNING anyarray EMPTY OBJECT ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING json)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$a' PASSING point ' (1, 2 )' AS a RETURNING point)
+;
+----------
+[PERFORMANCE] EXPLAIN (costs off)
+MERGE INTO rw_view1 t
+  USING (SELECT * FROM generate_series(1,5)) AS s(a) ON t.a = s.a
+  WHEN NOT MATCHED BY SOURCE THEN DELETE
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING bytea FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING char(3) OMIT QUOTES ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' EMPTY ARRAY ON EMPTY)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2 ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$' AS a
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS n_a
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '[1,2]', 'strict $[*]' DEFAULT 9 ON ERROR) AS default_on_error
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'lax $.a' ERROR ON EMPTY DEFAULT '3' ON ERROR)
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF, FORMAT JSON, VERBOSE)
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$'
+	)) json_table_func
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text OMIT QUOTES ON SCALAR STRING)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '123', '$' RETURNING queryfuncs_char2_chk ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1.23', '$' RETURNING int)
+;
+----------
+[PERFORMANCE] explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+----------
+[SELECT] SELECT JSON_EXISTS(jsonb '{"key1":[1,2,3]}', 'strict $.key1[*] ? (@ > $x)' PASSING 2 AS x) AS has_gt_x
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int true on empty))
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"1.23"', '$' RETURNING int ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '{"a": 1}', '$.b' RETURNING sqljsonb_int_not_null ERROR ON EMPTY ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1',  '$.a' RETURNING sqljsonb_int_not_null DEFAULT 2 ON EMPTY ERROR ON ERROR)
+;
+----------
+[SELECT] select json_value('{"a": 1.234}', '$.a' returning int error on error)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text KEEP QUOTES ON SCALAR STRING)
+;
+----------
+[SELECT] select json_value('{"a": "1.234"}', '$.a' returning int error on error)
+;
+----------
+[SELECT] SELECT *
+FROM
+	(VALUES ('1'), ('"err"')) vals(js)
+		LEFT OUTER JOIN
+	JSON_TABLE(vals.js::jsonb, '$' COLUMNS (a int PATH '$' ERROR ON ERROR)) jt
+		ON true
+;
+----------
+[SELECT] SELECT JSON('{"a":123, "b":[true,"foo"]}' WITH UNIQUE KEYS)
+;
+----------
+[SELECT] SELECT JSON_EXISTS(jsonb '{"a": 1, "b": 2}', '$.* ? (@ > $x && @ < $y)' PASSING 0 AS x, 2 AS y)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '["1"]', '$[*]' WITHOUT WRAPPER KEEP QUOTES)
+;
+----------
+[SELECT] -- error
+SELECT JSON_VALUE('{"a": "A"}', '$.c' RETURNING d1 DEFAULT 'A' COLLATE "C" ON EMPTY) = 'a'
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '[1,2]', '$[*]' DEFAULT '0' ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '1', '$' TRUE ON ERROR)
+;
+----------
+[SELECT] -- JSON_TABLE: WRAPPER/QUOTES clauses on scalar columns
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text PATH '$' KEEP QUOTES ON SCALAR STRING))
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a jsonb EXISTS PATH '$.a'))
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"aaa"', '$' RETURNING int DEFAULT 111 ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[3,4]', '$[*]' RETURNING bigint[] EMPTY OBJECT ON ERROR)
+;
+----------
+[SELECT] -- Check the cases where a coercion-related expression is masking an
+-- unsupported expressions
+
+-- CoerceViaIO
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int DEFAULT (SELECT '"1"')::jsonb ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '123', '$' RETURNING queryfuncs_char2_chk DEFAULT '1' ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+  jsonb '{"a":[1,2,3]}',
+  'strict $.missing[*]'
+  COLUMNS (item int PATH '$')
+  EMPTY ON ERROR
+) AS jt
+;

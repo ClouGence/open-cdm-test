@@ -1,0 +1,245 @@
+-- Rewrite of type two statements: Remove the `USING` keyword from the `DELETE` statement.
+CREATE GLOBAL BINDING for
+    DELETE users FROM users JOIN orders ON users.id = orders.user_id
+USING
+    DELETE users FROM users JOIN orders ON users.id = orders.user_id;
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('table', 'db_*.table_*');
+-- Create a GLOBAL scope cross-database binding.
+SHOW GLOBAL BINDINGS;
+WITH stmts AS (                                                -- Gets all information
+  SELECT * FROM INFORMATION_SCHEMA.CLUSTER_STATEMENTS_SUMMARY
+  UNION ALL
+  SELECT * FROM INFORMATION_SCHEMA.CLUSTER_STATEMENTS_SUMMARY_HISTORY 
+),
+best_plans AS (
+  SELECT plan_digest, `digest`, avg_latency, 
+  CONCAT('create global binding from history using plan digest "', plan_digest, '"') as binding_stmt 
+  FROM stmts t1
+  WHERE avg_latency = (SELECT min(avg_latency) FROM stmts t2   -- The plan with the lowest query latency
+                       WHERE t2.`digest` = t1.`digest`)
+)
+SELECT any_value(digest_text) as query, 
+       SUM(exec_count) as exec_count, 
+       plan_hint, binding_stmt
+FROM stmts, best_plans
+WHERE stmts.`digest` = best_plans.`digest`
+  AND summary_begin_time > DATE_SUB(NOW(), interval 14 day)    -- Executed in the past 2 weeks
+  AND stmt_type = 'Select'                                     -- Only consider select statements
+  AND schema_name NOT IN ('INFORMATION_SCHEMA', 'mysql')       -- Not an internal query
+  AND plan_in_binding = 0                                      -- No binding yet
+GROUP BY stmts.`digest`
+  HAVING COUNT(DISTINCT(stmts.plan_digest)) > 1                -- This query is unstable. It has more than 1 plan.
+         AND SUM(exec_count) > 10                              -- High-frequency, and has been executed more than 10 times.
+ORDER BY SUM(exec_count) DESC LIMIT 100;
+-- If `tidb_evolve_plan_baselines` is still enabled, disable it.
+    SET GLOBAL tidb_evolve_plan_baselines = OFF;
+SET tidb_opt_enable_fuzzy_binding=1;
+CREATE DATABASE db2;
+CREATE GLOBAL BINDING FOR SELECT * FROM orders USING SELECT /*+ use_index(orders, orders_book_id_idx) */ * FROM orders;
+-- The execution plan of this SQL statement uses the `sort merge join` specified in the GLOBAL binding.
+explain SELECT * FROM t1, t2 WHERE t1.id = t2.id;
+-- Views the SQL execution plan again.
+explain SELECT * FROM t1,t2 WHERE t1.id = t2.id;
+CREATE TABLE db2.t1 (a INT, KEY(a));
+CREATE BINDING FOR SELECT * FROM t WHERE a > 1 USING SELECT * FROM t use index  (idx) WHERE a > 2
+;
+-- Creates another SESSION binding and specifies using `hash join` in this binding.
+CREATE BINDING for
+    SELECT * FROM t1, t2 WHERE t1.id = t2.id
+USING
+    SELECT /*+ hash_join(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+-- Drops the binding created in the SESSION scope.
+drop session binding for SELECT * FROM t1, t2 WHERE t1.id = t2.id;
+SET GLOBAL tidb_evolve_plan_baselines = ON;
+--  Creates a GLOBAL binding and specifies using `sort merge join` in this binding.
+CREATE GLOBAL BINDING for
+    SELECT * FROM t1, t2 WHERE t1.id = t2.id
+USING
+    SELECT /*+ merge_join(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+-- Run `show warnings` to view the binding used in the query.
+    show warnings;
+-- Filter by user name
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('user', 'user1');
+-- Create a global binding
+    CREATE GLOBAL BINDING for
+        SELECT * FROM t
+    USING
+        SELECT /*+ USE_INDEX(t, idx_a) */ * FROM t;
+-- In the execution plan of this statement, `hash join` specified in the SESSION binding is used, instead of `sort merge join` specified in the GLOBAL binding.
+explain SELECT * FROM t1, t2 WHERE t1.id = t2.id;
+-- Rewrite of type one statements: Delete the `JOIN` keyword. Replace it with a comma.
+CREATE GLOBAL BINDING for
+    SELECT * FROM orders o1, orders o2
+USING
+    SELECT * FROM orders o1, orders o2;
+CREATE GLOBAL BINDING for SELECT * FROM t WHERE a < 100 AND b < 100 USING SELECT * FROM t use index(a) WHERE a < 100 AND b < 100;
+SELECT * FROM t WHERE a < 100 AND b < 100;
+-- Filter by frequency
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('frequency', '2');
+-- Use explain format = 'verbose' to view the execution plan of a SQL statement
+    explain format = 'verbose' SELECT * FROM t;
+CREATE DATABASE db1;
+SELECT * FROM t WHERE a = 1;
+-- The hint takes effect in the following statement.
+CREATE GLOBAL BINDING for
+    INSERT INTO orders SELECT * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR)
+USING
+    INSERT INTO orders SELECT /*+ use_index(@sel_1 pre_orders, idx_created) */ * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR);
+CREATE BINDING FOR SELECT * FROM t WHERE a > 1 USING SELECT * FROM t use index(idx) WHERE b > 2
+;
+CREATE TABLE db1.t2 (a INT, KEY(a));
+CREATE TABLE t(a INT, b INT, KEY(a), KEY(b));
+-- Check whether `tidb_evolve_plan_baselines` is disabled in the earlier version.
+    SELECT @@global.tidb_evolve_plan_baselines;
+-- The hint cannot take effect in the following statement.
+CREATE GLOBAL BINDING for
+    INSERT INTO orders SELECT * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR)
+USING
+    INSERT /*+ use_index(@sel_1 pre_orders, idx_created) */ INTO orders SELECT * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR);
+-- Filter by database name and table name through wildcards
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('table', 'test.table_*');
+CREATE TABLE db1.t1 (a INT, KEY(a));
+CREATE TABLE db2.t2 (a INT, KEY(a));
+-- Filter by table name
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('table', 'test.t');
+------------------------------------------------------------------------------------------
+[ADMIN_PERFORMANCE] -- Rewrite of type two statements: Remove the `USING` keyword from the `DELETE` statement.
+CREATE GLOBAL BINDING for
+    DELETE users FROM users JOIN orders ON users.id = orders.user_id
+USING
+    DELETE users FROM users JOIN orders ON users.id = orders.user_id;
+----------
+[INSERT] INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('table', 'db_*.table_*');
+----------
+[METADATA] -- Create a GLOBAL scope cross-database binding.
+SHOW GLOBAL BINDINGS;
+----------
+[SELECT] WITH stmts AS (                                                -- Gets all information
+  SELECT * FROM INFORMATION_SCHEMA.CLUSTER_STATEMENTS_SUMMARY
+  UNION ALL
+  SELECT * FROM INFORMATION_SCHEMA.CLUSTER_STATEMENTS_SUMMARY_HISTORY 
+),
+best_plans AS (
+  SELECT plan_digest, `digest`, avg_latency, 
+  CONCAT('create global binding from history using plan digest "', plan_digest, '"') as binding_stmt 
+  FROM stmts t1
+  WHERE avg_latency = (SELECT min(avg_latency) FROM stmts t2   -- The plan with the lowest query latency
+                       WHERE t2.`digest` = t1.`digest`)
+)
+SELECT any_value(digest_text) as query, 
+       SUM(exec_count) as exec_count, 
+       plan_hint, binding_stmt
+FROM stmts, best_plans
+WHERE stmts.`digest` = best_plans.`digest`
+  AND summary_begin_time > DATE_SUB(NOW(), interval 14 day)    -- Executed in the past 2 weeks
+  AND stmt_type = 'Select'                                     -- Only consider select statements
+  AND schema_name NOT IN ('INFORMATION_SCHEMA', 'mysql')       -- Not an internal query
+  AND plan_in_binding = 0                                      -- No binding yet
+GROUP BY stmts.`digest`
+  HAVING COUNT(DISTINCT(stmts.plan_digest)) > 1                -- This query is unstable. It has more than 1 plan.
+         AND SUM(exec_count) > 10                              -- High-frequency, and has been executed more than 10 times.
+ORDER BY SUM(exec_count) DESC LIMIT 100;
+----------
+[SYSTEM_SETTING_WRITE] -- If `tidb_evolve_plan_baselines` is still enabled, disable it.
+    SET GLOBAL tidb_evolve_plan_baselines = OFF;
+----------
+[SESSION_SETTING_WRITE] SET tidb_opt_enable_fuzzy_binding=1;
+----------
+[CREATE_SCHEMA] CREATE DATABASE db2;
+----------
+[ADMIN_PERFORMANCE] CREATE GLOBAL BINDING FOR SELECT * FROM orders USING SELECT /*+ use_index(orders, orders_book_id_idx) */ * FROM orders;
+----------
+[PERFORMANCE] -- The execution plan of this SQL statement uses the `sort merge join` specified in the GLOBAL binding.
+explain SELECT * FROM t1, t2 WHERE t1.id = t2.id;
+----------
+[PERFORMANCE] -- Views the SQL execution plan again.
+explain SELECT * FROM t1,t2 WHERE t1.id = t2.id;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE db2.t1 (a INT, KEY(a));
+----------
+[ADMIN_PERFORMANCE] CREATE BINDING FOR SELECT * FROM t WHERE a > 1 USING SELECT * FROM t use index  (idx) WHERE a > 2
+;
+----------
+[ADMIN_PERFORMANCE] -- Creates another SESSION binding and specifies using `hash join` in this binding.
+CREATE BINDING for
+    SELECT * FROM t1, t2 WHERE t1.id = t2.id
+USING
+    SELECT /*+ hash_join(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+----------
+[ADMIN_PERFORMANCE] -- Drops the binding created in the SESSION scope.
+drop session binding for SELECT * FROM t1, t2 WHERE t1.id = t2.id;
+----------
+[SYSTEM_SETTING_WRITE] SET GLOBAL tidb_evolve_plan_baselines = ON;
+----------
+[ADMIN_PERFORMANCE] --  Creates a GLOBAL binding and specifies using `sort merge join` in this binding.
+CREATE GLOBAL BINDING for
+    SELECT * FROM t1, t2 WHERE t1.id = t2.id
+USING
+    SELECT /*+ merge_join(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+----------
+[PERFORMANCE] -- Run `show warnings` to view the binding used in the query.
+    show warnings;
+----------
+[INSERT] -- Filter by user name
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('user', 'user1');
+----------
+[ADMIN_PERFORMANCE] -- Create a global binding
+    CREATE GLOBAL BINDING for
+        SELECT * FROM t
+    USING
+        SELECT /*+ USE_INDEX(t, idx_a) */ * FROM t;
+----------
+[PERFORMANCE] -- In the execution plan of this statement, `hash join` specified in the SESSION binding is used, instead of `sort merge join` specified in the GLOBAL binding.
+explain SELECT * FROM t1, t2 WHERE t1.id = t2.id;
+----------
+[ADMIN_PERFORMANCE] -- Rewrite of type one statements: Delete the `JOIN` keyword. Replace it with a comma.
+CREATE GLOBAL BINDING for
+    SELECT * FROM orders o1, orders o2
+USING
+    SELECT * FROM orders o1, orders o2;
+----------
+[ADMIN_PERFORMANCE] CREATE GLOBAL BINDING for SELECT * FROM t WHERE a < 100 AND b < 100 USING SELECT * FROM t use index(a) WHERE a < 100 AND b < 100;
+----------
+[SELECT] SELECT * FROM t WHERE a < 100 AND b < 100;
+----------
+[INSERT] -- Filter by frequency
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('frequency', '2');
+----------
+[PERFORMANCE] -- Use explain format = 'verbose' to view the execution plan of a SQL statement
+    explain format = 'verbose' SELECT * FROM t;
+----------
+[CREATE_SCHEMA] CREATE DATABASE db1;
+----------
+[SELECT] SELECT * FROM t WHERE a = 1;
+----------
+[ADMIN_PERFORMANCE] -- The hint takes effect in the following statement.
+CREATE GLOBAL BINDING for
+    INSERT INTO orders SELECT * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR)
+USING
+    INSERT INTO orders SELECT /*+ use_index(@sel_1 pre_orders, idx_created) */ * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR);
+----------
+[ADMIN_PERFORMANCE] CREATE BINDING FOR SELECT * FROM t WHERE a > 1 USING SELECT * FROM t use index(idx) WHERE b > 2
+;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE db1.t2 (a INT, KEY(a));
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE t(a INT, b INT, KEY(a), KEY(b));
+----------
+[SELECT] -- Check whether `tidb_evolve_plan_baselines` is disabled in the earlier version.
+    SELECT @@global.tidb_evolve_plan_baselines;
+----------
+[ADMIN_PERFORMANCE] -- The hint cannot take effect in the following statement.
+CREATE GLOBAL BINDING for
+    INSERT INTO orders SELECT * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR)
+USING
+    INSERT /*+ use_index(@sel_1 pre_orders, idx_created) */ INTO orders SELECT * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR);
+----------
+[INSERT] -- Filter by database name and table name through wildcards
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('table', 'test.table_*');
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE db1.t1 (a INT, KEY(a));
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE db2.t2 (a INT, KEY(a));
+----------
+[INSERT] -- Filter by table name
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('table', 'test.t');

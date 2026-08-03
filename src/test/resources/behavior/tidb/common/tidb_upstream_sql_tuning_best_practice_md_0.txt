@@ -1,0 +1,343 @@
+[admin_table__common_tidb_upstream_sql_tuning_best_practice_md_0_000]
+sql:
+ANALYZE TABLE test INDEX test_new;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_TABLE": [
+    {
+      "subject": "Table(1:14~1:18) /test/1/catalog1/schema1/test/",
+      "action" : "ANALYZE"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_sql_tuning_best_practice_md_0_001]
+sql:
+EXPLAIN ANALYZE SELECT
+test.*
+FROM
+  test
+WHERE
+  test.snapshot_id = 459840
+  AND test.id > 998464
+ORDER BY
+  test.id ASC
+LIMIT
+  1000
+;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(4:2~4:6) /test/1/catalog1/schema1/test/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_sql_tuning_best_practice_md_0_002]
+sql:
+EXPLAIN SELECT COUNT(*) FROM trips WHERE start_date BETWEEN '2017-07-01 00:00:00' AND '2017-07-01 23:59:59';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Function(1:15~1:20) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:29~1:34) /test/1/catalog1/schema1/trips/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[admin_table__common_tidb_upstream_sql_tuning_best_practice_md_0_003]
+sql:
+ANALYZE TABLE orders index idx_composite;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_TABLE": [
+    {
+      "subject": "Table(1:14~1:20) /test/1/catalog1/schema1/orders/",
+      "action" : "ANALYZE"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_sql_tuning_best_practice_md_0_004]
+sql:
+EXPLAIN SELECT id, name FROM emp WHERE id = 901;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(1:29~1:32) /test/1/catalog1/schema1/emp/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[add_index__common_tidb_upstream_sql_tuning_best_practice_md_0_005]
+sql:
+CREATE INDEX test_new ON test(snapshot_id);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADD_INDEX": [
+    {
+      "subject": "Index(1:13~1:21) /test/1/catalog1/schema1/test_new/",
+      "action" : "CREATE",
+      "target" : "Table(1:25~1:29) /test/1/catalog1/schema1/test/"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_sql_tuning_best_practice_md_0_006]
+sql:
+SELECT `orders`.*
+FROM `orders`
+WHERE
+    `orders`.`mode` = 'production'
+    AND `orders`.`user_id` = 11111
+    AND orders.label_id IS NOT NULL
+    AND orders.created_at >= '2024-04-07 18:07:52'
+    AND orders.created_at <= '2024-05-11 18:07:52'
+    AND orders.id >= 1000000000
+    AND orders.id < 1500000000
+ORDER BY orders.id DESC
+LIMIT 101;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:5~2:13) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_sql_tuning_best_practice_md_0_007]
+sql:
+select 100.00 * sum(case when i_data like 'PR%' then ol_amount else 0 end) / (1+sum(ol_amount)) as promo_revenue
+from order_line, item
+where ol_i_id = i_id and ol_delivery_d >= '2007-01-02 00:00:00.000000' and ol_delivery_d < '2030-01-02 00:00:00.000000';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:16~1:19) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:15) /test/1/catalog1/schema1/order_line/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:17~2:21) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_sql_tuning_best_practice_md_0_008]
+sql:
+WITH `results` AS (
+  SELECT field1, field2, field3, field4
+  FROM usertable
+  where tenantId = 1234 and objectTypeId = 6789
+),
+`limited_results` AS (
+  SELECT field1, field2, field3, field4
+  FROM `results` LIMIT 100
+)
+SELECT field1, field2, field3, field4
+FROM
+  (
+    SELECT 100 `__total__`, field1, field2, field3, field4
+    FROM `limited_results`
+    UNION ALL
+    SELECT count(*) `__total__`, field1, field2, field3, field4
+    FROM `results`
+  ) `result_and_count`;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:7~3:16) /test/1/catalog1/schema1/usertable/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(16:11~16:16) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_sql_tuning_best_practice_md_0_009]
+sql:
+EXPLAIN ANALYZE
+SELECT SUM(pm.m_count) / COUNT(*)
+FROM (
+    SELECT COUNT(m.name) m_count
+    FROM universe.moons m
+    RIGHT JOIN (
+        SELECT p.id, p.name
+        FROM universe.planet_categories c
+        JOIN universe.planets p
+            ON c.id = p.category_id
+            AND c.name = 'Jovian'
+    ) pc ON m.planet_id = pc.id
+    GROUP BY pc.name
+) pm;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Function(2:7~2:10) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:25~2:30) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:9~5:23) /test/1/catalog1/universe/moons/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:13~8:39) /test/1/catalog1/universe/planet_categories/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:13~9:29) /test/1/catalog1/universe/planets/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[add_index__common_tidb_upstream_sql_tuning_best_practice_md_0_010]
+sql:
+CREATE INDEX idx_composite ON orders(user_id, mode, id, created_at, label_id);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADD_INDEX": [
+    {
+      "subject": "Index(1:13~1:26) /test/1/catalog1/schema1/idx_composite/",
+      "action" : "CREATE",
+      "target" : "Table(1:30~1:36) /test/1/catalog1/schema1/orders/"
+    }
+  ]
+}
+
+----------
+[add_index__common_tidb_upstream_sql_tuning_best_practice_md_0_011]
+sql:
+CREATE INDEX logs_covered ON logs(snapshot_id, user_id, status, source_type, target_type, amount);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADD_INDEX": [
+    {
+      "subject": "Index(1:13~1:25) /test/1/catalog1/schema1/logs_covered/",
+      "action" : "CREATE",
+      "target" : "Table(1:29~1:33) /test/1/catalog1/schema1/logs/"
+    }
+  ]
+}
+
+----------
+[admin_table__common_tidb_upstream_sql_tuning_best_practice_md_0_012]
+sql:
+ANALYZE TABLE logs INDEX logs_covered;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_TABLE": [
+    {
+      "subject": "Table(1:14~1:18) /test/1/catalog1/schema1/logs/",
+      "action" : "ANALYZE"
+    }
+  ]
+}
+
+----------
+[metadata__common_tidb_upstream_sql_tuning_best_practice_md_0_013]
+sql:
+SHOW VARIABLES LIKE 'tidb\_auto\_analyze%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Instance(1:0~1:42) /test/1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_sql_tuning_best_practice_md_0_014]
+sql:
+EXPLAIN
+SELECT t5.name
+FROM (
+    SELECT p.name, p.gravity, p.distance_from_sun
+    FROM universe.planets p
+    JOIN universe.stars s
+        ON s.id = p.sun_id
+        AND s.name = 'Sun'
+    ORDER BY p.distance_from_sun ASC
+    LIMIT 5
+) t5
+ORDER BY t5.gravity DESC
+LIMIT 3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(5:9~5:25) /test/1/catalog1/universe/planets/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:9~6:23) /test/1/catalog1/universe/stars/",
+      "action" : "READ"
+    }
+  ]
+}

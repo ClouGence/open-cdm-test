@@ -1,0 +1,396 @@
+SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+SELECT COUNT(*) FROM (SELECT DISTINCT name FROM road)
+;
+SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (NULL), (2)) AS t(i)
+;
+-- indent null
+SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': volatile_one() RETURNING text) FORMAT JSON)
+;
+--SELECT JSON_OBJECT(1::text VALUE 2);
+--SELECT JSON_OBJECT(KEY 1::text VALUE 2);
+SELECT JSON_OBJECT(json '[1]': 123)
+;
+SELECT test_slru_page_sync(0x1234500000030)
+;
+--
+-- Similar to the previous test case, but this time it's a backwards scan
+-- using a < RowCompare.  Must use the <= strategy (and not the < strategy).
+--
+explain (costs off)
+SELECT proname, proargtypes, pronamespace
+   FROM pg_proc
+   WHERE (proname, pronamespace) < ('abs', 1_000_000)
+ORDER BY proname DESC, proargtypes DESC, pronamespace DESC LIMIT 1
+;
+SELECT JSON_OBJECT(RETURNING json FORMAT JSON)
+;
+select json_array ( returning jsonb format json )
+;
+SELECT ctid FROM (
+		SELECT ctid FROM corruption_test
+			WHERE (ctid::text::point)[0] != 0
+			ORDER BY random() LIMIT 5)
+		ORDER BY ctid ASC
+;
+-- indent non singly-rooted xml with mixed contents
+SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+-- JSON_ARRAYAGG()
+SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL)
+;
+SELECT bytea '\x00' IS JSON
+;
+-- Reading page in buffer for read-only
+SELECT test_slru_page_readonly(0x1234500000020)
+;
+-- Test JSON_OBJECTAGG deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+SELECT JSON_OBJECTAGG(mod(i,100): (i)::text FORMAT JSON WITH UNIQUE)
+FROM generate_series(0, 199) i
+;
+SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v ABSENT ON NULL)
+OVER (ORDER BY k RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)
+FROM (VALUES (1,1), (1,null), (2,2)) a(k,v)
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECT('foo' : '1' FORMAT JSON, 'bar' : 'baz' RETURNING json)
+;
+SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v WITH UNIQUE KEYS) OVER (ORDER BY k)
+FROM (VALUES (1,1), (2,2)) a(k,v)
+;
+SELECT JSON_OBJECT(1: 1, '2': NULL, '3': 1, 4: NULL, '5': 'a' ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+-- Ensure there is no problem if cheapest_startup_path is NULL
+explain (costs off)
+select * from tenk1 t1
+left join lateral
+  (select t1.tenthous from tenk2 t2 union all (values(1)))
+on true limit 1
+;
+SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+-- 'no indent' = not using 'no indent'
+SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text) = xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text NO INDENT)
+;
+SELECT JSON_ARRAY('a',  NULL, 'b' NULL   ON NULL)
+;
+explain (costs off)
+select * from tenk1 t1
+left join lateral
+  (select t1.tenthous from tenk2 t2 union all (values(1)))
+on true limit 1
+;
+SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': 1 RETURNING text) FORMAT JSON)
+;
+SELECT JSON_OBJECTAGG(k: v ABSENT ON NULL WITH UNIQUE KEYS RETURNING jsonb) FROM (VALUES ('a', 1), ('b', NULL), ('c', 3)) AS t(k,v)
+;
+SELECT
+	js0,
+	js IS JSON "IS JSON",
+	js IS NOT JSON "IS NOT JSON",
+	js IS JSON VALUE "IS VALUE",
+	js IS JSON OBJECT "IS OBJECT",
+	js IS JSON ARRAY "IS ARRAY",
+	js IS JSON SCALAR "IS SCALAR",
+	js IS JSON WITHOUT UNIQUE KEYS "WITHOUT UNIQUE",
+	js IS JSON WITH UNIQUE KEYS "WITH UNIQUE"
+FROM
+	(SELECT js, js::bytea FROM test_is_json WHERE js IS JSON) foo(js0, js)
+;
+-- Check that SJE removes references from PHVs correctly
+explain (costs off)
+select * from emp1 t1 left join
+    (select coalesce(t3.code, 1) from emp1 t2
+        left join (emp1 t3 join emp1 t4 on t3.id = t4.id)
+        on true)
+on true
+;
+explain (verbose, costs off)
+select * from int8_tbl t1
+  left join
+    (select coalesce(t2.q1 + x, 0) from int8_tbl t2,
+       lateral (select t3.q1 as x from int8_tbl t3,
+                  lateral (select t2.q1, t3.q1 offset 0) s))
+  on true
+;
+SELECT NULL::int IS JSON
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': 1 RETURNING text) FORMAT JSON)
+;
+SELECT JSON_OBJECT('happy'::mood: '123'::jsonb)
+;
+SELECT xmlserialize(CONTENT  '  ' AS text INDENT)
+;
+SELECT js,
+       js IS JSON AS is_json,
+       js IS JSON SCALAR AS is_scalar,
+       js IS JSON OBJECT AS is_object,
+       js IS JSON ARRAY AS is_array
+FROM (VALUES ('123'), ('"abc"'), ('{"a": "b"}'), ('[1,2]'), ('abc')) AS foo(js)
+;
+explain (costs off)
+select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+SELECT JSON_OBJECT(RETURNING bytea FORMAT JSON ENCODING UTF16)
+;
+SELECT NULL::jsonb IS JSON
+;
+SELECT xmlserialize(DOCUMENT '  ' AS text INDENT)
+;
+select json_object ( 1 : 1 , '2' : null absent on null without unique returning jsonb )
+;
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING varchar(2)) FROM generate_series(1, 1) i
+;
+SELECT JSON_OBJECT(1: 1, '1': NULL NULL ON NULL WITH UNIQUE RETURNING jsonb)
+;
+SELECT JSON_OBJECT('foo': NULL::jsonb FORMAT JSON)
+;
+SELECT JSON_OBJECT(1::text: 2)
+;
+with val ( js ) as ( values ( '{ "a": 1, "b": [{ "a": 1, "b": 0, "a": 2 }] }' ) ) select js is json "IS JSON" , js is not json "IS NOT JSON" , js is json value "IS VALUE" , js is json object "IS OBJECT" , js is json array "IS ARRAY" , js is json scalar "IS SCALAR" , js is json without unique keys "WITHOUT UNIQUE" , js is json with unique keys "WITH UNIQUE" from val
+;
+SELECT JSON_OBJECT(RETURNING bytea)
+;
+SELECT JSON_OBJECTAGG(k: v WITH UNIQUE KEYS RETURNING jsonb)
+FROM (VALUES (1, 1), (1, NULL), (2, 2)) foo(k, v)
+;
+select json_object ( 1 : 1 , '1' : null with unique )
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+----------
+[SELECT] SELECT COUNT(*) FROM (SELECT DISTINCT name FROM road)
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (NULL), (2)) AS t(i)
+;
+----------
+[SELECT] -- indent null
+SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': volatile_one() RETURNING text) FORMAT JSON)
+;
+----------
+[SELECT] --SELECT JSON_OBJECT(1::text VALUE 2);
+--SELECT JSON_OBJECT(KEY 1::text VALUE 2);
+SELECT JSON_OBJECT(json '[1]': 123)
+;
+----------
+[SELECT] SELECT test_slru_page_sync(0x1234500000030)
+;
+----------
+[PERFORMANCE] --
+-- Similar to the previous test case, but this time it's a backwards scan
+-- using a < RowCompare.  Must use the <= strategy (and not the < strategy).
+--
+explain (costs off)
+SELECT proname, proargtypes, pronamespace
+   FROM pg_proc
+   WHERE (proname, pronamespace) < ('abs', 1_000_000)
+ORDER BY proname DESC, proargtypes DESC, pronamespace DESC LIMIT 1
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING json FORMAT JSON)
+;
+----------
+[SELECT] select json_array ( returning jsonb format json )
+;
+----------
+[SELECT] SELECT ctid FROM (
+		SELECT ctid FROM corruption_test
+			WHERE (ctid::text::point)[0] != 0
+			ORDER BY random() LIMIT 5)
+		ORDER BY ctid ASC
+;
+----------
+[SELECT] -- indent non singly-rooted xml with mixed contents
+SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] -- JSON_ARRAYAGG()
+SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL)
+;
+----------
+[SELECT] SELECT bytea '\x00' IS JSON
+;
+----------
+[SELECT] -- Reading page in buffer for read-only
+SELECT test_slru_page_readonly(0x1234500000020)
+;
+----------
+[PERFORMANCE] -- Test JSON_OBJECTAGG deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(mod(i,100): (i)::text FORMAT JSON WITH UNIQUE)
+FROM generate_series(0, 199) i
+;
+----------
+[SELECT] SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v ABSENT ON NULL)
+OVER (ORDER BY k RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING)
+FROM (VALUES (1,1), (1,null), (2,2)) a(k,v)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECT('foo' : '1' FORMAT JSON, 'bar' : 'baz' RETURNING json)
+;
+----------
+[SELECT] SELECT to_json(a) AS a, JSON_OBJECTAGG(k : v WITH UNIQUE KEYS) OVER (ORDER BY k)
+FROM (VALUES (1,1), (2,2)) a(k,v)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1: 1, '2': NULL, '3': 1, 4: NULL, '5': 'a' ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+----------
+[PERFORMANCE] -- Ensure there is no problem if cheapest_startup_path is NULL
+explain (costs off)
+select * from tenk1 t1
+left join lateral
+  (select t1.tenthous from tenk2 t2 union all (values(1)))
+on true limit 1
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] -- 'no indent' = not using 'no indent'
+SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text) = xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text NO INDENT)
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a',  NULL, 'b' NULL   ON NULL)
+;
+----------
+[PERFORMANCE] explain (costs off)
+select * from tenk1 t1
+left join lateral
+  (select t1.tenthous from tenk2 t2 union all (values(1)))
+on true limit 1
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': 1 RETURNING text) FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v ABSENT ON NULL WITH UNIQUE KEYS RETURNING jsonb) FROM (VALUES ('a', 1), ('b', NULL), ('c', 3)) AS t(k,v)
+;
+----------
+[SELECT] SELECT
+	js0,
+	js IS JSON "IS JSON",
+	js IS NOT JSON "IS NOT JSON",
+	js IS JSON VALUE "IS VALUE",
+	js IS JSON OBJECT "IS OBJECT",
+	js IS JSON ARRAY "IS ARRAY",
+	js IS JSON SCALAR "IS SCALAR",
+	js IS JSON WITHOUT UNIQUE KEYS "WITHOUT UNIQUE",
+	js IS JSON WITH UNIQUE KEYS "WITH UNIQUE"
+FROM
+	(SELECT js, js::bytea FROM test_is_json WHERE js IS JSON) foo(js0, js)
+;
+----------
+[PERFORMANCE] -- Check that SJE removes references from PHVs correctly
+explain (costs off)
+select * from emp1 t1 left join
+    (select coalesce(t3.code, 1) from emp1 t2
+        left join (emp1 t3 join emp1 t4 on t3.id = t4.id)
+        on true)
+on true
+;
+----------
+[PERFORMANCE] explain (verbose, costs off)
+select * from int8_tbl t1
+  left join
+    (select coalesce(t2.q1 + x, 0) from int8_tbl t2,
+       lateral (select t3.q1 as x from int8_tbl t3,
+                  lateral (select t2.q1, t3.q1 offset 0) s))
+  on true
+;
+----------
+[SELECT] SELECT NULL::int IS JSON
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': 1 RETURNING text) FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('happy'::mood: '123'::jsonb)
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '  ' AS text INDENT)
+;
+----------
+[SELECT] SELECT js,
+       js IS JSON AS is_json,
+       js IS JSON SCALAR AS is_scalar,
+       js IS JSON OBJECT AS is_object,
+       js IS JSON ARRAY AS is_array
+FROM (VALUES ('123'), ('"abc"'), ('{"a": "b"}'), ('[1,2]'), ('abc')) AS foo(js)
+;
+----------
+[PERFORMANCE] explain (costs off)
+select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING bytea FORMAT JSON ENCODING UTF16)
+;
+----------
+[SELECT] SELECT NULL::jsonb IS JSON
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT '  ' AS text INDENT)
+;
+----------
+[SELECT] select json_object ( 1 : 1 , '2' : null absent on null without unique returning jsonb )
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING varchar(2)) FROM generate_series(1, 1) i
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1: 1, '1': NULL NULL ON NULL WITH UNIQUE RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('foo': NULL::jsonb FORMAT JSON)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1::text: 2)
+;
+----------
+[SELECT] with val ( js ) as ( values ( '{ "a": 1, "b": [{ "a": 1, "b": 0, "a": 2 }] }' ) ) select js is json "IS JSON" , js is not json "IS NOT JSON" , js is json value "IS VALUE" , js is json object "IS OBJECT" , js is json array "IS ARRAY" , js is json scalar "IS SCALAR" , js is json without unique keys "WITHOUT UNIQUE" , js is json with unique keys "WITH UNIQUE" from val
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING bytea)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v WITH UNIQUE KEYS RETURNING jsonb)
+FROM (VALUES (1, 1), (1, NULL), (2, 2)) foo(k, v)
+;
+----------
+[SELECT] select json_object ( 1 : 1 , '1' : null with unique )
+;

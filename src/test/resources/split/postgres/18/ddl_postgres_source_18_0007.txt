@@ -1,0 +1,564 @@
+CREATE TABLE tab_rowfilter_virtual (id int PRIMARY KEY, x int, y int GENERATED ALWAYS AS (x * 2) VIRTUAL)
+;
+CREATE TABLE tab1 (a int PRIMARY KEY, b int GENERATED ALWAYS AS (a * 22) STORED, c int GENERATED ALWAYS AS (a * 33) VIRTUAL, d int)
+;
+ALTER TABLE temporal_fk_mltrng2mltrng
+  ADD CONSTRAINT temporal_fk_mltrng2mltrng_fk
+  FOREIGN KEY (parent_id, PERIOD valid_at)
+  REFERENCES temporal_mltrng (id, PERIOD valid_at)
+;
+CREATE TABLE dump_test.test_table_nonn_chld1 (
+		   CONSTRAINT nn NOT NULL col2 NO INHERIT)
+		INHERITS (dump_test.test_table_nonn)
+;
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (b, c)
+;
+-- these constraints can also be added and removed by name
+alter domain dnotnulltest add constraint dnotnulltest_notnull not null
+;
+ALTER TABLE temporal_partitioned_fk_mltrng2mltrng
+  DROP CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk,
+  ADD CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk
+    FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_partitioned_mltrng
+    ON DELETE CASCADE ON UPDATE CASCADE
+;
+CREATE TABLE temporal_partitioned (
+  id int4range,
+  valid_at daterange,
+  name text,
+  CONSTRAINT temporal_paritioned_uq UNIQUE (id, valid_at WITHOUT OVERLAPS)
+) PARTITION BY LIST (id)
+;
+CREATE OR REPLACE FUNCTION "overlaps"(time, interval,
+  time, interval)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, ($3 + $4))
+;
+CREATE OR REPLACE FUNCTION "overlaps"(timestamptz, interval,
+  timestamptz, interval)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, ($3 + $4))
+;
+CREATE FUNCTION unbounded_syntax_test1a(x int) RETURNS TABLE (a int, b int, c int)
+LANGUAGE SQL
+BEGIN ATOMIC
+  SELECT sum(unique1) over (rows between x preceding and x following),
+         unique1, four
+  FROM tenk1 WHERE unique1 < 10;
+END
+;
+-- Enforceability also changes the validate state, as data validation will be
+-- performed during this transformation.
+ALTER TABLE FKTABLE ALTER CONSTRAINT fk_con ENFORCED
+;
+CREATE TABLE gtest_parent (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS (f2 * 2) VIRTUAL) PARTITION BY RANGE (f1)
+;
+CREATE FUNCTION functest_S_10(a text, b date) RETURNS boolean
+    LANGUAGE SQL
+    BEGIN ATOMIC
+        SELECT a = 'abcd' AND b > '2001-01-01';
+    END
+;
+CREATE FUNCTION functest_S_3() RETURNS boolean
+    RETURN false
+;
+ALTER TABLE cmpart2 ALTER COLUMN f1 SET COMPRESSION lz4
+;
+-- Ensure only the parent is vacuumed
+VACUUM ONLY only_inh_parent
+;
+ALTER TABLE FKTABLE ALTER CONSTRAINT fktable_ftest1_fkey ENFORCED
+;
+CREATE TABLE gtest22b (a int, b int GENERATED ALWAYS AS (a / 2) VIRTUAL, PRIMARY KEY (a, b))
+;
+create table inh_nn1 (f1 int not null no inherit)
+;
+ALTER TABLE temporal_fk_mltrng2mltrng
+  ADD CONSTRAINT temporal_fk_mltrng2mltrng_fk2
+  FOREIGN KEY (parent_id, PERIOD parent_id)
+  REFERENCES temporal_mltrng (id, PERIOD id)
+;
+ALTER TABLE gtest20 ALTER COLUMN b SET EXPRESSION AS (a * 3)
+;
+CREATE OR REPLACE FUNCTION ts_debug(config regconfig, document text,
+    OUT alias text,
+    OUT description text,
+    OUT token text,
+    OUT dictionaries regdictionary[],
+    OUT dictionary regdictionary,
+    OUT lexemes text[])
+ RETURNS SETOF record
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT
+BEGIN ATOMIC
+select
+    tt.alias AS alias,
+    tt.description AS description,
+    parse.token AS token,
+    ARRAY ( SELECT m.mapdict::regdictionary
+            FROM pg_ts_config_map AS m
+            WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+            ORDER BY m.mapseqno )
+    AS dictionaries,
+    ( SELECT mapdict::regdictionary
+      FROM pg_ts_config_map AS m
+      WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+      ORDER BY ts_lexize(mapdict, parse.token) IS NULL, m.mapseqno
+      LIMIT 1
+    ) AS dictionary,
+    ( SELECT ts_lexize(mapdict, parse.token)
+      FROM pg_ts_config_map AS m
+      WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+      ORDER BY ts_lexize(mapdict, parse.token) IS NULL, m.mapseqno
+      LIMIT 1
+    ) AS lexemes
+FROM ts_parse(
+        (SELECT cfgparser FROM pg_ts_config WHERE oid = $1 ), $2
+    ) AS parse,
+     ts_token_type(
+        (SELECT cfgparser FROM pg_ts_config WHERE oid = $1 )
+    ) AS tt
+WHERE tt.tokid = parse.tokid;
+END
+;
+-- Schema publication that does not include the schema that has the parent table
+CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch2 WITH (PUBLISH_VIA_PARTITION_ROOT=1)
+;
+CREATE PUBLICATION tap_pub_toast FOR TABLE tab_rowfilter_toast WHERE (a = repeat('1234567890', 200) AND b < '10')
+;
+CREATE OR REPLACE FUNCTION numeric_pl_pg_lsn(numeric, pg_lsn)
+ RETURNS pg_lsn
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+create schema if not exists abc authorization current_role
+;
+-- ok - can use row filter for partition
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 WHERE (a > 99)
+;
+create table notnull_tbl_fail (a int primary key, not null a no inherit)
+;
+CREATE TABLE gtest_err_7c (a int PRIMARY KEY, b int GENERATED ALWAYS AS ((SELECT a)) VIRTUAL)
+;
+CREATE PUBLICATION testpub6 FOR TABLES IN SCHEMA testpub_rf_schema2
+;
+ALTER PUBLICATION testpub_fortable_insert ADD TABLE testpub_tbl5 (b, c)
+;
+ALTER TABLE public.itest3 ADD CONSTRAINT itest3_a_not_null NOT NULL a
+;
+CREATE OR REPLACE FUNCTION xpath(text, xml)
+ RETURNS xml[]
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN xpath($1, $2, '{}'::text[])
+;
+-- Switch type to use typanalyze function that always returns false.
+ALTER TYPE int_custom SET (ANALYZE = int_custom_typanalyze_false)
+;
+-- check that non-commutable hash clauses do not lead to error
+alter operator = (int8, int8alias1) set (hashes)
+;
+ALTER TABLE pp_nn_1 ADD CONSTRAINT nn1 NOT NULL a NOT VALID
+;
+CREATE FUNCTION _pg_truetypid(pg_attribute, pg_type) RETURNS oid
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN CASE WHEN $2.typtype = 'd' THEN $2.typbasetype ELSE $1.atttypid END
+;
+CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(false_positive_rate = 0.00009)
+)
+;
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb
+;
+-- check that NOT NULL NO INHERIT cannot be merged to a normal NOT NULL
+CREATE TABLE part_fail (a int NOT NULL NO INHERIT,
+	b char(2) COLLATE "C",
+	CONSTRAINT check_a CHECK (a > 0)
+)
+;
+CREATE TABLE pp_nn (a int, b int, NOT NULL a) PARTITION BY LIST (a)
+;
+CREATE TABLE split_table_idx.base_inherit (
+    id integer NOT NULL,
+    code text UNIQUE NULLS NOT DISTINCT,
+    period tstzrange NOT NULL,
+    EXCLUDE USING gist (id WITH =, period WITH &&)
+)
+;
+-- Partitioned table with relam at 0
+ALTER TABLE am_partitioned SET ACCESS METHOD DEFAULT
+;
+CREATE OR REPLACE FUNCTION heap_page_item_attrs(IN page bytea, IN rel_oid regclass,
+    OUT lp smallint,
+    OUT lp_off smallint,
+    OUT lp_flags smallint,
+    OUT lp_len smallint,
+    OUT t_xmin xid,
+    OUT t_xmax xid,
+    OUT t_field3 int4,
+    OUT t_ctid tid,
+    OUT t_infomask2 integer,
+    OUT t_infomask integer,
+    OUT t_hoff smallint,
+    OUT t_bits text,
+    OUT t_oid oid,
+    OUT t_attrs bytea[]
+    )
+RETURNS SETOF record
+LANGUAGE SQL PARALLEL RESTRICTED
+BEGIN ATOMIC
+SELECT * FROM heap_page_item_attrs(page, rel_oid, false);
+END
+;
+create table notnull_tbl_fail (a int constraint foo not null, constraint foo not null a no inherit)
+;
+ALTER TABLE ONLY "public"."temporal_mltrng"
+    ADD CONSTRAINT "temporal_mltrng_pk" PRIMARY KEY ("id", "valid_at" WITHOUT OVERLAPS)
+;
+-- test LIKE INCLUDING COMPRESSION
+CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION)
+;
+alter table renameColumn add column y int check (x > 0) not enforced enforced
+;
+ALTER TYPE myvarchar SET (
+        send = myvarcharsend,
+        receive = myvarcharrecv
+    )
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] CREATE TABLE tab_rowfilter_virtual (id int PRIMARY KEY, x int, y int GENERATED ALWAYS AS (x * 2) VIRTUAL)
+;
+----------
+[CREATE_TABLE] CREATE TABLE tab1 (a int PRIMARY KEY, b int GENERATED ALWAYS AS (a * 22) STORED, c int GENERATED ALWAYS AS (a * 33) VIRTUAL, d int)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE temporal_fk_mltrng2mltrng
+  ADD CONSTRAINT temporal_fk_mltrng2mltrng_fk
+  FOREIGN KEY (parent_id, PERIOD valid_at)
+  REFERENCES temporal_mltrng (id, PERIOD valid_at)
+;
+----------
+[CREATE_TABLE] CREATE TABLE dump_test.test_table_nonn_chld1 (
+		   CONSTRAINT nn NOT NULL col2 NO INHERIT)
+		INHERITS (dump_test.test_table_nonn)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (b, c)
+;
+----------
+[ALTER_TYPE] -- these constraints can also be added and removed by name
+alter domain dnotnulltest add constraint dnotnulltest_notnull not null
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT|ADD_CONSTRAINT] ALTER TABLE temporal_partitioned_fk_mltrng2mltrng
+  DROP CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk,
+  ADD CONSTRAINT temporal_partitioned_fk_mltrng2mltrng_fk
+    FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_partitioned_mltrng
+    ON DELETE CASCADE ON UPDATE CASCADE
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_partitioned (
+  id int4range,
+  valid_at daterange,
+  name text,
+  CONSTRAINT temporal_paritioned_uq UNIQUE (id, valid_at WITHOUT OVERLAPS)
+) PARTITION BY LIST (id)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "overlaps"(time, interval,
+  time, interval)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, ($3 + $4))
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "overlaps"(timestamptz, interval,
+  timestamptz, interval)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, ($3 + $4))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION unbounded_syntax_test1a(x int) RETURNS TABLE (a int, b int, c int)
+LANGUAGE SQL
+BEGIN ATOMIC
+  SELECT sum(unique1) over (rows between x preceding and x following),
+         unique1, four
+  FROM tenk1 WHERE unique1 < 10;
+END
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] -- Enforceability also changes the validate state, as data validation will be
+-- performed during this transformation.
+ALTER TABLE FKTABLE ALTER CONSTRAINT fk_con ENFORCED
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_parent (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS (f2 * 2) VIRTUAL) PARTITION BY RANGE (f1)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_10(a text, b date) RETURNS boolean
+    LANGUAGE SQL
+    BEGIN ATOMIC
+        SELECT a = 'abcd' AND b > '2001-01-01';
+    END
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_3() RETURNS boolean
+    RETURN false
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE cmpart2 ALTER COLUMN f1 SET COMPRESSION lz4
+;
+----------
+[ADMIN_TABLE] -- Ensure only the parent is vacuumed
+VACUUM ONLY only_inh_parent
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] ALTER TABLE FKTABLE ALTER CONSTRAINT fktable_ftest1_fkey ENFORCED
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest22b (a int, b int GENERATED ALWAYS AS (a / 2) VIRTUAL, PRIMARY KEY (a, b))
+;
+----------
+[CREATE_TABLE] create table inh_nn1 (f1 int not null no inherit)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE temporal_fk_mltrng2mltrng
+  ADD CONSTRAINT temporal_fk_mltrng2mltrng_fk2
+  FOREIGN KEY (parent_id, PERIOD parent_id)
+  REFERENCES temporal_mltrng (id, PERIOD id)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest20 ALTER COLUMN b SET EXPRESSION AS (a * 3)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION ts_debug(config regconfig, document text,
+    OUT alias text,
+    OUT description text,
+    OUT token text,
+    OUT dictionaries regdictionary[],
+    OUT dictionary regdictionary,
+    OUT lexemes text[])
+ RETURNS SETOF record
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT
+BEGIN ATOMIC
+select
+    tt.alias AS alias,
+    tt.description AS description,
+    parse.token AS token,
+    ARRAY ( SELECT m.mapdict::regdictionary
+            FROM pg_ts_config_map AS m
+            WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+            ORDER BY m.mapseqno )
+    AS dictionaries,
+    ( SELECT mapdict::regdictionary
+      FROM pg_ts_config_map AS m
+      WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+      ORDER BY ts_lexize(mapdict, parse.token) IS NULL, m.mapseqno
+      LIMIT 1
+    ) AS dictionary,
+    ( SELECT ts_lexize(mapdict, parse.token)
+      FROM pg_ts_config_map AS m
+      WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+      ORDER BY ts_lexize(mapdict, parse.token) IS NULL, m.mapseqno
+      LIMIT 1
+    ) AS lexemes
+FROM ts_parse(
+        (SELECT cfgparser FROM pg_ts_config WHERE oid = $1 ), $2
+    ) AS parse,
+     ts_token_type(
+        (SELECT cfgparser FROM pg_ts_config WHERE oid = $1 )
+    ) AS tt
+WHERE tt.tokid = parse.tokid;
+END
+;
+----------
+[CREATE_PUB_SUB] -- Schema publication that does not include the schema that has the parent table
+CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch2 WITH (PUBLISH_VIA_PARTITION_ROOT=1)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_toast FOR TABLE tab_rowfilter_toast WHERE (a = repeat('1234567890', 200) AND b < '10')
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION numeric_pl_pg_lsn(numeric, pg_lsn)
+ RETURNS pg_lsn
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+----------
+[CREATE_SCHEMA] create schema if not exists abc authorization current_role
+;
+----------
+[ALTER_PUB_SUB] -- ok - can use row filter for partition
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 WHERE (a > 99)
+;
+----------
+[CREATE_TABLE] create table notnull_tbl_fail (a int primary key, not null a no inherit)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_err_7c (a int PRIMARY KEY, b int GENERATED ALWAYS AS ((SELECT a)) VIRTUAL)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub6 FOR TABLES IN SCHEMA testpub_rf_schema2
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable_insert ADD TABLE testpub_tbl5 (b, c)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE public.itest3 ADD CONSTRAINT itest3_a_not_null NOT NULL a
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION xpath(text, xml)
+ RETURNS xml[]
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN xpath($1, $2, '{}'::text[])
+;
+----------
+[ALTER_TYPE] -- Switch type to use typanalyze function that always returns false.
+ALTER TYPE int_custom SET (ANALYZE = int_custom_typanalyze_false)
+;
+----------
+[ALTER_PROG_OBJ] -- check that non-commutable hash clauses do not lead to error
+alter operator = (int8, int8alias1) set (hashes)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE pp_nn_1 ADD CONSTRAINT nn1 NOT NULL a NOT VALID
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_truetypid(pg_attribute, pg_type) RETURNS oid
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN CASE WHEN $2.typtype = 'd' THEN $2.typbasetype ELSE $1.atttypid END
+;
+----------
+[ADD_INDEX] CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(false_positive_rate = 0.00009)
+)
+;
+----------
+[CREATE_VIEW(SELECT)] create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb
+;
+----------
+[CREATE_TABLE] -- check that NOT NULL NO INHERIT cannot be merged to a normal NOT NULL
+CREATE TABLE part_fail (a int NOT NULL NO INHERIT,
+	b char(2) COLLATE "C",
+	CONSTRAINT check_a CHECK (a > 0)
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE pp_nn (a int, b int, NOT NULL a) PARTITION BY LIST (a)
+;
+----------
+[CREATE_TABLE] CREATE TABLE split_table_idx.base_inherit (
+    id integer NOT NULL,
+    code text UNIQUE NULLS NOT DISTINCT,
+    period tstzrange NOT NULL,
+    EXCLUDE USING gist (id WITH =, period WITH &&)
+)
+;
+----------
+[ALTER_TABLE] -- Partitioned table with relam at 0
+ALTER TABLE am_partitioned SET ACCESS METHOD DEFAULT
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION heap_page_item_attrs(IN page bytea, IN rel_oid regclass,
+    OUT lp smallint,
+    OUT lp_off smallint,
+    OUT lp_flags smallint,
+    OUT lp_len smallint,
+    OUT t_xmin xid,
+    OUT t_xmax xid,
+    OUT t_field3 int4,
+    OUT t_ctid tid,
+    OUT t_infomask2 integer,
+    OUT t_infomask integer,
+    OUT t_hoff smallint,
+    OUT t_bits text,
+    OUT t_oid oid,
+    OUT t_attrs bytea[]
+    )
+RETURNS SETOF record
+LANGUAGE SQL PARALLEL RESTRICTED
+BEGIN ATOMIC
+SELECT * FROM heap_page_item_attrs(page, rel_oid, false);
+END
+;
+----------
+[CREATE_TABLE] create table notnull_tbl_fail (a int constraint foo not null, constraint foo not null a no inherit)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "public"."temporal_mltrng"
+    ADD CONSTRAINT "temporal_mltrng_pk" PRIMARY KEY ("id", "valid_at" WITHOUT OVERLAPS)
+;
+----------
+[CREATE_TABLE] -- test LIKE INCLUDING COMPRESSION
+CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION)
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] alter table renameColumn add column y int check (x > 0) not enforced enforced
+;
+----------
+[ALTER_TYPE] ALTER TYPE myvarchar SET (
+        send = myvarcharsend,
+        receive = myvarcharrecv
+    )
+;

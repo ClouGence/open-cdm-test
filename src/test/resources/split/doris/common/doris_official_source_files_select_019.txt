@@ -1,0 +1,1158 @@
+SELECT
+    cast(v["repo"]["name"] as string),
+    count() AS prs,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors
+FROM github_events
+WHERE (cast(v["type"] as string) = 'PullRequestEvent') AND (cast(v["payload"]["action"] as string) = 'opened') AND (cast(v["actor"]["login"] as string) IN
+(
+    SELECT cast(v["actor"]["login"] as string)
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'PullRequestEvent') AND (cast(v["payload"]["action"] as string)= 'opened') AND (cast(v["repo"]["name"] as string) IN ('rspec/rspec-core', 'golden-warning/giraffedraft-server', 'apache/spark'))
+)) AND (lower(cast(v["repo"]["name"] as string)) NOT LIKE '%clickhouse%')
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY authors DESC, prs DESC, cast(v["repo"]["name"] as string) DESC
+LIMIT 50
+;
+SELECT
+    cast(v["repo"]["name"] as string),
+    count() AS prs,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors
+FROM github_events
+WHERE (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') AND (cast(v["actor"]["login"] as string) IN
+(
+    SELECT cast(v["actor"]["login"] as string)
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') AND (cast(v["repo"]["name"] as string) IN ('No-CQRT/GooGuns', 'ivolunteerph/ivolunteerph', 'Tribler/tribler'))
+)) AND (lower(cast(v["repo"]["name"] as string)) NOT LIKE '%clickhouse%')
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY authors DESC, prs DESC, cast(v["repo"]["name"] as string) ASC
+LIMIT 50
+;
+SELECT
+      cast(v["actor"]["login"] as string),
+      count() AS c,
+      count(distinct cast(v["repo"]["name"] as string)) AS repos
+  FROM github_events
+  WHERE cast(v["type"] as string) = 'PushEvent'
+  GROUP BY cast(v["actor"]["login"] as string)
+  ORDER BY c DESC, 1, 3
+  LIMIT 50
+;
+SELECT count() FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent'
+;
+SELECT cast(v["payload"]["action"] as string), count() FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' GROUP BY cast(v["payload"]["action"] as string)
+;
+SELECT count() FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' AND cast(v["repo"]["name"] as string) IN ('apache/spark', 'GunZi200/Memory-Colour', 'isohuntto/openbay', 'wasabeef/awesome-android-ui') GROUP BY cast(v["payload"]["action"] as string)
+;
+SELECT
+    pow(10, floor(log10(c))) AS stars,
+    count(distinct k)
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as k,
+        count() AS c
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+    GROUP BY cast(v["repo"]["name"] as string)
+) t
+GROUP BY stars
+ORDER BY stars ASC
+;
+SELECT cast(v["repo"]["name"] as string) FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' ORDER BY cast(v["created_at"] as datetime),  cast(v["repo"]["name"] as string) LIMIT 50
+;
+SELECT cast(v["repo"]["name"] as string), count() AS stars FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' AND year(cast(v["created_at"] as datetime)) = '2015' GROUP BY cast(v["repo"]["name"] as string) ORDER BY stars DESC, 1 LIMIT 50
+;
+SELECT cast(v["repo"]["name"] as string), count() AS stars FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' AND year(cast(v["created_at"] as datetime)) = '2015' GROUP BY cast(v["repo"]["name"] as string) ORDER BY stars, cast(v["repo"]["name"] as string) DESC LIMIT 50
+;
+SELECT year(cast(v["created_at"] as datetime)) AS year, count() AS stars FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' GROUP BY year ORDER BY year
+;
+SELECT count() FROM github_events WHERE cast(v["type"] as string) = 'IssueCommentEvent'
+;
+SELECT cast(v["repo"]["name"] as string), count() FROM github_events WHERE cast(v["type"] as string) = 'IssueCommentEvent' GROUP BY cast(v["repo"]["name"] as string) ORDER BY count() DESC, 1 LIMIT 50
+;
+SELECT
+    repo_name,
+    comments,
+    issues,
+    round(comments / issues, 2) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        count() AS comments,
+        count(distinct cast(v["payload"]["issue"]["number"] as int)) AS issues
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'IssueCommentEvent'
+    GROUP BY cast(v["repo"]["name"] as string)
+) t
+ORDER BY comments DESC, 1, 3, 4
+LIMIT 50
+;
+SELECT
+    cast(v["repo"]["name"] as string),
+    cast(v["payload"]["issue"]["number"] as int)  as number,
+    count() AS comments
+FROM github_events
+WHERE cast(v["type"] as string) = 'IssueCommentEvent' AND (cast(v["payload"]["action"] as string) = 'created')
+GROUP BY cast(v["repo"]["name"] as string), number 
+ORDER BY comments DESC, number ASC, 1
+LIMIT 50
+;
+SELECT
+    cast(v["repo"]["name"] as string),
+    cast(v["payload"]["issue"]["number"] as int)  as number,
+    count() AS comments
+FROM github_events
+WHERE cast(v["type"] as string) = 'IssueCommentEvent' AND (cast(v["payload"]["action"] as string) = 'created') AND (cast(v["payload"]["issue"]["number"] as int)  > 10)
+GROUP BY cast(v["repo"]["name"] as string), number
+ORDER BY comments DESC, cast(v["repo"]["name"] as string), number
+LIMIT 50
+;
+SELECT
+    cast(v["repo"]["name"] as string),
+    cast(v["payload"]["issue"]["number"] as int)  as number,
+    count() AS comments,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors
+FROM github_events
+WHERE cast(v["type"] as string) = 'IssueCommentEvent' AND (cast(v["payload"]["action"] as string) = 'created') AND (cast(v["payload"]["issue"]["number"] as int) > 10)
+GROUP BY cast(v["repo"]["name"] as string), number
+HAVING authors >= 4
+ORDER BY comments DESC, cast(v["repo"]["name"] as string)
+LIMIT 50
+;
+SELECT
+    cast(v["repo"]["name"] as string),
+    count() AS comments,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors
+FROM github_events
+WHERE cast(v["type"] as string) = 'CommitCommentEvent'
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY count() DESC, 1, 3
+LIMIT 50
+;
+SELECT cast(v["repo"]["name"] as string), count() AS forks FROM github_events WHERE cast(v["type"] as string) = 'ForkEvent' GROUP BY cast(v["repo"]["name"] as string) ORDER BY forks DESC, 1 LIMIT 50
+;
+SELECT cast(v["payload"]["comment"]["body"] as string), count() FROM github_events WHERE cast(v["payload"]["comment"]["body"] as string) != "" AND length(cast(v["payload"]["comment"]["body"] as string)) < 100 GROUP BY cast(v["payload"]["comment"]["body"] as string)  ORDER BY count(), 1 DESC LIMIT 50
+;
+SELECT
+    lower(split_part(repo_name, '/', 1)) AS org,
+    count(distinct repo_name) AS repos
+FROM
+(
+    SELECT cast(v["repo"]["name"] as string) as repo_name
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+    GROUP BY cast(v["repo"]["name"] as string)
+    HAVING count() >= 10
+) t
+GROUP BY org
+ORDER BY repos DESC, org ASC
+LIMIT 50
+;
+SELECT
+    lower(split_part(cast(v["repo"]["name"] as string), '/', 1)) AS org,
+    count() AS stars
+FROM github_events
+WHERE cast(v["type"] as string) = 'WatchEvent'
+GROUP BY org
+ORDER BY stars DESC, 1
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 3) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY forks DESC, 1, 3, 4
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 3) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY  repo_name 
+HAVING (stars > 20) AND (forks >= 10)
+ORDER BY ratio DESC, repo_name 
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(fork) / sum(star), 2) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING (stars > 4) AND (forks > 4)
+ORDER BY ratio DESC
+LIMIT 50
+;
+SELECT
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 2) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string),
+        CASE WHEN cast(v["type"] as string) = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('ForkEvent', 'WatchEvent')
+) t
+;
+SELECT
+    sum(forks) AS forks,
+    sum(stars) AS stars,
+    round(sum(stars) / sum(forks), 2) AS ratio
+FROM
+(
+    SELECT
+        sum(fork) AS forks,
+        sum(star) AS stars
+    FROM
+    (
+        SELECT
+            cast(v["repo"]["name"] as string) as repo_name,
+            CASE WHEN cast(v["type"] as string) = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+            CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+        FROM github_events
+        WHERE cast(v["type"] as string) IN ('ForkEvent', 'WatchEvent')
+    ) t
+    GROUP BY repo_name
+    HAVING stars > 10
+) t2
+;
+SELECT /*+SET_VAR(enable_fallback_to_original_planner=false,disable_streaming_preaggregations=false) */
+    cast(v["repo"]["name"] as string) as repo_name,
+    count() AS prs,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors,
+    sum(cast(v["payload"]["pull_request"]["additions"] as int)) AS adds,
+    sum(cast(v["payload"]["pull_request"]["deletions"] as int)) AS dels
+FROM github_events
+WHERE (cast(v["type"] as string) = 'PullRequestEvent') AND (cast(v["payload"]["action"] as string) = 'opened') AND (cast(v["payload"]["pull_request"]["additions"] as int) < 10000) AND (cast(v["payload"]["pull_request"]["deletions"] as int) < 10000)
+GROUP BY repo_name
+HAVING (adds / dels) < 10
+ORDER BY adds + dels DESC, 1
+LIMIT 50
+;
+SELECT
+    cast(v["repo"]["name"] as string),
+    count() AS pushes,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors
+FROM github_events
+WHERE (cast(v["type"] as string) = 'PushEvent') AND (cast(v["repo"]["name"] as string) IN
+(
+    SELECT cast(v["repo"]["name"] as string)
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+    GROUP BY cast(v["repo"]["name"] as string)
+    ORDER BY count() DESC
+    LIMIT 10000
+))
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY count() DESC, cast(v["repo"]["name"] as string)
+LIMIT 50
+;
+SELECT cast(v["repo"]["name"] as string), count() FROM github_events WHERE lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%apache%' GROUP BY cast(v["repo"]["name"] as string) ORDER BY count() DESC, cast(v["repo"]["name"] as string) ASC LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(num_star) AS num_stars,
+    sum(num_comment) AS num_comments
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS num_star,
+        CASE WHEN lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%apache%' THEN 1 ELSE 0 END AS num_comment
+    FROM github_events
+    WHERE (lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%apache%') OR (cast(v["type"] as string) = 'WatchEvent')
+) t
+GROUP BY repo_name 
+HAVING num_comments > 0
+ORDER BY num_stars DESC,num_comments DESC, repo_name ASC
+LIMIT 50
+;
+SELECT cast(v["repo"]["name"] as string), count() FROM github_events WHERE lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%spark%' GROUP BY cast(v["repo"]["name"] as string) ORDER BY count() DESC, cast(v["repo"]["name"] as string) ASC LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(num_star) AS num_stars,
+    sum(num_comment) AS num_comments
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS num_star,
+        CASE WHEN lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%spark%' THEN 1 ELSE 0 END AS num_comment
+    FROM github_events
+    WHERE (lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%spark%') OR (cast(v["type"] as string) = 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING num_comments > 0
+ORDER BY num_stars DESC,num_comments DESC,repo_name ASC
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(created_at_2022) AS stars2022,
+    sum(created_at_2015) AS stars2015,
+    round(sum(created_at_2022) / sum(created_at_2015), 3) AS yoy,
+    min(created_at) AS first_seen
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE year(cast(v["created_at"] as datetime)) WHEN 2022 THEN 1 ELSE 0 END AS created_at_2022,
+        CASE year(cast(v["created_at"] as datetime)) WHEN 2015 THEN 1 ELSE 0 END AS created_at_2015,
+        cast(v["created_at"] as datetime) as created_at
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+) t
+GROUP BY  repo_name 
+HAVING (min(created_at) <= '2023-01-01 00:00:00') AND (stars2022 >= 1) and (stars2015 >= 1)
+ORDER BY yoy DESC, repo_name 
+LIMIT 50
+;
+SELECT cast(v["repo"]["name"] as string), count() AS c, count(distinct cast(v["actor"]["login"] as string)) AS u FROM github_events WHERE cast(v["type"] as string) = 'IssuesEvent' AND cast(v["payload"]["action"] as string) = 'opened' GROUP BY cast(v["repo"]["name"] as string) ORDER BY c DESC, cast(v["repo"]["name"] as string) LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN cast(v["actor"]["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY c DESC, repo_name
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN cast(v["actor"]["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 10
+ORDER BY c, u, stars DESC, repo_name
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN cast(v["actor"]["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY u, c, stars DESC, 1
+LIMIT 50
+;
+SELECT cast(v["repo"]["name"] as string) as repo_name, count(), count(distinct cast(v["actor"]["login"] as string)) FROM github_events WHERE cast(v["type"] as string) = 'PullRequestEvent' AND cast(v["payload"]["action"] as string) = 'opened' GROUP BY cast(v["repo"]["name"] as string) ORDER BY 2,1,3 DESC LIMIT 50
+;
+SELECT cast(v["repo"]["name"] as string), count(), count(distinct cast(v["actor"]["login"] as string)) AS u FROM github_events WHERE cast(v["type"] as string) = 'PullRequestEvent' AND cast(v["payload"]["action"] as string) = 'opened' GROUP BY cast(v["repo"]["name"] as string) ORDER BY u DESC, 2 DESC, 1 LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(invitation) AS invitations,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'MemberEvent' THEN 1 ELSE 0 END AS invitation,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('MemberEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 2
+ORDER BY invitations DESC, stars DESC, repo_name
+LIMIT 50
+;
+SELECT
+    repo_name,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        lower(cast(v["repo"]["name"] as string)) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'PushEvent' THEN cast(v["actor"]["login"] as string) ELSE NULL END AS actor_login,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events WHERE cast(v["type"] as string) IN ('PushEvent', 'WatchEvent') AND cast(v["repo"]["name"] as string) != '/'
+) t
+GROUP BY repo_name ORDER BY u, stars, repo_name DESC LIMIT 50
+;
+SELECT
+    repo_name,
+    day,
+    stars
+FROM
+(
+    SELECT
+        row_number() OVER (PARTITION BY repo_name  ORDER BY stars DESC) AS rank,
+        repo_name,
+        day,
+        stars
+    FROM
+    (
+        SELECT
+            cast(v["repo"]["name"] as string) as repo_name,
+            to_date(cast(v["created_at"] as datetime)) AS day,
+            count() AS stars
+        FROM github_events
+        WHERE cast(v["type"] as string) = 'WatchEvent'
+        GROUP BY cast(v["repo"]["name"] as string), day
+    ) t1
+) t2
+WHERE rank = 1
+ORDER BY stars DESC, 1
+LIMIT 50
+;
+SELECT
+    repo_name,
+    max(stars) AS daily_stars,
+    sum(stars) AS total_stars,
+    sum(stars) / max(stars) AS rate
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        to_date(cast(v["created_at"] as datetime)) AS day,
+        count() AS stars
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+    GROUP BY
+        repo_name,
+        day
+) t
+GROUP BY repo_name
+ORDER BY rate DESC, 1
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(created_at_2022) AS stars2022,
+    sum(created_at_2015) AS stars2015,
+    round(sum(created_at_2022) / sum(created_at_2015), 3) AS yoy,
+    min(created_at) AS first_seen
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE year(cast(v["created_at"] as datetime)) WHEN 2022 THEN 1 ELSE 0 END AS created_at_2022,
+        CASE year(cast(v["created_at"] as datetime)) WHEN 2015 THEN 1 ELSE 0 END AS created_at_2015,
+        cast(v["created_at"] as datetime) as created_at
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+) t
+GROUP BY repo_name
+HAVING (min(created_at) <= '2019-01-01 00:00:00') AND (max(created_at) >= '2020-06-01 00:00:00') AND (stars2015 >= 2)
+ORDER BY yoy, repo_name
+LIMIT 50
+;
+SELECT
+  cast(v["repo"]["name"] as string) as repo_name,
+  count() AS stars
+FROM github_events
+WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["actor"]["login"] as string) IN
+(
+    SELECT cast(v["actor"]["login"] as string)
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["repo"]["name"] as string) IN ('apache/spark', 'prakhar1989/awesome-courses'))
+)) AND (cast(v["repo"]["name"] as string) NOT IN ('ClickHouse/ClickHouse', 'yandex/ClickHouse'))
+GROUP BY repo_name
+ORDER BY stars DESC, repo_name 
+LIMIT 50
+;
+SELECT
+  repo_name,
+  total_stars,
+  round(spark_stars / total_stars, 2) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        count(distinct cast(v["actor"]["login"] as string)) AS total_stars
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["repo"]["name"] as string) NOT IN ('apache/spark'))
+    GROUP BY repo_name
+    HAVING total_stars >= 10
+) t1
+JOIN
+(
+    SELECT
+        count(distinct cast(v["actor"]["login"] as string)) AS spark_stars
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["repo"]["name"] as string) IN ('apache/spark'))
+) t2
+ORDER BY ratio DESC, repo_name
+LIMIT 50
+;
+SELECT
+    cast(v["repo"]["name"] as string),
+    count()
+FROM github_events
+WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["actor"]["login"] as string) IN
+(
+    SELECT cast(v["actor"]["login"] as string)
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'PullRequestEvent') AND (cast(v["payload"]["action"] as string) = 'opened')
+))
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY count() DESC, cast(v["repo"]["name"] as string)
+LIMIT 50
+;
+SELECT
+    cast(v["repo"]["name"] as string),
+    count()
+FROM github_events
+WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["actor"]["login"] as string) IN
+(
+    SELECT cast(v["actor"]["login"] as string)
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'PullRequestEvent') AND (cast(v["payload"]["action"] as string) = 'opened')
+    GROUP BY cast(v["actor"]["login"] as string)
+    HAVING count() >= 2
+))
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY 1, count() DESC, 1
+LIMIT 50
+;
+SELECT count(), cast(v["repo"]["name"] as string) FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' GROUP BY cast(v["repo"]["name"] as string) ORDER BY length(cast(v["repo"]["name"] as string)) DESC, cast(v["repo"]["name"] as string) LIMIT 50
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT
+    cast(v["repo"]["name"] as string),
+    count() AS prs,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors
+FROM github_events
+WHERE (cast(v["type"] as string) = 'PullRequestEvent') AND (cast(v["payload"]["action"] as string) = 'opened') AND (cast(v["actor"]["login"] as string) IN
+(
+    SELECT cast(v["actor"]["login"] as string)
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'PullRequestEvent') AND (cast(v["payload"]["action"] as string)= 'opened') AND (cast(v["repo"]["name"] as string) IN ('rspec/rspec-core', 'golden-warning/giraffedraft-server', 'apache/spark'))
+)) AND (lower(cast(v["repo"]["name"] as string)) NOT LIKE '%clickhouse%')
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY authors DESC, prs DESC, cast(v["repo"]["name"] as string) DESC
+LIMIT 50
+----------
+[SELECT] SELECT
+    cast(v["repo"]["name"] as string),
+    count() AS prs,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors
+FROM github_events
+WHERE (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') AND (cast(v["actor"]["login"] as string) IN
+(
+    SELECT cast(v["actor"]["login"] as string)
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') AND (cast(v["repo"]["name"] as string) IN ('No-CQRT/GooGuns', 'ivolunteerph/ivolunteerph', 'Tribler/tribler'))
+)) AND (lower(cast(v["repo"]["name"] as string)) NOT LIKE '%clickhouse%')
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY authors DESC, prs DESC, cast(v["repo"]["name"] as string) ASC
+LIMIT 50
+----------
+[SELECT] SELECT
+      cast(v["actor"]["login"] as string),
+      count() AS c,
+      count(distinct cast(v["repo"]["name"] as string)) AS repos
+  FROM github_events
+  WHERE cast(v["type"] as string) = 'PushEvent'
+  GROUP BY cast(v["actor"]["login"] as string)
+  ORDER BY c DESC, 1, 3
+  LIMIT 50
+----------
+[SELECT] SELECT count() FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent'
+----------
+[SELECT] SELECT cast(v["payload"]["action"] as string), count() FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' GROUP BY cast(v["payload"]["action"] as string)
+----------
+[SELECT] SELECT count() FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' AND cast(v["repo"]["name"] as string) IN ('apache/spark', 'GunZi200/Memory-Colour', 'isohuntto/openbay', 'wasabeef/awesome-android-ui') GROUP BY cast(v["payload"]["action"] as string)
+----------
+[SELECT] SELECT
+    pow(10, floor(log10(c))) AS stars,
+    count(distinct k)
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as k,
+        count() AS c
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+    GROUP BY cast(v["repo"]["name"] as string)
+) t
+GROUP BY stars
+ORDER BY stars ASC
+----------
+[SELECT] SELECT cast(v["repo"]["name"] as string) FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' ORDER BY cast(v["created_at"] as datetime),  cast(v["repo"]["name"] as string) LIMIT 50
+----------
+[SELECT] SELECT cast(v["repo"]["name"] as string), count() AS stars FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' AND year(cast(v["created_at"] as datetime)) = '2015' GROUP BY cast(v["repo"]["name"] as string) ORDER BY stars DESC, 1 LIMIT 50
+----------
+[SELECT] SELECT cast(v["repo"]["name"] as string), count() AS stars FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' AND year(cast(v["created_at"] as datetime)) = '2015' GROUP BY cast(v["repo"]["name"] as string) ORDER BY stars, cast(v["repo"]["name"] as string) DESC LIMIT 50
+----------
+[SELECT] SELECT year(cast(v["created_at"] as datetime)) AS year, count() AS stars FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' GROUP BY year ORDER BY year
+----------
+[SELECT] SELECT count() FROM github_events WHERE cast(v["type"] as string) = 'IssueCommentEvent'
+----------
+[SELECT] SELECT cast(v["repo"]["name"] as string), count() FROM github_events WHERE cast(v["type"] as string) = 'IssueCommentEvent' GROUP BY cast(v["repo"]["name"] as string) ORDER BY count() DESC, 1 LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    comments,
+    issues,
+    round(comments / issues, 2) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        count() AS comments,
+        count(distinct cast(v["payload"]["issue"]["number"] as int)) AS issues
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'IssueCommentEvent'
+    GROUP BY cast(v["repo"]["name"] as string)
+) t
+ORDER BY comments DESC, 1, 3, 4
+LIMIT 50
+----------
+[SELECT] SELECT
+    cast(v["repo"]["name"] as string),
+    cast(v["payload"]["issue"]["number"] as int)  as number,
+    count() AS comments
+FROM github_events
+WHERE cast(v["type"] as string) = 'IssueCommentEvent' AND (cast(v["payload"]["action"] as string) = 'created')
+GROUP BY cast(v["repo"]["name"] as string), number 
+ORDER BY comments DESC, number ASC, 1
+LIMIT 50
+----------
+[SELECT] SELECT
+    cast(v["repo"]["name"] as string),
+    cast(v["payload"]["issue"]["number"] as int)  as number,
+    count() AS comments
+FROM github_events
+WHERE cast(v["type"] as string) = 'IssueCommentEvent' AND (cast(v["payload"]["action"] as string) = 'created') AND (cast(v["payload"]["issue"]["number"] as int)  > 10)
+GROUP BY cast(v["repo"]["name"] as string), number
+ORDER BY comments DESC, cast(v["repo"]["name"] as string), number
+LIMIT 50
+----------
+[SELECT] SELECT
+    cast(v["repo"]["name"] as string),
+    cast(v["payload"]["issue"]["number"] as int)  as number,
+    count() AS comments,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors
+FROM github_events
+WHERE cast(v["type"] as string) = 'IssueCommentEvent' AND (cast(v["payload"]["action"] as string) = 'created') AND (cast(v["payload"]["issue"]["number"] as int) > 10)
+GROUP BY cast(v["repo"]["name"] as string), number
+HAVING authors >= 4
+ORDER BY comments DESC, cast(v["repo"]["name"] as string)
+LIMIT 50
+----------
+[SELECT] SELECT
+    cast(v["repo"]["name"] as string),
+    count() AS comments,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors
+FROM github_events
+WHERE cast(v["type"] as string) = 'CommitCommentEvent'
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY count() DESC, 1, 3
+LIMIT 50
+----------
+[SELECT] SELECT cast(v["repo"]["name"] as string), count() AS forks FROM github_events WHERE cast(v["type"] as string) = 'ForkEvent' GROUP BY cast(v["repo"]["name"] as string) ORDER BY forks DESC, 1 LIMIT 50
+----------
+[SELECT] SELECT cast(v["payload"]["comment"]["body"] as string), count() FROM github_events WHERE cast(v["payload"]["comment"]["body"] as string) != "" AND length(cast(v["payload"]["comment"]["body"] as string)) < 100 GROUP BY cast(v["payload"]["comment"]["body"] as string)  ORDER BY count(), 1 DESC LIMIT 50
+----------
+[SELECT] SELECT
+    lower(split_part(repo_name, '/', 1)) AS org,
+    count(distinct repo_name) AS repos
+FROM
+(
+    SELECT cast(v["repo"]["name"] as string) as repo_name
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+    GROUP BY cast(v["repo"]["name"] as string)
+    HAVING count() >= 10
+) t
+GROUP BY org
+ORDER BY repos DESC, org ASC
+LIMIT 50
+----------
+[SELECT] SELECT
+    lower(split_part(cast(v["repo"]["name"] as string), '/', 1)) AS org,
+    count() AS stars
+FROM github_events
+WHERE cast(v["type"] as string) = 'WatchEvent'
+GROUP BY org
+ORDER BY stars DESC, 1
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 3) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY forks DESC, 1, 3, 4
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 3) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY  repo_name 
+HAVING (stars > 20) AND (forks >= 10)
+ORDER BY ratio DESC, repo_name 
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(fork) / sum(star), 2) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING (stars > 4) AND (forks > 4)
+ORDER BY ratio DESC
+LIMIT 50
+----------
+[SELECT] SELECT
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 2) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string),
+        CASE WHEN cast(v["type"] as string) = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('ForkEvent', 'WatchEvent')
+) t
+----------
+[SELECT] SELECT
+    sum(forks) AS forks,
+    sum(stars) AS stars,
+    round(sum(stars) / sum(forks), 2) AS ratio
+FROM
+(
+    SELECT
+        sum(fork) AS forks,
+        sum(star) AS stars
+    FROM
+    (
+        SELECT
+            cast(v["repo"]["name"] as string) as repo_name,
+            CASE WHEN cast(v["type"] as string) = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+            CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+        FROM github_events
+        WHERE cast(v["type"] as string) IN ('ForkEvent', 'WatchEvent')
+    ) t
+    GROUP BY repo_name
+    HAVING stars > 10
+) t2
+----------
+[SELECT] SELECT /*+SET_VAR(enable_fallback_to_original_planner=false,disable_streaming_preaggregations=false) */
+    cast(v["repo"]["name"] as string) as repo_name,
+    count() AS prs,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors,
+    sum(cast(v["payload"]["pull_request"]["additions"] as int)) AS adds,
+    sum(cast(v["payload"]["pull_request"]["deletions"] as int)) AS dels
+FROM github_events
+WHERE (cast(v["type"] as string) = 'PullRequestEvent') AND (cast(v["payload"]["action"] as string) = 'opened') AND (cast(v["payload"]["pull_request"]["additions"] as int) < 10000) AND (cast(v["payload"]["pull_request"]["deletions"] as int) < 10000)
+GROUP BY repo_name
+HAVING (adds / dels) < 10
+ORDER BY adds + dels DESC, 1
+LIMIT 50
+----------
+[SELECT] SELECT
+    cast(v["repo"]["name"] as string),
+    count() AS pushes,
+    count(distinct cast(v["actor"]["login"] as string)) AS authors
+FROM github_events
+WHERE (cast(v["type"] as string) = 'PushEvent') AND (cast(v["repo"]["name"] as string) IN
+(
+    SELECT cast(v["repo"]["name"] as string)
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+    GROUP BY cast(v["repo"]["name"] as string)
+    ORDER BY count() DESC
+    LIMIT 10000
+))
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY count() DESC, cast(v["repo"]["name"] as string)
+LIMIT 50
+----------
+[SELECT] SELECT cast(v["repo"]["name"] as string), count() FROM github_events WHERE lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%apache%' GROUP BY cast(v["repo"]["name"] as string) ORDER BY count() DESC, cast(v["repo"]["name"] as string) ASC LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(num_star) AS num_stars,
+    sum(num_comment) AS num_comments
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS num_star,
+        CASE WHEN lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%apache%' THEN 1 ELSE 0 END AS num_comment
+    FROM github_events
+    WHERE (lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%apache%') OR (cast(v["type"] as string) = 'WatchEvent')
+) t
+GROUP BY repo_name 
+HAVING num_comments > 0
+ORDER BY num_stars DESC,num_comments DESC, repo_name ASC
+LIMIT 50
+----------
+[SELECT] SELECT cast(v["repo"]["name"] as string), count() FROM github_events WHERE lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%spark%' GROUP BY cast(v["repo"]["name"] as string) ORDER BY count() DESC, cast(v["repo"]["name"] as string) ASC LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(num_star) AS num_stars,
+    sum(num_comment) AS num_comments
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS num_star,
+        CASE WHEN lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%spark%' THEN 1 ELSE 0 END AS num_comment
+    FROM github_events
+    WHERE (lower(cast(v["payload"]["comment"]["body"] as string)) LIKE '%spark%') OR (cast(v["type"] as string) = 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING num_comments > 0
+ORDER BY num_stars DESC,num_comments DESC,repo_name ASC
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(created_at_2022) AS stars2022,
+    sum(created_at_2015) AS stars2015,
+    round(sum(created_at_2022) / sum(created_at_2015), 3) AS yoy,
+    min(created_at) AS first_seen
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE year(cast(v["created_at"] as datetime)) WHEN 2022 THEN 1 ELSE 0 END AS created_at_2022,
+        CASE year(cast(v["created_at"] as datetime)) WHEN 2015 THEN 1 ELSE 0 END AS created_at_2015,
+        cast(v["created_at"] as datetime) as created_at
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+) t
+GROUP BY  repo_name 
+HAVING (min(created_at) <= '2023-01-01 00:00:00') AND (stars2022 >= 1) and (stars2015 >= 1)
+ORDER BY yoy DESC, repo_name 
+LIMIT 50
+----------
+[SELECT] SELECT cast(v["repo"]["name"] as string), count() AS c, count(distinct cast(v["actor"]["login"] as string)) AS u FROM github_events WHERE cast(v["type"] as string) = 'IssuesEvent' AND cast(v["payload"]["action"] as string) = 'opened' GROUP BY cast(v["repo"]["name"] as string) ORDER BY c DESC, cast(v["repo"]["name"] as string) LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN cast(v["actor"]["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY c DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN cast(v["actor"]["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 10
+ORDER BY c, u, stars DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (cast(v["type"] as string) = 'IssuesEvent') AND (cast(v["payload"]["action"] as string) = 'opened') THEN cast(v["actor"]["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY u, c, stars DESC, 1
+LIMIT 50
+----------
+[SELECT] SELECT cast(v["repo"]["name"] as string) as repo_name, count(), count(distinct cast(v["actor"]["login"] as string)) FROM github_events WHERE cast(v["type"] as string) = 'PullRequestEvent' AND cast(v["payload"]["action"] as string) = 'opened' GROUP BY cast(v["repo"]["name"] as string) ORDER BY 2,1,3 DESC LIMIT 50
+----------
+[SELECT] SELECT cast(v["repo"]["name"] as string), count(), count(distinct cast(v["actor"]["login"] as string)) AS u FROM github_events WHERE cast(v["type"] as string) = 'PullRequestEvent' AND cast(v["payload"]["action"] as string) = 'opened' GROUP BY cast(v["repo"]["name"] as string) ORDER BY u DESC, 2 DESC, 1 LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(invitation) AS invitations,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'MemberEvent' THEN 1 ELSE 0 END AS invitation,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE cast(v["type"] as string) IN ('MemberEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 2
+ORDER BY invitations DESC, stars DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        lower(cast(v["repo"]["name"] as string)) as repo_name,
+        CASE WHEN cast(v["type"] as string) = 'PushEvent' THEN cast(v["actor"]["login"] as string) ELSE NULL END AS actor_login,
+        CASE WHEN cast(v["type"] as string) = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events WHERE cast(v["type"] as string) IN ('PushEvent', 'WatchEvent') AND cast(v["repo"]["name"] as string) != '/'
+) t
+GROUP BY repo_name ORDER BY u, stars, repo_name DESC LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    day,
+    stars
+FROM
+(
+    SELECT
+        row_number() OVER (PARTITION BY repo_name  ORDER BY stars DESC) AS rank,
+        repo_name,
+        day,
+        stars
+    FROM
+    (
+        SELECT
+            cast(v["repo"]["name"] as string) as repo_name,
+            to_date(cast(v["created_at"] as datetime)) AS day,
+            count() AS stars
+        FROM github_events
+        WHERE cast(v["type"] as string) = 'WatchEvent'
+        GROUP BY cast(v["repo"]["name"] as string), day
+    ) t1
+) t2
+WHERE rank = 1
+ORDER BY stars DESC, 1
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    max(stars) AS daily_stars,
+    sum(stars) AS total_stars,
+    sum(stars) / max(stars) AS rate
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        to_date(cast(v["created_at"] as datetime)) AS day,
+        count() AS stars
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+    GROUP BY
+        repo_name,
+        day
+) t
+GROUP BY repo_name
+ORDER BY rate DESC, 1
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(created_at_2022) AS stars2022,
+    sum(created_at_2015) AS stars2015,
+    round(sum(created_at_2022) / sum(created_at_2015), 3) AS yoy,
+    min(created_at) AS first_seen
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        CASE year(cast(v["created_at"] as datetime)) WHEN 2022 THEN 1 ELSE 0 END AS created_at_2022,
+        CASE year(cast(v["created_at"] as datetime)) WHEN 2015 THEN 1 ELSE 0 END AS created_at_2015,
+        cast(v["created_at"] as datetime) as created_at
+    FROM github_events
+    WHERE cast(v["type"] as string) = 'WatchEvent'
+) t
+GROUP BY repo_name
+HAVING (min(created_at) <= '2019-01-01 00:00:00') AND (max(created_at) >= '2020-06-01 00:00:00') AND (stars2015 >= 2)
+ORDER BY yoy, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+  cast(v["repo"]["name"] as string) as repo_name,
+  count() AS stars
+FROM github_events
+WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["actor"]["login"] as string) IN
+(
+    SELECT cast(v["actor"]["login"] as string)
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["repo"]["name"] as string) IN ('apache/spark', 'prakhar1989/awesome-courses'))
+)) AND (cast(v["repo"]["name"] as string) NOT IN ('ClickHouse/ClickHouse', 'yandex/ClickHouse'))
+GROUP BY repo_name
+ORDER BY stars DESC, repo_name 
+LIMIT 50
+----------
+[SELECT] SELECT
+  repo_name,
+  total_stars,
+  round(spark_stars / total_stars, 2) AS ratio
+FROM
+(
+    SELECT
+        cast(v["repo"]["name"] as string) as repo_name,
+        count(distinct cast(v["actor"]["login"] as string)) AS total_stars
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["repo"]["name"] as string) NOT IN ('apache/spark'))
+    GROUP BY repo_name
+    HAVING total_stars >= 10
+) t1
+JOIN
+(
+    SELECT
+        count(distinct cast(v["actor"]["login"] as string)) AS spark_stars
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["repo"]["name"] as string) IN ('apache/spark'))
+) t2
+ORDER BY ratio DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+    cast(v["repo"]["name"] as string),
+    count()
+FROM github_events
+WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["actor"]["login"] as string) IN
+(
+    SELECT cast(v["actor"]["login"] as string)
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'PullRequestEvent') AND (cast(v["payload"]["action"] as string) = 'opened')
+))
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY count() DESC, cast(v["repo"]["name"] as string)
+LIMIT 50
+----------
+[SELECT] SELECT
+    cast(v["repo"]["name"] as string),
+    count()
+FROM github_events
+WHERE (cast(v["type"] as string) = 'WatchEvent') AND (cast(v["actor"]["login"] as string) IN
+(
+    SELECT cast(v["actor"]["login"] as string)
+    FROM github_events
+    WHERE (cast(v["type"] as string) = 'PullRequestEvent') AND (cast(v["payload"]["action"] as string) = 'opened')
+    GROUP BY cast(v["actor"]["login"] as string)
+    HAVING count() >= 2
+))
+GROUP BY cast(v["repo"]["name"] as string)
+ORDER BY 1, count() DESC, 1
+LIMIT 50
+----------
+[SELECT] SELECT count(), cast(v["repo"]["name"] as string) FROM github_events WHERE cast(v["type"] as string) = 'WatchEvent' GROUP BY cast(v["repo"]["name"] as string) ORDER BY length(cast(v["repo"]["name"] as string)) DESC, cast(v["repo"]["name"] as string) LIMIT 50

@@ -1,0 +1,66 @@
+alter database abc owner to CURRENT_ROLE
+;
+REINDEX (TABLESPACE pg_global) INDEX CONCURRENTLY regress_tblspace_test_tbl_idx
+;
+-- shared catalog, fail
+REINDEX (TABLESPACE regress_tblspace) TABLE pg_authid
+;
+-- error, doesn't have ADMIN OPTION
+GRANT regress_priv_role TO regress_priv_user1 WITH ADMIN OPTION GRANTED BY CURRENT_ROLE
+;
+DROP OWNED BY CURRENT_ROLE CASCADE
+;
+REINDEX (TABLESPACE reindex_tbspace) TABLE public.test1
+;
+-- ok - with lsn = NONE
+ALTER SUBSCRIPTION regress_testsub SKIP (lsn = NONE)
+;
+GRANT SET ON PARAMETER auto_explain.log_format TO regress_user1
+;
+REVOKE ALTER SYSTEM ON PARAMETER enable_material FROM PUBLIC
+;
+-- fail, privileges remain
+-- Use "revoke" to remove the privileges and allow the role to be dropped
+REVOKE SET, ALTER SYSTEM ON PARAMETER
+    autovacuum_work_mem, hash_mem_multiplier, max_stack_depth,
+    shared_buffers, temp_file_limit, work_mem
+FROM regress_host_resource_admin
+;
+------------------------------------------------------------------------------------------
+[TRANSFER_PRIVILEGE] alter database abc owner to CURRENT_ROLE
+;
+----------
+[ADMIN] REINDEX (TABLESPACE pg_global) INDEX CONCURRENTLY regress_tblspace_test_tbl_idx
+;
+----------
+[ADMIN] -- shared catalog, fail
+REINDEX (TABLESPACE regress_tblspace) TABLE pg_authid
+;
+----------
+[GRANT] -- error, doesn't have ADMIN OPTION
+GRANT regress_priv_role TO regress_priv_user1 WITH ADMIN OPTION GRANTED BY CURRENT_ROLE
+;
+----------
+[REVOKE] DROP OWNED BY CURRENT_ROLE CASCADE
+;
+----------
+[ADMIN] REINDEX (TABLESPACE reindex_tbspace) TABLE public.test1
+;
+----------
+[ADMIN_PUB_SUB] -- ok - with lsn = NONE
+ALTER SUBSCRIPTION regress_testsub SKIP (lsn = NONE)
+;
+----------
+[GRANT] GRANT SET ON PARAMETER auto_explain.log_format TO regress_user1
+;
+----------
+[REVOKE] REVOKE ALTER SYSTEM ON PARAMETER enable_material FROM PUBLIC
+;
+----------
+[REVOKE] -- fail, privileges remain
+-- Use "revoke" to remove the privileges and allow the role to be dropped
+REVOKE SET, ALTER SYSTEM ON PARAMETER
+    autovacuum_work_mem, hash_mem_multiplier, max_stack_depth,
+    shared_buffers, temp_file_limit, work_mem
+FROM regress_host_resource_admin
+;

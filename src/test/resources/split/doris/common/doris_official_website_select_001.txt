@@ -1,0 +1,750 @@
+SELECT
+    c.candidate_id, c.name,
+    j.job_id, j.title
+FROM candidate_profiles AS c
+JOIN job_requirements AS j
+WHERE AI_FILTER(CONCAT(
+    'Does the following candidate self-introduction match the job description?',
+    'Job: ', j.jd_text, ' Candidate: ', c.self_intro
+));
+-- Equivalent to SHOW CACHE HOTSPOT "/" before version 3.0.4
+WITH t1 AS (
+    SELECT
+        cluster_id,
+        cluster_name,
+        table_id,
+        table_name,
+        insert_day,
+        SUM(query_per_day) AS query_per_day_total,
+        SUM(query_per_week) AS query_per_week_total
+    FROM __internal_schema.cloud_cache_hotspot
+    GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+    cluster_id AS ComputeGroupId,
+    cluster_name AS ComputeGroupName,
+    table_id AS TableId,
+    table_name AS TableName
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (
+            PARTITION BY cluster_id
+            ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+        ) AS dr2,
+        *
+    FROM t1
+) t2
+WHERE dr2 = 1;
+-- Equivalent to SHOW CACHE HOTSPOT '/compute_group_name0' before version 3.0.4
+WITH t1 AS (
+    SELECT
+        cluster_id,
+        cluster_name,
+        table_id,
+        table_name,
+        insert_day,
+        SUM(query_per_day) AS query_per_day_total,
+        SUM(query_per_week) AS query_per_week_total
+    FROM __internal_schema.cloud_cache_hotspot
+    WHERE cluster_name = "compute_group_name0" -- Replace with the actual compute group name, e.g. "default_compute_group"
+    GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+    cluster_id AS ComputeGroupId,
+    cluster_name AS ComputeGroupName,
+    table_id AS TableId,
+    table_name AS TableName
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (
+            PARTITION BY cluster_id
+            ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+        ) AS dr2,
+        *
+    FROM t1
+) t2
+WHERE dr2 = 1;
+SELECT *
+FROM information_schema.table_properties
+WHERE PROPERTY_NAME = "storage_vault_id"
+  AND PROPERTY_VALUE = 3;
+SELECT * FROM t1 TABLET(10001,10002) limit 1000;
+SELECT * FROM users;
+SELECT
+      DATE_FORMAT(l_shipdate, '%Y-%m') AS ship_month,
+      l_shipmode,
+      SUM(l_extendedprice * (1 - l_discount)) AS revenue
+    FROM lineitem
+    WHERE l_shipdate >= '1995-01-01'
+      AND l_shipdate < '1997-01-01'
+    GROUP BY
+      DATE_FORMAT(l_shipdate, '%Y-%m'),
+      l_shipmode
+    ORDER BY ship_month, l_shipmode
+;
+SELECT * FROM hive.warehouse.orders LIMIT 100;
+SELECT c1, c2, c3 FROM tbl
+INTO OUTFILE "hdfs://ip:port/path/to/result_"
+FORMAT AS PARQUET
+PROPERTIES
+(
+    "fs.defaultFS" = "hdfs://ip:port",
+    "hadoop.username" = "hadoop"
+);
+SELECT * FROM tbl
+INTO OUTFILE "s3://bucket/export/result_"
+FORMAT AS ORC
+PROPERTIES(
+    "s3.endpoint" = "xxxxx",
+    "s3.region" = "xxxxx",
+    "s3.secret_key"="xxxx",
+    "s3.access_key" = "xxxxx"
+);
+SELECT c1, c2, c3 FROM tbl
+INTO OUTFILE "hdfs://HDFS8000871/path/to/result_"
+FORMAT AS PARQUET
+PROPERTIES
+(
+    "fs.defaultFS" = "hdfs://HDFS8000871",
+    "hadoop.username" = "hadoop",
+    "dfs.nameservices" = "your-nameservices",
+    "dfs.ha.namenodes.your-nameservices" = "nn1,nn2",
+    "dfs.namenode.rpc-address.HDFS8000871.nn1" = "ip:port",
+    "dfs.namenode.rpc-address.HDFS8000871.nn2" = "ip:port",
+    "dfs.client.failover.proxy.provider.HDFS8000871" = "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider"
+);
+SELECT * FROM tbl
+INTO OUTFILE "hdfs://path/to/result_"
+FORMAT AS PARQUET
+PROPERTIES
+(
+    "fs.defaultFS"="hdfs://hacluster/",
+    "hadoop.username" = "hadoop",
+    "dfs.nameservices"="hacluster",
+    "dfs.ha.namenodes.hacluster"="n1,n2",
+    "dfs.namenode.rpc-address.hacluster.n1"="192.168.0.1:8020",
+    "dfs.namenode.rpc-address.hacluster.n2"="192.168.0.2:8020",
+    "dfs.client.failover.proxy.provider.hacluster"="org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider",
+    "dfs.namenode.kerberos.principal"="hadoop/_HOST@REALM.COM",
+    "hadoop.security.authentication"="kerberos",
+    "hadoop.kerberos.principal"="doris_test@REALM.COM",
+    "hadoop.kerberos.keytab"="/path/to/doris_test.keytab"
+);
+SELECT k1,k2,v1 FROM tbl1 LIMIT 100000
+INTO OUTFILE "s3://bucket/export/result_"
+FORMAT AS CSV
+PROPERTIES
+(
+    "s3.endpoint" = "xxxxx",
+    "s3.region" = "xxxxx",
+    "s3.secret_key"="xxxx",
+    "s3.access_key" = "xxxxx",
+    "column_separator" = ",",
+    "line_delimiter" = "\n",
+    "success_file_name" = "SUCCESS"
+);
+SELECT * FROM tbl1
+INTO OUTFILE "s3://bucket/export/result_"
+FORMAT AS CSV
+PROPERTIES
+(
+    "s3.endpoint" = "xxxxx",
+    "s3.region" = "xxxxx",
+    "s3.secret_key"="xxxx",
+    "s3.access_key" = "xxxxx",
+    "column_separator" = ",",
+    "line_delimiter" = "\n",
+    "delete_existing_files" = "true"
+);
+SELECT * FROM tbl
+INTO OUTFILE "s3://path/to/result_"
+FORMAT AS ORC
+PROPERTIES(
+    "s3.endpoint" = "xxxxx",
+    "s3.region" = "xxxxx",
+    "s3.secret_key"="xxxx",
+    "s3.access_key" = "xxxxx",
+    "max_file_size" = "2048MB"
+);
+SELECT c1, c2 FROM db.tbl
+INTO OUTFILE "file:///path/to/result_"
+FORMAT AS CSV
+PROPERTIES(
+    "column_separator" = ","
+);
+SELECT * FROM test_s3load;
+SELECT * FROM test_hdfsload;
+SELECT * FROM jobs("type"="insert") WHERE ExecuteType = "STREAMING";
+SELECT * FROM doris_db.students;
+select * from jobs("type"="insert") where ExecuteType = "STREAMING";
+select * from tasks("type"="insert") where jobId='<job_id>';
+-- 1. Verify that aggregation works (metrics with the same dt+site_id are merged)
+SELECT dt, site_id, pv, uv FROM site_metrics ORDER BY dt DESC LIMIT 10;
+
+-- 2. Verify that partition pruning works
+EXPLAIN SELECT * FROM site_metrics WHERE dt = '2024-01-01';
+EXPLAIN SELECT * FROM your_table WHERE filter_column = 'xxx';
+-- Check whether the Sort Key index is used
+;
+SELECT id, SUM(cost) FROM iceberg_db.table1
+GROUP BY id ORDER BY id;
+SELECT * FROM
+iceberg_catalog.iceberg_db.table1 tbl1 JOIN mysql_catalog.mysql_db.dim_table tbl2
+ON tbl1.id = tbl2.id;
+select * from es_table where esquery(k4, '{
+        "match_phrase": {
+           "k4": "doris on es"
+        }
+    }');
+select * from es_table where esquery(k4, '{
+      "geo_shape": {
+         "location": {
+            "shape": {
+               "type": "envelope",
+               "coordinates": [
+                  [
+                     13,
+                     53
+                  ],
+                  [
+                     14,
+                     52
+                  ]
+               ]
+            },
+            "relation": "within"
+         }
+      }
+   }');
+select * from es_table where esquery(k4, ' {
+         "bool": {
+            "must": [
+               {
+                  "terms": {
+                     "k1": [
+                        11,
+                        12
+                     ]
+                  }
+               },
+               {
+                  "terms": {
+                     "k2": [
+                        100
+                     ]
+                  }
+               }
+            ]
+         }
+      }');
+select * from doe where k2 > '2020-06-21';
+
+select * from doe where k2 < '2020-06-21 12:00:00'; 
+
+select * from doe where k2 < 1593497011; 
+
+select * from doe where k2 < now();
+
+select * from doe where k2 < date_format(now(), '%Y-%m-%d');
+SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'hudi_ctl' AND engine_name = 'hudi'
+ORDER BY entry_name;
+SELECT * FROM hudi_tbl FOR TIME AS OF "2022-10-07 17:20:37";
+SELECT * FROM hudi_tbl FOR TIME AS OF "20221007172037";
+SELECT * FROM hudi_tbl FOR TIME AS OF "2022-10-07";
+SELECT smallint_u, sum(int_u)
+  FROM all_types WHERE smallint_u > 10 GROUP BY smallint_u;
+SELECT smallint_u, int_u 
+  FROM all_types
+  WHERE smallint_u > 10;
+SELECT * FROM
+QUERY(
+  'catalog' = 'mysql_catalog', 
+  'query' = 'SELECT smallint_u, sum(int_u) FROM db.all_types WHERE smallint_u > 10 GROUP BY smallint_u;'
+);
+SELECT 
+    _partition_id,
+    _partition_offset,
+    _message_timestamp,
+    *
+FROM kafka.schema.topic_name
+LIMIT 10;
+SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'mc_ctl' AND engine_name = 'maxcompute'
+ORDER BY entry_name;
+SELECT * FROM mc_tbl WHERE pt = 'value' LIMIT 100;
+    SELECT * FROM mc_tbl WHERE pt IN ('v1', 'v2') LIMIT 100;
+SELECT * FROM s3(
+    'uri' = 's3://bucket/path/to/tvf_test/test.parquet',
+    'format' = 'parquet',
+    's3.endpoint' = 'https://s3.us-east-1.amazonaws.com',
+    's3.region' = 'us-east-1',
+    's3.access_key' = 'ak',
+    's3.secret_key' = 'sk'
+)
+ORDER BY p_partkey LIMIT 5;
+SELECT * FROM s3(
+    'uri' = 's3://bucket/path/to/tvf_test/test.parquet',
+    'format' = 'parquet',
+    'resource' = 's3_resource'
+);
+SELECT * FROM s3(
+    "uri" = "s3://bucket/path/to/my_dataset.lance/data/*.lance",
+    "format" = "lance",
+    "s3.access_key" = "ak",
+    "s3.secret_key" = "sk",
+    "s3.region" = "us-east-1",
+    "s3.endpoint" = "https://s3.us-east-1.amazonaws.com"
+) ORDER BY id LIMIT 10;
+-- Get backend_id via: SHOW BACKENDS;
+SELECT * FROM local(
+    "file_path" = "data/my_dataset.lance/data/*.lance",
+    "backend_id" = "<backend_id>",
+    "format" = "lance"
+) ORDER BY id LIMIT 10;
+SELECT count(*), min(id), max(id) FROM s3(
+    "uri" = "s3://bucket/path/to/large.lance/data/*.lance",
+    "format" = "lance",
+    "s3.access_key" = "ak",
+    "s3.secret_key" = "sk",
+    "s3.region" = "us-east-1",
+    "s3.endpoint" = "https://s3.us-east-1.amazonaws.com"
+);
+SELECT COUNT(*) FROM
+HTTP(
+    "uri" = "hf://datasets/fka/awesome-chatgpt-prompts/blob/main/prompts.csv",
+    "format" = "csv"
+);
+SELECT * FROM
+HTTP(
+    "uri" = "hf://datasets/stanfordnlp/imdb@main/*/*.parquet",
+    "format" = "parquet"
+) ORDER BY text LIMIT 1;
+SELECT h.id, m.name
+FROM hive.db.hive_table h JOIN mysql.db.mysql_table m
+ON h.id = m.id;
+SELECT 'gauge' AS type, metric_name FROM otel.otel_metrics_gauge WHERE metric_name = 'your_metric_name' LIMIT 1
+UNION ALL
+SELECT 'sum', metric_name FROM otel.otel_metrics_sum WHERE metric_name = 'your_metric_name' LIMIT 1
+UNION ALL
+SELECT 'histogram', metric_name FROM otel.otel_metrics_histogram WHERE metric_name = 'your_metric_name' LIMIT 1;
+SELECT DISTINCT metric_name FROM otel.otel_metrics_gauge ORDER BY metric_name;
+SELECT timestamp, value
+FROM otel.otel_metrics_gauge
+WHERE metric_name = 'k8s.pod.cpu.usage'
+;
+SELECT
+  FLOOR(UNIX_TIMESTAMP(timestamp) / 20) * 20 AS time,
+  AVG(value) AS value
+FROM otel.otel_metrics_gauge
+WHERE metric_name = 'k8s.pod.cpu.usage'
+  AND timestamp >= FROM_UNIXTIME($__from/1000)
+  AND timestamp < FROM_UNIXTIME($__to/1000)
+GROUP BY time
+ORDER BY time
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT
+    c.candidate_id, c.name,
+    j.job_id, j.title
+FROM candidate_profiles AS c
+JOIN job_requirements AS j
+WHERE AI_FILTER(CONCAT(
+    'Does the following candidate self-introduction match the job description?',
+    'Job: ', j.jd_text, ' Candidate: ', c.self_intro
+));
+----------
+[SELECT] -- Equivalent to SHOW CACHE HOTSPOT "/" before version 3.0.4
+WITH t1 AS (
+    SELECT
+        cluster_id,
+        cluster_name,
+        table_id,
+        table_name,
+        insert_day,
+        SUM(query_per_day) AS query_per_day_total,
+        SUM(query_per_week) AS query_per_week_total
+    FROM __internal_schema.cloud_cache_hotspot
+    GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+    cluster_id AS ComputeGroupId,
+    cluster_name AS ComputeGroupName,
+    table_id AS TableId,
+    table_name AS TableName
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (
+            PARTITION BY cluster_id
+            ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+        ) AS dr2,
+        *
+    FROM t1
+) t2
+WHERE dr2 = 1;
+----------
+[SELECT] -- Equivalent to SHOW CACHE HOTSPOT '/compute_group_name0' before version 3.0.4
+WITH t1 AS (
+    SELECT
+        cluster_id,
+        cluster_name,
+        table_id,
+        table_name,
+        insert_day,
+        SUM(query_per_day) AS query_per_day_total,
+        SUM(query_per_week) AS query_per_week_total
+    FROM __internal_schema.cloud_cache_hotspot
+    WHERE cluster_name = "compute_group_name0" -- Replace with the actual compute group name, e.g. "default_compute_group"
+    GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+    cluster_id AS ComputeGroupId,
+    cluster_name AS ComputeGroupName,
+    table_id AS TableId,
+    table_name AS TableName
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (
+            PARTITION BY cluster_id
+            ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+        ) AS dr2,
+        *
+    FROM t1
+) t2
+WHERE dr2 = 1;
+----------
+[SELECT] SELECT *
+FROM information_schema.table_properties
+WHERE PROPERTY_NAME = "storage_vault_id"
+  AND PROPERTY_VALUE = 3;
+----------
+[SELECT] SELECT * FROM t1 TABLET(10001,10002) limit 1000;
+----------
+[SELECT] SELECT * FROM users;
+----------
+[SELECT] SELECT
+      DATE_FORMAT(l_shipdate, '%Y-%m') AS ship_month,
+      l_shipmode,
+      SUM(l_extendedprice * (1 - l_discount)) AS revenue
+    FROM lineitem
+    WHERE l_shipdate >= '1995-01-01'
+      AND l_shipdate < '1997-01-01'
+    GROUP BY
+      DATE_FORMAT(l_shipdate, '%Y-%m'),
+      l_shipmode
+    ORDER BY ship_month, l_shipmode
+----------
+[SELECT] SELECT * FROM hive.warehouse.orders LIMIT 100;
+----------
+[SELECT|DATA_EXPORT] SELECT c1, c2, c3 FROM tbl
+INTO OUTFILE "hdfs://ip:port/path/to/result_"
+FORMAT AS PARQUET
+PROPERTIES
+(
+    "fs.defaultFS" = "hdfs://ip:port",
+    "hadoop.username" = "hadoop"
+);
+----------
+[SELECT|DATA_EXPORT] SELECT * FROM tbl
+INTO OUTFILE "s3://bucket/export/result_"
+FORMAT AS ORC
+PROPERTIES(
+    "s3.endpoint" = "xxxxx",
+    "s3.region" = "xxxxx",
+    "s3.secret_key"="xxxx",
+    "s3.access_key" = "xxxxx"
+);
+----------
+[SELECT|DATA_EXPORT] SELECT c1, c2, c3 FROM tbl
+INTO OUTFILE "hdfs://HDFS8000871/path/to/result_"
+FORMAT AS PARQUET
+PROPERTIES
+(
+    "fs.defaultFS" = "hdfs://HDFS8000871",
+    "hadoop.username" = "hadoop",
+    "dfs.nameservices" = "your-nameservices",
+    "dfs.ha.namenodes.your-nameservices" = "nn1,nn2",
+    "dfs.namenode.rpc-address.HDFS8000871.nn1" = "ip:port",
+    "dfs.namenode.rpc-address.HDFS8000871.nn2" = "ip:port",
+    "dfs.client.failover.proxy.provider.HDFS8000871" = "org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider"
+);
+----------
+[SELECT|DATA_EXPORT] SELECT * FROM tbl
+INTO OUTFILE "hdfs://path/to/result_"
+FORMAT AS PARQUET
+PROPERTIES
+(
+    "fs.defaultFS"="hdfs://hacluster/",
+    "hadoop.username" = "hadoop",
+    "dfs.nameservices"="hacluster",
+    "dfs.ha.namenodes.hacluster"="n1,n2",
+    "dfs.namenode.rpc-address.hacluster.n1"="192.168.0.1:8020",
+    "dfs.namenode.rpc-address.hacluster.n2"="192.168.0.2:8020",
+    "dfs.client.failover.proxy.provider.hacluster"="org.apache.hadoop.hdfs.server.namenode.ha.ConfiguredFailoverProxyProvider",
+    "dfs.namenode.kerberos.principal"="hadoop/_HOST@REALM.COM",
+    "hadoop.security.authentication"="kerberos",
+    "hadoop.kerberos.principal"="doris_test@REALM.COM",
+    "hadoop.kerberos.keytab"="/path/to/doris_test.keytab"
+);
+----------
+[SELECT|DATA_EXPORT] SELECT k1,k2,v1 FROM tbl1 LIMIT 100000
+INTO OUTFILE "s3://bucket/export/result_"
+FORMAT AS CSV
+PROPERTIES
+(
+    "s3.endpoint" = "xxxxx",
+    "s3.region" = "xxxxx",
+    "s3.secret_key"="xxxx",
+    "s3.access_key" = "xxxxx",
+    "column_separator" = ",",
+    "line_delimiter" = "\n",
+    "success_file_name" = "SUCCESS"
+);
+----------
+[SELECT|DATA_EXPORT] SELECT * FROM tbl1
+INTO OUTFILE "s3://bucket/export/result_"
+FORMAT AS CSV
+PROPERTIES
+(
+    "s3.endpoint" = "xxxxx",
+    "s3.region" = "xxxxx",
+    "s3.secret_key"="xxxx",
+    "s3.access_key" = "xxxxx",
+    "column_separator" = ",",
+    "line_delimiter" = "\n",
+    "delete_existing_files" = "true"
+);
+----------
+[SELECT|DATA_EXPORT] SELECT * FROM tbl
+INTO OUTFILE "s3://path/to/result_"
+FORMAT AS ORC
+PROPERTIES(
+    "s3.endpoint" = "xxxxx",
+    "s3.region" = "xxxxx",
+    "s3.secret_key"="xxxx",
+    "s3.access_key" = "xxxxx",
+    "max_file_size" = "2048MB"
+);
+----------
+[SELECT|DATA_EXPORT] SELECT c1, c2 FROM db.tbl
+INTO OUTFILE "file:///path/to/result_"
+FORMAT AS CSV
+PROPERTIES(
+    "column_separator" = ","
+);
+----------
+[SELECT] SELECT * FROM test_s3load;
+----------
+[SELECT] SELECT * FROM test_hdfsload;
+----------
+[SELECT] SELECT * FROM jobs("type"="insert") WHERE ExecuteType = "STREAMING";
+----------
+[SELECT] SELECT * FROM doris_db.students;
+----------
+[SELECT] select * from jobs("type"="insert") where ExecuteType = "STREAMING";
+----------
+[SELECT] select * from tasks("type"="insert") where jobId='<job_id>';
+----------
+[SELECT] -- 1. Verify that aggregation works (metrics with the same dt+site_id are merged)
+SELECT dt, site_id, pv, uv FROM site_metrics ORDER BY dt DESC LIMIT 10;
+----------
+[SELECT] -- 2. Verify that partition pruning works
+EXPLAIN SELECT * FROM site_metrics WHERE dt = '2024-01-01';
+----------
+[SELECT] EXPLAIN SELECT * FROM your_table WHERE filter_column = 'xxx';
+----------
+[SELECT] SELECT id, SUM(cost) FROM iceberg_db.table1
+GROUP BY id ORDER BY id;
+----------
+[SELECT] SELECT * FROM
+iceberg_catalog.iceberg_db.table1 tbl1 JOIN mysql_catalog.mysql_db.dim_table tbl2
+ON tbl1.id = tbl2.id;
+----------
+[SELECT] select * from es_table where esquery(k4, '{
+        "match_phrase": {
+           "k4": "doris on es"
+        }
+    }');
+----------
+[SELECT] select * from es_table where esquery(k4, '{
+      "geo_shape": {
+         "location": {
+            "shape": {
+               "type": "envelope",
+               "coordinates": [
+                  [
+                     13,
+                     53
+                  ],
+                  [
+                     14,
+                     52
+                  ]
+               ]
+            },
+            "relation": "within"
+         }
+      }
+   }');
+----------
+[SELECT] select * from es_table where esquery(k4, ' {
+         "bool": {
+            "must": [
+               {
+                  "terms": {
+                     "k1": [
+                        11,
+                        12
+                     ]
+                  }
+               },
+               {
+                  "terms": {
+                     "k2": [
+                        100
+                     ]
+                  }
+               }
+            ]
+         }
+      }');
+----------
+[SELECT] select * from doe where k2 > '2020-06-21';
+----------
+[SELECT] select * from doe where k2 < '2020-06-21 12:00:00';
+----------
+[SELECT] select * from doe where k2 < 1593497011;
+----------
+[SELECT] select * from doe where k2 < now();
+----------
+[SELECT] select * from doe where k2 < date_format(now(), '%Y-%m-%d');
+----------
+[SELECT] SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'hudi_ctl' AND engine_name = 'hudi'
+ORDER BY entry_name;
+----------
+[SELECT] SELECT * FROM hudi_tbl FOR TIME AS OF "2022-10-07 17:20:37";
+----------
+[SELECT] SELECT * FROM hudi_tbl FOR TIME AS OF "20221007172037";
+----------
+[SELECT] SELECT * FROM hudi_tbl FOR TIME AS OF "2022-10-07";
+----------
+[SELECT] SELECT smallint_u, sum(int_u)
+  FROM all_types WHERE smallint_u > 10 GROUP BY smallint_u;
+----------
+[SELECT] SELECT smallint_u, int_u 
+  FROM all_types
+  WHERE smallint_u > 10;
+----------
+[SELECT] SELECT * FROM
+QUERY(
+  'catalog' = 'mysql_catalog', 
+  'query' = 'SELECT smallint_u, sum(int_u) FROM db.all_types WHERE smallint_u > 10 GROUP BY smallint_u;'
+);
+----------
+[SELECT] SELECT 
+    _partition_id,
+    _partition_offset,
+    _message_timestamp,
+    *
+FROM kafka.schema.topic_name
+LIMIT 10;
+----------
+[SELECT] SELECT catalog_name, engine_name, entry_name,
+       effective_enabled, ttl_second, capacity,
+       estimated_size, hit_rate, load_failure_count, last_error
+FROM information_schema.catalog_meta_cache_statistics
+WHERE catalog_name = 'mc_ctl' AND engine_name = 'maxcompute'
+ORDER BY entry_name;
+----------
+[SELECT] SELECT * FROM mc_tbl WHERE pt = 'value' LIMIT 100;
+----------
+[SELECT] SELECT * FROM mc_tbl WHERE pt IN ('v1', 'v2') LIMIT 100;
+----------
+[SELECT|DATA_IMPORT] SELECT * FROM s3(
+    'uri' = 's3://bucket/path/to/tvf_test/test.parquet',
+    'format' = 'parquet',
+    's3.endpoint' = 'https://s3.us-east-1.amazonaws.com',
+    's3.region' = 'us-east-1',
+    's3.access_key' = 'ak',
+    's3.secret_key' = 'sk'
+)
+ORDER BY p_partkey LIMIT 5;
+----------
+[SELECT|DATA_IMPORT] SELECT * FROM s3(
+    'uri' = 's3://bucket/path/to/tvf_test/test.parquet',
+    'format' = 'parquet',
+    'resource' = 's3_resource'
+);
+----------
+[SELECT|DATA_IMPORT] SELECT * FROM s3(
+    "uri" = "s3://bucket/path/to/my_dataset.lance/data/*.lance",
+    "format" = "lance",
+    "s3.access_key" = "ak",
+    "s3.secret_key" = "sk",
+    "s3.region" = "us-east-1",
+    "s3.endpoint" = "https://s3.us-east-1.amazonaws.com"
+) ORDER BY id LIMIT 10;
+----------
+[SELECT|DATA_IMPORT] -- Get backend_id via: SHOW BACKENDS;
+SELECT * FROM local(
+    "file_path" = "data/my_dataset.lance/data/*.lance",
+    "backend_id" = "<backend_id>",
+    "format" = "lance"
+) ORDER BY id LIMIT 10;
+----------
+[SELECT|DATA_IMPORT] SELECT count(*), min(id), max(id) FROM s3(
+    "uri" = "s3://bucket/path/to/large.lance/data/*.lance",
+    "format" = "lance",
+    "s3.access_key" = "ak",
+    "s3.secret_key" = "sk",
+    "s3.region" = "us-east-1",
+    "s3.endpoint" = "https://s3.us-east-1.amazonaws.com"
+);
+----------
+[SELECT] SELECT COUNT(*) FROM
+HTTP(
+    "uri" = "hf://datasets/fka/awesome-chatgpt-prompts/blob/main/prompts.csv",
+    "format" = "csv"
+);
+----------
+[SELECT] SELECT * FROM
+HTTP(
+    "uri" = "hf://datasets/stanfordnlp/imdb@main/*/*.parquet",
+    "format" = "parquet"
+) ORDER BY text LIMIT 1;
+----------
+[SELECT] SELECT h.id, m.name
+FROM hive.db.hive_table h JOIN mysql.db.mysql_table m
+ON h.id = m.id;
+----------
+[SELECT] SELECT 'gauge' AS type, metric_name FROM otel.otel_metrics_gauge WHERE metric_name = 'your_metric_name' LIMIT 1
+UNION ALL
+SELECT 'sum', metric_name FROM otel.otel_metrics_sum WHERE metric_name = 'your_metric_name' LIMIT 1
+UNION ALL
+SELECT 'histogram', metric_name FROM otel.otel_metrics_histogram WHERE metric_name = 'your_metric_name' LIMIT 1;
+----------
+[SELECT] SELECT DISTINCT metric_name FROM otel.otel_metrics_gauge ORDER BY metric_name;
+----------
+[SELECT] SELECT timestamp, value
+FROM otel.otel_metrics_gauge
+WHERE metric_name = 'k8s.pod.cpu.usage'
+----------
+[SELECT] SELECT
+  FLOOR(UNIX_TIMESTAMP(timestamp) / 20) * 20 AS time,
+  AVG(value) AS value
+FROM otel.otel_metrics_gauge
+WHERE metric_name = 'k8s.pod.cpu.usage'
+  AND timestamp >= FROM_UNIXTIME($__from/1000)
+  AND timestamp < FROM_UNIXTIME($__to/1000)
+GROUP BY time
+ORDER BY time

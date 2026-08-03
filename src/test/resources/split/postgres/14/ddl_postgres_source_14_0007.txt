@@ -1,0 +1,178 @@
+CREATE OR REPLACE FUNCTION heap_page_item_attrs(
+    IN page bytea,
+    IN rel_oid regclass,
+    IN do_detoast bool,
+    OUT lp smallint,
+    OUT lp_off smallint,
+    OUT lp_flags smallint,
+    OUT lp_len smallint,
+    OUT t_xmin xid,
+    OUT t_xmax xid,
+    OUT t_field3 int4,
+    OUT t_ctid tid,
+    OUT t_infomask2 integer,
+    OUT t_infomask integer,
+    OUT t_hoff smallint,
+    OUT t_bits text,
+    OUT t_oid oid,
+    OUT t_attrs bytea[]
+    )
+RETURNS SETOF record
+LANGUAGE SQL PARALLEL RESTRICTED
+BEGIN ATOMIC
+SELECT lp,
+       lp_off,
+       lp_flags,
+       lp_len,
+       t_xmin,
+       t_xmax,
+       t_field3,
+       t_ctid,
+       t_infomask2,
+       t_infomask,
+       t_hoff,
+       t_bits,
+       t_oid,
+       tuple_data_split(
+         rel_oid::oid,
+         t_data,
+         t_infomask,
+         t_infomask2,
+         t_bits,
+         do_detoast)
+         AS t_attrs
+  FROM heap_page_items(page);
+END
+;
+CREATE OR REPLACE FUNCTION strpos( citext, citext ) RETURNS INT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.strpos( pg_catalog.lower( $1::text ), pg_catalog.lower( $2::text ) )
+;
+create index hidx on testhstore using gist(h gist_hstore_ops(siglen=0))
+;
+ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    
+    analyze = ts_typanalyze,
+    subscript = raw_array_subscript_handler
+)
+;
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub WITH (refresh = false)
+;
+-- This test checks both the functionality of 'if exists' and the syntax
+-- of the drop database command.
+drop database test_database_exists (force)
+;
+CREATE SCHEMA AUTHORIZATION CURRENT_ROLE
+  CREATE VIEW schema_not_existing.view AS SELECT 1
+;
+ALTER TABLE partrem DETACH PARTITION partrem2 CONCURRENTLY
+;
+CREATE OR REPLACE FUNCTION lo_oid(lo) RETURNS pg_catalog.oid
+LANGUAGE SQL STRICT IMMUTABLE PARALLEL SAFE
+RETURN (SELECT $1::pg_catalog.oid)
+;
+CREATE OR REPLACE FUNCTION "overlaps"(timestamp, interval,
+  timestamp, timestamp)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION heap_page_item_attrs(
+    IN page bytea,
+    IN rel_oid regclass,
+    IN do_detoast bool,
+    OUT lp smallint,
+    OUT lp_off smallint,
+    OUT lp_flags smallint,
+    OUT lp_len smallint,
+    OUT t_xmin xid,
+    OUT t_xmax xid,
+    OUT t_field3 int4,
+    OUT t_ctid tid,
+    OUT t_infomask2 integer,
+    OUT t_infomask integer,
+    OUT t_hoff smallint,
+    OUT t_bits text,
+    OUT t_oid oid,
+    OUT t_attrs bytea[]
+    )
+RETURNS SETOF record
+LANGUAGE SQL PARALLEL RESTRICTED
+BEGIN ATOMIC
+SELECT lp,
+       lp_off,
+       lp_flags,
+       lp_len,
+       t_xmin,
+       t_xmax,
+       t_field3,
+       t_ctid,
+       t_infomask2,
+       t_infomask,
+       t_hoff,
+       t_bits,
+       t_oid,
+       tuple_data_split(
+         rel_oid::oid,
+         t_data,
+         t_infomask,
+         t_infomask2,
+         t_bits,
+         do_detoast)
+         AS t_attrs
+  FROM heap_page_items(page);
+END
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION strpos( citext, citext ) RETURNS INT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.strpos( pg_catalog.lower( $1::text ), pg_catalog.lower( $2::text ) )
+;
+----------
+[ADD_INDEX] create index hidx on testhstore using gist(h gist_hstore_ops(siglen=0))
+;
+----------
+[ALTER_TYPE] ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    
+    analyze = ts_typanalyze,
+    subscript = raw_array_subscript_handler
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub WITH (refresh = false)
+;
+----------
+[DROP_CATALOG] -- This test checks both the functionality of 'if exists' and the syntax
+-- of the drop database command.
+drop database test_database_exists (force)
+;
+----------
+[CREATE_SCHEMA(SELECT)] CREATE SCHEMA AUTHORIZATION CURRENT_ROLE
+  CREATE VIEW schema_not_existing.view AS SELECT 1
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE partrem DETACH PARTITION partrem2 CONCURRENTLY
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION lo_oid(lo) RETURNS pg_catalog.oid
+LANGUAGE SQL STRICT IMMUTABLE PARALLEL SAFE
+RETURN (SELECT $1::pg_catalog.oid)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "overlaps"(timestamp, interval,
+  timestamp, timestamp)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;

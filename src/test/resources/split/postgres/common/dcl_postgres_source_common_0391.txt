@@ -1,0 +1,78 @@
+-- spilling subxact, non-spilling main xact
+BEGIN
+;
+EXECUTE dumpOpr('965')
+;
+EXECUTE dumpFunc('39926')
+;
+EXECUTE dumpOpr('762')
+;
+SET constraint_exclusion = 'on'
+;
+EXECUTE dumpFunc('36284')
+;
+-- should fail
+ALTER FOREIGN DATA WRAPPER dblink_fdw OPTIONS (nonexistent 'fdw')
+;
+GRANT SELECT(col2) ON regress_pg_dump_table
+						   TO regress_dump_test_role
+;
+--
+-- Add coverage for optimization of backwards scan index descents
+--
+-- Here we expect _bt_search to descend straight to a leaf page containing a
+-- non-pivot tuple with the value '47', which comes last (after 11 similar
+-- non-pivot tuples).  Query execution should only need to visit a single
+-- leaf page here.
+--
+-- Test case relies on tenk1_hundred index having a leaf page whose high key
+-- is '(48, -inf)'.  We use a low cardinality index to make our test case less
+-- sensitive to implementation details that may change in the future.
+set enable_seqscan to false
+;
+set search_path to public, stts_s1
+;
+------------------------------------------------------------------------------------------
+[TRANSACTION] -- spilling subxact, non-spilling main xact
+BEGIN
+;
+----------
+[UNSAFE] EXECUTE dumpOpr('965')
+;
+----------
+[UNSAFE] EXECUTE dumpFunc('39926')
+;
+----------
+[UNSAFE] EXECUTE dumpOpr('762')
+;
+----------
+[SESSION_SETTING_WRITE] SET constraint_exclusion = 'on'
+;
+----------
+[UNSAFE] EXECUTE dumpFunc('36284')
+;
+----------
+[SYSTEM_SETTING_WRITE] -- should fail
+ALTER FOREIGN DATA WRAPPER dblink_fdw OPTIONS (nonexistent 'fdw')
+;
+----------
+[GRANT] GRANT SELECT(col2) ON regress_pg_dump_table
+						   TO regress_dump_test_role
+;
+----------
+[SESSION_SETTING_WRITE] --
+-- Add coverage for optimization of backwards scan index descents
+--
+-- Here we expect _bt_search to descend straight to a leaf page containing a
+-- non-pivot tuple with the value '47', which comes last (after 11 similar
+-- non-pivot tuples).  Query execution should only need to visit a single
+-- leaf page here.
+--
+-- Test case relies on tenk1_hundred index having a leaf page whose high key
+-- is '(48, -inf)'.  We use a low cardinality index to make our test case less
+-- sensitive to implementation details that may change in the future.
+set enable_seqscan to false
+;
+----------
+[SESSION_SETTING_WRITE] set search_path to public, stts_s1
+;

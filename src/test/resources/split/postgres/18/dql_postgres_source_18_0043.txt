@@ -1,0 +1,442 @@
+SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (NULL), (2)) AS t(i)
+;
+-- indent null
+SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+SELECT JSON_VALUE(jsonb '1234', '$' RETURNING bit(3)  DEFAULT 1 ON ERROR)
+;
+-- Test PASSING argument parsing
+SELECT JSON_QUERY(jsonb 'null', '$xyz' PASSING 1 AS xy)
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': volatile_one() RETURNING text) FORMAT JSON)
+;
+--SELECT JSON_OBJECT(1::text VALUE 2);
+--SELECT JSON_OBJECT(KEY 1::text VALUE 2);
+SELECT JSON_OBJECT(json '[1]': 123)
+;
+-- JSON_TABLE: ON EMPTY/ON ERROR behavior
+SELECT *
+FROM
+	(VALUES ('1'), ('"err"')) vals(js),
+	JSON_TABLE(vals.js::jsonb, '$' COLUMNS (a int PATH '$')) jt
+;
+SELECT JSON_VALUE(jsonb '[1,2]', '$[*]' ERROR ON ERROR)
+;
+explain (verbose, costs off)
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select * from search_graph
+;
+select foo.*, unnamed_join.* from
+  t1 join t2 using (a) as foo, t3 as unnamed_join
+  for update of unnamed_join
+;
+SELECT JSON_VALUE(jsonb '1', 'lax $.a' DEFAULT '2' ON EMPTY DEFAULT '3' ON ERROR)
+;
+/* jsonb bytea ??? */
+SELECT JSON_VALUE(jsonb '123', '$' RETURNING bytea ERROR ON ERROR)
+;
+SELECT JSON_VALUE(jsonb '1', 'strict $.*' DEFAULT 2 ON ERROR)
+;
+SELECT JSON_QUERY(jsonb 'null', '$xyz' PASSING 1 AS xy)
+;
+SELECT test_slru_page_sync(0x1234500000030)
+;
+-- RelabelType
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int DEFAULT (SELECT 1)::oid::int ON ERROR)
+;
+--
+-- Similar to the previous test case, but this time it's a backwards scan
+-- using a < RowCompare.  Must use the <= strategy (and not the < strategy).
+--
+explain (costs off)
+SELECT proname, proargtypes, pronamespace
+   FROM pg_proc
+   WHERE (proname, pronamespace) < ('abs', 1_000_000)
+ORDER BY proname DESC, proargtypes DESC, pronamespace DESC LIMIT 1
+;
+select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by distinct rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+SELECT JSON_VALUE(jsonb '1234', '$' RETURNING queryfuncs_d_varbit3  DEFAULT '111111' ON ERROR)
+;
+SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST ROWS WITH TIES
+;
+-- check that we distinguish same CTE name used at different levels
+-- (this case could be supported, perhaps, but it isn't today)
+with recursive x(col) as (
+	select 1
+	union
+	(with x as (select * from x)
+	 select * from x)
+) search depth first by col set seq
+select * from x
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t, f set seq
+select * from search_graph
+;
+-- Test PASSING args
+SELECT *
+FROM JSON_TABLE(
+	jsonb '[1,2,3]',
+	'$[*] ? (@ < $x)'
+		PASSING 3 AS x
+		COLUMNS (y text FORMAT JSON PATH '$')
+	) jt
+;
+SELECT -0b1000000000000000000000000000000000000000000000000000000000000001
+;
+SELECT read_rel_block_ll('tbl_zero', 1, nblocks=>4, zero_on_error=>false)
+COMMIT
+;
+SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON EMPTY)
+;
+SELECT JSON_OBJECT(RETURNING json FORMAT JSON)
+;
+-- error
+SELECT x.* FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+SELECT sub.* FROM s,
+	(VALUES (23)) x(x), generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y COLUMNS (
+		NESTED PATH '$.a.za[2]' COLUMNS (
+			NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$')),
+			NESTED PATH '$.a.za[1]' columns (d int[] PATH '$.z21'),
+			NESTED PATH '$.a.za[0]' columns (NESTED PATH '$.z1[*]' as z1 COLUMNS (a int PATH  '$')),
+			xx1 int PATH '$.c',
+			NESTED PATH '$.a.za[1]'  columns (NESTED PATH '$.z21[*]' as z21 COLUMNS (b int PATH '$')),
+			xx int PATH '$.c'
+	)) sub
+;
+select json_array ( returning jsonb format json )
+;
+SELECT JSON_QUERY(jsonb '{"a": 1}', '$.a' RETURNING sqljsonb_int_not_null)
+;
+SELECT ctid FROM (
+		SELECT ctid FROM corruption_test
+			WHERE (ctid::text::point)[0] != 0
+			ORDER BY random() LIMIT 5)
+		ORDER BY ctid ASC
+;
+SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$'
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS b
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+SELECT 0b111111111111111111111111111111111111111111111111111111111111111
+;
+SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING char(10))
+;
+explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() + 1 as pid) as q join part_abc_2 pt2 on (q.pid = pt2.a) on pt.a = stable_one() + 2
+when not matched then insert values (1, 'd', false) returning pt.a
+;
+-- Column and path names must be distinct
+SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' as js2 COLUMNS (js2 int path '$'))
+;
+-- indent non singly-rooted xml with mixed contents
+SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE x.i = 1
+;
+-- JSON_ARRAYAGG()
+SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+SELECT JSON('{ "a" : 1 } ' FORMAT JSON ENCODING UTF8)
+;
+SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL)
+;
+SELECT bytea '\x00' IS JSON
+;
+SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') ERROR ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '{"a":"[1, 2]"}', 'lax $.a' OMIT QUOTES) AS omitted_quotes
+;
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int exists empty object on error))
+;
+SELECT a, b, c
+FROM (VALUES (1, 2, 3), (4, NULL, 6), (7, 8, 9)) AS t (a, b, c)
+GROUP BY DISTINCT ROLLUP(a, b), rollup(a, c)
+ORDER BY a, b, c
+;
+-- Reading page in buffer for read-only
+SELECT test_slru_page_readonly(0x1234500000020)
+;
+-- Test JSON_OBJECTAGG deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+SELECT JSON_OBJECTAGG(mod(i,100): (i)::text FORMAT JSON WITH UNIQUE)
+FROM generate_series(0, 199) i
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) FROM (VALUES (1), (NULL), (2)) AS t(i)
+;
+----------
+[SELECT] -- indent null
+SELECT xmlserialize(DOCUMENT NULL AS text INDENT)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1234', '$' RETURNING bit(3)  DEFAULT 1 ON ERROR)
+;
+----------
+[SELECT] -- Test PASSING argument parsing
+SELECT JSON_QUERY(jsonb 'null', '$xyz' PASSING 1 AS xy)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': volatile_one() RETURNING text) FORMAT JSON)
+;
+----------
+[SELECT] --SELECT JSON_OBJECT(1::text VALUE 2);
+--SELECT JSON_OBJECT(KEY 1::text VALUE 2);
+SELECT JSON_OBJECT(json '[1]': 123)
+;
+----------
+[SELECT] -- JSON_TABLE: ON EMPTY/ON ERROR behavior
+SELECT *
+FROM
+	(VALUES ('1'), ('"err"')) vals(js),
+	JSON_TABLE(vals.js::jsonb, '$' COLUMNS (a int PATH '$')) jt
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '[1,2]', '$[*]' ERROR ON ERROR)
+;
+----------
+[PERFORMANCE] explain (verbose, costs off)
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select * from search_graph
+;
+----------
+[SELECT|QUERY_LOCK] select foo.*, unnamed_join.* from
+  t1 join t2 using (a) as foo, t3 as unnamed_join
+  for update of unnamed_join
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'lax $.a' DEFAULT '2' ON EMPTY DEFAULT '3' ON ERROR)
+;
+----------
+[SELECT] /* jsonb bytea ??? */
+SELECT JSON_VALUE(jsonb '123', '$' RETURNING bytea ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'strict $.*' DEFAULT 2 ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb 'null', '$xyz' PASSING 1 AS xy)
+;
+----------
+[SELECT] SELECT test_slru_page_sync(0x1234500000030)
+;
+----------
+[SELECT] -- RelabelType
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int DEFAULT (SELECT 1)::oid::int ON ERROR)
+;
+----------
+[PERFORMANCE] --
+-- Similar to the previous test case, but this time it's a backwards scan
+-- using a < RowCompare.  Must use the <= strategy (and not the < strategy).
+--
+explain (costs off)
+SELECT proname, proargtypes, pronamespace
+   FROM pg_proc
+   WHERE (proname, pronamespace) < ('abs', 1_000_000)
+ORDER BY proname DESC, proargtypes DESC, pronamespace DESC LIMIT 1
+;
+----------
+[SELECT] select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by distinct rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1234', '$' RETURNING queryfuncs_d_varbit3  DEFAULT '111111' ON ERROR)
+;
+----------
+[SELECT] SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST ROWS WITH TIES
+;
+----------
+[SELECT] -- check that we distinguish same CTE name used at different levels
+-- (this case could be supported, perhaps, but it isn't today)
+with recursive x(col) as (
+	select 1
+	union
+	(with x as (select * from x)
+	 select * from x)
+) search depth first by col set seq
+select * from x
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t, f set seq
+select * from search_graph
+;
+----------
+[SELECT] -- Test PASSING args
+SELECT *
+FROM JSON_TABLE(
+	jsonb '[1,2,3]',
+	'$[*] ? (@ < $x)'
+		PASSING 3 AS x
+		COLUMNS (y text FORMAT JSON PATH '$')
+	) jt
+;
+----------
+[SELECT] SELECT -0b1000000000000000000000000000000000000000000000000000000000000001
+;
+----------
+[SELECT] SELECT read_rel_block_ll('tbl_zero', 1, nblocks=>4, zero_on_error=>false)
+COMMIT
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[]', '$[*]' ERROR ON EMPTY)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING json FORMAT JSON)
+;
+----------
+[SELECT] -- error
+SELECT x.* FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+----------
+[SELECT] SELECT sub.* FROM s,
+	(VALUES (23)) x(x), generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y COLUMNS (
+		NESTED PATH '$.a.za[2]' COLUMNS (
+			NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$')),
+			NESTED PATH '$.a.za[1]' columns (d int[] PATH '$.z21'),
+			NESTED PATH '$.a.za[0]' columns (NESTED PATH '$.z1[*]' as z1 COLUMNS (a int PATH  '$')),
+			xx1 int PATH '$.c',
+			NESTED PATH '$.a.za[1]'  columns (NESTED PATH '$.z21[*]' as z21 COLUMNS (b int PATH '$')),
+			xx int PATH '$.c'
+	)) sub
+;
+----------
+[SELECT] select json_array ( returning jsonb format json )
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '{"a": 1}', '$.a' RETURNING sqljsonb_int_not_null)
+;
+----------
+[SELECT] SELECT ctid FROM (
+		SELECT ctid FROM corruption_test
+			WHERE (ctid::text::point)[0] != 0
+			ORDER BY random() LIMIT 5)
+		ORDER BY ctid ASC
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$'
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS b
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+----------
+[SELECT] SELECT 0b111111111111111111111111111111111111111111111111111111111111111
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2]', '$' RETURNING char(10))
+;
+----------
+[PERFORMANCE] explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() + 1 as pid) as q join part_abc_2 pt2 on (q.pid = pt2.a) on pt.a = stable_one() + 2
+when not matched then insert values (1, 'd', false) returning pt.a
+;
+----------
+[SELECT] -- Column and path names must be distinct
+SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' as js2 COLUMNS (js2 int path '$'))
+;
+----------
+[SELECT] -- indent non singly-rooted xml with mixed contents
+SELECT xmlserialize(DOCUMENT 'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+----------
+[SELECT] SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE x.i = 1
+;
+----------
+[SELECT] -- JSON_ARRAYAGG()
+SELECT	JSON_ARRAYAGG(i) IS NULL,
+		JSON_ARRAYAGG(i RETURNING jsonb) IS NULL
+FROM generate_series(1, 0) i
+;
+----------
+[SELECT] SELECT JSON('{ "a" : 1 } ' FORMAT JSON ENCODING UTF8)
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a',  NULL, 'b' ABSENT ON NULL)
+;
+----------
+[SELECT] SELECT bytea '\x00' IS JSON
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '{"a":"[1, 2]"}', 'lax $.a' OMIT QUOTES) AS omitted_quotes
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int exists empty object on error))
+;
+----------
+[SELECT] SELECT a, b, c
+FROM (VALUES (1, 2, 3), (4, NULL, 6), (7, 8, 9)) AS t (a, b, c)
+GROUP BY DISTINCT ROLLUP(a, b), rollup(a, c)
+ORDER BY a, b, c
+;
+----------
+[SELECT] -- Reading page in buffer for read-only
+SELECT test_slru_page_readonly(0x1234500000020)
+;
+----------
+[PERFORMANCE] -- Test JSON_OBJECTAGG deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(mod(i,100): (i)::text FORMAT JSON WITH UNIQUE)
+FROM generate_series(0, 199) i
+;

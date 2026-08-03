@@ -1,0 +1,965 @@
+[doris_official_website_create_job_000__create_job__0001]
+sql:
+CREATE JOB multi_table_sync
+ON STREAMING
+FROM MYSQL (
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-j-8.0.31.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "test",
+        "include_tables" = "user_info,order_info",
+        "offset" = "initial"
+)
+TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"
+)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0002]
+sql:
+CREATE JOB mysql_db_sync
+ON STREAMING
+FROM MYSQL (
+    "jdbc_url"       = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url"     = "mysql-connector-java-8.0.25.jar",
+    "driver_class"   = "com.mysql.cj.jdbc.Driver",
+    "user"           = "root",
+    "password"       = "123456",
+    "database"       = "test",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- set to 1 in single-BE deployments
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__insert__0003]
+sql:
+CREATE JOB mysql_students_sync
+ON STREAMING
+DO
+INSERT INTO doris_db.students
+SELECT * FROM cdc_stream(
+    "type"         = "mysql",
+    "jdbc_url"     = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url"   = "mysql-connector-java-8.0.25.jar",
+    "driver_class" = "com.mysql.cj.jdbc.Driver",
+    "user"         = "root",
+    "password"     = "123456",
+    "database"     = "test",
+    "table"        = "students",
+    "offset"       = "initial"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:12~4:29) /test/1/catalog1/doris_db/students/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0004]
+sql:
+CREATE JOB pg_db_sync
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url"       = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url"     = "postgresql-42.5.1.jar",
+    "driver_class"   = "org.postgresql.Driver",
+    "user"           = "postgres",
+    "password"       = "postgres",
+    "database"       = "postgres",
+    "schema"         = "public",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- set to 1 in single-BE deployments
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__insert__0005]
+sql:
+CREATE JOB pg_students_sync
+ON STREAMING
+DO
+INSERT INTO doris_db.students
+SELECT * FROM cdc_stream(
+    "type"         = "postgres",
+    "jdbc_url"     = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url"   = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user"         = "postgres",
+    "password"     = "postgres",
+    "database"     = "postgres",
+    "schema"       = "public",
+    "table"        = "students",
+    "offset"       = "initial"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:12~4:29) /test/1/catalog1/doris_db/students/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0006]
+sql:
+CREATE JOB multi_table_sync
+ON STREAMING
+FROM MYSQL (
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-java-8.0.25.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "test",
+        "include_tables" = "user_info,order_info",
+        "offset" = "initial"
+)
+TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"  -- Set to 1 for single-BE deployment
+)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__insert__0007]
+sql:
+CREATE JOB mysql_single_sync
+ON STREAMING
+DO
+INSERT INTO db1.tbl1
+SELECT * FROM cdc_stream(
+    "type" = "mysql",
+    "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url" = "mysql-connector-java-8.0.25.jar",
+    "driver_class" = "com.mysql.cj.jdbc.Driver",
+    "user" = "root",
+    "password" = "123456",
+    "database" = "source_db",
+    "table" = "source_table",
+    "offset" = "initial"
+)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:12~4:20) /test/1/catalog1/db1/tbl1/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0008]
+sql:
+CREATE JOB mysql_cdc_with_delete
+ON STREAMING
+DO
+INSERT INTO db1.target_table (id, value, __DORIS_DELETE_SIGN__)
+SELECT id, value, __DORIS_DELETE_SIGN__
+FROM cdc_stream(
+    "type" = "mysql",
+    "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url" = "mysql-connector-java-8.0.25.jar",
+    "driver_class" = "com.mysql.cj.jdbc.Driver",
+    "user" = "root",
+    "password" = "123456",
+    "database" = "source_db",
+    "table" = "source_table",
+    "offset" = "initial",
+    "include_delete_sign" = "true"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:12~4:28) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0009]
+sql:
+CREATE JOB test_postgres_job
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "include_tables" = "test_tbls",
+    "offset" = "latest"
+)
+TO DATABASE target_test_db (
+  "table.create.properties.replication_num" = "1"  -- Set to 1 for single-BE deployments
+)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__insert__0010]
+sql:
+CREATE JOB pg_single_sync
+ON STREAMING
+DO
+INSERT INTO db1.tbl1
+SELECT * FROM cdc_stream(
+    "type" = "postgres",
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "table" = "source_table",
+    "offset" = "initial"
+)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:12~4:20) /test/1/catalog1/db1/tbl1/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0011]
+sql:
+CREATE JOB pg_cdc_with_delete
+ON STREAMING
+DO
+INSERT INTO db1.target_table (id, value, __DORIS_DELETE_SIGN__)
+SELECT id, value, __DORIS_DELETE_SIGN__
+FROM cdc_stream(
+    "type" = "postgres",
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "schema" = "public",
+    "table" = "source_table",
+    "offset" = "initial",
+    "include_delete_sign" = "true"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:12~4:28) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0012]
+sql:
+CREATE JOB my_job 
+ON STREAMING
+DO 
+INSERT INTO db1.tbl1 
+select * from S3(
+    "uri" = "s3://bucket/*.csv",
+    "s3.access_key" = "<s3_access_key>",
+    "s3.secret_key" = "<s3_secret_key>",
+    "s3.region" = "<s3_region>",
+    "s3.endpoint" = "<s3_endpoint>",
+    "format" = "<format>"
+)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:12~4:20) /test/1/catalog1/db1/tbl1/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0013]
+sql:
+CREATE JOB mysql_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:14~4:30) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0014]
+sql:
+CREATE JOB pg_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "postgres",
+      "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+      "driver_url" = "postgresql-42.5.1.jar",
+      "driver_class" = "org.postgresql.Driver",
+      "user" = "postgres",
+      "password" = "postgres",
+      "database" = "postgres",
+      "schema" = "public",
+      "table" = "source_table",
+      "offset" = "initial"
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:14~4:30) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0015]
+sql:
+CREATE JOB mysql_cdc_transform_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table (id, name, age)
+  SELECT id, name, cast(age as INT) as age
+  FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:14~4:30) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0016]
+sql:
+CREATE JOB mysql_cdc_delete_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table (id, name, __DORIS_DELETE_SIGN__)
+  SELECT id, name, __DORIS_DELETE_SIGN__
+  FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial",
+      "include_delete_sign" = "true"
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:14~4:30) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0017]
+sql:
+CREATE JOB my_job
+PROPERTIES (
+    "max_interval" = "30",
+    "session.insert_max_filter_ratio" = "0.5"
+)
+ON STREAMING
+DO
+INSERT INTO db1.tbl1
+SELECT * FROM S3(
+    "uri" = "s3://bucket/s3/demo/*.csv",
+    "format" = "csv",
+    "column_separator" = ",",
+    "s3.endpoint" = "https://s3.ap-southeast-1.amazonaws.com",
+    "s3.region" = "ap-southeast-1",
+    "s3.access_key" = "",
+    "s3.secret_key" = ""
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(8:12~8:20) /test/1/catalog1/db1/tbl1/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0018]
+sql:
+CREATE JOB my_job
+    ON STREAMING
+    DO 
+    INSERT INTO db1.`tbl1`
+    SELECT * FROM S3
+    (
+        "uri" = "s3://bucket/s3/demo/*.csv",
+        "format" = "csv",
+        "column_separator" = ",",
+        "s3.endpoint" = "https://s3.ap-southeast-1.amazonaws.com",
+        "s3.region" = "ap-southeast-1",
+        "s3.access_key" = "",
+        "s3.secret_key" = ""
+    );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:16~4:26) /test/1/catalog1/db1/tbl1/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0019]
+sql:
+CREATE JOB mysql_cdc_job
+    ON STREAMING
+    DO
+    INSERT INTO db1.target_table
+    SELECT * FROM cdc_stream(
+        "type" = "mysql",
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-java-8.0.25.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "source_db",
+        "table" = "source_table",
+        "offset" = "initial"
+    );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:16~4:32) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0020]
+sql:
+CREATE JOB pg_cdc_job
+    ON STREAMING
+    DO
+    INSERT INTO db1.target_table
+    SELECT * FROM cdc_stream(
+        "type" = "postgres",
+        "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+        "driver_url" = "postgresql-42.5.1.jar",
+        "driver_class" = "org.postgresql.Driver",
+        "user" = "postgres",
+        "password" = "postgres",
+        "database" = "postgres",
+        "schema" = "public",
+        "table" = "source_table",
+        "offset" = "initial"
+    );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:16~4:32) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0021]
+sql:
+CREATE JOB multi_table_sync
+    ON STREAMING
+    FROM MYSQL (
+            "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+            "driver_url" = "mysql-connector-java-8.0.25.jar",
+            "driver_class" = "com.mysql.cj.jdbc.Driver",
+            "user" = "root",
+            "password" = "123456",
+            "database" = "test",
+            "include_tables" = "user_info,order_info",
+            "offset" = "initial"
+    )
+    TO DATABASE target_test_db (
+        "table.create.properties.replication_num" = "1"
+    )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0022]
+sql:
+CREATE JOB test_postgres_job
+    ON STREAMING
+    FROM POSTGRES (
+        "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+        "driver_url" = "postgresql-42.5.1.jar",
+        "driver_class" = "org.postgresql.Driver",
+        "user" = "postgres",
+        "password" = "postgres",
+        "database" = "postgres",
+        "schema" = "public",
+        "include_tables" = "test_tbls", 
+        "offset" = "latest"
+    )
+    TO DATABASE target_test_db (
+        "table.create.properties.replication_num" = "1"
+    )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0023]
+sql:
+CREATE JOB mysql_db_sync
+ON STREAMING
+FROM MYSQL (
+    "jdbc_url"       = "jdbc:mysql://127.0.0.1:3306",
+    "driver_url"     = "mysql-connector-java-8.0.25.jar",
+    "driver_class"   = "com.mysql.cj.jdbc.Driver",
+    "user"           = "root",
+    "password"       = "123456",
+    "database"       = "test",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- 单 BE 部署时设置为 1
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0024]
+sql:
+CREATE JOB pg_db_sync
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url"       = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url"     = "postgresql-42.5.1.jar",
+    "driver_class"   = "org.postgresql.Driver",
+    "user"           = "postgres",
+    "password"       = "postgres",
+    "database"       = "postgres",
+    "schema"         = "public",
+    "include_tables" = "students",
+    "offset"         = "initial"
+)
+TO DATABASE doris_db (
+    "table.create.properties.replication_num" = "1"  -- 单 BE 部署时设置为 1
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0025]
+sql:
+CREATE JOB multi_table_sync
+ON STREAMING
+FROM MYSQL (
+        "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+        "driver_url" = "mysql-connector-java-8.0.25.jar",
+        "driver_class" = "com.mysql.cj.jdbc.Driver",
+        "user" = "root",
+        "password" = "123456",
+        "database" = "test",
+        "include_tables" = "user_info,order_info",
+        "offset" = "initial"
+)
+TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"  -- 单 BE 部署时需要设置为 1
+)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0026]
+sql:
+CREATE JOB test_postgres_job
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.1.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "include_tables" = "test_tbls",
+    "offset" = "latest"
+)
+TO DATABASE target_test_db (
+  "table.create.properties.replication_num" = "1"  -- 单BE部署时需要设置为1
+)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__insert__0027]
+sql:
+CREATE JOB mysql_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:14~4:30) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0028]
+sql:
+CREATE JOB pg_cdc_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "postgres",
+      "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+      "driver_url" = "postgresql-42.5.1.jar",
+      "driver_class" = "org.postgresql.Driver",
+      "user" = "postgres",
+      "password" = "postgres",
+      "database" = "postgres",
+      "schema" = "public",
+      "table" = "source_table",
+      "offset" = "initial"
+  )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:14~4:30) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__insert__0029]
+sql:
+CREATE JOB mysql_cdc_transform_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table (id, name, age)
+  SELECT id, name, cast(age as INT) as age
+  FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "initial"
+  )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:14~4:30) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0030]
+sql:
+CREATE JOB test_postgres_job
+ON STREAMING
+FROM POSTGRES (
+    "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+    "driver_url" = "postgresql-42.5.0.jar",
+    "driver_class" = "org.postgresql.Driver",
+    "user" = "postgres",
+    "password" = "postgres",
+    "database" = "postgres",
+    "schema" = "public",
+    "include_tables" = "test_tbls",
+    "offset" = "latest"
+)
+TO DATABASE target_test_db (
+  "table.create.properties.replication_num" = "1"
+)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__insert__0031]
+sql:
+CREATE JOB my_job
+    ON STREAMING
+    DO 
+    INSERT INTO db1.`tbl1`
+    SELECT * FROM S3
+    (
+        "uri" = "s3://bucket/s3/demo/*.csv",
+        "format" = "csv",
+        "column_separator" = ",",
+        "s3.endpoint" = "s3.ap-southeast-1.amazonaws.com",
+        "s3.region" = "ap-southeast-1",
+        "s3.access_key" = "",
+        "s3.secret_key" = ""
+    );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:16~4:26) /test/1/catalog1/db1/tbl1/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0032]
+sql:
+CREATE JOB multi_table_sync
+    ON STREAMING
+    FROM MYSQL (
+            "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+            "driver_url" = "mysql-connector-j-8.0.31.jar",
+            "driver_class" = "com.mysql.cj.jdbc.Driver",
+            "user" = "root",
+            "password" = "123456",
+            "database" = "test",
+            "include_tables" = "user_info,order_info",
+            "offset" = "initial"
+    )
+    TO DATABASE target_test_db (
+        "table.create.properties.replication_num" = "1"
+    )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__create_job__0033]
+sql:
+CREATE JOB test_postgres_job
+    ON STREAMING
+    FROM POSTGRES (
+        "jdbc_url" = "jdbc:postgresql://127.0.0.1:5432/postgres",
+        "driver_url" = "postgresql-42.5.0.jar",
+        "driver_class" = "org.postgresql.Driver",
+        "user" = "postgres",
+        "password" = "postgres",
+        "database" = "postgres",
+        "schema" = "public",
+        "include_tables" = "test_tbls", 
+        "offset" = "latest"
+    )
+    TO DATABASE target_test_db (
+    "table.create.properties.replication_num" = "1"
+    )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_JOB": []
+}
+
+----------
+[doris_official_website_create_job_000__insert__0034]
+sql:
+CREATE JOB mysql_incremental_job
+  ON STREAMING
+  DO
+  INSERT INTO db1.target_table
+  SELECT * FROM cdc_stream(
+      "type" = "mysql",
+      "jdbc_url" = "jdbc:mysql://127.0.0.1:3306",
+      "driver_url" = "mysql-connector-java-8.0.25.jar",
+      "driver_class" = "com.mysql.cj.jdbc.Driver",
+      "user" = "root",
+      "password" = "123456",
+      "database" = "source_db",
+      "table" = "source_table",
+      "offset" = "latest"
+  )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(4:14~4:30) /test/1/catalog1/db1/target_table/",
+      "action" : "INSERT"
+    }
+  ]
+}

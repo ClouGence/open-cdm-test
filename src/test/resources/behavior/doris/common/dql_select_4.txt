@@ -1,0 +1,67 @@
+[dql_select_4__select__0001]
+sql:
+with target_users as  (
+SELECT u_vip, second_id
+FROM users
+WHERE u_vip_mtt >= 1000
+AND second_id IS NOT NULL
+),
+act_user as (
+select
+DISTINCT
+_user_id, dt
+from events
+WHERE
+dt >='2025-12-01'
+and
+  (event_id = 'page_main'
+  AND  events.is_login_id IN ('Y')
+  OR event_id = 'registration_success'
+  AND events.act_id NOT IN ('bpt')
+  OR event_id = 'event_join_in'
+  OR event_id = 'event_club_round_history_user'
+  OR event_id = 'signin_page_view')
+)
+select
+a.u_vip,
+count(DISTINCT a.second_id) user_num,
+count(DISTINCT case when b.dt>='2025-12-05' then a.second_id else null end  ) actnum_after_swap,
+count(DISTINCT case when b.dt>='2025-12-01' then a.second_id else null end  ) actnum_after_entertain
+from target_users a
+left  join act_user b on b.`_user_id` =  a.second_id
+group by a.u_vip;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:10) /test/1/catalog1/schema1/users/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:5~11:11) /test/1/catalog1/schema1/events/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(25:0~25:5) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(26:0~26:5) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(27:0~27:5) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(28:5~28:17) /test/1/catalog1/schema1/target_users/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:11~29:19) /test/1/catalog1/schema1/act_user/",
+      "action" : "READ"
+    }
+  ]
+}

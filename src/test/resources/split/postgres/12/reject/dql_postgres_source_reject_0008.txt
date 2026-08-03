@@ -1,0 +1,354 @@
+SELECT JSON_OBJECT('foo': NULL::jsonb FORMAT JSON ENCODING UTF8)
+;
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (3), (1), (NULL), (2)) foo(i) ORDER BY i RETURNING text)
+;
+SELECT xmlserialize(DOCUMENT '<!DOCTYPE a><a/>' AS text INDENT)
+;
+SELECT
+	JSON_OBJECTAGG(k: v),
+	JSON_OBJECTAGG(k: v NULL ON NULL),
+	JSON_OBJECTAGG(k: v ABSENT ON NULL),
+	JSON_OBJECTAGG(k: v RETURNING jsonb),
+	JSON_OBJECTAGG(k: v NULL ON NULL RETURNING jsonb),
+	JSON_OBJECTAGG(k: v ABSENT ON NULL RETURNING jsonb)
+FROM
+	(VALUES (1, 1), (1, NULL), (2, NULL), (3, 3)) foo(k, v)
+;
+SELECT JSON_OBJECTAGG(k: v WITH UNIQUE KEYS RETURNING jsonb) OVER (ORDER BY k) FROM (VALUES ('a', 1), ('b', 2), ('c', 3)) AS t(k,v)
+;
+SELECT JSON_OBJECT(RETURNING bytea FORMAT JSON ENCODING UTF8)
+;
+SELECT JSON_OBJECTAGG(k: v ABSENT ON NULL WITH UNIQUE KEYS)
+FROM (VALUES (1, 1), (1, NULL), (2, 2)) foo(k, v)
+;
+-- ensure we get a hash right semi join
+explain (costs off)
+select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+SELECT NULL IS JSON
+;
+explain (costs off) select * from rparted_by_int2 where a > 100_000_000_000_000
+;
+SELECT JSON_OBJECT(json '[1]': 123)
+;
+SELECT xmlserialize(CONTENT  NULL AS text INDENT)
+;
+select json_object ( returning text )
+;
+SELECT JSON_OBJECTAGG(k: v ABSENT ON NULL WITH UNIQUE KEYS)
+FROM (VALUES (1, 1), (0, NULL), (3, NULL), (2, 2), (4, NULL)) foo(k, v)
+;
+SELECT JSON_ARRAY(RETURNING json FORMAT JSON)
+;
+SELECT xmlserialize(CONTENT  '<foo><bar><val x="y">42</val></bar></foo>' AS text) = xmlserialize(CONTENT '<foo><bar><val x="y">42</val></bar></foo>' AS text NO INDENT)
+;
+SELECT JSON_ARRAY(RETURNING jsonb)
+;
+SELECT xmlserialize(CONTENT  '<foo><bar></bar></foo>' AS text INDENT)
+;
+-- Check the timestamp offsets for v7.
+--
+-- generate UUIDv7 values with timestamps ranging from 1970 (the Unix epoch year)
+-- to 10888 (one year before the maximum possible year), and then verify that
+-- the extracted timestamps from these UUIDv7 values have not overflowed.
+WITH uuidts AS (
+    SELECT y, ts as ts, lag(ts) OVER (ORDER BY y) AS prev_ts
+    FROM (SELECT y, uuid_extract_timestamp(uuidv7((y || ' years')::interval)) AS ts
+        FROM generate_series(1970 - extract(year from now())::int, 10888 - extract(year from now())::int) y)
+)
+SELECT y, ts, prev_ts FROM uuidts WHERE ts < prev_ts
+;
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i))
+;
+SELECT xmlserialize(CONTENT  '' AS text INDENT)
+;
+SELECT * FROM (SELECT * FROM int4_tbl), (VALUES (123456)) WHERE f1 = column1
+;
+select array_agg(distinct val)
+from (select null as val from generate_series(1, 2))
+;
+SELECT min(r), max(r), count(r) FROM (
+  SELECT DISTINCT random(-0.5, 0.49) r FROM generate_series(1, 2500))
+;
+SELECT JSON_ARRAYAGG(i RETURNING jsonb) FILTER (WHERE i > 1) FROM (VALUES (1), (2), (3)) AS t(i)
+;
+SELECT JSON_OBJECT('a': JSON_OBJECT('b': 1 RETURNING varchar(2)))
+;
+SELECT test_slru_page_write(0x1234500000000, 'Test SLRU 64-bit')
+;
+--SELECT JSON_OBJECT('a' || 2 VALUE 1);
+--SELECT JSON_OBJECT(KEY 'a' || 2 VALUE 1);
+SELECT JSON_OBJECT('a': 2::text)
+;
+SELECT JSON_OBJECT(RETURNING jsonb FORMAT JSON)
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) OVER (PARTITION BY i % 2)
+FROM generate_series(1,5) i
+;
+SELECT JSON_OBJECT('a': '123', 'b': JSON_OBJECT('a': 111, 'b': 'aaa' RETURNING jsonb))
+;
+SELECT JSON_QUERY(jsonb '123', '$' RETURNING queryfuncs_char2 ERROR ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '["1"]', '$[*]' WITH WRAPPER KEEP QUOTES)
+;
+select json ( '{ "a" : 1 } ' format json encoding UTF8 )
+;
+SELECT JSON_EXISTS(jsonb '1', '$.a > 2' ERROR ON ERROR)
+;
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING bool error on error)
+;
+SELECT a, a::bool FROM JSON_TABLE(jsonb '{"a":1}', '$' COLUMNS (a dint4_0 EXISTS PATH '$.b' TRUE ON ERROR))
+;
+SELECT JSON_QUERY(jsonb'{"rec": "{1,2,3}"}', '$.rec' returning int[] keep quotes error on error)
+;
+-- true
+SELECT JSON_VALUE('{"a": "A"}', '$.a' RETURNING d1 DEFAULT 'C' ON EMPTY) = 'a'
+;
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int PATH 'strict $.a' ERROR ON ERROR) ERROR ON ERROR) jt
+;
+SELECT JSON_VALUE('"purple"'::jsonb, 'lax $[*]' RETURNING rgb)
+;
+SELECT JSON_EXISTS(jsonb '1', '$' DEFAULT 1 ON ERROR)
+;
+-- JSON_TABLE: only one FOR ORDINALITY columns allowed
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (id FOR ORDINALITY, id2 FOR ORDINALITY, a int PATH '$.a' ERROR ON EMPTY)) jt
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a char(5) EXISTS PATH '$.a' ERROR ON ERROR))
+;
+-- Test that numeric JSON values are coerced uniformly
+select json_value('{"a": 1.234}', '$.a' returning int error on error)
+;
+-- only string types or bytea allowed
+SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING jsonb)
+;
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$',
+			"char(4)" char(4) PATH '$',
+			"bool" bool PATH '$',
+			"numeric" numeric PATH '$',
+			"domain" jsonb_test_domain PATH '$',
+			js json PATH '$',
+			jb jsonb PATH '$'
+		)
+	) jt
+	ON true
+;
+SELECT JSON_SERIALIZE('1' FORMAT JSON RETURNING varchar)
+;
+SELECT JSON_VALUE(jsonb '"123.45"', '$' RETURNING float) AS value_float
+;
+SELECT * FROM JSON_TABLE('{"a": [{"b": "1"}, {"b": "2"}]}', '$' COLUMNS (b json path '$.a[*].b' ERROR ON ERROR))
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT JSON_OBJECT('foo': NULL::jsonb FORMAT JSON ENCODING UTF8)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT i FROM (VALUES (3), (1), (NULL), (2)) foo(i) ORDER BY i RETURNING text)
+;
+----------
+[SELECT] SELECT xmlserialize(DOCUMENT '<!DOCTYPE a><a/>' AS text INDENT)
+;
+----------
+[SELECT] SELECT
+	JSON_OBJECTAGG(k: v),
+	JSON_OBJECTAGG(k: v NULL ON NULL),
+	JSON_OBJECTAGG(k: v ABSENT ON NULL),
+	JSON_OBJECTAGG(k: v RETURNING jsonb),
+	JSON_OBJECTAGG(k: v NULL ON NULL RETURNING jsonb),
+	JSON_OBJECTAGG(k: v ABSENT ON NULL RETURNING jsonb)
+FROM
+	(VALUES (1, 1), (1, NULL), (2, NULL), (3, 3)) foo(k, v)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v WITH UNIQUE KEYS RETURNING jsonb) OVER (ORDER BY k) FROM (VALUES ('a', 1), ('b', 2), ('c', 3)) AS t(k,v)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING bytea FORMAT JSON ENCODING UTF8)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v ABSENT ON NULL WITH UNIQUE KEYS)
+FROM (VALUES (1, 1), (1, NULL), (2, 2)) foo(k, v)
+;
+----------
+[PERFORMANCE] -- ensure we get a hash right semi join
+explain (costs off)
+select * from tbl_rs t1 join
+  lateral (select * from tbl_rs t2 where t2.a in
+            (select t1.a+t3.a from tbl_rs t3) and t2.a < 5)
+  on true
+;
+----------
+[SELECT] SELECT NULL IS JSON
+;
+----------
+[PERFORMANCE] explain (costs off) select * from rparted_by_int2 where a > 100_000_000_000_000
+;
+----------
+[SELECT] SELECT JSON_OBJECT(json '[1]': 123)
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  NULL AS text INDENT)
+;
+----------
+[SELECT] select json_object ( returning text )
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v ABSENT ON NULL WITH UNIQUE KEYS)
+FROM (VALUES (1, 1), (0, NULL), (3, NULL), (2, 2), (4, NULL)) foo(k, v)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING json FORMAT JSON)
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '<foo><bar><val x="y">42</val></bar></foo>' AS text) = xmlserialize(CONTENT '<foo><bar><val x="y">42</val></bar></foo>' AS text NO INDENT)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING jsonb)
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '<foo><bar></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] -- Check the timestamp offsets for v7.
+--
+-- generate UUIDv7 values with timestamps ranging from 1970 (the Unix epoch year)
+-- to 10888 (one year before the maximum possible year), and then verify that
+-- the extracted timestamps from these UUIDv7 values have not overflowed.
+WITH uuidts AS (
+    SELECT y, ts as ts, lag(ts) OVER (ORDER BY y) AS prev_ts
+    FROM (SELECT y, uuid_extract_timestamp(uuidv7((y || ' years')::interval)) AS ts
+        FROM generate_series(1970 - extract(year from now())::int, 10888 - extract(year from now())::int) y)
+)
+SELECT y, ts, prev_ts FROM uuidts WHERE ts < prev_ts
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i))
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '' AS text INDENT)
+;
+----------
+[SELECT] SELECT * FROM (SELECT * FROM int4_tbl), (VALUES (123456)) WHERE f1 = column1
+;
+----------
+[SELECT] select array_agg(distinct val)
+from (select null as val from generate_series(1, 2))
+;
+----------
+[SELECT] SELECT min(r), max(r), count(r) FROM (
+  SELECT DISTINCT random(-0.5, 0.49) r FROM generate_series(1, 2500))
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(i RETURNING jsonb) FILTER (WHERE i > 1) FROM (VALUES (1), (2), (3)) AS t(i)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': JSON_OBJECT('b': 1 RETURNING varchar(2)))
+;
+----------
+[SELECT] SELECT test_slru_page_write(0x1234500000000, 'Test SLRU 64-bit')
+;
+----------
+[SELECT] --SELECT JSON_OBJECT('a' || 2 VALUE 1);
+--SELECT JSON_OBJECT(KEY 'a' || 2 VALUE 1);
+SELECT JSON_OBJECT('a': 2::text)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING jsonb FORMAT JSON)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) OVER (PARTITION BY i % 2)
+FROM generate_series(1,5) i
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': '123', 'b': JSON_OBJECT('a': 111, 'b': 'aaa' RETURNING jsonb))
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '123', '$' RETURNING queryfuncs_char2 ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '["1"]', '$[*]' WITH WRAPPER KEEP QUOTES)
+;
+----------
+[SELECT] select json ( '{ "a" : 1 } ' format json encoding UTF8 )
+;
+----------
+[SELECT] SELECT JSON_EXISTS(jsonb '1', '$.a > 2' ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING bool error on error)
+;
+----------
+[SELECT] SELECT a, a::bool FROM JSON_TABLE(jsonb '{"a":1}', '$' COLUMNS (a dint4_0 EXISTS PATH '$.b' TRUE ON ERROR))
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb'{"rec": "{1,2,3}"}', '$.rec' returning int[] keep quotes error on error)
+;
+----------
+[SELECT] -- true
+SELECT JSON_VALUE('{"a": "A"}', '$.a' RETURNING d1 DEFAULT 'C' ON EMPTY) = 'a'
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (a int PATH 'strict $.a' ERROR ON ERROR) ERROR ON ERROR) jt
+;
+----------
+[SELECT] SELECT JSON_VALUE('"purple"'::jsonb, 'lax $[*]' RETURNING rgb)
+;
+----------
+[SELECT] SELECT JSON_EXISTS(jsonb '1', '$' DEFAULT 1 ON ERROR)
+;
+----------
+[SELECT] -- JSON_TABLE: only one FOR ORDINALITY columns allowed
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (id FOR ORDINALITY, id2 FOR ORDINALITY, a int PATH '$.a' ERROR ON EMPTY)) jt
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a char(5) EXISTS PATH '$.a' ERROR ON ERROR))
+;
+----------
+[SELECT] -- Test that numeric JSON values are coerced uniformly
+select json_value('{"a": 1.234}', '$.a' returning int error on error)
+;
+----------
+[SELECT] -- only string types or bytea allowed
+SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING jsonb)
+;
+----------
+[SELECT] SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$',
+			"char(4)" char(4) PATH '$',
+			"bool" bool PATH '$',
+			"numeric" numeric PATH '$',
+			"domain" jsonb_test_domain PATH '$',
+			js json PATH '$',
+			jb jsonb PATH '$'
+		)
+	) jt
+	ON true
+;
+----------
+[SELECT] SELECT JSON_SERIALIZE('1' FORMAT JSON RETURNING varchar)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '"123.45"', '$' RETURNING float) AS value_float
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE('{"a": [{"b": "1"}, {"b": "2"}]}', '$' COLUMNS (b json path '$.a[*].b' ERROR ON ERROR))
+;

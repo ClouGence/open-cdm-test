@@ -1,0 +1,1174 @@
+-- Register a Hive catalog
+CREATE CATALOG hive_ctl PROPERTIES (
+  "type" = "hms",
+  "hive.metastore.uris" = "thrift://hms:9083"
+);
+
+-- Register a MySQL catalog for dimension tables
+CREATE CATALOG mysql_ctl PROPERTIES (
+  "type" = "jdbc",
+  "user" = "doris", "password" = "xxx",
+  "jdbc_url" = "jdbc:mysql://mysql:3306/dim",
+  "driver_url" = "mysql-connector-j-8.4.0.jar",
+  "driver_class" = "com.mysql.cj.jdbc.Driver"
+);
+
+-- One federated query, three catalogs
+SELECT o.region, SUM(f.amount), d.name
+FROM hive_ctl.sales.orders f
+JOIN internal.curated.region o ON f.region_id = o.id
+JOIN mysql_ctl.dim.product   d ON f.sku       = d.sku
+WHERE f.dt = CURRENT_DATE() GROUP BY 1, 3;
+CREATE TABLE orders (
+  order_id   BIGINT,
+  user_id    BIGINT,
+  order_date DATE NOT NULL,
+  amount     DECIMAL(10,2)
+)
+DUPLICATE KEY(order_id, user_id)
+AUTO PARTITION BY RANGE (date_trunc(order_date, 'month')) ()
+DISTRIBUTED BY HASH(user_id) BUCKETS 16;
+
+INSERT INTO orders VALUES
+  (1, 100, '2026-04-15', 99.00),
+  (2, 200, '2026-05-02', 50.00);
+
+EXPLAIN SELECT SUM(amount) FROM orders
+WHERE order_date >= '2026-05-01' AND user_id = 200;
+-- Inspect the default (0 means "half the CPU cores")
+SHOW VARIABLES LIKE 'parallel_pipeline_task_num';
+
+-- Pin parallelism for one heavy query without touching the session
+SELECT /*+ SET_VAR(parallel_pipeline_task_num=16) */
+       l_orderkey, COUNT(*) AS lines, SUM(l_extendedprice) AS gross
+FROM lineitem
+GROUP BY l_orderkey
+ORDER BY gross DESC
+LIMIT 100;
+
+-- See the resulting plan and Local Exchange placement
+EXPLAIN SELECT /*+ SET_VAR(parallel_pipeline_task_num=16) */
+        l_orderkey, COUNT(*) FROM lineitem GROUP BY l_orderkey;
+-- Roles in Doris match LDAP group names; Ranger holds the actual grants
+CREATE ROLE doris_analyst;
+CREATE ROLE doris_etl;
+
+-- Local break-glass account that survives LDAP / Ranger outages
+CREATE USER 'breakglass'@'127.0.0.1' IDENTIFIED BY 'rotate-me';
+GRANT 'admin' TO 'breakglass'@'127.0.0.1';
+CREATE TABLE ad_events (
+  dt DATE,
+  ad_id INT,
+  user_id BIGINT,
+  clicks BIGINT SUM,
+  cost DECIMAL(10,2) SUM
+)
+AGGREGATE KEY(dt, ad_id, user_id)
+DISTRIBUTED BY HASH(ad_id) BUCKETS 4;
+
+ALTER TABLE ad_events ADD ROLLUP rollup_ad (dt, ad_id, clicks, cost);
+
+SELECT dt, ad_id, SUM(clicks) FROM ad_events
+WHERE dt = '2026-05-01' GROUP BY dt, ad_id;
+SET enable_query_cache = true;
+
+-- Run 1: warms the cache for partitions 2024-01-01 .. 2024-01-07
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt >= '2024-01-01' AND dt < '2024-01-08'
+GROUP BY region;
+
+-- Run 2: overlapping window, three shared days
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt >= '2024-01-05' AND dt < '2024-01-12'
+GROUP BY region;
+-- Tag two BEs into 'online', one into 'offline'
+ALTER SYSTEM MODIFY BACKEND "be1:9050" SET ("tag.location" = "online");
+ALTER SYSTEM MODIFY BACKEND "be2:9050" SET ("tag.location" = "online");
+ALTER SYSTEM MODIFY BACKEND "be3:9050" SET ("tag.location" = "offline");
+
+-- Place 2 replicas in 'online', 1 in 'offline'
+CREATE TABLE orders (id BIGINT, region STRING, amount DECIMAL(18,2))
+DISTRIBUTED BY HASH(id) BUCKETS 8
+PROPERTIES ("replication_allocation" = "tag.location.online:2, tag.location.offline:1");
+
+-- Bind users to their pools
+SET PROPERTY FOR 'bi_user'  'resource_tags.location' = 'online';
+SET PROPERTY FOR 'etl_user' 'resource_tags.location' = 'offline';
+-- Enable spill for this session (or set it on a workload group).
+SET enable_spill = true;
+-- Spill paths do real disk IO, so give the query a longer budget.
+SET query_timeout = 3600;
+-- Run a query that would normally OOM.
+SELECT l_orderkey, SUM(l_quantity)
+FROM lineitem JOIN orders ON l_orderkey = o_orderkey
+WHERE o_orderdate >= '1995-01-01'
+GROUP BY l_orderkey
+ORDER BY 2 DESC LIMIT 100;
+-- Check that spill actually happened.
+SELECT query_id, spill_write_bytes_to_local_storage
+FROM information_schema.backend_active_tasks;
+CREATE TABLE orders (
+  order_id BIGINT,
+  status   VARCHAR(20),
+  amount   DECIMAL(10, 2),
+  updated  DATETIME
+)
+UNIQUE KEY(order_id)
+DISTRIBUTED BY HASH(order_id) BUCKETS 4
+PROPERTIES ("function_column.sequence_col" = "updated");
+
+INSERT INTO orders VALUES
+  (1, 'created', 99.50, '2026-05-08 10:00:00'),
+  (1, 'paid',    99.50, '2026-05-08 10:05:00'),
+  (1, 'created', 99.50, '2026-05-08 09:00:00');  -- late event
+;
+CREATE TABLE github_events (
+  id          BIGINT,
+  type        VARCHAR(30),
+  payload     VARIANT,
+  created_at  DATETIME,
+  INDEX idx_payload (payload) USING INVERTED PROPERTIES("parser" = "english")
+)
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 4
+PROPERTIES ("storage_format" = "V3");
+
+INSERT INTO github_events VALUES
+  (1, 'PushEvent', '{"action":"opened","commits":[{"sha":"abc"}],"size":4}', '2026-05-01'),
+  (2, 'IssueCommentEvent', '{"action":"created","issue":{"number":42}}', '2026-05-01');
+
+SELECT CAST(payload['action'] AS STRING) AS action, COUNT(*) AS n
+FROM github_events
+WHERE payload['action'] MATCH 'opened'
+GROUP BY action;
+-- Default; safe to leave alone for most workloads
+SHOW VARIABLES LIKE 'batch_size';
+
+-- Larger batches: better throughput on big aggregations, more memory per fragment
+SET batch_size = 8192;
+
+SELECT user_id, COUNT(*) AS events, SUM(bytes) AS total_bytes
+FROM access_log
+WHERE ts BETWEEN '2026-05-01' AND '2026-05-08'
+GROUP BY user_id
+ORDER BY total_bytes DESC
+LIMIT 10;
+CREATE TABLE user_profile (
+  user_id BIGINT,
+  name VARCHAR(64), age INT, country VARCHAR(32), city VARCHAR(64),
+  attr_01 STRING, attr_02 STRING, attr_03 STRING, attr_04 STRING,
+  attr_05 STRING, attr_06 STRING, attr_07 STRING, attr_08 STRING
+)
+DUPLICATE KEY(user_id)
+DISTRIBUTED BY HASH(user_id) BUCKETS 4
+PROPERTIES (
+  "vertical_compaction_num_columns_per_group" = "3"
+);
+
+SHOW CREATE TABLE user_profile;
+-- One group for ETL, one for BI dashboards
+CREATE WORKLOAD GROUP etl PROPERTIES (
+  'min_cpu_percent'='30','max_cpu_percent'='70',
+  'min_memory_percent'='30','max_memory_percent'='70',
+  'max_concurrency'='10');
+
+CREATE WORKLOAD GROUP bi PROPERTIES (
+  'min_cpu_percent'='20','max_cpu_percent'='50',
+  'min_memory_percent'='20','max_memory_percent'='50',
+  'max_concurrency'='50','max_queue_size'='100','queue_timeout'='3000');
+
+-- Bind users persistently
+SET PROPERTY FOR 'etl_user' 'default_workload_group'='etl';
+SET PROPERTY FOR 'bi_user'  'default_workload_group'='bi';
+
+-- One-off override for a single query
+SELECT /*+ SET_VAR(workload_group='bi') */ region, SUM(revenue)
+FROM orders WHERE dt = CURRENT_DATE() GROUP BY region;
+-- 1. switch to catalog, use database and query
+SWITCH doris_ctl;
+USE doris_db;
+SELECT * FROM doris_tbl LIMIT 10;
+
+-- 2. use doris database directly
+USE doris_ctl.doris_db;
+SELECT * FROM doris_tbl LIMIT 10;
+
+-- 3. use full qualified name to query
+SELECT * FROM doris_ctl.doris_db.doris_tbl LIMIT 10;
+-- 1. switch to catalog, use database and insert
+SWITCH doris_ctl;
+USE doris_db;
+insert into doris_tbl values (1,2);
+
+-- 2. use doris database directly
+USE doris_ctl.doris_db;
+insert into doris_tbl values (1,2);
+
+-- 3. use full qualified name to insert
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+-- 1. insert into values
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+
+-- 2. insert into select
+insert into doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+
+-- 3. insert overwrite
+insert overwrite table doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+SET show_hidden_columns = true;
+DESC iceberg_tbl;
+CREATE TABLE iceberg_table (
+      id INT,
+      name STRING
+  );
+  -- Modify the id column type to BIGINT, set as NOT NULL, default value to 0, and add comment
+  ALTER TABLE iceberg_table MODIFY COLUMN id BIGINT NOT NULL DEFAULT 0 COMMENT 'This is a modified id column';
+-- Create Iceberg table with complex types
+  CREATE TABLE iceberg_tbl (
+      id BIGINT,
+      user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT>,
+      dt STRING
+  );
+
+  -- Append a new field (email) to the STRUCT column
+  ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT, email:STRING>;
+
+  -- Promote the nested ARRAY element type from INT to BIGINT
+  ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<BIGINT>, age:INT, email:STRING>;
+-- Set parameters (adjust according to your rewrite parameters)
+    SET @min_file_size_bytes = 16 * 1024 * 1024;   -- 16 MB (default: target-file-size-bytes * 0.75)
+    SET @max_file_size_bytes = 768 * 1024 * 1024;  -- 768 MB (default: target-file-size-bytes * 1.8)
+
+    SELECT 
+        file_path,
+        `partition`,
+        file_size_in_bytes / 1024.0 / 1024.0 AS file_size_mb,
+        record_count,
+        CASE 
+            WHEN file_size_in_bytes < @min_file_size_bytes THEN 'Too small'
+            WHEN file_size_in_bytes > @max_file_size_bytes THEN 'Too large'
+        END AS size_issue
+    FROM iceberg_table$data_files
+    WHERE file_size_in_bytes < @min_file_size_bytes 
+    OR file_size_in_bytes > @max_file_size_bytes
+    ORDER BY `partition`, file_size_in_bytes DESC;
+-- Set parameters (adjust according to your rewrite parameters)
+    SET @min_file_size_bytes = 16 * 1024 * 1024;
+    SET @max_file_size_bytes = 768 * 1024 * 1024;
+
+    WITH file_analysis AS (
+        SELECT 
+            `partition`,
+            file_path,
+            file_size_in_bytes,
+            record_count,
+            (file_size_in_bytes < @min_file_size_bytes OR file_size_in_bytes > @max_file_size_bytes) AS meets_file_level_conditions
+        FROM iceberg_table$data_files
+    )
+    SELECT 
+        'Total files' AS metric, 
+        COUNT(*) AS value
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Files meeting file-level conditions', 
+        SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Total size (GB)', 
+        ROUND(SUM(file_size_in_bytes) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Size meeting file-level conditions (GB)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN file_size_in_bytes ELSE 0 END) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Percentage meeting file-level conditions (%)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+    FROM file_analysis;
+-- 目的：创建演示用数据库和表
+create database demo;
+use demo;
+
+create table mytable
+(
+    k1 TINYINT,
+    k2 DECIMAL(10, 2) DEFAULT "10.05",
+    k3 CHAR(10) COMMENT "string column",
+    k4 INT NOT NULL DEFAULT "1" COMMENT "int column"
+)
+COMMENT "my first table"
+DISTRIBUTED BY HASH(k1) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+-- 1. switch to catalog, use database and query
+SWITCH doris_ctl;
+USE doris_db;
+insert into doris_tbl values (1,2);
+
+-- 2. use doris database directly
+USE doris_ctl.doris_db;
+insert into doris_tbl values (1,2);
+
+-- 3. use full qualified name to query
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+-- 1.insert into values
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+
+-- 2.insert into select
+insert into doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+
+-- 3. insert overwrite
+insert overwrite table doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+CREATE TABLE iceberg_table (
+      id INT,
+      name STRING
+  );
+  -- 修改 id 列的类型为 BIGINT，设置为 NOT NULL，默认值为 0，并添加注释
+  ALTER TABLE iceberg_table MODIFY COLUMN id BIGINT NOT NULL DEFAULT 0 COMMENT 'This is a modified id column' FIRST;
+-- 创建包含复杂类型的 Iceberg 表
+  CREATE TABLE iceberg_tbl (
+      id BIGINT,
+      user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT>,
+      dt STRING
+  );
+
+  -- 为 STRUCT 类型的列追加新字段 (email)
+  ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT, email:STRING>;
+
+  -- 将嵌套 ARRAY 元素类型从 INT 提升为 BIGINT
+  ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<BIGINT>, age:INT, email:STRING>;
+-- 设置参数（根据实际的重写参数调整）
+    SET @min_file_size_bytes = 16 * 1024 * 1024;   -- 16 MB（默认：target-file-size-bytes * 0.75）
+    SET @max_file_size_bytes = 768 * 1024 * 1024;  -- 768 MB（默认：target-file-size-bytes * 1.8）
+
+    SELECT
+        file_path,
+        `partition`,
+        file_size_in_bytes / 1024.0 / 1024.0 AS file_size_mb,
+        record_count,
+        CASE
+            WHEN file_size_in_bytes < @min_file_size_bytes THEN 'Too small'
+            WHEN file_size_in_bytes > @max_file_size_bytes THEN 'Too large'
+        END AS size_issue
+    FROM iceberg_table$data_files
+    WHERE file_size_in_bytes < @min_file_size_bytes
+    OR file_size_in_bytes > @max_file_size_bytes
+    ORDER BY `partition`, file_size_in_bytes DESC;
+-- 设置参数（根据你的重写参数调整）
+    SET @min_file_size_bytes = 16 * 1024 * 1024;
+    SET @max_file_size_bytes = 768 * 1024 * 1024;
+
+    WITH file_analysis AS (
+        SELECT
+            `partition`,
+            file_path,
+            file_size_in_bytes,
+            record_count,
+            (file_size_in_bytes < @min_file_size_bytes OR file_size_in_bytes > @max_file_size_bytes) AS meets_file_level_conditions
+        FROM iceberg_table$data_files
+    )
+    SELECT
+        'Total files' AS metric,
+        COUNT(*) AS value
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Files meeting file-level conditions',
+        SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END)
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Total size (GB)',
+        ROUND(SUM(file_size_in_bytes) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Size meeting file-level conditions (GB)',
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN file_size_in_bytes ELSE 0 END) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Percentage meeting file-level conditions (%)',
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+    FROM file_analysis;
+-- 1. switch to catalog, use database and query
+SWITCH paimon_ctl;
+USE paimon_db;
+SELECT * FROM paimon_tbl LIMIT 10;
+
+-- 2. use paimon database directly
+USE paimon_ctl.paimon_db;
+SELECT * FROM paimon_tbl LIMIT 10;
+
+-- 3. use full qualified name to query
+SELECT * FROM paimon_ctl.paimon_db.paimon_tbl LIMIT 10;
+create database demo;
+
+   use demo; 
+   create table mytable
+   (
+       k1 TINYINT,
+       k2 DECIMAL(10, 2) DEFAULT "10.05",    
+       k3 CHAR(10) COMMENT "string column",    
+       k4 INT NOT NULL DEFAULT "1" COMMENT "int column"
+   ) 
+   COMMENT "my first table"
+   DISTRIBUTED BY HASH(k1) BUCKETS 1
+   PROPERTIES (
+    "replication_num" = "1"
+   );
+-- 设置参数（根据你的重写参数调整）
+    SET @min_file_size_bytes = 16 * 1024 * 1024;   -- 16 MB (默认：target-file-size-bytes * 0.75)
+    SET @max_file_size_bytes = 768 * 1024 * 1024;  -- 768 MB (默认：target-file-size-bytes * 1.8)
+
+    SELECT 
+        file_path,
+        `partition`,
+        file_size_in_bytes / 1024.0 / 1024.0 AS file_size_mb,
+        record_count,
+        CASE 
+            WHEN file_size_in_bytes < @min_file_size_bytes THEN 'Too small'
+            WHEN file_size_in_bytes > @max_file_size_bytes THEN 'Too large'
+        END AS size_issue
+    FROM iceberg_table$data_files
+    WHERE file_size_in_bytes < @min_file_size_bytes 
+    OR file_size_in_bytes > @max_file_size_bytes
+    ORDER BY `partition`, file_size_in_bytes DESC;
+-- 设置参数（根据你的重写参数调整）
+    SET @min_file_size_bytes = 16 * 1024 * 1024;
+    SET @max_file_size_bytes = 768 * 1024 * 1024;
+
+    WITH file_analysis AS (
+        SELECT 
+            `partition`,
+            file_path,
+            file_size_in_bytes,
+            record_count,
+            (file_size_in_bytes < @min_file_size_bytes OR file_size_in_bytes > @max_file_size_bytes) AS meets_file_level_conditions
+        FROM iceberg_table$data_files
+    )
+    SELECT 
+        'Total files' AS metric, 
+        COUNT(*) AS value
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Files meeting file-level conditions', 
+        SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Total size (GB)', 
+        ROUND(SUM(file_size_in_bytes) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Size meeting file-level conditions (GB)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN file_size_in_bytes ELSE 0 END) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Percentage meeting file-level conditions (%)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+    FROM file_analysis;
+-- 1. カタログに切り替え、データベースを使用してクエリを実行
+SWITCH hive_ctl;
+USE hive_db;
+SELECT * FROM hive_tbl LIMIT 10;
+
+-- 2. hiveデータベースを直接使用
+USE hive_ctl.hive_db;
+SELECT * FROM hive_tbl LIMIT 10;
+
+-- 3. 完全修飾名を使用してクエリを実行
+SELECT * FROM hive_ctl.hive_db.hive_tbl LIMIT 10;
+-- 1. カタログに切り替え、データベースを使用してクエリ実行
+SWITCH hive_ctl;
+USE hive_db;
+SELECT * FROM hive_tbl LIMIT 10;
+
+-- 2. hiveデータベースを直接使用
+USE hive_ctl.hive_db;
+SELECT * FROM hive_tbl LIMIT 10;
+
+-- 3. 完全修飾名を使用してクエリ実行
+SELECT * FROM hive_ctl.hive_db.hive_tbl LIMIT 10;
+-- Create table with inverted index for full-text search
+CREATE TABLE documents (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    content TEXT,
+    INDEX idx_content(content) USING INVERTED PROPERTIES("parser"="english")
+) DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1;
+
+-- Insert sample documents
+INSERT INTO documents (content) VALUES
+('Apache Kafka was first released in 2011 as an open-source distributed event streaming platform.'),
+('Michael Faraday discovered electromagnetic induction in 1831.'),
+('The International Space Station orbits Earth at 400km altitude.');
+
+-- Full-text search using MATCH
+SELECT id, content
+FROM documents
+WHERE content MATCH 'electromagnetic induction'
+LIMIT 5;
+-- Create table with vector index for similarity search
+CREATE TABLE documents_with_vectors (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    content TEXT,
+    embedding ARRAY<FLOAT>,
+    INDEX idx_embedding(embedding) USING INVERTED
+) DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1;
+
+-- Insert documents with embeddings (simplified 5-dim vectors for demo)
+INSERT INTO documents_with_vectors (content, embedding) VALUES
+('Apache Kafka was first released in 2011 as an open-source distributed event streaming platform.', [0.8, 0.2, 0.1, 0.5, 0.3]),
+('Michael Faraday discovered electromagnetic induction in 1831.', [0.1, 0.9, 0.7, 0.2, 0.4]),
+('The International Space Station orbits Earth at 400km altitude.', [0.3, 0.1, 0.2, 0.9, 0.8]);
+
+-- Similarity search: find documents similar to "streaming data" [0.7, 0.3, 0.2, 0.4, 0.2]
+SELECT id, content,
+       1 - cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) AS similarity
+FROM documents_with_vectors
+ORDER BY cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) ASC
+LIMIT 5;
+-- Create table with BOTH indexes
+CREATE TABLE rag_documents (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    content TEXT,
+    embedding ARRAY<FLOAT>,
+    -- Vector index for similarity search
+    INDEX idx_embedding(embedding) USING INVERTED,
+    -- Inverted index for full-text search
+    INDEX idx_content(content) USING INVERTED PROPERTIES("parser"="english")
+) DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+-- Insert sample documents with embeddings (simplified 5-dim vectors for demo)
+INSERT INTO rag_documents (content, embedding) VALUES
+('Apache Kafka was first released in 2011 as an open-source distributed event streaming platform.', [0.8, 0.2, 0.1, 0.5, 0.3]),
+('Michael Faraday discovered electromagnetic induction in 1831.', [0.1, 0.9, 0.7, 0.2, 0.4]),
+('The International Space Station orbits Earth at 400km altitude.', [0.3, 0.1, 0.2, 0.9, 0.8]);
+------------------------------------------------------------------------------------------
+[CREATE_CATALOG] -- Register a Hive catalog
+CREATE CATALOG hive_ctl PROPERTIES (
+  "type" = "hms",
+  "hive.metastore.uris" = "thrift://hms:9083"
+);
+----------
+[CREATE_CATALOG] -- Register a MySQL catalog for dimension tables
+CREATE CATALOG mysql_ctl PROPERTIES (
+  "type" = "jdbc",
+  "user" = "doris", "password" = "xxx",
+  "jdbc_url" = "jdbc:mysql://mysql:3306/dim",
+  "driver_url" = "mysql-connector-j-8.4.0.jar",
+  "driver_class" = "com.mysql.cj.jdbc.Driver"
+);
+----------
+[SELECT] -- One federated query, three catalogs
+SELECT o.region, SUM(f.amount), d.name
+FROM hive_ctl.sales.orders f
+JOIN internal.curated.region o ON f.region_id = o.id
+JOIN mysql_ctl.dim.product   d ON f.sku       = d.sku
+WHERE f.dt = CURRENT_DATE() GROUP BY 1, 3;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE orders (
+  order_id   BIGINT,
+  user_id    BIGINT,
+  order_date DATE NOT NULL,
+  amount     DECIMAL(10,2)
+)
+DUPLICATE KEY(order_id, user_id)
+AUTO PARTITION BY RANGE (date_trunc(order_date, 'month')) ()
+DISTRIBUTED BY HASH(user_id) BUCKETS 16;
+----------
+[INSERT] INSERT INTO orders VALUES
+  (1, 100, '2026-04-15', 99.00),
+  (2, 200, '2026-05-02', 50.00);
+----------
+[SELECT] EXPLAIN SELECT SUM(amount) FROM orders
+WHERE order_date >= '2026-05-01' AND user_id = 200;
+----------
+[METADATA] -- Inspect the default (0 means "half the CPU cores")
+SHOW VARIABLES LIKE 'parallel_pipeline_task_num';
+----------
+[SELECT] -- Pin parallelism for one heavy query without touching the session
+SELECT /*+ SET_VAR(parallel_pipeline_task_num=16) */
+       l_orderkey, COUNT(*) AS lines, SUM(l_extendedprice) AS gross
+FROM lineitem
+GROUP BY l_orderkey
+ORDER BY gross DESC
+LIMIT 100;
+----------
+[SELECT] -- See the resulting plan and Local Exchange placement
+EXPLAIN SELECT /*+ SET_VAR(parallel_pipeline_task_num=16) */
+        l_orderkey, COUNT(*) FROM lineitem GROUP BY l_orderkey;
+----------
+[CREATE_ROLE] -- Roles in Doris match LDAP group names; Ranger holds the actual grants
+CREATE ROLE doris_analyst;
+----------
+[CREATE_ROLE] CREATE ROLE doris_etl;
+----------
+[CREATE_USER] -- Local break-glass account that survives LDAP / Ranger outages
+CREATE USER 'breakglass'@'127.0.0.1' IDENTIFIED BY 'rotate-me';
+----------
+[GRANT] GRANT 'admin' TO 'breakglass'@'127.0.0.1';
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE ad_events (
+  dt DATE,
+  ad_id INT,
+  user_id BIGINT,
+  clicks BIGINT SUM,
+  cost DECIMAL(10,2) SUM
+)
+AGGREGATE KEY(dt, ad_id, user_id)
+DISTRIBUTED BY HASH(ad_id) BUCKETS 4;
+----------
+[ALTER_TABLE|ADD_INDEX] ALTER TABLE ad_events ADD ROLLUP rollup_ad (dt, ad_id, clicks, cost);
+----------
+[SELECT] SELECT dt, ad_id, SUM(clicks) FROM ad_events
+WHERE dt = '2026-05-01' GROUP BY dt, ad_id;
+----------
+[SESSION_SETTING_WRITE] SET enable_query_cache = true;
+----------
+[SELECT] -- Run 1: warms the cache for partitions 2024-01-01 .. 2024-01-07
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt >= '2024-01-01' AND dt < '2024-01-08'
+GROUP BY region;
+----------
+[SELECT] -- Run 2: overlapping window, three shared days
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt >= '2024-01-05' AND dt < '2024-01-12'
+GROUP BY region;
+----------
+[ADMIN] -- Tag two BEs into 'online', one into 'offline'
+ALTER SYSTEM MODIFY BACKEND "be1:9050" SET ("tag.location" = "online");
+----------
+[ADMIN] ALTER SYSTEM MODIFY BACKEND "be2:9050" SET ("tag.location" = "online");
+----------
+[ADMIN] ALTER SYSTEM MODIFY BACKEND "be3:9050" SET ("tag.location" = "offline");
+----------
+[CREATE_TABLE|ADD_COLUMN] -- Place 2 replicas in 'online', 1 in 'offline'
+CREATE TABLE orders (id BIGINT, region STRING, amount DECIMAL(18,2))
+DISTRIBUTED BY HASH(id) BUCKETS 8
+PROPERTIES ("replication_allocation" = "tag.location.online:2, tag.location.offline:1");
+----------
+[ALTER_USER] -- Bind users to their pools
+SET PROPERTY FOR 'bi_user'  'resource_tags.location' = 'online';
+----------
+[ALTER_USER] SET PROPERTY FOR 'etl_user' 'resource_tags.location' = 'offline';
+----------
+[SESSION_SETTING_WRITE] -- Enable spill for this session (or set it on a workload group).
+SET enable_spill = true;
+----------
+[SESSION_SETTING_WRITE] -- Spill paths do real disk IO, so give the query a longer budget.
+SET query_timeout = 3600;
+----------
+[SELECT] -- Run a query that would normally OOM.
+SELECT l_orderkey, SUM(l_quantity)
+FROM lineitem JOIN orders ON l_orderkey = o_orderkey
+WHERE o_orderdate >= '1995-01-01'
+GROUP BY l_orderkey
+ORDER BY 2 DESC LIMIT 100;
+----------
+[SELECT] -- Check that spill actually happened.
+SELECT query_id, spill_write_bytes_to_local_storage
+FROM information_schema.backend_active_tasks;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE orders (
+  order_id BIGINT,
+  status   VARCHAR(20),
+  amount   DECIMAL(10, 2),
+  updated  DATETIME
+)
+UNIQUE KEY(order_id)
+DISTRIBUTED BY HASH(order_id) BUCKETS 4
+PROPERTIES ("function_column.sequence_col" = "updated");
+----------
+[INSERT] INSERT INTO orders VALUES
+  (1, 'created', 99.50, '2026-05-08 10:00:00'),
+  (1, 'paid',    99.50, '2026-05-08 10:05:00'),
+  (1, 'created', 99.50, '2026-05-08 09:00:00');
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE github_events (
+  id          BIGINT,
+  type        VARCHAR(30),
+  payload     VARIANT,
+  created_at  DATETIME,
+  INDEX idx_payload (payload) USING INVERTED PROPERTIES("parser" = "english")
+)
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 4
+PROPERTIES ("storage_format" = "V3");
+----------
+[INSERT] INSERT INTO github_events VALUES
+  (1, 'PushEvent', '{"action":"opened","commits":[{"sha":"abc"}],"size":4}', '2026-05-01'),
+  (2, 'IssueCommentEvent', '{"action":"created","issue":{"number":42}}', '2026-05-01');
+----------
+[SELECT] SELECT CAST(payload['action'] AS STRING) AS action, COUNT(*) AS n
+FROM github_events
+WHERE payload['action'] MATCH 'opened'
+GROUP BY action;
+----------
+[METADATA] -- Default; safe to leave alone for most workloads
+SHOW VARIABLES LIKE 'batch_size';
+----------
+[SESSION_SETTING_WRITE] -- Larger batches: better throughput on big aggregations, more memory per fragment
+SET batch_size = 8192;
+----------
+[SELECT] SELECT user_id, COUNT(*) AS events, SUM(bytes) AS total_bytes
+FROM access_log
+WHERE ts BETWEEN '2026-05-01' AND '2026-05-08'
+GROUP BY user_id
+ORDER BY total_bytes DESC
+LIMIT 10;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE user_profile (
+  user_id BIGINT,
+  name VARCHAR(64), age INT, country VARCHAR(32), city VARCHAR(64),
+  attr_01 STRING, attr_02 STRING, attr_03 STRING, attr_04 STRING,
+  attr_05 STRING, attr_06 STRING, attr_07 STRING, attr_08 STRING
+)
+DUPLICATE KEY(user_id)
+DISTRIBUTED BY HASH(user_id) BUCKETS 4
+PROPERTIES (
+  "vertical_compaction_num_columns_per_group" = "3"
+);
+----------
+[METADATA] SHOW CREATE TABLE user_profile;
+----------
+[CREATE_RESOURCE_GROUP] -- One group for ETL, one for BI dashboards
+CREATE WORKLOAD GROUP etl PROPERTIES (
+  'min_cpu_percent'='30','max_cpu_percent'='70',
+  'min_memory_percent'='30','max_memory_percent'='70',
+  'max_concurrency'='10');
+----------
+[CREATE_RESOURCE_GROUP] CREATE WORKLOAD GROUP bi PROPERTIES (
+  'min_cpu_percent'='20','max_cpu_percent'='50',
+  'min_memory_percent'='20','max_memory_percent'='50',
+  'max_concurrency'='50','max_queue_size'='100','queue_timeout'='3000');
+----------
+[ALTER_USER] -- Bind users persistently
+SET PROPERTY FOR 'etl_user' 'default_workload_group'='etl';
+----------
+[ALTER_USER] SET PROPERTY FOR 'bi_user'  'default_workload_group'='bi';
+----------
+[SELECT] -- One-off override for a single query
+SELECT /*+ SET_VAR(workload_group='bi') */ region, SUM(revenue)
+FROM orders WHERE dt = CURRENT_DATE() GROUP BY region;
+----------
+[SWITCH_CATALOG] -- 1. switch to catalog, use database and query
+SWITCH doris_ctl;
+----------
+[SWITCH_SCHEMA] USE doris_db;
+----------
+[SELECT] SELECT * FROM doris_tbl LIMIT 10;
+----------
+[SWITCH_SCHEMA] -- 2. use doris database directly
+USE doris_ctl.doris_db;
+----------
+[SELECT] SELECT * FROM doris_tbl LIMIT 10;
+----------
+[SELECT] -- 3. use full qualified name to query
+SELECT * FROM doris_ctl.doris_db.doris_tbl LIMIT 10;
+----------
+[SWITCH_CATALOG] -- 1. switch to catalog, use database and insert
+SWITCH doris_ctl;
+----------
+[SWITCH_SCHEMA] USE doris_db;
+----------
+[INSERT] insert into doris_tbl values (1,2);
+----------
+[SWITCH_SCHEMA] -- 2. use doris database directly
+USE doris_ctl.doris_db;
+----------
+[INSERT] insert into doris_tbl values (1,2);
+----------
+[INSERT] -- 3. use full qualified name to insert
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+----------
+[INSERT] -- 1. insert into values
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+----------
+[INSERT|SELECT] -- 2. insert into select
+insert into doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+----------
+[MERGE|SELECT] -- 3. insert overwrite
+insert overwrite table doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+----------
+[SESSION_SETTING_WRITE] SET show_hidden_columns = true;
+----------
+[METADATA] DESC iceberg_tbl;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE iceberg_table (
+      id INT,
+      name STRING
+  );
+----------
+[ALTER_TABLE|ALTER_COLUMN|COMMENT_COLUMN] ALTER TABLE iceberg_table MODIFY COLUMN id BIGINT NOT NULL DEFAULT 0 COMMENT 'This is a modified id column';
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE iceberg_tbl (
+      id BIGINT,
+      user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT>,
+      dt STRING
+  );
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT, email:STRING>;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<BIGINT>, age:INT, email:STRING>;
+----------
+[SESSION_VARIABLE_RW] SET @min_file_size_bytes = 16 * 1024 * 1024;
+----------
+[SESSION_VARIABLE_RW] SET @max_file_size_bytes = 768 * 1024 * 1024;
+----------
+[SELECT] SELECT 
+        file_path,
+        `partition`,
+        file_size_in_bytes / 1024.0 / 1024.0 AS file_size_mb,
+        record_count,
+        CASE 
+            WHEN file_size_in_bytes < @min_file_size_bytes THEN 'Too small'
+            WHEN file_size_in_bytes > @max_file_size_bytes THEN 'Too large'
+        END AS size_issue
+    FROM iceberg_table$data_files
+    WHERE file_size_in_bytes < @min_file_size_bytes 
+    OR file_size_in_bytes > @max_file_size_bytes
+    ORDER BY `partition`, file_size_in_bytes DESC;
+----------
+[SESSION_VARIABLE_RW] SET @min_file_size_bytes = 16 * 1024 * 1024;
+----------
+[SESSION_VARIABLE_RW] SET @max_file_size_bytes = 768 * 1024 * 1024;
+----------
+[SELECT] WITH file_analysis AS (
+        SELECT 
+            `partition`,
+            file_path,
+            file_size_in_bytes,
+            record_count,
+            (file_size_in_bytes < @min_file_size_bytes OR file_size_in_bytes > @max_file_size_bytes) AS meets_file_level_conditions
+        FROM iceberg_table$data_files
+    )
+    SELECT 
+        'Total files' AS metric, 
+        COUNT(*) AS value
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Files meeting file-level conditions', 
+        SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Total size (GB)', 
+        ROUND(SUM(file_size_in_bytes) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Size meeting file-level conditions (GB)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN file_size_in_bytes ELSE 0 END) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Percentage meeting file-level conditions (%)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+    FROM file_analysis;
+----------
+[CREATE_SCHEMA] -- 目的：创建演示用数据库和表
+create database demo;
+----------
+[SWITCH_SCHEMA] use demo;
+----------
+[CREATE_TABLE|ADD_COLUMN|COMMENT_COLUMN|COMMENT_TABLE] create table mytable
+(
+    k1 TINYINT,
+    k2 DECIMAL(10, 2) DEFAULT "10.05",
+    k3 CHAR(10) COMMENT "string column",
+    k4 INT NOT NULL DEFAULT "1" COMMENT "int column"
+)
+COMMENT "my first table"
+DISTRIBUTED BY HASH(k1) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[SWITCH_CATALOG] -- 1. switch to catalog, use database and query
+SWITCH doris_ctl;
+----------
+[SWITCH_SCHEMA] USE doris_db;
+----------
+[INSERT] insert into doris_tbl values (1,2);
+----------
+[SWITCH_SCHEMA] -- 2. use doris database directly
+USE doris_ctl.doris_db;
+----------
+[INSERT] insert into doris_tbl values (1,2);
+----------
+[INSERT] -- 3. use full qualified name to query
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+----------
+[INSERT] -- 1.insert into values
+insert into doris_ctl.doris_db.doris_tbl values (1,2);
+----------
+[INSERT|SELECT] -- 2.insert into select
+insert into doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+----------
+[MERGE|SELECT] -- 3. insert overwrite
+insert overwrite table doris_ctl.doris_db.doris_tbl select * from doris_db.doris_tbl;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE iceberg_table (
+      id INT,
+      name STRING
+  );
+----------
+[ALTER_TABLE|ALTER_COLUMN|COMMENT_COLUMN] ALTER TABLE iceberg_table MODIFY COLUMN id BIGINT NOT NULL DEFAULT 0 COMMENT 'This is a modified id column' FIRST;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE iceberg_tbl (
+      id BIGINT,
+      user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT>,
+      dt STRING
+  );
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<INT>, age:INT, email:STRING>;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE iceberg_tbl MODIFY COLUMN user_info STRUCT<name:STRING, scores:ARRAY<BIGINT>, age:INT, email:STRING>;
+----------
+[SESSION_VARIABLE_RW] SET @min_file_size_bytes = 16 * 1024 * 1024;
+----------
+[SESSION_VARIABLE_RW] SET @max_file_size_bytes = 768 * 1024 * 1024;
+----------
+[SELECT] SELECT
+        file_path,
+        `partition`,
+        file_size_in_bytes / 1024.0 / 1024.0 AS file_size_mb,
+        record_count,
+        CASE
+            WHEN file_size_in_bytes < @min_file_size_bytes THEN 'Too small'
+            WHEN file_size_in_bytes > @max_file_size_bytes THEN 'Too large'
+        END AS size_issue
+    FROM iceberg_table$data_files
+    WHERE file_size_in_bytes < @min_file_size_bytes
+    OR file_size_in_bytes > @max_file_size_bytes
+    ORDER BY `partition`, file_size_in_bytes DESC;
+----------
+[SESSION_VARIABLE_RW] SET @min_file_size_bytes = 16 * 1024 * 1024;
+----------
+[SESSION_VARIABLE_RW] SET @max_file_size_bytes = 768 * 1024 * 1024;
+----------
+[SELECT] WITH file_analysis AS (
+        SELECT
+            `partition`,
+            file_path,
+            file_size_in_bytes,
+            record_count,
+            (file_size_in_bytes < @min_file_size_bytes OR file_size_in_bytes > @max_file_size_bytes) AS meets_file_level_conditions
+        FROM iceberg_table$data_files
+    )
+    SELECT
+        'Total files' AS metric,
+        COUNT(*) AS value
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Files meeting file-level conditions',
+        SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END)
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Total size (GB)',
+        ROUND(SUM(file_size_in_bytes) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Size meeting file-level conditions (GB)',
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN file_size_in_bytes ELSE 0 END) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT
+        'Percentage meeting file-level conditions (%)',
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+    FROM file_analysis;
+----------
+[SWITCH_CATALOG] -- 1. switch to catalog, use database and query
+SWITCH paimon_ctl;
+----------
+[SWITCH_SCHEMA] USE paimon_db;
+----------
+[SELECT] SELECT * FROM paimon_tbl LIMIT 10;
+----------
+[SWITCH_SCHEMA] -- 2. use paimon database directly
+USE paimon_ctl.paimon_db;
+----------
+[SELECT] SELECT * FROM paimon_tbl LIMIT 10;
+----------
+[SELECT] -- 3. use full qualified name to query
+SELECT * FROM paimon_ctl.paimon_db.paimon_tbl LIMIT 10;
+----------
+[CREATE_SCHEMA] create database demo;
+----------
+[SWITCH_SCHEMA] use demo;
+----------
+[CREATE_TABLE|ADD_COLUMN|COMMENT_COLUMN|COMMENT_TABLE] create table mytable
+   (
+       k1 TINYINT,
+       k2 DECIMAL(10, 2) DEFAULT "10.05",    
+       k3 CHAR(10) COMMENT "string column",    
+       k4 INT NOT NULL DEFAULT "1" COMMENT "int column"
+   ) 
+   COMMENT "my first table"
+   DISTRIBUTED BY HASH(k1) BUCKETS 1
+   PROPERTIES (
+    "replication_num" = "1"
+   );
+----------
+[SESSION_VARIABLE_RW] SET @min_file_size_bytes = 16 * 1024 * 1024;
+----------
+[SESSION_VARIABLE_RW] SET @max_file_size_bytes = 768 * 1024 * 1024;
+----------
+[SELECT] SELECT 
+        file_path,
+        `partition`,
+        file_size_in_bytes / 1024.0 / 1024.0 AS file_size_mb,
+        record_count,
+        CASE 
+            WHEN file_size_in_bytes < @min_file_size_bytes THEN 'Too small'
+            WHEN file_size_in_bytes > @max_file_size_bytes THEN 'Too large'
+        END AS size_issue
+    FROM iceberg_table$data_files
+    WHERE file_size_in_bytes < @min_file_size_bytes 
+    OR file_size_in_bytes > @max_file_size_bytes
+    ORDER BY `partition`, file_size_in_bytes DESC;
+----------
+[SESSION_VARIABLE_RW] SET @min_file_size_bytes = 16 * 1024 * 1024;
+----------
+[SESSION_VARIABLE_RW] SET @max_file_size_bytes = 768 * 1024 * 1024;
+----------
+[SELECT] WITH file_analysis AS (
+        SELECT 
+            `partition`,
+            file_path,
+            file_size_in_bytes,
+            record_count,
+            (file_size_in_bytes < @min_file_size_bytes OR file_size_in_bytes > @max_file_size_bytes) AS meets_file_level_conditions
+        FROM iceberg_table$data_files
+    )
+    SELECT 
+        'Total files' AS metric, 
+        COUNT(*) AS value
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Files meeting file-level conditions', 
+        SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Total size (GB)', 
+        ROUND(SUM(file_size_in_bytes) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Size meeting file-level conditions (GB)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN file_size_in_bytes ELSE 0 END) / 1024.0 / 1024.0 / 1024.0, 2)
+    FROM file_analysis
+    UNION ALL
+    SELECT 
+        'Percentage meeting file-level conditions (%)', 
+        ROUND(SUM(CASE WHEN meets_file_level_conditions THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+    FROM file_analysis;
+----------
+[SWITCH_CATALOG] -- 1. カタログに切り替え、データベースを使用してクエリを実行
+SWITCH hive_ctl;
+----------
+[SWITCH_SCHEMA] USE hive_db;
+----------
+[SELECT] SELECT * FROM hive_tbl LIMIT 10;
+----------
+[SWITCH_SCHEMA] -- 2. hiveデータベースを直接使用
+USE hive_ctl.hive_db;
+----------
+[SELECT] SELECT * FROM hive_tbl LIMIT 10;
+----------
+[SELECT] -- 3. 完全修飾名を使用してクエリを実行
+SELECT * FROM hive_ctl.hive_db.hive_tbl LIMIT 10;
+----------
+[SWITCH_CATALOG] -- 1. カタログに切り替え、データベースを使用してクエリ実行
+SWITCH hive_ctl;
+----------
+[SWITCH_SCHEMA] USE hive_db;
+----------
+[SELECT] SELECT * FROM hive_tbl LIMIT 10;
+----------
+[SWITCH_SCHEMA] -- 2. hiveデータベースを直接使用
+USE hive_ctl.hive_db;
+----------
+[SELECT] SELECT * FROM hive_tbl LIMIT 10;
+----------
+[SELECT] -- 3. 完全修飾名を使用してクエリ実行
+SELECT * FROM hive_ctl.hive_db.hive_tbl LIMIT 10;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Create table with inverted index for full-text search
+CREATE TABLE documents (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    content TEXT,
+    INDEX idx_content(content) USING INVERTED PROPERTIES("parser"="english")
+) DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1;
+----------
+[INSERT] -- Insert sample documents
+INSERT INTO documents (content) VALUES
+('Apache Kafka was first released in 2011 as an open-source distributed event streaming platform.'),
+('Michael Faraday discovered electromagnetic induction in 1831.'),
+('The International Space Station orbits Earth at 400km altitude.');
+----------
+[SELECT] -- Full-text search using MATCH
+SELECT id, content
+FROM documents
+WHERE content MATCH 'electromagnetic induction'
+LIMIT 5;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Create table with vector index for similarity search
+CREATE TABLE documents_with_vectors (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    content TEXT,
+    embedding ARRAY<FLOAT>,
+    INDEX idx_embedding(embedding) USING INVERTED
+) DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1;
+----------
+[INSERT] -- Insert documents with embeddings (simplified 5-dim vectors for demo)
+INSERT INTO documents_with_vectors (content, embedding) VALUES
+('Apache Kafka was first released in 2011 as an open-source distributed event streaming platform.', [0.8, 0.2, 0.1, 0.5, 0.3]),
+('Michael Faraday discovered electromagnetic induction in 1831.', [0.1, 0.9, 0.7, 0.2, 0.4]),
+('The International Space Station orbits Earth at 400km altitude.', [0.3, 0.1, 0.2, 0.9, 0.8]);
+----------
+[SELECT] -- Similarity search: find documents similar to "streaming data" [0.7, 0.3, 0.2, 0.4, 0.2]
+SELECT id, content,
+       1 - cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) AS similarity
+FROM documents_with_vectors
+ORDER BY cosine_distance(embedding, [0.7, 0.3, 0.2, 0.4, 0.2]) ASC
+LIMIT 5;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] -- Create table with BOTH indexes
+CREATE TABLE rag_documents (
+    id BIGINT NOT NULL AUTO_INCREMENT,
+    content TEXT,
+    embedding ARRAY<FLOAT>,
+    -- Vector index for similarity search
+    INDEX idx_embedding(embedding) USING INVERTED,
+    -- Inverted index for full-text search
+    INDEX idx_content(content) USING INVERTED PROPERTIES("parser"="english")
+) DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] -- Insert sample documents with embeddings (simplified 5-dim vectors for demo)
+INSERT INTO rag_documents (content, embedding) VALUES
+('Apache Kafka was first released in 2011 as an open-source distributed event streaming platform.', [0.8, 0.2, 0.1, 0.5, 0.3]),
+('Michael Faraday discovered electromagnetic induction in 1831.', [0.1, 0.9, 0.7, 0.2, 0.4]),
+('The International Space Station orbits Earth at 400km altitude.', [0.3, 0.1, 0.2, 0.9, 0.8]);

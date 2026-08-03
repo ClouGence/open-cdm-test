@@ -1,0 +1,3118 @@
+[doris_official_website_mixed_006__session_setting_write__0001]
+sql:
+-- 强制下一次查询跳过缓存并重新计算结果
+SET query_cache_force_refresh = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(2:4~2:29) /test/1/query_cache_force_refresh/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0002]
+sql:
+SELECT region, SUM(revenue) FROM orders WHERE dt = '2024-01-15' GROUP BY region;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:15~1:18) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:33~1:39) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__session_setting_write__0003]
+sql:
+-- 重置
+SET query_cache_force_refresh = false;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(2:4~2:29) /test/1/query_cache_force_refresh/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__session_setting_write__0004]
+sql:
+-- 在当前 Session 打开 SQL Cache，默认是关闭状态
+set enable_sql_cache=true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(2:4~2:20) /test/1/enable_sql_cache/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__session_setting_write__0005]
+sql:
+-- 在当前 Session 关闭 SQL Cache
+set enable_sql_cache=false;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(2:4~2:20) /test/1/enable_sql_cache/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__system_setting_write__0006]
+sql:
+-- 全局打开 SQL Cache，默认是关闭状态
+set global enable_sql_cache=true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(2:11~2:27) /test/1/enable_sql_cache/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__system_setting_write__0007]
+sql:
+-- 全局关闭 SQL Cache
+set global enable_sql_cache=false;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(2:11~2:27) /test/1/enable_sql_cache/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__drop_prog_obj__0008]
+sql:
+DROP FUNCTION IF EXISTS py_multiply(INT);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "DROP_PROG_OBJ": [
+    {
+      "subject": "Function(1:24~1:35) /test/1/catalog1/schema1/py_multiply/",
+      "action" : "DROP"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_prog_obj__0009]
+sql:
+-- ZIP 结构: my_udf/__init__.py, my_udf/math_ops.py
+CREATE FUNCTION py_multiply(INT)
+RETURNS INT
+PROPERTIES (
+    "type" = "PYTHON_UDF",
+    "file" = "file:///path/to/my_udf.zip",
+    "symbol" = "my_udf.math_ops.multiply_by_two",
+    "runtime_version" = "3.10.12",
+    "always_nullable" = "true",
+    "volatility" = "immutable"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_PROG_OBJ": [
+    {
+      "subject": "Function(2:16~2:27) /test/1/catalog1/schema1/py_multiply/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__session_setting_write__0010]
+sql:
+SET inverted_index_skip_threshold = 0;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:33) /test/1/inverted_index_skip_threshold/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0011]
+sql:
+SELECT client_ip, COUNT(*) AS cnt
+FROM access_log
+WHERE request_time BETWEEN '2026-06-01 00:00:00' AND '2026-06-02 00:00:00'
+  AND client_ip NOT IN (to_ipv6('::ffff:3.219.120.76'))               -- IPv4 精确排除 → mapped
+  AND NOT is_ip_address_in_range(client_ip, '::ffff:10.42.0.0/112')   -- IPv4 /16 → /112
+  AND NOT is_ip_address_in_range(client_ip, '2001:4860:4801::/48')    -- IPv6 网段
+GROUP BY client_ip;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:18~1:23) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:15) /test/1/catalog1/schema1/access_log/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:24~4:31) /test/1/catalog1/schema1/to_ipv6/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:10~5:32) /test/1/catalog1/schema1/is_ip_address_in_range/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:10~6:32) /test/1/catalog1/schema1/is_ip_address_in_range/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0012]
+sql:
+CREATE TABLE struct_table (
+      `k` INT NOT NULL,
+      `struct_varchar` STRUCT<name: VARCHAR(10), age: INT>
+  ) ENGINE=OLAP
+  DUPLICATE KEY(`k`)
+  DISTRIBUTED BY HASH(`k`) BUCKETS 1
+  PROPERTIES (
+      "replication_num" = "1"
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:25) /test/1/catalog1/schema1/struct_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__alter_table__0013]
+sql:
+ALTER TABLE struct_table MODIFY COLUMN struct_varchar STRUCT<name: VARCHAR(10), age: INT, id: INT>;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:24) /test/1/catalog1/schema1/struct_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0014]
+sql:
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT,
+    INDEX idx_v(v) USING INVERTED PROPERTIES("parser" = "english")
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:30) /test/1/catalog1/schema1/tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0015]
+sql:
+-- 全部子列继承 english 分词属性
+SELECT * FROM tbl WHERE v['id_1'] MATCH 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0016]
+sql:
+SELECT * FROM tbl WHERE v['id_2'] MATCH 'Apache';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0017]
+sql:
+SELECT * FROM tbl WHERE v MATCH 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0018]
+sql:
+CREATE TABLE IF NOT EXISTS tbl (
+       k BIGINT,
+       v VARIANT,
+       v_str STRING,
+       INDEX idx_v_str(v_str) USING INVERTED PROPERTIES("parser" = "english")
+   );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:30) /test/1/catalog1/schema1/tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0019]
+sql:
+SELECT * FROM tbl WHERE v_str MATCH 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0020]
+sql:
+CREATE TABLE example_table (
+  id INT,
+  data_variant VARIANT
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:26) /test/1/catalog1/schema1/example_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0021]
+sql:
+SELECT * FROM example_table WHERE data_variant LIKE '%doris%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:27) /test/1/catalog1/schema1/example_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0022]
+sql:
+-- 更优做法：额外保留原始 JSON 字符串列用于整体检索
+CREATE TABLE example_table (
+  id INT,
+  data_string STRING,
+  data_variant VARIANT
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:26) /test/1/catalog1/schema1/example_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0023]
+sql:
+SELECT * FROM example_table WHERE data_string LIKE '%doris%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:27) /test/1/catalog1/schema1/example_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0024]
+sql:
+-- 插入示例数据
+INSERT INTO event_log VALUES
+    ('2025-01-01 10:00:00', 1001, 'click', '{"page": "home", "user_id": 42, "duration_ms": 320}'),
+    ('2025-01-01 10:00:01', 1002, 'purchase', '{"item": "widget", "price": 9.99, "user_id": 42}'),
+    ('2025-01-01 10:00:02', 1003, 'click', '{"page": "search", "user_id": 99, "query": "doris variant"}');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:21) /test/1/catalog1/schema1/event_log/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0025]
+sql:
+-- 验证数据
+SELECT payload['user_id'], payload['page'] FROM event_log;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:48~2:57) /test/1/catalog1/schema1/event_log/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__session_setting_write__0026]
+sql:
+-- 查看 Subcolumnization 结果
+SET describe_extend_variant_column = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(2:4~2:34) /test/1/describe_extend_variant_column/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__metadata__0027]
+sql:
+DESC event_log;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_006__select__0028]
+sql:
+-- 查看每行类型
+SELECT variant_type(payload) FROM event_log;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:19) /test/1/catalog1/schema1/variant_type/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:34~2:43) /test/1/catalog1/schema1/event_log/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0029]
+sql:
+-- setup
+CREATE TABLE test_bitmap_agg (
+	id INT,
+	k0 INT,
+	k1 INT,
+	k2 INT,
+	k3 INT,
+	k4 BIGINT,
+	k5 VARCHAR(32)
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:28) /test/1/catalog1/schema1/test_bitmap_agg/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0030]
+sql:
+INSERT INTO test_bitmap_agg VALUES
+	(1, 10, 110, 11, 300, 10000000000, '0'),
+	(2, 20, 120, 21, 400, 20000000000, '200000000000000'),
+	(3, 30, 130, 31, 350, 30000000000, '300000000000000'),
+	(4, 40, 140, 41, 500, 40000000000, '18446744073709551616'),
+	(5, 50, 150, 51, 250, 50000000000, '18446744073709551615'),
+	(6, 60, 160, 61, 600, 60000000000, '-1'),
+	(7, 60, 160, 120, 600, 60000000000, NULL);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:27) /test/1/catalog1/schema1/test_bitmap_agg/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0031]
+sql:
+-- setup
+CREATE TABLE pv_bitmap (
+	dt INT,
+	page INT,
+	user_id BITMAP
+) DISTRIBUTED BY HASH(dt) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:22) /test/1/catalog1/schema1/pv_bitmap/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0032]
+sql:
+INSERT INTO pv_bitmap VALUES
+	(1, 100, to_bitmap(100)),
+	(1, 100, to_bitmap(200)),
+	(1, 100, to_bitmap(300)),
+	(2, 200, to_bitmap(300));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:21) /test/1/catalog1/schema1/pv_bitmap/",
+      "action" : "INSERT"
+    },
+    {
+      "subject": "Function(2:10~2:19) /test/1/catalog1/schema1/to_bitmap/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:10~3:19) /test/1/catalog1/schema1/to_bitmap/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:10~4:19) /test/1/catalog1/schema1/to_bitmap/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:10~5:19) /test/1/catalog1/schema1/to_bitmap/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0033]
+sql:
+-- setup
+CREATE TABLE test_datasketches_hll_union_agg_tbl (
+    id INT,
+    sk STRING
+)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:48) /test/1/catalog1/schema1/test_datasketches_hll_union_agg_tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0034]
+sql:
+-- 通过 from_base64() 将 Base64 文本解码为 sketch 字节串后写入
+INSERT INTO test_datasketches_hll_union_agg_tbl VALUES
+    (1, from_base64('AgEHCAMIBwjL18IEK/L7BoYv+Q11gWYHgbxdBntl5gj8LUIK')),
+    (2, from_base64('AwEHCAUIAAkKAAAAIjvrBcS1nwfGGWoEyHokBO8t9wc1qTEENkcJB7hWqQxZf9QNnuSbGA==')),
+    (3, NULL);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:47) /test/1/catalog1/schema1/test_datasketches_hll_union_agg_tbl/",
+      "action" : "INSERT"
+    },
+    {
+      "subject": "Function(3:8~3:19) /test/1/catalog1/schema1/from_base64/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:8~4:19) /test/1/catalog1/schema1/from_base64/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0035]
+sql:
+-- 准备数据
+create table temparature_data (
+    id int,
+    temp double,
+    ts double
+) distributed by hash (id) buckets 1
+properties ("replication_num"="1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:29) /test/1/catalog1/schema1/temparature_data/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0036]
+sql:
+insert into temparature_data values
+    (1, 10, 1),
+    (2, 20, 2),
+    (3, 30, 3);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:28) /test/1/catalog1/schema1/temparature_data/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0037]
+sql:
+-- 准备数据
+create table sensor_data (
+    sensor_id int,
+    reading double,
+    ts double
+) distributed by hash (sensor_id) buckets 1
+properties ("replication_num"="1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:24) /test/1/catalog1/schema1/sensor_data/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0038]
+sql:
+insert into sensor_data values
+    (1, 10, 1),
+    (1, 20, 2),
+    (2, 100, 1),
+    (2, 200, 2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:23) /test/1/catalog1/schema1/sensor_data/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0039]
+sql:
+-- 准备数据
+create table null_test (
+    id int,
+    val double,
+    ts double
+) distributed by hash (id) buckets 1
+properties ("replication_num"="1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:22) /test/1/catalog1/schema1/null_test/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0040]
+sql:
+insert into null_test values
+    (1, 10, 1),
+    (2, null, 2),
+    (3, 20, 3);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:21) /test/1/catalog1/schema1/null_test/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0041]
+sql:
+-- 准备数据
+create table time_series (
+    ts double,
+    val double
+) distributed by hash (ts) buckets 1
+properties ("replication_num"="1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:24) /test/1/catalog1/schema1/time_series/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0042]
+sql:
+insert into time_series values (0, 10), (1, 10), (2, 10);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:23) /test/1/catalog1/schema1/time_series/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0043]
+sql:
+-- setup
+CREATE TABLE group_array_intersect_test (
+	id INT,
+	c_array_string ARRAY<STRING>
+) DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:39) /test/1/catalog1/schema1/group_array_intersect_test/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0044]
+sql:
+INSERT INTO group_array_intersect_test VALUES
+	(1, ['a', 'b', 'c', 'd', 'e']),
+	(2, ['a', 'b']),
+	(3, ['a', null]);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:38) /test/1/catalog1/schema1/group_array_intersect_test/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0045]
+sql:
+-- setup
+CREATE TABLE weighted_scores (
+    student_id INT,
+    score DECIMAL(10, 2),
+    weight INT
+) DUPLICATE KEY(student_id)
+DISTRIBUTED BY HASH(student_id) BUCKETS AUTO
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:28) /test/1/catalog1/schema1/weighted_scores/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0046]
+sql:
+INSERT INTO weighted_scores VALUES
+(1, 85.5, 1),   -- 普通作业分数，权重 1
+(2, 90.0, 2),   -- 重要作业分数，权重 2
+(3, 75.5, 1),
+(4, 95.5, 3),   -- 非常重要的作业，权重 3
+(5, 88.0, 2),
+(6, 92.5, 2),
+(7, 78.0, 1),
+(8, 89.5, 2),
+(9, 94.0, 3),
+(10, 83.5, 1);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:27) /test/1/catalog1/schema1/weighted_scores/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0047]
+sql:
+-- setup
+CREATE TABLE sales_data
+(
+    product_id INT,
+    sale_price DECIMAL(10, 2)
+) DUPLICATE KEY(`product_id`)
+DISTRIBUTED BY HASH(`product_id`) BUCKETS AUTO
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:23) /test/1/catalog1/schema1/sales_data/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0048]
+sql:
+INSERT INTO sales_data VALUES
+(1, 10.00),
+(1, 15.00),
+(1, 20.00),
+(1, 25.00),
+(1, 30.00),
+(1, 35.00),
+(1, 40.00),
+(1, 45.00),
+(1, 50.00),
+(1, 100.00);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:22) /test/1/catalog1/schema1/sales_data/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0049]
+sql:
+-- 创建示例表
+CREATE TABLE sales_data
+(
+    product_id INT,
+    sale_price DECIMAL(10, 2)
+) DUPLICATE KEY(`product_id`)
+DISTRIBUTED BY HASH(`product_id`) BUCKETS AUTO
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:23) /test/1/catalog1/schema1/sales_data/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0050]
+sql:
+-- 插入示例数据
+INSERT INTO sales_data VALUES
+(1, 10.00),
+(1, 15.00),
+(1, 20.00),
+(1, 25.00),
+(1, 30.00),
+(1, 35.00),
+(1, 40.00),
+(1, 45.00),
+(1, 50.00),
+(1, 100.00);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:22) /test/1/catalog1/schema1/sales_data/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0051]
+sql:
+-- 计算不同百分位的销售价格
+SELECT 
+    percentile_reservoir(sale_price, 0.5)  as median_price,     -- 中位数
+    percentile_reservoir(sale_price, 0.75) as p75_price,        -- 75 分位数
+    percentile_reservoir(sale_price, 0.90) as p90_price,        -- 90 分位数
+    percentile_reservoir(sale_price, 0.95) as p95_price,        -- 95 分位数
+    percentile_reservoir(null, 0.99)       as p99_null          -- null 的 99 分位数
+FROM sales_data;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:24) /test/1/catalog1/schema1/percentile_reservoir/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:24) /test/1/catalog1/schema1/percentile_reservoir/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:24) /test/1/catalog1/schema1/percentile_reservoir/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:24) /test/1/catalog1/schema1/percentile_reservoir/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:4~7:24) /test/1/catalog1/schema1/percentile_reservoir/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:5~8:15) /test/1/catalog1/schema1/sales_data/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0052]
+sql:
+-- 创建示例表
+CREATE TABLE sequence_count_test1(
+    `uid` int COMMENT 'user id',
+    `date` datetime COMMENT 'date time', 
+    `number` int NULL COMMENT 'number' 
+) DUPLICATE KEY(uid) 
+DISTRIBUTED BY HASH(uid) BUCKETS AUTO
+PROPERTIES ( 
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:33) /test/1/catalog1/schema1/sequence_count_test1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0053]
+sql:
+-- 插入示例数据
+INSERT INTO sequence_count_test1(uid, date, number) values 
+(1, '2022-11-02 10:41:00', 1),
+(2, '2022-11-02 13:28:02', 2),
+(3, '2022-11-02 16:15:01', 1),
+(4, '2022-11-02 19:05:04', 2),
+(5, '2022-11-02 20:08:44', 3);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:32) /test/1/catalog1/schema1/sequence_count_test1/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0054]
+sql:
+-- 查询示例
+SELECT
+    SEQUENCE_COUNT('(?1)(?2)', date, number = 1, number = 3) as c1,
+    SEQUENCE_COUNT('(?1)(?2)', date, number = 1, number = 2) as c2,
+    SEQUENCE_COUNT('(?1)(?t>=3600)(?2)', date, number = 1, number = 2) as c3
+FROM sequence_count_test1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:18) /test/1/catalog1/schema1/SEQUENCE_COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:18) /test/1/catalog1/schema1/SEQUENCE_COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:18) /test/1/catalog1/schema1/SEQUENCE_COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:5~6:25) /test/1/catalog1/schema1/sequence_count_test1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0055]
+sql:
+-- 创建示例表
+CREATE TABLE sequence_count_test2(
+    `uid` int COMMENT 'user id',
+    `date` datetime COMMENT 'date time', 
+    `number` int NULL COMMENT 'number' 
+) DUPLICATE KEY(uid) 
+DISTRIBUTED BY HASH(uid) BUCKETS AUTO
+PROPERTIES ( 
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:33) /test/1/catalog1/schema1/sequence_count_test2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0056]
+sql:
+-- 插入示例数据
+INSERT INTO sequence_count_test2(uid, date, number) values
+(1, '2022-11-02 10:41:00', 1),
+(2, '2022-11-02 11:41:00', 7),
+(3, '2022-11-02 16:15:01', 3),
+(4, '2022-11-02 19:05:04', 4),
+(5, '2022-11-02 21:24:12', 5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:32) /test/1/catalog1/schema1/sequence_count_test2/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0057]
+sql:
+-- 查询示例
+SELECT
+    SEQUENCE_COUNT('(?1)(?2)', date, number = 1, number = 2) as c1,
+    SEQUENCE_COUNT('(?1)(?2).*', date, number = 1, number = 2) as c2,
+    SEQUENCE_COUNT('(?1)(?t>3600)(?2)', date, number = 1, number = 7) as c3
+FROM sequence_count_test2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:18) /test/1/catalog1/schema1/SEQUENCE_COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:18) /test/1/catalog1/schema1/SEQUENCE_COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:18) /test/1/catalog1/schema1/SEQUENCE_COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:5~6:25) /test/1/catalog1/schema1/sequence_count_test2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0058]
+sql:
+-- 创建示例表
+CREATE TABLE sequence_count_test3(
+    `uid` int COMMENT 'user id',
+    `date` datetime COMMENT 'date time', 
+    `number` int NULL COMMENT 'number' 
+) DUPLICATE KEY(uid) 
+DISTRIBUTED BY HASH(uid) BUCKETS AUTO
+PROPERTIES ( 
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:33) /test/1/catalog1/schema1/sequence_count_test3/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0059]
+sql:
+-- 插入示例数据
+INSERT INTO sequence_count_test3(uid, date, number) values
+(1, '2022-11-02 10:41:00', 1),
+(2, '2022-11-02 11:41:00', 7),
+(3, '2022-11-02 16:15:01', 3),
+(4, '2022-11-02 19:05:04', 4),
+(5, '2022-11-02 21:24:12', 5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:32) /test/1/catalog1/schema1/sequence_count_test3/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0060]
+sql:
+-- 查询示例
+SELECT SEQUENCE_COUNT('(?1)(?2)', date, number = 1, number = 5) FROM sequence_count_test3;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:21) /test/1/catalog1/schema1/SEQUENCE_COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:69~2:89) /test/1/catalog1/schema1/sequence_count_test3/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0061]
+sql:
+CREATE TABLE statistic_test(
+    tag int, 
+    val1 double not null, 
+    val2 double null
+) DISTRIBUTED BY HASH(tag)
+PROPERTIES (
+    "replication_num"="1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:27) /test/1/catalog1/schema1/statistic_test/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0062]
+sql:
+INSERT INTO statistic_test VALUES
+(1, -10, -10),
+(2, -20, NULL),
+(3, 100, NULL),
+(4, 100, NULL),
+(5, 1000,1000);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:26) /test/1/catalog1/schema1/statistic_test/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0063]
+sql:
+-- NULL 值会被忽略
+SELECT 
+  skew(val1), 
+  skew(val2)
+FROM statistic_test;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:2~3:6) /test/1/catalog1/schema1/skew/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:2~4:6) /test/1/catalog1/schema1/skew/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:5~5:19) /test/1/catalog1/schema1/statistic_test/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0064]
+sql:
+-- 创建示例表
+CREATE TABLE score_table (
+    student_id INT,
+    score DOUBLE
+) DISTRIBUTED BY HASH(student_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:24) /test/1/catalog1/schema1/score_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0065]
+sql:
+-- 插入测试数据
+INSERT INTO score_table VALUES
+(1, 85),
+(2, 90),
+(3, 82),
+(4, 88),
+(5, 95);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/score_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0066]
+sql:
+-- 计算所有学生分数的样本标准差
+SELECT STDDEV_SAMP(score) as score_stddev
+FROM score_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:18) /test/1/catalog1/schema1/STDDEV_SAMP/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:16) /test/1/catalog1/schema1/score_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0067]
+sql:
+-- 创建示例表
+CREATE TABLE score_table (
+    student_id INT,
+    score DOUBLE
+) DISTRIBUTED BY HASH(student_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:24) /test/1/catalog1/schema1/score_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0068]
+sql:
+-- 插入测试数据
+INSERT INTO score_table VALUES
+(1, 85),
+(2, 90),
+(3, 82),
+(4, 88),
+(5, 95);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/score_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0069]
+sql:
+-- 计算所有学生分数的标准差
+SELECT STDDEV(score) as score_stddev
+FROM score_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:13) /test/1/catalog1/schema1/STDDEV/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:16) /test/1/catalog1/schema1/score_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0070]
+sql:
+-- 创建示例表
+CREATE TABLE sales_table (
+    product_id INT,
+    price DECIMAL(10,2),
+    quantity INT
+) DISTRIBUTED BY HASH(product_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:24) /test/1/catalog1/schema1/sales_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0071]
+sql:
+-- 插入测试数据
+INSERT INTO sales_table VALUES
+(1, 99.99, 2),
+(2, 159.99, 1),
+(3, 49.99, 5),
+(4, 299.99, 1),
+(5, 79.99, 3);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/sales_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0072]
+sql:
+-- 计算销售总金额
+SELECT SUM(price * quantity) as total_sales
+FROM sales_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:10) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:16) /test/1/catalog1/schema1/sales_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0073]
+sql:
+-- 创建示例表
+CREATE TABLE sales_table (
+    product_id INT,
+    price DECIMAL(10,2),
+    quantity INT,
+    discount DECIMAL(10,2)
+) DISTRIBUTED BY HASH(product_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:24) /test/1/catalog1/schema1/sales_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0074]
+sql:
+-- 插入测试数据
+INSERT INTO sales_table VALUES
+(1, 99.99, 2, NULL),
+(2, 159.99, 1, NULL),
+(3, 49.99, 5, NULL),
+(4, 299.99, 1, NULL),
+(5, 79.99, 3, NULL);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/sales_table/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0075]
+sql:
+-- 对比 SUM 和 SUM0 的区别
+SELECT 
+    SUM(discount) as sum_discount,    -- 返回 NULL
+    SUM0(discount) as sum0_discount   -- 返回 0
+FROM sales_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:7) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:8) /test/1/catalog1/schema1/SUM0/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:5~5:16) /test/1/catalog1/schema1/sales_table/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0076]
+sql:
+-- 创建示例表
+CREATE TABLE student_scores (
+    student_id INT,
+    score DECIMAL(4,1)
+) DISTRIBUTED BY HASH(student_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:27) /test/1/catalog1/schema1/student_scores/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0077]
+sql:
+-- 插入测试数据
+INSERT INTO student_scores VALUES
+(1, 85.5),
+(2, 92.0),
+(3, 78.5),
+(4, 88.0),
+(5, 95.5),
+(6, 82.0),
+(7, 90.0),
+(8, 87.5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:26) /test/1/catalog1/schema1/student_scores/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0078]
+sql:
+-- 计算学生成绩的样本方差
+SELECT 
+    VAR_SAMP(score) as sample_variance,
+    VARIANCE(score) as population_variance
+FROM student_scores;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:12) /test/1/catalog1/schema1/VAR_SAMP/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:4~4:12) /test/1/catalog1/schema1/VARIANCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:5~5:19) /test/1/catalog1/schema1/student_scores/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0079]
+sql:
+-- 创建示例表
+CREATE TABLE student_scores (
+    student_id INT,
+    score DECIMAL(4,1)
+) DISTRIBUTED BY HASH(student_id)
+PROPERTIES (
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:27) /test/1/catalog1/schema1/student_scores/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0080]
+sql:
+-- 插入测试数据
+INSERT INTO student_scores VALUES
+(1, 85.5),
+(2, 92.0),
+(3, 78.5),
+(4, 88.0),
+(5, 95.5),
+(6, 82.0),
+(7, 90.0),
+(8, 87.5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:26) /test/1/catalog1/schema1/student_scores/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0081]
+sql:
+-- 计算学生成绩的方差
+SELECT VARIANCE(score) as score_variance
+FROM student_scores;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:15) /test/1/catalog1/schema1/VARIANCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:5~3:19) /test/1/catalog1/schema1/student_scores/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0082]
+sql:
+CREATE TABLE events(
+    user_id BIGINT,
+    event_name VARCHAR(64),
+    event_timestamp datetime,
+    phone_brand varchar(64),
+    tab_num int
+) distributed by hash(user_id) buckets 3 properties("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/events/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0083]
+sql:
+INSERT INTO
+    events
+VALUES
+    (100123, '登录', '2022-05-14 10:01:00', 'HONOR', 1),
+    (100123, '访问', '2022-05-14 10:02:00', 'HONOR', 2),
+    (100123, '下单', '2022-05-14 10:04:00', 'HONOR', 3),
+    (100123, '付款', '2022-05-14 10:10:00', 'HONOR', 4),
+    (100125, '登录', '2022-05-15 11:00:00', 'XIAOMI', 1),
+    (100125, '访问', '2022-05-15 11:01:00', 'XIAOMI', 2),
+    (100125, '下单', '2022-05-15 11:02:00', 'XIAOMI', 6),
+    (100126, '登录', '2022-05-15 12:00:00', 'IPHONE', 1),
+    (100126, '访问', '2022-05-15 12:01:00', 'HONOR', 2),
+    (100127, '登录', '2022-05-15 11:30:00', 'VIVO', 1),
+    (100127, '访问', '2022-05-15 11:31:00', 'VIVO', 5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:4~2:10) /test/1/catalog1/schema1/events/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0084]
+sql:
+SELECT
+    user_id,
+    window_funnel(
+        300,
+        "default",
+        event_timestamp,
+        event_name = '登录',
+        event_name = '访问',
+        event_name = '下单',
+        event_name = '付款'
+    ) AS level
+FROM
+    events
+GROUP BY
+    user_id
+order BY
+    user_id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:17) /test/1/catalog1/schema1/window_funnel/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:4~13:10) /test/1/catalog1/schema1/events/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0085]
+sql:
+CREATE TABLE events(
+    user_id BIGINT,
+    event_name VARCHAR(64),
+    event_timestamp datetime,
+    phone_brand varchar(64),
+    tab_num int
+) distributed by hash(user_id) buckets 3 properties("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/events/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0086]
+sql:
+INSERT INTO
+    events
+VALUES
+    (100123, '登录', '2022-05-14 10:01:00', 'HONOR', 1),
+    (100123, '访问', '2022-05-14 10:02:00', 'HONOR', 2),
+    (100123, '登录', '2022-05-14 10:03:00', 'HONOR', 3),
+    (100123, '下单', '2022-05-14 10:04:00', 'HONOR', 4),
+    (100123, '付款', '2022-05-14 10:10:00', 'HONOR', 4),
+    (100125, '登录', '2022-05-15 11:00:00', 'XIAOMI', 1),
+    (100125, '访问', '2022-05-15 11:01:00', 'XIAOMI', 2),
+    (100125, '下单', '2022-05-15 11:02:00', 'XIAOMI', 6),
+    (100126, '登录', '2022-05-15 12:00:00', 'IPHONE', 1),
+    (100126, '访问', '2022-05-15 12:01:00', 'HONOR', 2),
+    (100127, '登录', '2022-05-15 11:30:00', 'VIVO', 1),
+    (100127, '访问', '2022-05-15 11:31:00', 'VIVO', 5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:4~2:10) /test/1/catalog1/schema1/events/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0087]
+sql:
+SELECT
+    user_id,
+    window_funnel(
+        3600,
+        "deduplication",
+        event_timestamp,
+        event_name = '登录',
+        event_name = '访问',
+        event_name = '下单',
+        event_name = '付款'
+    ) AS level
+FROM
+    events
+GROUP BY
+    user_id
+order BY
+    user_id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:17) /test/1/catalog1/schema1/window_funnel/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:4~13:10) /test/1/catalog1/schema1/events/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0088]
+sql:
+CREATE TABLE events(
+    user_id BIGINT,
+    event_name VARCHAR(64),
+    event_timestamp datetime,
+    phone_brand varchar(64),
+    tab_num int
+) distributed by hash(user_id) buckets 3 properties("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/events/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0089]
+sql:
+INSERT INTO
+    events
+VALUES
+    (100123, '登录', '2022-05-14 10:01:00', 'HONOR', 1),
+    (100123, '访问', '2022-05-14 10:02:00', 'HONOR', 2),
+    (100123, '登录 2', '2022-05-14 10:03:00', 'HONOR', 3),
+    (100123, '下单', '2022-05-14 10:04:00', 'HONOR', 4),
+    (100123, '付款', '2022-05-14 10:10:00', 'HONOR', 4),
+    (100125, '登录', '2022-05-15 11:00:00', 'XIAOMI', 1),
+    (100125, '访问', '2022-05-15 11:01:00', 'XIAOMI', 2),
+    (100125, '下单', '2022-05-15 11:02:00', 'XIAOMI', 6),
+    (100126, '登录', '2022-05-15 12:00:00', 'IPHONE', 1),
+    (100126, '访问', '2022-05-15 12:01:00', 'HONOR', 2),
+    (100127, '登录', '2022-05-15 11:30:00', 'VIVO', 1),
+    (100127, '访问', '2022-05-15 11:31:00', 'VIVO', 5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:4~2:10) /test/1/catalog1/schema1/events/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0090]
+sql:
+SELECT
+    user_id,
+    window_funnel(
+        3600,
+        "fixed",
+        event_timestamp,
+        event_name = '登录',
+        event_name = '访问',
+        event_name = '下单',
+        event_name = '付款'
+    ) AS level
+FROM
+    events
+GROUP BY
+    user_id
+order BY
+    user_id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:17) /test/1/catalog1/schema1/window_funnel/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:4~13:10) /test/1/catalog1/schema1/events/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0091]
+sql:
+CREATE TABLE events(
+    user_id BIGINT,
+    event_name VARCHAR(64),
+    event_timestamp datetime,
+    phone_brand varchar(64),
+    tab_num int
+) distributed by hash(user_id) buckets 3 properties("replication_num" = "1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/schema1/events/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0092]
+sql:
+INSERT INTO
+    events
+VALUES
+    (100123, '登录', '2022-05-14 10:01:00', 'HONOR', 1),
+    (100123, '访问', '2022-05-14 10:02:00', 'HONOR', 2),
+    (100123, '下单', '2022-05-14 10:04:00', 'HONOR', 4),
+    (100123, '付款', '2022-05-14 10:04:00', 'HONOR', 4),
+    (100125, '登录', '2022-05-15 11:00:00', 'XIAOMI', 1),
+    (100125, '访问', '2022-05-15 11:01:00', 'XIAOMI', 2),
+    (100125, '下单', '2022-05-15 11:02:00', 'XIAOMI', 6),
+    (100126, '登录', '2022-05-15 12:00:00', 'IPHONE', 1),
+    (100126, '访问', '2022-05-15 12:01:00', 'HONOR', 2),
+    (100127, '登录', '2022-05-15 11:30:00', 'VIVO', 1),
+    (100127, '访问', '2022-05-15 11:31:00', 'VIVO', 5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:4~2:10) /test/1/catalog1/schema1/events/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0093]
+sql:
+SELECT
+    user_id,
+    window_funnel(
+        3600,
+        "increase",
+        event_timestamp,
+        event_name = '登录',
+        event_name = '访问',
+        event_name = '下单',
+        event_name = '付款'
+    ) AS level
+FROM
+    events
+GROUP BY
+    user_id
+order BY
+    user_id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:17) /test/1/catalog1/schema1/window_funnel/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:4~13:10) /test/1/catalog1/schema1/events/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__session_setting_write__0094]
+sql:
+SET default_ai_resource = 'resource_name';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:23) /test/1/default_ai_resource/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0095]
+sql:
+SELECT AI_SENTIMENT('Apache Doirs is a great DB system.') AS Result;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:19) /test/1/catalog1/schema1/AI_SENTIMENT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0096]
+sql:
+CREATE TABLE knowledge_base (
+    id BIGINT,
+    title STRING,
+    content STRING,
+    embedding ARRAY<FLOAT> COMMENT '由 EMBED 函数生成的嵌入向量'
+)
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 4
+PROPERTIES (
+    "replication_num" = "1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:27) /test/1/catalog1/schema1/knowledge_base/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__session_setting_write__0097]
+sql:
+SET default_ai_resource = 'embed_resource_name';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:23) /test/1/default_ai_resource/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0098]
+sql:
+-- `embedding` 是函数 EMBED 根据 content 对应的标签所生成的嵌入向量
+INSERT INTO knowledge_base (id, title, content, embedding) VALUES
+(1, "Travel Reimbursement Policy",
+    "Employees must submit a reimbursement request within 7 days after the business trip, with invoices and travel approval attached.",
+    EMBED("travel reimbursement policy")),
+(2, "Leave Policy",
+    "Employees must apply for leave in the system in advance. If the leave is longer than three days, approval from the direct manager is required.",
+    EMBED("leave request policy")),
+(3, "VPN User Guide",
+    "To access the internal network, employees must use VPN. For the first login, download and install the client and configure the certificate.",
+    EMBED("VPN guide intranet access")),
+(4, "Meeting Room Reservation",
+    "Meeting rooms can be reserved in advance through the OA system, with time and number of participants specified.",
+    EMBED("meeting room booking reservation")),
+(5, "Procurement Request Process",
+    "Departments must fill out a procurement request form for purchasing items. If the amount exceeds $5000, financial approval is required.",
+    EMBED("procurement request process finance"));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:26) /test/1/catalog1/schema1/knowledge_base/",
+      "action" : "INSERT"
+    },
+    {
+      "subject": "Function(5:4~5:9) /test/1/catalog1/schema1/EMBED/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:4~8:9) /test/1/catalog1/schema1/EMBED/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:4~11:9) /test/1/catalog1/schema1/EMBED/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(14:4~14:9) /test/1/catalog1/schema1/EMBED/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(17:4~17:9) /test/1/catalog1/schema1/EMBED/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__session_setting_write__0099]
+sql:
+SET default_ai_resource='global_default_resource';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:23) /test/1/default_ai_resource/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0100]
+sql:
+SELECT AI_SENTIMENT('this is a test');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:19) /test/1/catalog1/schema1/AI_SENTIMENT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0101]
+sql:
+-- 调用名为'global_default_resource'的资源
+SELECT AI_SENTIMENT('invoke_resource', 'this is a test');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:19) /test/1/catalog1/schema1/AI_SENTIMENT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__session_setting_write__0102]
+sql:
+SET default_ai_resource = 'resource_name';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:23) /test/1/default_ai_resource/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0103]
+sql:
+SELECT AI_SENTIMENT('Apache Doirs is a great DBMS.');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:19) /test/1/catalog1/schema1/AI_SENTIMENT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0104]
+sql:
+-- 建表示例
+CREATE TABLE `test_array_index` (
+    `apply_date` date NULL COMMENT '',
+    `id` varchar(60) NOT NULL COMMENT '',
+    `inventors` array<text> NULL COMMENT '' -- 建表时对array 列加不分词倒排索引
+  ) ENGINE=OLAP
+  DUPLICATE KEY(`apply_date`, `id`)
+  COMMENT 'OLAP'
+  DISTRIBUTED BY HASH(`id`) BUCKETS 1
+  PROPERTIES (
+  "replication_allocation" = "tag.location.default: 1",
+  "storage_format" = "V2",
+  "light_schema_change" = "true",
+  "disable_auto_compaction" = "false"
+  );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:31) /test/1/catalog1/schema1/test_array_index/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0105]
+sql:
+-- 查询示例
+SELECT id, inventors FROM test_array_index WHERE array_contains(inventors, 'x') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:26~2:42) /test/1/catalog1/schema1/test_array_index/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:49~2:63) /test/1/catalog1/schema1/array_contains/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0106]
+sql:
+CREATE TABLE IF NOT EXISTS arrays_overlap_table (
+        id INT,
+        array_column ARRAY<STRING>,
+        INDEX idx_array_column (array_column) USING INVERTED --只允许不分词倒排索引
+    ) ENGINE=OLAP
+    DUPLICATE KEY(id)
+    DISTRIBUTED BY HASH(id) BUCKETS 1
+    PROPERTIES (
+    "replication_num" = "1"
+    );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:47) /test/1/catalog1/schema1/arrays_overlap_table/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0107]
+sql:
+INSERT INTO arrays_overlap_table (id, array_column) VALUES (1, ARRAY('HELLO', 'ALOHA')), (2, ARRAY('NO', 'WORLD'));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:32) /test/1/catalog1/schema1/arrays_overlap_table/",
+      "action" : "INSERT"
+    },
+    {
+      "subject": "Function(1:63~1:68) /test/1/catalog1/schema1/ARRAY/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:93~1:98) /test/1/catalog1/schema1/ARRAY/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0108]
+sql:
+-- 创建一个表来存储测试数据
+CREATE TABLE test_table_for_regexp_replace (
+        id INT,
+        original_text VARCHAR(500),
+        pattern VARCHAR(100),
+        replacement VARCHAR(100)
+    ) PROPERTIES ("replication_num"="1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:42) /test/1/catalog1/schema1/test_table_for_regexp_replace/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0109]
+sql:
+--  插入测试数据
+INSERT INTO test_table_for_regexp_replace VALUES
+    (1, 'Hello, World!', ',', '-'),    
+    (2, 'apple123', '[0-9]', '*'),    
+    (3, 'aabbcc', '(aa|bb|cc)', 'XX'),         
+    (4, '123-456-7890', '-', ' '), 
+    (5, 'test,data', ',', ';'),              
+    (6, 'a1b2c3', '[0-9]', '#'),         
+    (7, 'book keeper', 'oo|ee', '**'),        
+    (8, 'ababab', '(ab)', 'XY'),       
+    (9, 'aabbcc', '(aa|bb|cc)', 'ZZ'),         
+    (10, 'apple,banana', ',', ' - ');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:41) /test/1/catalog1/schema1/test_table_for_regexp_replace/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0110]
+sql:
+-- 对插入的数据执行替换操作
+SELECT id, regexp_replace(original_text, pattern, replacement) as replaced_text FROM test_table_for_regexp_replace ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:11~2:25) /test/1/catalog1/schema1/regexp_replace/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:85~2:114) /test/1/catalog1/schema1/test_table_for_regexp_replace/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0111]
+sql:
+CREATE TABLE test_regexp (
+    id INT,
+    name VARCHAR(255)
+) PROPERTIES("replication_num"="1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:24) /test/1/catalog1/schema1/test_regexp/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0112]
+sql:
+INSERT INTO test_regexp (id, name) VALUES
+    (1, 'Alice'),
+    (2, 'Bob'),
+    (3, 'Charlie'),
+    (4, 'David');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:23) /test/1/catalog1/schema1/test_regexp/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0113]
+sql:
+--查找以'A'开头的名字
+SELECT id, name FROM test_regexp WHERE name REGEXP '^A';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:21~2:32) /test/1/catalog1/schema1/test_regexp/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0114]
+sql:
+-- 插入具有特殊字符的名字
+INSERT INTO test_regexp (id, name) VALUES
+    (5, 'Anna-Maria'),
+    (6, 'John_Doe');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/test_regexp/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0115]
+sql:
+-- 查找包含'-'字符的名字
+SELECT id, name FROM test_regexp WHERE name REGEXP '-';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:21~2:32) /test/1/catalog1/schema1/test_regexp/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0116]
+sql:
+SELECT regexp('foobar', '(?<=foo)bar');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:13) /test/1/catalog1/schema1/regexp/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__session_setting_write__0117]
+sql:
+SET enable_extended_regex = true;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:25) /test/1/enable_extended_regex/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0118]
+sql:
+SELECT regexp('foobar', '(?<=foo)bar');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:13) /test/1/catalog1/schema1/regexp/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0119]
+sql:
+create table example(
+            k1 int
+        ) properties(
+            "replication_num" = "1"
+        );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:20) /test/1/catalog1/schema1/example/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0120]
+sql:
+insert into example values(1);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:19) /test/1/catalog1/schema1/example/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0121]
+sql:
+create table example(
+            id int
+        ) properties(
+            "replication_num" = "1"
+        );
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:20) /test/1/catalog1/schema1/example/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0122]
+sql:
+insert into example values(1);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:19) /test/1/catalog1/schema1/example/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0123]
+sql:
+CREATE TABLE test_window_order (
+  item_id int,
+  date_time date,
+  sales double)
+distributed BY hash(item_id)
+properties("replication_num" = 1);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:30) /test/1/catalog1/schema1/test_window_order/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0124]
+sql:
+INSERT INTO test_window_order VALUES
+(1, '2024-07-01', 100),
+(2, '2024-07-01', 100),
+(3, '2024-07-01', 140);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:29) /test/1/catalog1/schema1/test_window_order/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__select__0125]
+sql:
+SELECT
+    item_id, date_time, sales,
+    sum(sales) OVER (ORDER BY date_time ROWS BETWEEN 
+        UNBOUNDED PRECEDING AND CURRENT ROW) sum
+FROM
+    test_window_order;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:4~3:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:4~6:21) /test/1/catalog1/schema1/test_window_order/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0126]
+sql:
+CREATE TABLE t1
+     (id INT, c1 BIGINT, c2 STRING, c3 DOUBLE, c4 DATE)
+   UNIQUE KEY (id)
+   DISTRIBUTED BY HASH (id)
+   PROPERTIES('replication_num'='1', "function_column.sequence_col" = "c4");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0127]
+sql:
+CREATE TABLE t2
+     (id INT, c1 BIGINT, c2 STRING, c3 DOUBLE, c4 DATE)
+   DISTRIBUTED BY HASH (id)
+   PROPERTIES('replication_num'='1');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0128]
+sql:
+CREATE TABLE t3
+     (id INT)
+   DISTRIBUTED BY HASH (id)
+   PROPERTIES('replication_num'='1');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t3/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0129]
+sql:
+INSERT INTO t1 VALUES
+     (1, 1, '1', 1.0, '2000-01-01'),
+     (2, 2, '2', 2.0, '2000-01-02'),
+     (3, 3, '3', 3.0, '2000-01-03');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t1/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0130]
+sql:
+INSERT INTO t2 VALUES
+     (1, 10, '10', 10.0, '2000-01-10'),
+     (2, 20, '20', 20.0, '2000-01-20'),
+     (3, 30, '30', 30.0, '2000-01-30'),
+     (4, 4, '4', 4.0, '2000-01-04'),
+     (5, 5, '5', 5.0, '2000-01-05');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t2/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0131]
+sql:
+INSERT INTO t3 VALUES
+     (1),
+     (4),
+     (5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t3/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__delete__0132]
+sql:
+DELETE FROM t1
+     USING t2 INNER JOIN t3 ON t2.id = t3.id
+     WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "DELETE": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t1/",
+      "action" : "DELETE",
+      "target" : [
+        "Table(2:11~2:13) /test/1/catalog1/schema1/t2/",
+        "Table(2:25~2:27) /test/1/catalog1/schema1/t3/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0133]
+sql:
+-- 创建 t1, t2, t3 三张表
+CREATE TABLE t1
+  (id INT, c1 BIGINT, c2 STRING, c3 DOUBLE, c4 DATE)
+UNIQUE KEY (id)
+DISTRIBUTED BY HASH (id)
+PROPERTIES('replication_num'='1', "function_column.sequence_col" = "c4");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:15) /test/1/catalog1/schema1/t1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0134]
+sql:
+CREATE TABLE t2
+  (id INT, c1 BIGINT, c2 STRING, c3 DOUBLE, c4 DATE)
+DISTRIBUTED BY HASH (id)
+PROPERTIES('replication_num'='1');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__create_table__0135]
+sql:
+CREATE TABLE t3
+  (id INT)
+DISTRIBUTED BY HASH (id)
+PROPERTIES('replication_num'='1');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t3/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0136]
+sql:
+-- 插入数据
+INSERT INTO t1 VALUES
+  (1, 1, '1', 1.0, '2000-01-01'),
+  (2, 2, '2', 2.0, '2000-01-02'),
+  (3, 3, '3', 3.0, '2000-01-03');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:14) /test/1/catalog1/schema1/t1/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0137]
+sql:
+INSERT INTO t2 VALUES
+  (1, 10, '10', 10.0, '2000-01-10'),
+  (2, 20, '20', 20.0, '2000-01-20'),
+  (3, 30, '30', 30.0, '2000-01-30'),
+  (4, 4, '4', 4.0, '2000-01-04'),
+  (5, 5, '5', 5.0, '2000-01-05');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t2/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0138]
+sql:
+INSERT INTO t3 VALUES
+  (1),
+  (4),
+  (5);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:14) /test/1/catalog1/schema1/t3/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__update__0139]
+sql:
+-- 更新 t1
+UPDATE t1
+  SET t1.c1 = t2.c1, t1.c3 = t2.c3 * 100
+  FROM t2 INNER JOIN t3 ON t2.id = t3.id
+  WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "UPDATE": [
+    {
+      "subject": "Table(2:7~2:9) /test/1/catalog1/schema1/t1/",
+      "action" : "UPDATE",
+      "target" : [
+        "Table(4:7~4:9) /test/1/catalog1/schema1/t2/",
+        "Table(4:21~4:23) /test/1/catalog1/schema1/t3/"
+      ]
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__alter_table__0140]
+sql:
+-- 原表使用 AUTO PARTITION BY RANGE，分桶数为 5
+ALTER TABLE example_db.my_auto_range_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 8;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:42) /test/1/catalog1/example_db/my_auto_range_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_006__insert__0141]
+sql:
+-- 后续 INSERT 触发自动创建的新分区将使用 8 个分桶
+INSERT INTO example_db.my_auto_range_table VALUES ('2024-01-03', 3);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:42) /test/1/catalog1/example_db/my_auto_range_table/",
+      "action" : "INSERT"
+    }
+  ]
+}

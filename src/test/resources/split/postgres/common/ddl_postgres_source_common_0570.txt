@@ -1,0 +1,582 @@
+/*
+ * 6.31
+ * ELEMENT_TYPES view
+ */
+
+CREATE VIEW element_types AS
+    SELECT CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST(n.nspname AS sql_identifier) AS object_schema,
+           CAST(x.objname AS sql_identifier) AS object_name,
+           CAST(x.objtype AS character_data) AS object_type,
+           CAST(x.objdtdid AS sql_identifier) AS collection_type_identifier,
+           CAST(
+             CASE WHEN nbt.nspname = 'pg_catalog' THEN format_type(bt.oid, null)
+                  ELSE 'USER-DEFINED' END AS character_data) AS data_type,
+
+           CAST(null AS cardinal_number) AS character_maximum_length,
+           CAST(null AS cardinal_number) AS character_octet_length,
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+           CAST(null AS cardinal_number) AS numeric_precision,
+           CAST(null AS cardinal_number) AS numeric_precision_radix,
+           CAST(null AS cardinal_number) AS numeric_scale,
+           CAST(null AS cardinal_number) AS datetime_precision,
+           CAST(null AS character_data) AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nbt.nspname AS sql_identifier) AS udt_schema,
+           CAST(bt.typname AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST('a' || CAST(x.objdtdid AS text) AS sql_identifier) AS dtd_identifier
+
+    FROM pg_namespace n, pg_type at, pg_namespace nbt, pg_type bt,
+         (
+           /* columns, attributes */
+           SELECT c.relnamespace, CAST(c.relname AS sql_identifier),
+                  CASE WHEN c.relkind = 'c' THEN 'USER-DEFINED TYPE'::text ELSE 'TABLE'::text END,
+                  a.attnum, a.atttypid, a.attcollation
+           FROM pg_class c, pg_attribute a
+           WHERE c.oid = a.attrelid
+                 AND c.relkind IN ('r', 'v', 'f', 'c', 'p')
+                 AND attnum > 0 AND NOT attisdropped
+
+           UNION ALL
+
+           /* domains */
+           SELECT t.typnamespace, CAST(t.typname AS sql_identifier),
+                  'DOMAIN'::text, 1, t.typbasetype, t.typcollation
+           FROM pg_type t
+           WHERE t.typtype = 'd'
+
+           UNION ALL
+
+           /* parameters */
+           SELECT pronamespace,
+                  CAST(nameconcatoid(proname, oid) AS sql_identifier),
+                  'ROUTINE'::text, (ss.x).n, (ss.x).x, 0
+           FROM (SELECT p.pronamespace, p.proname, p.oid,
+                        _pg_expandarray(coalesce(p.proallargtypes, p.proargtypes::oid[])) AS x
+                 FROM pg_proc p) AS ss
+
+           UNION ALL
+
+           /* result types */
+           SELECT p.pronamespace,
+                  CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier),
+                  'ROUTINE'::text, 0, p.prorettype, 0
+           FROM pg_proc p
+
+         ) AS x (objschema, objname, objtype, objdtdid, objtypeid, objcollation)
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON x.objcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+
+    WHERE n.oid = x.objschema
+          AND at.oid = x.objtypeid
+          AND (at.typelem <> 0 AND at.typlen = -1)
+          AND at.typelem = bt.oid
+          AND nbt.oid = bt.typnamespace
+
+          AND (n.nspname, x.objname, x.objtype, CAST(x.objdtdid AS sql_identifier)) IN
+              ( SELECT object_schema, object_name, object_type, dtd_identifier
+                    FROM data_type_privileges )
+;
+ALTER TABLE pg_enum ADD UNIQUE USING INDEX pg_enum_typid_label_index
+;
+ALTER EXTENSION test_pg_dump ADD OPERATOR ==== (int, int)
+;
+CREATE FUNCTION test_shm_mq(queue_size pg_catalog.int8,
+					   message pg_catalog.text,
+					   repeat_count pg_catalog.int4 default 1,
+					   num_workers pg_catalog.int4 default 1)
+    RETURNS pg_catalog.void STRICT
+	AS '$libdir/test_shm_mq' LANGUAGE C
+;
+CREATE SCHEMA import_dest1
+;
+CREATE POLICY p1 ON dob_t1 TO regress_rls_dob_role1,regress_rls_dob_role1 USING (true)
+;
+CREATE FUNCTION ltree_compress(internal)
+RETURNS internal as '$libdir/ltree' LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+VACUUM (SKIP_DATABASE_STATS) pg_catalog.pg_database
+;
+-- fail
+SECURITY LABEL ON TABLE seclabel_tbl3 IS 'unclassified'
+;
+CREATE FUNCTION voidtest4(a int) RETURNS VOID LANGUAGE SQL AS
+$$ INSERT INTO sometable VALUES(a - 1) RETURNING f1 $$
+;
+CREATE VIEW "public"."rtest_v1" AS
+ SELECT "a",
+    "b"
+   FROM "public"."rtest_t1"
+;
+ANALYZE pg_temp_3.pg_temp_27606_2
+;
+CREATE TEMP TABLE pg_temp_13.pg_temp_26675_2 (tid pg_catalog.tid)
+;
+DROP PUBLICATION testpub_syntax1
+;
+create temp table prtx2_3 partition of prtx2 for values from (21) to (31)
+;
+CREATE TABLE test12fk (a int, b text COLLATE case_insensitive REFERENCES test12pk (x) ON UPDATE RESTRICT)
+;
+CREATE TABLE pagg_tab_m_p3 PARTITION OF pagg_tab_m FOR VALUES FROM (20, 20) TO (30, 30)
+;
+ANALYZE pg_temp_10.pg_temp_26350_2
+;
+CREATE AGGREGATE split_agg_probe.min_int(integer) (
+    SFUNC = int4smaller,
+    STYPE = integer,
+    SORTOP = operator(<),
+    PARALLEL = SAFE
+)
+;
+CREATE TABLE plt1_p1 PARTITION OF plt1 FOR VALUES IN ('0000', '0003', '0004', '0010')
+;
+CREATE FUNCTION sort_asc(_int4)
+RETURNS _int4
+AS '$libdir/_int'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+alter table atacc3 inherit atacc2
+;
+CREATE OR REPLACE FUNCTION ext_cor_func() RETURNS text
+  AS $$ SELECT 'ext_cor_func: from extension'::text $$ LANGUAGE sql
+;
+CREATE TRIGGER some_trig_before BEFORE UPDATE ON some_t FOR EACH ROW
+  EXECUTE PROCEDURE dummy_update_func('before')
+;
+-- test accum and combine functions directly
+CREATE TABLE regr_test (x float8, y float8)
+;
+do $$
+<<blk>>
+declare
+  v int;
+  r two_int8s;
+  v1 v%type;
+  v2 blk.v%type;
+  r1 r%type;
+  r2 blk.r%type;
+begin
+  raise notice '%', pg_typeof(v1);
+  raise notice '%', pg_typeof(v2);
+  raise notice '%', pg_typeof(r1);
+  raise notice '%', pg_typeof(r2);
+end$$
+;
+drop schema alter1 cascade
+;
+create type jsb_i_not_null_rec as (a jsb_i_not_null)
+;
+ALTER OPERATOR FAMILY gist_date_ops USING gist ADD
+	FUNCTION	11  (date, date) gbt_date_sortsupport (internal)
+;
+CREATE TABLE "public"."hash_name_heap" (
+    "seqno" integer,
+    "random" "name"
+)
+;
+create event trigger regress_event_trigger
+   on ddl_command_start
+   execute procedure pg_backend_pid()
+;
+CREATE OPERATOR >= (
+	PROCEDURE = isnge,
+	LEFTARG = issn13,
+	RIGHTARG = ean13,
+	COMMUTATOR = <=,
+	NEGATOR = <,
+	RESTRICT = scalargtsel,
+	JOIN = scalargtjoinsel )
+;
+alter table alterlock set without cluster
+;
+drop type textandtext
+;
+create function formarray(anyelement, variadic anyarray) returns anyarray as $$
+  select array_prepend($1, $2);
+$$ language sql immutable strict
+;
+ANALYZE public.nv_parent
+;
+alter table inh_parent add constraint inh_parent_excl exclude ((1) with =)
+;
+CREATE TABLE reindex_index_status AS
+      SELECT oid, relname, relfilenode, relkind, reltoastrelid
+      FROM pg_class
+      WHERE oid IN
+         (SELECT relid FROM pg_partition_tree('concur_reindex_part_index'))
+;
+CREATE TABLE "public"."bit_defaults" (
+    "b1" bit(4) DEFAULT '1001'::"bit",
+    "b2" bit(4) DEFAULT '0101'::"bit",
+    "b3" bit varying(5) DEFAULT '1001'::bit varying,
+    "b4" bit varying(5) DEFAULT '0101'::"bit"
+)
+;
+VACUUM (TRUNCATE FALSE) pg_catalog.pg_range
+;
+CREATE FUNCTION widget_in(cstring)
+   RETURNS widget
+   AS '/src/src/test/regress/regress.so'
+   LANGUAGE C STRICT IMMUTABLE
+;
+CREATE FUNCTION dummy_seclabel_dummy()
+   RETURNS pg_catalog.void
+       AS 'MODULE_PATHNAME' LANGUAGE C
+;
+ALTER SEQUENCE sequence_test2 RESTART WITH 24
+  INCREMENT BY 4 MAXVALUE 36 MINVALUE 5 CYCLE
+;
+CREATE TABLE "public"."road" (
+    "name" "text",
+    "thepath" "path"
+)
+;
+CREATE FUNCTION gbt_inet_union(internal, internal)
+RETURNS gbtreekey16
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+CREATE CONSTRAINT TRIGGER t_raster AFTER UPDATE OR DELETE ON image
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE PROCEDURE lo_manage(raster)
+;
+VACUUM pg_catalog.pg_inherits
+;
+create trigger parted_trig_before_stmt before insert or update or delete on parted_trig
+   for each statement execute procedure trigger_notice()
+;
+create table rtest_emp (ename char(20), salary money)
+;
+-- remove partitioned table's row filter
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk
+;
+------------------------------------------------------------------------------------------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 6.31
+ * ELEMENT_TYPES view
+ */
+
+CREATE VIEW element_types AS
+    SELECT CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST(n.nspname AS sql_identifier) AS object_schema,
+           CAST(x.objname AS sql_identifier) AS object_name,
+           CAST(x.objtype AS character_data) AS object_type,
+           CAST(x.objdtdid AS sql_identifier) AS collection_type_identifier,
+           CAST(
+             CASE WHEN nbt.nspname = 'pg_catalog' THEN format_type(bt.oid, null)
+                  ELSE 'USER-DEFINED' END AS character_data) AS data_type,
+
+           CAST(null AS cardinal_number) AS character_maximum_length,
+           CAST(null AS cardinal_number) AS character_octet_length,
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+           CAST(null AS cardinal_number) AS numeric_precision,
+           CAST(null AS cardinal_number) AS numeric_precision_radix,
+           CAST(null AS cardinal_number) AS numeric_scale,
+           CAST(null AS cardinal_number) AS datetime_precision,
+           CAST(null AS character_data) AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nbt.nspname AS sql_identifier) AS udt_schema,
+           CAST(bt.typname AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST('a' || CAST(x.objdtdid AS text) AS sql_identifier) AS dtd_identifier
+
+    FROM pg_namespace n, pg_type at, pg_namespace nbt, pg_type bt,
+         (
+           /* columns, attributes */
+           SELECT c.relnamespace, CAST(c.relname AS sql_identifier),
+                  CASE WHEN c.relkind = 'c' THEN 'USER-DEFINED TYPE'::text ELSE 'TABLE'::text END,
+                  a.attnum, a.atttypid, a.attcollation
+           FROM pg_class c, pg_attribute a
+           WHERE c.oid = a.attrelid
+                 AND c.relkind IN ('r', 'v', 'f', 'c', 'p')
+                 AND attnum > 0 AND NOT attisdropped
+
+           UNION ALL
+
+           /* domains */
+           SELECT t.typnamespace, CAST(t.typname AS sql_identifier),
+                  'DOMAIN'::text, 1, t.typbasetype, t.typcollation
+           FROM pg_type t
+           WHERE t.typtype = 'd'
+
+           UNION ALL
+
+           /* parameters */
+           SELECT pronamespace,
+                  CAST(nameconcatoid(proname, oid) AS sql_identifier),
+                  'ROUTINE'::text, (ss.x).n, (ss.x).x, 0
+           FROM (SELECT p.pronamespace, p.proname, p.oid,
+                        _pg_expandarray(coalesce(p.proallargtypes, p.proargtypes::oid[])) AS x
+                 FROM pg_proc p) AS ss
+
+           UNION ALL
+
+           /* result types */
+           SELECT p.pronamespace,
+                  CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier),
+                  'ROUTINE'::text, 0, p.prorettype, 0
+           FROM pg_proc p
+
+         ) AS x (objschema, objname, objtype, objdtdid, objtypeid, objcollation)
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON x.objcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+
+    WHERE n.oid = x.objschema
+          AND at.oid = x.objtypeid
+          AND (at.typelem <> 0 AND at.typlen = -1)
+          AND at.typelem = bt.oid
+          AND nbt.oid = bt.typnamespace
+
+          AND (n.nspname, x.objname, x.objtype, CAST(x.objdtdid AS sql_identifier)) IN
+              ( SELECT object_schema, object_name, object_type, dtd_identifier
+                    FROM data_type_privileges )
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE pg_enum ADD UNIQUE USING INDEX pg_enum_typid_label_index
+;
+----------
+[ALTER_LIBRARY] ALTER EXTENSION test_pg_dump ADD OPERATOR ==== (int, int)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION test_shm_mq(queue_size pg_catalog.int8,
+					   message pg_catalog.text,
+					   repeat_count pg_catalog.int4 default 1,
+					   num_workers pg_catalog.int4 default 1)
+    RETURNS pg_catalog.void STRICT
+	AS '$libdir/test_shm_mq' LANGUAGE C
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA import_dest1
+;
+----------
+[CREATE_POLICY] CREATE POLICY p1 ON dob_t1 TO regress_rls_dob_role1,regress_rls_dob_role1 USING (true)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ltree_compress(internal)
+RETURNS internal as '$libdir/ltree' LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS) pg_catalog.pg_database
+;
+----------
+[UNKNOWN] -- fail
+SECURITY LABEL ON TABLE seclabel_tbl3 IS 'unclassified'
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION voidtest4(a int) RETURNS VOID LANGUAGE SQL AS
+$$ INSERT INTO sometable VALUES(a - 1) RETURNING f1 $$
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."rtest_v1" AS
+ SELECT "a",
+    "b"
+   FROM "public"."rtest_t1"
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_3.pg_temp_27606_2
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE pg_temp_13.pg_temp_26675_2 (tid pg_catalog.tid)
+;
+----------
+[DROP_PUB_SUB] DROP PUBLICATION testpub_syntax1
+;
+----------
+[CREATE_TABLE] create temp table prtx2_3 partition of prtx2 for values from (21) to (31)
+;
+----------
+[CREATE_TABLE] CREATE TABLE test12fk (a int, b text COLLATE case_insensitive REFERENCES test12pk (x) ON UPDATE RESTRICT)
+;
+----------
+[CREATE_TABLE] CREATE TABLE pagg_tab_m_p3 PARTITION OF pagg_tab_m FOR VALUES FROM (20, 20) TO (30, 30)
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_10.pg_temp_26350_2
+;
+----------
+[CREATE_PROG_OBJ] CREATE AGGREGATE split_agg_probe.min_int(integer) (
+    SFUNC = int4smaller,
+    STYPE = integer,
+    SORTOP = operator(<),
+    PARALLEL = SAFE
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE plt1_p1 PARTITION OF plt1 FOR VALUES IN ('0000', '0003', '0004', '0010')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION sort_asc(_int4)
+RETURNS _int4
+AS '$libdir/_int'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[ALTER_TABLE] alter table atacc3 inherit atacc2
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION ext_cor_func() RETURNS text
+  AS $$ SELECT 'ext_cor_func: from extension'::text $$ LANGUAGE sql
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER some_trig_before BEFORE UPDATE ON some_t FOR EACH ROW
+  EXECUTE PROCEDURE dummy_update_func('before')
+;
+----------
+[CREATE_TABLE] -- test accum and combine functions directly
+CREATE TABLE regr_test (x float8, y float8)
+;
+----------
+[BLOCK] do $$
+<<blk>>
+declare
+  v int;
+  r two_int8s;
+  v1 v%type;
+  v2 blk.v%type;
+  r1 r%type;
+  r2 blk.r%type;
+begin
+  raise notice '%', pg_typeof(v1);
+  raise notice '%', pg_typeof(v2);
+  raise notice '%', pg_typeof(r1);
+  raise notice '%', pg_typeof(r2);
+end$$
+;
+----------
+[DROP_SCHEMA] drop schema alter1 cascade
+;
+----------
+[CREATE_TYPE] create type jsb_i_not_null_rec as (a jsb_i_not_null)
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY gist_date_ops USING gist ADD
+	FUNCTION	11  (date, date) gbt_date_sortsupport (internal)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."hash_name_heap" (
+    "seqno" integer,
+    "random" "name"
+)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create event trigger regress_event_trigger
+   on ddl_command_start
+   execute procedure pg_backend_pid()
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR >= (
+	PROCEDURE = isnge,
+	LEFTARG = issn13,
+	RIGHTARG = ean13,
+	COMMUTATOR = <=,
+	NEGATOR = <,
+	RESTRICT = scalargtsel,
+	JOIN = scalargtjoinsel )
+;
+----------
+[ALTER_TABLE] alter table alterlock set without cluster
+;
+----------
+[DROP_TYPE] drop type textandtext
+;
+----------
+[CREATE_PROG_OBJ] create function formarray(anyelement, variadic anyarray) returns anyarray as $$
+  select array_prepend($1, $2);
+$$ language sql immutable strict
+;
+----------
+[ADMIN_TABLE] ANALYZE public.nv_parent
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table inh_parent add constraint inh_parent_excl exclude ((1) with =)
+;
+----------
+[CREATE_TABLE|SELECT|METADATA] CREATE TABLE reindex_index_status AS
+      SELECT oid, relname, relfilenode, relkind, reltoastrelid
+      FROM pg_class
+      WHERE oid IN
+         (SELECT relid FROM pg_partition_tree('concur_reindex_part_index'))
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."bit_defaults" (
+    "b1" bit(4) DEFAULT '1001'::"bit",
+    "b2" bit(4) DEFAULT '0101'::"bit",
+    "b3" bit varying(5) DEFAULT '1001'::bit varying,
+    "b4" bit varying(5) DEFAULT '0101'::"bit"
+)
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) pg_catalog.pg_range
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION widget_in(cstring)
+   RETURNS widget
+   AS '/src/src/test/regress/regress.so'
+   LANGUAGE C STRICT IMMUTABLE
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION dummy_seclabel_dummy()
+   RETURNS pg_catalog.void
+       AS 'MODULE_PATHNAME' LANGUAGE C
+;
+----------
+[ALTER_SEQUENCE] ALTER SEQUENCE sequence_test2 RESTART WITH 24
+  INCREMENT BY 4 MAXVALUE 36 MINVALUE 5 CYCLE
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."road" (
+    "name" "text",
+    "thepath" "path"
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_inet_union(internal, internal)
+RETURNS gbtreekey16
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE CONSTRAINT TRIGGER t_raster AFTER UPDATE OR DELETE ON image
+    DEFERRABLE INITIALLY DEFERRED
+    FOR EACH ROW EXECUTE PROCEDURE lo_manage(raster)
+;
+----------
+[ADMIN_TABLE] VACUUM pg_catalog.pg_inherits
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger parted_trig_before_stmt before insert or update or delete on parted_trig
+   for each statement execute procedure trigger_notice()
+;
+----------
+[CREATE_TABLE] create table rtest_emp (ename char(20), salary money)
+;
+----------
+[ALTER_PUB_SUB] -- remove partitioned table's row filter
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk
+;

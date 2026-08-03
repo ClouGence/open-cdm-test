@@ -1,0 +1,500 @@
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a char(3) EXISTS PATH '$.a'))
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+MERGE INTO pa_target t USING pa_source s ON t.tid = s.sid
+  WHEN NOT MATCHED THEN INSERT VALUES (s.sid)
+;
+--
+-- FETCH FIRST
+-- Check the WITH TIES clause
+--
+
+SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST 2 ROW WITH TIES
+;
+SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING bytea)
+;
+SELECT
+	js,
+	js IS JSON "IS JSON",
+	js IS NOT JSON "IS NOT JSON",
+	js IS JSON VALUE "IS VALUE",
+	js IS JSON OBJECT "IS OBJECT",
+	js IS JSON ARRAY "IS ARRAY",
+	js IS JSON SCALAR "IS SCALAR",
+	js IS JSON WITHOUT UNIQUE KEYS "WITHOUT UNIQUE",
+	js IS JSON WITH UNIQUE KEYS "WITH UNIQUE"
+FROM
+	test_is_json
+;
+SELECT JSON_OBJECT('a': '1', 'b': NULL, 'c': 2 NULL ON NULL)
+;
+SELECT 0x1234::int2::bytea AS "\x1234", (-0x1234)::int2::bytea AS "\xedcc"
+;
+SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::oid[]::int[] ON ERROR)
+;
+SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') DEFAULT 1 ON ERROR)
+;
+explain (costs off)
+select * from emp1 t1 left join
+    (select coalesce(t3.code, 1) from emp1 t2
+        left join (emp1 t3 join emp1 t4 on t3.id = t4.id)
+        on true)
+on true
+;
+SELECT JSON_VALUE(jsonb '[1,2]', 'strict $[$off]' PASSING 1 AS off RETURNING int) AS value_with_passing
+;
+SELECT test_slru_page_read(0x1234500000000)
+;
+SELECT JSON_VALUE(jsonb '1', 'lax $.a' ERROR ON ERROR)
+;
+SELECT JSON_EXISTS(jsonb '1', 'strict $.a' ERROR ON ERROR)
+;
+SELECT JSON_ARRAY('a', NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' COLUMNS (js2 int path '$', js2 int path '$'))
+;
+SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int4 EXISTS PATH '$.a' ERROR ON ERROR))
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text KEEP QUOTES)
+;
+EXPLAIN (COSTS OFF)
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED THEN
+	UPDATE SET balance = 0
+;
+SELECT * FROM JSON_TABLE(jsonb '123', '$'
+	COLUMNS (item int PATH '$', foo int)) bar
+;
+-- all partitions but rparted_by_int2_maxvalue pruned
+explain (costs off) select * from rparted_by_int2 where a > 100_000_000_000_000
+;
+SELECT
+	JSON_QUERY(js, 'strict $[*]') AS "unspec",
+	JSON_QUERY(js, 'strict $[*]' WITHOUT WRAPPER) AS "without",
+	JSON_QUERY(js, 'strict $[*]' WITH CONDITIONAL WRAPPER) AS "with cond",
+	JSON_QUERY(js, 'strict $[*]' WITH UNCONDITIONAL ARRAY WRAPPER) AS "with uncond",
+	JSON_QUERY(js, 'strict $[*]' WITH ARRAY WRAPPER) AS "with"
+FROM
+	(VALUES
+		(jsonb '1'),
+		('[]'),
+		('[null]'),
+		('[12.3]'),
+		('[true]'),
+		('["aaa"]'),
+		('[[1, 2, 3]]'),
+		('[{"a": 1, "b": [2]}]'),
+		('[1, "2", null, [3]]')
+	) foo(js)
+;
+explain (verbose, costs off)
+with recursive test as (
+  select 1 as x
+  union all
+  select x + 1
+  from test
+) search breadth first by x set y
+select * from test limit 5
+;
+-- Regular "unformatted" columns
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$',
+			"char(4)" char(4) PATH '$',
+			"bool" bool PATH '$',
+			"numeric" numeric PATH '$',
+			"domain" jsonb_test_domain PATH '$',
+			js json PATH '$',
+			jb jsonb PATH '$'
+		)
+	) jt
+	ON true
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search breadth first by f, t set seq
+  cycle f, t set is_cycle using path
+select * from search_graph
+;
+SELECT min(r), max(r), count(r) FROM (
+  SELECT DISTINCT random(-50, 49) r FROM generate_series(1, 2500))
+;
+SELECT JSON_ARRAY(RETURNING bytea FORMAT JSON ENCODING UTF32)
+;
+-- JSON_TABLE() with alias
+EXPLAIN (COSTS OFF, VERBOSE)
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$'
+	)) json_table_func
+;
+SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text OMIT QUOTES)
+;
+-- error
+SELECT sub.* FROM s,
+	JSON_TABLE(js, '$' PASSING 32 AS x, 13 AS y COLUMNS (
+		xx int path '$.c',
+		NESTED PATH '$.a.za[1]' columns (NESTED PATH '$.z21[*]' COLUMNS (z21 int path '$?(@ >= $"x")' ERROR ON ERROR))
+	)) sub
+;
+-- GROUP BY DISTINCT
+
+-- "normal" behavior...
+select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by all rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+SELECT JSON_VALUE(jsonb '{"d1": "H"}', '$.a2' RETURNING queryfuncs_test_domain DEFAULT '"foo1"'::jsonb::text ON EMPTY)
+;
+SELECT JSON_EXISTS(jsonb '{"a": 1, "b": 2}', '$.* ? (@ > $x)' PASSING '1' AS x)
+;
+SELECT JSON_ARRAY(RETURNING bytea FORMAT JSON ENCODING UTF8)
+;
+-- Test JSON_OBJECT deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECT('foo' : '1' FORMAT JSON, 'bar' : 'baz' RETURNING json)
+;
+SELECT SUBSTRING('abcdefg' SIMILAR 'a*#"%#"g*' ESCAPE '#') AS "abcdefg"
+;
+SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text FORMAT JSON PATH '$' KEEP QUOTES))
+;
+EXPLAIN (costs off)
+MERGE INTO rw_view1 t USING (VALUES (5, 'X')) AS v(a,b) ON t.a = v.a
+  WHEN MATCHED THEN DELETE
+;
+EXPLAIN (FORMAT TEXT) MERGE INTO split_explain.items_target t USING (VALUES (1, 'merge', 100), (6, 'merge', 60)) AS s(id, category, qty) ON t.id = s.id WHEN MATCHED THEN UPDATE SET category = s.category, qty = s.qty WHEN NOT MATCHED THEN INSERT (id, category, qty) VALUES (s.id, s.category, s.qty)
+;
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (id FOR ORDINALITY, id2 FOR ORDINALITY, a int PATH '$.a' ERROR ON EMPTY)) jt
+;
+SELECT JSON_QUERY(jsonb '[1,2,null,"a"]', '$[*]' RETURNING int[] WITH WRAPPER ERROR ON ERROR)
+;
+SELECT JSON('{ "a" : 1 } '::bytea FORMAT JSON ENCODING UTF8)
+;
+explain (verbose, costs off)
+with recursive test as (
+  select 0 as x
+  union all
+  select (x + 1) % 10
+  from test
+) cycle x set is_cycle using path
+select * from test
+;
+SELECT JSON_QUERY(jsonb'{"rec": "[1,2]"}', '$.rec' returning int4range keep quotes)
+;
+select * from (with test1 as (select * from table1) select * from (with test1 as (select * from table2) select * from test1)) t
+;
+SELECT min(r), max(r), count(r) FROM (
+  SELECT DISTINCT random(123000000000, 123000000099) r
+  FROM generate_series(1, 2500))
+;
+SELECT *
+FROM JSON_TABLE(
+	jsonb '[1,2,3]',
+	'$[*] ? (@ < $x)'
+		PASSING 10 AS x, 3 AS y
+		COLUMNS (a text FORMAT JSON PATH '$ ? (@ < $y)')
+	) jt
+;
+SELECT a, a::bool FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a dint4 EXISTS PATH '$.a' ))
+;
+EXPLAIN (costs off)
+MERGE INTO rw_view1 t
+  USING (SELECT * FROM generate_series(1,5)) AS s(a) ON t.a = s.a
+  WHEN NOT MATCHED THEN INSERT (a) VALUES (s.a)
+;
+SELECT xmlserialize(CONTENT  'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a char(3) EXISTS PATH '$.a'))
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+MERGE INTO pa_target t USING pa_source s ON t.tid = s.sid
+  WHEN NOT MATCHED THEN INSERT VALUES (s.sid)
+;
+----------
+[SELECT] --
+-- FETCH FIRST
+-- Check the WITH TIES clause
+--
+
+SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST 2 ROW WITH TIES
+;
+----------
+[SELECT] SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING bytea)
+;
+----------
+[SELECT] SELECT
+	js,
+	js IS JSON "IS JSON",
+	js IS NOT JSON "IS NOT JSON",
+	js IS JSON VALUE "IS VALUE",
+	js IS JSON OBJECT "IS OBJECT",
+	js IS JSON ARRAY "IS ARRAY",
+	js IS JSON SCALAR "IS SCALAR",
+	js IS JSON WITHOUT UNIQUE KEYS "WITHOUT UNIQUE",
+	js IS JSON WITH UNIQUE KEYS "WITH UNIQUE"
+FROM
+	test_is_json
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': '1', 'b': NULL, 'c': 2 NULL ON NULL)
+;
+----------
+[SELECT] SELECT 0x1234::int2::bytea AS "\x1234", (-0x1234)::int2::bytea AS "\xedcc"
+;
+----------
+[SELECT] SELECT JSON_QUERY('"a"', '$.a'  RETURNING int[] DEFAULT (SELECT '{1}')::oid[]::int[] ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') DEFAULT 1 ON ERROR)
+;
+----------
+[PERFORMANCE] explain (costs off)
+select * from emp1 t1 left join
+    (select coalesce(t3.code, 1) from emp1 t2
+        left join (emp1 t3 join emp1 t4 on t3.id = t4.id)
+        on true)
+on true
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '[1,2]', 'strict $[$off]' PASSING 1 AS off RETURNING int) AS value_with_passing
+;
+----------
+[SELECT] SELECT test_slru_page_read(0x1234500000000)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '1', 'lax $.a' ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_EXISTS(jsonb '1', 'strict $.a' ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a', NULL, 'b' ABSENT ON NULL RETURNING jsonb)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb'"1.23"', '$.a' COLUMNS (js2 int path '$', js2 int path '$'))
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a int4 EXISTS PATH '$.a' ERROR ON ERROR))
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text KEEP QUOTES)
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF)
+MERGE INTO target t
+USING source AS s
+ON t.tid = s.sid
+WHEN MATCHED THEN
+	UPDATE SET balance = 0
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '123', '$'
+	COLUMNS (item int PATH '$', foo int)) bar
+;
+----------
+[PERFORMANCE] -- all partitions but rparted_by_int2_maxvalue pruned
+explain (costs off) select * from rparted_by_int2 where a > 100_000_000_000_000
+;
+----------
+[SELECT] SELECT
+	JSON_QUERY(js, 'strict $[*]') AS "unspec",
+	JSON_QUERY(js, 'strict $[*]' WITHOUT WRAPPER) AS "without",
+	JSON_QUERY(js, 'strict $[*]' WITH CONDITIONAL WRAPPER) AS "with cond",
+	JSON_QUERY(js, 'strict $[*]' WITH UNCONDITIONAL ARRAY WRAPPER) AS "with uncond",
+	JSON_QUERY(js, 'strict $[*]' WITH ARRAY WRAPPER) AS "with"
+FROM
+	(VALUES
+		(jsonb '1'),
+		('[]'),
+		('[null]'),
+		('[12.3]'),
+		('[true]'),
+		('["aaa"]'),
+		('[[1, 2, 3]]'),
+		('[{"a": 1, "b": [2]}]'),
+		('[1, "2", null, [3]]')
+	) foo(js)
+;
+----------
+[PERFORMANCE] explain (verbose, costs off)
+with recursive test as (
+  select 1 as x
+  union all
+  select x + 1
+  from test
+) search breadth first by x set y
+select * from test limit 5
+;
+----------
+[SELECT] -- Regular "unformatted" columns
+SELECT *
+FROM json_table_test vals
+	LEFT OUTER JOIN
+	JSON_TABLE(
+		vals.js::jsonb, 'lax $[*]'
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$',
+			"char(4)" char(4) PATH '$',
+			"bool" bool PATH '$',
+			"numeric" numeric PATH '$',
+			"domain" jsonb_test_domain PATH '$',
+			js json PATH '$',
+			jb jsonb PATH '$'
+		)
+	) jt
+	ON true
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) search breadth first by f, t set seq
+  cycle f, t set is_cycle using path
+select * from search_graph
+;
+----------
+[SELECT] SELECT min(r), max(r), count(r) FROM (
+  SELECT DISTINCT random(-50, 49) r FROM generate_series(1, 2500))
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING bytea FORMAT JSON ENCODING UTF32)
+;
+----------
+[PERFORMANCE] -- JSON_TABLE() with alias
+EXPLAIN (COSTS OFF, VERBOSE)
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$'
+	)) json_table_func
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"aaa"', '$' RETURNING text OMIT QUOTES)
+;
+----------
+[SELECT] -- error
+SELECT sub.* FROM s,
+	JSON_TABLE(js, '$' PASSING 32 AS x, 13 AS y COLUMNS (
+		xx int path '$.c',
+		NESTED PATH '$.a.za[1]' columns (NESTED PATH '$.z21[*]' COLUMNS (z21 int path '$?(@ >= $"x")' ERROR ON ERROR))
+	)) sub
+;
+----------
+[SELECT] -- GROUP BY DISTINCT
+
+-- "normal" behavior...
+select a, b, c
+from (values (1, 2, 3), (4, null, 6), (7, 8, 9)) as t (a, b, c)
+group by all rollup(a, b), rollup(a, c)
+order by a, b, c
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '{"d1": "H"}', '$.a2' RETURNING queryfuncs_test_domain DEFAULT '"foo1"'::jsonb::text ON EMPTY)
+;
+----------
+[SELECT] SELECT JSON_EXISTS(jsonb '{"a": 1, "b": 2}', '$.* ? (@ > $x)' PASSING '1' AS x)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING bytea FORMAT JSON ENCODING UTF8)
+;
+----------
+[PERFORMANCE] -- Test JSON_OBJECT deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECT('foo' : '1' FORMAT JSON, 'bar' : 'baz' RETURNING json)
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR 'a*#"%#"g*' ESCAPE '#') AS "abcdefg"
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '"world"', '$' COLUMNS (item text FORMAT JSON PATH '$' KEEP QUOTES))
+;
+----------
+[PERFORMANCE] EXPLAIN (costs off)
+MERGE INTO rw_view1 t USING (VALUES (5, 'X')) AS v(a,b) ON t.a = v.a
+  WHEN MATCHED THEN DELETE
+;
+----------
+[PERFORMANCE] EXPLAIN (FORMAT TEXT) MERGE INTO split_explain.items_target t USING (VALUES (1, 'merge', 100), (6, 'merge', 60)) AS s(id, category, qty) ON t.id = s.id WHEN MATCHED THEN UPDATE SET category = s.category, qty = s.qty WHEN NOT MATCHED THEN INSERT (id, category, qty) VALUES (s.id, s.category, s.qty)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (id FOR ORDINALITY, id2 FOR ORDINALITY, a int PATH '$.a' ERROR ON EMPTY)) jt
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[1,2,null,"a"]', '$[*]' RETURNING int[] WITH WRAPPER ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON('{ "a" : 1 } '::bytea FORMAT JSON ENCODING UTF8)
+;
+----------
+[PERFORMANCE] explain (verbose, costs off)
+with recursive test as (
+  select 0 as x
+  union all
+  select (x + 1) % 10
+  from test
+) cycle x set is_cycle using path
+select * from test
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb'{"rec": "[1,2]"}', '$.rec' returning int4range keep quotes)
+;
+----------
+[SELECT] select * from (with test1 as (select * from table1) select * from (with test1 as (select * from table2) select * from test1)) t
+;
+----------
+[SELECT] SELECT min(r), max(r), count(r) FROM (
+  SELECT DISTINCT random(123000000000, 123000000099) r
+  FROM generate_series(1, 2500))
+;
+----------
+[SELECT] SELECT *
+FROM JSON_TABLE(
+	jsonb '[1,2,3]',
+	'$[*] ? (@ < $x)'
+		PASSING 10 AS x, 3 AS y
+		COLUMNS (a text FORMAT JSON PATH '$ ? (@ < $y)')
+	) jt
+;
+----------
+[SELECT] SELECT a, a::bool FROM JSON_TABLE(jsonb '"a"', '$' COLUMNS (a dint4 EXISTS PATH '$.a' ))
+;
+----------
+[PERFORMANCE] EXPLAIN (costs off)
+MERGE INTO rw_view1 t
+  USING (SELECT * FROM generate_series(1,5)) AS s(a) ON t.a = s.a
+  WHEN NOT MATCHED THEN INSERT (a) VALUES (s.a)
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  'text node<foo>73</foo>text node<bar><val x="y">42</val></bar>' AS text INDENT)
+;

@@ -1,0 +1,64 @@
+-- fail
+
+START TRANSACTION READ WRITE
+;
+EXECUTE dumpFunc('20476')
+;
+-- ok
+-- PGC_INTERNAL
+SET block_size = 50
+;
+ALTER AGGREGATE "public"."array_larger_accum"("anyarray") OWNER TO zyc
+;
+-- Create an owner for tested objects because output contains owner name.
+CREATE ROLE regress_zeropriv_owner
+;
+EXECUTE dumpOpr('16789')
+;
+EXECUTE dumpOpr('3242')
+;
+EXECUTE dumpAgg('34700')
+;
+LOCK TABLE "public"."pagg_tab1" IN ACCESS SHARE MODE
+;
+-- test interaction of SET SESSION AUTHORIZATION and SET ROLE,
+-- as well as propagation of these settings to parallel workers
+GRANT regress_priv_user9 TO regress_priv_user8
+;
+------------------------------------------------------------------------------------------
+[TRANSACTION] -- fail
+
+START TRANSACTION READ WRITE
+;
+----------
+[UNSAFE] EXECUTE dumpFunc('20476')
+;
+----------
+[SESSION_SETTING_WRITE] -- ok
+-- PGC_INTERNAL
+SET block_size = 50
+;
+----------
+[TRANSFER_PRIVILEGE] ALTER AGGREGATE "public"."array_larger_accum"("anyarray") OWNER TO zyc
+;
+----------
+[CREATE_ROLE] -- Create an owner for tested objects because output contains owner name.
+CREATE ROLE regress_zeropriv_owner
+;
+----------
+[UNSAFE] EXECUTE dumpOpr('16789')
+;
+----------
+[UNSAFE] EXECUTE dumpOpr('3242')
+;
+----------
+[UNSAFE] EXECUTE dumpAgg('34700')
+;
+----------
+[SESSION_LOCK] LOCK TABLE "public"."pagg_tab1" IN ACCESS SHARE MODE
+;
+----------
+[GRANT] -- test interaction of SET SESSION AUTHORIZATION and SET ROLE,
+-- as well as propagation of these settings to parallel workers
+GRANT regress_priv_user9 TO regress_priv_user8
+;

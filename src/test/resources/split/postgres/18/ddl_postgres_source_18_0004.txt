@@ -1,0 +1,504 @@
+ALTER TABLE has_volatile ADD col5 int GENERATED ALWAYS AS (tableoid::int + col2) VIRTUAL
+;
+CREATE FUNCTION _pg_numeric_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE $1
+         WHEN 21 /*int2*/ THEN 16
+         WHEN 23 /*int4*/ THEN 32
+         WHEN 20 /*int8*/ THEN 64
+         WHEN 1700 /*numeric*/ THEN
+              CASE WHEN $2 = -1
+                   THEN null
+                   ELSE (($2 - 4) >> 16) & 65535
+                   END
+         WHEN 700 /*float4*/ THEN 24 /*FLT_MANT_DIG*/
+         WHEN 701 /*float8*/ THEN 53 /*DBL_MANT_DIG*/
+         ELSE null
+  END
+;
+CREATE OR REPLACE FUNCTION log(numeric)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN log(10, $1)
+;
+ALTER PUBLICATION pub_mix_1 SET TABLE test_mix_1 (a, c)
+;
+-- polymorphic arguments not allowed in this form
+CREATE FUNCTION functest_S_xx(x anyarray) RETURNS anyelement
+    LANGUAGE SQL
+    RETURN x[1]
+;
+ALTER TABLE notnull_tbl1 ADD CONSTRAINT foobar NOT NULL a
+;
+ALTER PUBLICATION split_pub_cols SET TABLE split_fdw_repl.accounts (id, amount) WHERE (amount >= 0)
+;
+alter table p1 add constraint inh_check_constraint3 check (f1 > 0) not enforced
+;
+CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_mltrng (id, PERIOD valid_at)
+)
+;
+CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA CURRENT_SCHEMA
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl5 WHERE (xmlexists('//foo[text() = ''bar'']' PASSING BY VALUE a))
+;
+ALTER TABLE split_alter_table.part_parent DETACH PARTITION split_alter_table.part_us CONCURRENTLY
+;
+CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange,
+  CONSTRAINT temporal3_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+CREATE OR REPLACE FUNCTION lpad(text, integer)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN lpad($1, $2, ' ')
+;
+CREATE TABLE temporal_rng3 (
+  id1 int4range,
+  id2 int4range,
+  valid_at daterange,
+  CONSTRAINT temporal_rng3_uq UNIQUE (id1, id2, valid_at WITHOUT OVERLAPS)
+)
+;
+-- virtual
+create table test9v (a int not null, b int generated always as (a * 2) virtual)
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$[1, $.a ? (@.datetime("HH:MI") == $x)]' PASSING '12:34'::time AS x))
+;
+CREATE PUBLICATION pub5 FOR TABLE tab7 (a, b)
+;
+-- error
+CREATE TABLE cminh(f1 TEXT COMPRESSION lz4) INHERITS(cmdata)
+;
+CREATE TABLE gtesty (x int, b int GENERATED ALWAYS AS (x * 22) VIRTUAL)
+;
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub, testpub1, testpub2 WITH (refresh = false)
+;
+-- no dice
+-- ok: for insert-only publication, any column list is acceptable
+ALTER PUBLICATION testpub_fortable_insert ADD TABLE testpub_tbl5 (b, c)
+;
+alter table p1_c1 add constraint inh_check_constraint7 check (f1 < 10) not enforced
+;
+--
+-- test FK dependencies
+--
+
+-- can't drop a range referenced by an FK, unless with CASCADE
+CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange,
+  CONSTRAINT temporal3_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+ALTER TABLE cmpart1 ALTER COLUMN f1 SET COMPRESSION pglz
+;
+CREATE TABLE temporal_rng2 (
+  id1 int4range,
+  id2 int4range,
+  valid_at daterange,
+  CONSTRAINT temporal_rng2_pk PRIMARY KEY (id1, id2, valid_at WITHOUT OVERLAPS)
+)
+;
+ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public
+;
+-- try to drop a nonexistant constraint
+alter table inh_nn1 alter constraint foo inherit
+;
+CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(n_distinct_per_range = -1.1)
+)
+;
+ALTER TABLE temporal_fk_rng2rng
+  ADD CONSTRAINT temporal_fk_rng2rng_fk
+  FOREIGN KEY (parent_id, PERIOD valid_at)
+  REFERENCES temporal_rng
+  ON UPDATE RESTRICT
+;
+CREATE OR REPLACE FUNCTION split_part( citext, citext, int ) RETURNS TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN (pg_catalog.regexp_split_to_array( $1::text, pg_catalog.regexp_replace($2::text, '([^a-zA-Z_0-9])', E'\\\\\\1', 'g'), 'i'))[$3]
+;
+CREATE TABLE gtest_child2 PARTITION OF gtest_parent (
+    f3 WITH OPTIONS GENERATED ALWAYS AS (f2 * 22) VIRTUAL  -- overrides gen expr
+) FOR VALUES FROM ('2016-08-01') TO ('2016-09-01')
+;
+CREATE TABLE gtest_child3 (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS (f2 * 33) VIRTUAL)
+;
+create table test9v (a int not null, b int generated always as (a * 2) virtual)
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime() < $x' PASSING '1234'::int AS x))
+;
+-- test ruleutils and view expansion
+create temp view v_search as
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+select f, t, label from search_graph
+;
+CREATE TABLE temporal_fk_rng2rng (
+  id int4range,
+  valid_at daterange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_rng2rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng (id, PERIOD valid_at)
+)
+;
+-- but not allowed if the child constraint is explicitly asked to be NOT ENFORCED
+create table p1_fail(f1 int constraint inh_check_constraint6 check (f1 < 10) not enforced) inherits(p1, p1_c1)
+;
+CREATE PUBLICATION dump_pub_qual_1ct FOR
+  TABLE ONLY pubme.t0 (c, d) WHERE (c > 0)
+;
+-- empty body
+CREATE PROCEDURE ptest8(x text)
+BEGIN ATOMIC
+END
+;
+CREATE TABLE "generated_virtual_tests"."gtestnn_child" (
+    "f1" integer,
+    "f2" bigint,
+    "f3" bigint GENERATED ALWAYS AS ((NULLIF("f1", 1) + NULLIF("f2", 10))) CONSTRAINT "gtestnn_parent_f3_not_null" NOT NULL,
+    "c" integer GENERATED ALWAYS AS ((NULLIF("f1", 4) + NULLIF("f2", 6))) CONSTRAINT "gtestnn_parent_c_not_null" NOT NULL
+)
+;
+ALTER TABLE "public"."identity_dump_logged" ALTER COLUMN "a" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."identity_dump_logged_a_seq"
+    UNLOGGED
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+)
+;
+-- error: duplicate function body
+CREATE FUNCTION functest_S_xxx(x int) RETURNS int
+    LANGUAGE SQL
+    AS $$ SELECT x * 2 $$
+    RETURN x * 3
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk WHERE (a > 99)
+;
+--
+-- test changing the PK's dependencies
+--
+
+CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange,
+  CONSTRAINT temporal3_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+-- Changing the constraint to NOT ENFORCED drops the associated FK triggers
+ALTER TABLE FKTABLE ALTER CONSTRAINT fktable_fk_fkey NOT ENFORCED
+;
+ALTER PUBLICATION pub1 ADD TABLE tab2 (a, b)
+;
+CREATE PUBLICATION dump_pub_all FOR
+  TABLE ONLY pubme.t0,
+  TABLE ONLY pubme.t1 WHERE (c < 0),
+  TABLES IN SCHEMA pubme,
+  TABLES IN SCHEMA pubme2
+  WITH (publish_via_partition_root = true)
+;
+-- this should fail
+alter table renameColumn add column y int check (x > 0) not enforced enforced
+;
+ALTER TABLE notnull_inhchild ADD CONSTRAINT nn1 NOT NULL i
+;
+------------------------------------------------------------------------------------------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE has_volatile ADD col5 int GENERATED ALWAYS AS (tableoid::int + col2) VIRTUAL
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_numeric_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE $1
+         WHEN 21 /*int2*/ THEN 16
+         WHEN 23 /*int4*/ THEN 32
+         WHEN 20 /*int8*/ THEN 64
+         WHEN 1700 /*numeric*/ THEN
+              CASE WHEN $2 = -1
+                   THEN null
+                   ELSE (($2 - 4) >> 16) & 65535
+                   END
+         WHEN 700 /*float4*/ THEN 24 /*FLT_MANT_DIG*/
+         WHEN 701 /*float8*/ THEN 53 /*DBL_MANT_DIG*/
+         ELSE null
+  END
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION log(numeric)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN log(10, $1)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub_mix_1 SET TABLE test_mix_1 (a, c)
+;
+----------
+[CREATE_PROG_OBJ] -- polymorphic arguments not allowed in this form
+CREATE FUNCTION functest_S_xx(x anyarray) RETURNS anyelement
+    LANGUAGE SQL
+    RETURN x[1]
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE notnull_tbl1 ADD CONSTRAINT foobar NOT NULL a
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION split_pub_cols SET TABLE split_fdw_repl.accounts (id, amount) WHERE (amount >= 0)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table p1 add constraint inh_check_constraint3 check (f1 > 0) not enforced
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_fk_mltrng2mltrng (
+  id int4range,
+  valid_at datemultirange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_mltrng2mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_mltrng2mltrng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_mltrng (id, PERIOD valid_at)
+)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA CURRENT_SCHEMA
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl5 WHERE (xmlexists('//foo[text() = ''bar'']' PASSING BY VALUE a))
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE split_alter_table.part_parent DETACH PARTITION split_alter_table.part_us CONCURRENTLY
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange,
+  CONSTRAINT temporal3_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION lpad(text, integer)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN lpad($1, $2, ' ')
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_rng3 (
+  id1 int4range,
+  id2 int4range,
+  valid_at daterange,
+  CONSTRAINT temporal_rng3_uq UNIQUE (id1, id2, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[CREATE_TABLE] -- virtual
+create table test9v (a int not null, b int generated always as (a * 2) virtual)
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$[1, $.a ? (@.datetime("HH:MI") == $x)]' PASSING '12:34'::time AS x))
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub5 FOR TABLE tab7 (a, b)
+;
+----------
+[CREATE_TABLE] -- error
+CREATE TABLE cminh(f1 TEXT COMPRESSION lz4) INHERITS(cmdata)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtesty (x int, b int GENERATED ALWAYS AS (x * 22) VIRTUAL)
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub, testpub1, testpub2 WITH (refresh = false)
+;
+----------
+[ALTER_PUB_SUB] -- no dice
+-- ok: for insert-only publication, any column list is acceptable
+ALTER PUBLICATION testpub_fortable_insert ADD TABLE testpub_tbl5 (b, c)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table p1_c1 add constraint inh_check_constraint7 check (f1 < 10) not enforced
+;
+----------
+[CREATE_TABLE] --
+-- test FK dependencies
+--
+
+-- can't drop a range referenced by an FK, unless with CASCADE
+CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange,
+  CONSTRAINT temporal3_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE cmpart1 ALTER COLUMN f1 SET COMPRESSION pglz
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_rng2 (
+  id1 int4range,
+  id2 int4range,
+  valid_at daterange,
+  CONSTRAINT temporal_rng2_pk PRIMARY KEY (id1, id2, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_tbl9 ADD TABLES IN SCHEMA public
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] -- try to drop a nonexistant constraint
+alter table inh_nn1 alter constraint foo inherit
+;
+----------
+[ADD_INDEX] CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(n_distinct_per_range = -1.1)
+)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE temporal_fk_rng2rng
+  ADD CONSTRAINT temporal_fk_rng2rng_fk
+  FOREIGN KEY (parent_id, PERIOD valid_at)
+  REFERENCES temporal_rng
+  ON UPDATE RESTRICT
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION split_part( citext, citext, int ) RETURNS TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN (pg_catalog.regexp_split_to_array( $1::text, pg_catalog.regexp_replace($2::text, '([^a-zA-Z_0-9])', E'\\\\\\1', 'g'), 'i'))[$3]
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_child2 PARTITION OF gtest_parent (
+    f3 WITH OPTIONS GENERATED ALWAYS AS (f2 * 22) VIRTUAL  -- overrides gen expr
+) FOR VALUES FROM ('2016-08-01') TO ('2016-09-01')
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_child3 (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS (f2 * 33) VIRTUAL)
+;
+----------
+[CREATE_TABLE] create table test9v (a int not null, b int generated always as (a * 2) virtual)
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime() < $x' PASSING '1234'::int AS x))
+;
+----------
+[CREATE_VIEW(SELECT)] -- test ruleutils and view expansion
+create temp view v_search as
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+select f, t, label from search_graph
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_fk_rng2rng (
+  id int4range,
+  valid_at daterange,
+  parent_id int4range,
+  CONSTRAINT temporal_fk_rng2rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS),
+  CONSTRAINT temporal_fk_rng2rng_fk FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng (id, PERIOD valid_at)
+)
+;
+----------
+[CREATE_TABLE] -- but not allowed if the child constraint is explicitly asked to be NOT ENFORCED
+create table p1_fail(f1 int constraint inh_check_constraint6 check (f1 < 10) not enforced) inherits(p1, p1_c1)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION dump_pub_qual_1ct FOR
+  TABLE ONLY pubme.t0 (c, d) WHERE (c > 0)
+;
+----------
+[CREATE_PROG_OBJ] -- empty body
+CREATE PROCEDURE ptest8(x text)
+BEGIN ATOMIC
+END
+;
+----------
+[CREATE_TABLE] CREATE TABLE "generated_virtual_tests"."gtestnn_child" (
+    "f1" integer,
+    "f2" bigint,
+    "f3" bigint GENERATED ALWAYS AS ((NULLIF("f1", 1) + NULLIF("f2", 10))) CONSTRAINT "gtestnn_parent_f3_not_null" NOT NULL,
+    "c" integer GENERATED ALWAYS AS ((NULLIF("f1", 4) + NULLIF("f2", 6))) CONSTRAINT "gtestnn_parent_c_not_null" NOT NULL
+)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE "public"."identity_dump_logged" ALTER COLUMN "a" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."identity_dump_logged_a_seq"
+    UNLOGGED
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+)
+;
+----------
+[CREATE_PROG_OBJ] -- error: duplicate function body
+CREATE FUNCTION functest_S_xxx(x int) RETURNS int
+    LANGUAGE SQL
+    AS $$ SELECT x * 2 $$
+    RETURN x * 3
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk WHERE (a > 99)
+;
+----------
+[CREATE_TABLE] --
+-- test changing the PK's dependencies
+--
+
+CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange,
+  CONSTRAINT temporal3_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] -- Changing the constraint to NOT ENFORCED drops the associated FK triggers
+ALTER TABLE FKTABLE ALTER CONSTRAINT fktable_fk_fkey NOT ENFORCED
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub1 ADD TABLE tab2 (a, b)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION dump_pub_all FOR
+  TABLE ONLY pubme.t0,
+  TABLE ONLY pubme.t1 WHERE (c < 0),
+  TABLES IN SCHEMA pubme,
+  TABLES IN SCHEMA pubme2
+  WITH (publish_via_partition_root = true)
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] -- this should fail
+alter table renameColumn add column y int check (x > 0) not enforced enforced
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE notnull_inhchild ADD CONSTRAINT nn1 NOT NULL i
+;

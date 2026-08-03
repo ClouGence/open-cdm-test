@@ -1,0 +1,971 @@
+[create_table__common_tidb_upstream_optimizer_hints_md_0_common_000_000]
+sql:
+CREATE TABLE t1(a INT, b INT, KEY(a));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:30~1:36) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:15) /test/1/catalog1/schema1/t1/"
+    },
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_optimizer_hints_md_0_common_000_001]
+sql:
+-- Does not use SEMI_JOIN_REWRITE() to rewrite the query.
+EXPLAIN SELECT * FROM t WHERE EXISTS (SELECT 1 FROM t1 WHERE t1.a = t.a);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(2:22~2:23) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:52~2:54) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_002]
+sql:
+-- Multiple `LEADING` hints are specified.
+SELECT /*+ LEADING(t1, t2) LEADING(t3) */ * FROM t1, t2, t3 WHERE t1.id = t2.id and t2.id = t3.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:49~2:51) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:53~2:55) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:57~2:59) /test/1/catalog1/schema1/t3/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_003]
+sql:
+SELECT /*+ SET_VAR(MAX_EXECUTION_TIME=1234) */ @@MAX_EXECUTION_TIME;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "ConfigKey(1:47~1:67) /test/1/MAX_EXECUTION_TIME/",
+      "action" : "READ"
+    },
+    {
+      "subject": "ConfigKey(1:19~1:37) /test/1/MAX_EXECUTION_TIME/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_optimizer_hints_md_0_common_000_004]
+sql:
+CREATE TABLE t1 (k varchar(8), key(k)) COLLATE=utf8mb4_general_ci;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:31~1:37) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:15) /test/1/catalog1/schema1/t1/"
+    },
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_005]
+sql:
+SELECT * FROM t use index(idx1);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:15) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_006]
+sql:
+-- The IndexLookUp operator will not be pushed down.
+SELECT /*+ NO_INDEX_LOOKUP_PUSHDOWN(t) */ * FROM t WHERE a > 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:49~2:50) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_007]
+sql:
+select /*+ READ_FROM_STORAGE(TIFLASH[t1], TIKV[t2]) */ t1.a from t t1, t t2 where t1.a = t2.a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:65~1:66) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_optimizer_hints_md_0_common_000_008]
+sql:
+CREATE TABLE t(a INT, b INT, key(a), key(b));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:29~1:35) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:14) /test/1/catalog1/schema1/t/"
+    },
+    {
+      "subject": "Index(1:37~1:43) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:14) /test/1/catalog1/schema1/t/"
+    },
+    {
+      "subject": "Table(1:13~1:14) /test/1/catalog1/schema1/t/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_009]
+sql:
+SELECT /*+ BROADCAST_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:44~1:46) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:48~1:50) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_010]
+sql:
+select /*+ AGG_TO_COP() */ sum(t1.a) from t t1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:27~1:30) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:42~1:43) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_011]
+sql:
+SELECT /* Comment: The name of the current query block is the default @SEL_1 */ * FROM v2 JOIN (
+        SELECT /* Comment: The name of the current query block is the default @SEL_2 */ * FROM v2) vv;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:87~1:89) /test/1/catalog1/schema1/v2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_012]
+sql:
+SELECT * /*+ use_index(t, a) */ FROM t;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:37~1:38) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_optimizer_hints_md_0_common_000_013]
+sql:
+EXPLAIN SELECT /*+ NO_ORDER_INDEX(t, a) */ a FROM t ORDER BY a LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(1:50~1:51) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_014]
+sql:
+select /*+ MAX_EXECUTION_TIME(1000) */ * from t1 inner join t2 where t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:46~1:48) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:60~1:62) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_015]
+sql:
+select /*+ HASH_JOIN(t1, t2) */ * from t1, t2 where t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:39~1:41) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:43~1:45) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_optimizer_hints_md_0_common_000_016]
+sql:
+CREATE TABLE t2(a INT, KEY(a));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:23~1:29) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:15) /test/1/catalog1/schema1/t2/"
+    },
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_optimizer_hints_md_0_common_000_017]
+sql:
+SHOW WARNINGS;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Instance(1:0~1:13) /test/1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_018]
+sql:
+SELECT /*+ NO_MERGE_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:43~1:45) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:47~1:49) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_019]
+sql:
+SELECT /*+ USE_INDEX(t, idx1) */ * FROM t;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:40~1:41) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_optimizer_hints_md_0_common_000_020]
+sql:
+CREATE TABLE t2 (k varchar(8), key(k)) COLLATE=utf8mb4_bin;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:31~1:37) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:15) /test/1/catalog1/schema1/t2/"
+    },
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_021]
+sql:
+select /*+ HASH_AGG() */ count(*) from t1, t2 where t1.a > 10 group by t1.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:25~1:30) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:39~1:41) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:43~1:45) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_022]
+sql:
+SELECT /*+ FORCE_INDEX(t, idx1) */ * FROM t;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:42~1:43) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_view__common_tidb_upstream_optimizer_hints_md_0_common_000_023]
+sql:
+CREATE VIEW v2 AS
+        SELECT * FROM t JOIN /* Comment: For view v2, the name of the current query block is the default @SEL_1. So, the current query block view list is v2@SEL_1 .@SEL_1 */
+        (
+            SELECT COUNT(*) FROM t1 JOIN v1 /* Comment: For view v2, the name of the current query block is the default @SEL_2. So, the current query block view list is v2@SEL_1 .@SEL_2 */
+        ) tt;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "View(1:12~1:14) /test/1/catalog1/schema1/v2/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(2:22~2:23) /test/1/catalog1/schema1/t/",
+        "Table(4:33~4:35) /test/1/catalog1/schema1/t1/",
+        "Table(4:41~4:43) /test/1/catalog1/schema1/v1/"
+      ]
+    },
+    {
+      "subject": "Function(4:19~4:24) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_optimizer_hints_md_0_common_000_024]
+sql:
+-- To learn why the `LEADING` hint fails to take effect, execute `show warnings`.
+SHOW WARNINGS;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Instance(2:0~2:13) /test/1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_optimizer_hints_md_0_common_000_025]
+sql:
+EXPLAIN SELECT /*+ INDEX_LOOKUP_PUSHDOWN(t1, a) */ a, b FROM t1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(1:61~1:63) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_026]
+sql:
+SELECT /* Comment: The name of the current query block is the default @SEL_1 */ * FROM v;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:87~1:88) /test/1/catalog1/schema1/v/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_027]
+sql:
+SELECT * FROM (SELECT * FROM t) t1, (SELECT * FROM t) t2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:29~1:30) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_optimizer_hints_md_0_common_000_028]
+sql:
+CREATE TABLE t2 (id varchar(10) primary key, tname varchar(10));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t2/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Constraint(1:32~1:43) /test/1/catalog1/schema1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_optimizer_hints_md_0_common_000_029]
+sql:
+EXPLAIN SELECT /*+ ORDER_INDEX(t, a) */ a FROM t ORDER BY a LIMIT 10;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(1:47~1:48) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_optimizer_hints_md_0_common_000_030]
+sql:
+CREATE TABLE t1(a INT, KEY(a));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:23~1:29) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:15) /test/1/catalog1/schema1/t1/"
+    },
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_031]
+sql:
+SELECT /*+ QB_NAME(v2_1, v2) merge_join(t@v2_1) */ * FROM v2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:58~1:60) /test/1/catalog1/schema1/v2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_optimizer_hints_md_0_common_000_032]
+sql:
+-- Using NO_DECORRELATE().
+explain select * from t1 where t1.a < (select /*+ NO_DECORRELATE() */ sum(t2.a) from t2 where t2.b = t1.b);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(2:22~2:24) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:70~2:73) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:85~2:87) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_033]
+sql:
+-- Specifies the global hint
+    SELECT /*+ QB_NAME(v_1, v) USE_INDEX(t@v_1, idx) */ * FROM v;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:63~2:64) /test/1/catalog1/schema1/v/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_optimizer_hints_md_0_common_000_034]
+sql:
+EXPLAIN SELECT /*+ INL_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id=t2.id and SUBSTR(t1.tname,1,2)=SUBSTR(t2.tname,1,2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(1:46~1:48) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:50~1:52) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:75~1:81) /test/1/catalog1/schema1/SUBSTR/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_035]
+sql:
+SELECT /*+ MPP_2PHASE_AGG() */ COUNT(*) FROM t1, t2 WHERE t1.a > 10 GROUP BY t1.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:31~1:36) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:45~1:47) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:49~1:51) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_036]
+sql:
+select /*+ STREAM_AGG() */ count(*) from t1, t2 where t1.a > 10 group by t1.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:27~1:32) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:41~1:43) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:45~1:47) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_optimizer_hints_md_0_common_000_037]
+sql:
+CREATE TABLE t1 (id varchar(10) primary key, tname varchar(10));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t1/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Constraint(1:32~1:43) /test/1/catalog1/schema1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_038]
+sql:
+-- Uses the hint to push down the predicate of the outer query.
+WITH CTE AS (SELECT /*+ MERGE() */ * FROM tc WHERE tc.a < 60) SELECT * FROM CTE WHERE CTE.a < 18;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:42~2:44) /test/1/catalog1/schema1/tc/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_view__common_tidb_upstream_optimizer_hints_md_0_common_000_039]
+sql:
+CREATE VIEW v1 AS SELECT * FROM t JOIN /* Comment: For view `v1`, the name of the current query block is the default @SEL_1. So, the current query block view list is v2@SEL_1 .@SEL_2 .v1@SEL_1 */
+        (
+            SELECT COUNT(*) FROM t1 JOIN t2 /* Comment: For view `v1`, the name of the current query block is the default @SEL_2. So, the current query block view list is v2@SEL_1 .@SEL_2 .v1@SEL_2 */
+        ) tt;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "View(1:12~1:14) /test/1/catalog1/schema1/v1/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(1:32~1:33) /test/1/catalog1/schema1/t/",
+        "Table(3:33~3:35) /test/1/catalog1/schema1/t1/",
+        "Table(3:41~3:43) /test/1/catalog1/schema1/t2/"
+      ]
+    },
+    {
+      "subject": "Function(3:19~3:24) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_040]
+sql:
+SELECT /*+ NO_HASH_JOIN(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:42~1:44) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:46~1:48) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_041]
+sql:
+SELECT /*+ LIMIT_TO_COP() */ * FROM t WHERE a = 1 AND b > 10 ORDER BY c LIMIT 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:36~1:37) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_042]
+sql:
+select /*+ IGNORE_INDEX(t1, idx1, idx2) */ * from t t1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:50~1:51) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_043]
+sql:
+select /*+ NO_INDEX_MERGE() */ * from t where t.a > 0 or t.b > 0;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:38~1:39) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[unsafe__common_tidb_upstream_optimizer_hints_md_0_common_000_044]
+sql:
+prepare stmt from 'select  /*+ IGNORE_PLAN_CACHE() */ * from t where t.id = ?';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "UNSAFE": [
+    {
+      "subject": "PrepareStatement(1:8~1:12) /test/1/stmt/",
+      "action" : "UNSAFE"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_045]
+sql:
+SELECT /*+ MPP_1PHASE_AGG() */ COUNT(*) FROM t1, t2 WHERE t1.a > 10 GROUP BY t1.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:31~1:36) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:45~1:47) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:49~1:51) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_optimizer_hints_md_0_common_000_046]
+sql:
+-- Uses SEMI_JOIN_REWRITE() to rewrite the query.
+EXPLAIN SELECT * FROM t WHERE EXISTS (SELECT /*+ SEMI_JOIN_REWRITE() */ 1 FROM t1 WHERE t1.a = t.a);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(2:22~2:23) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:79~2:81) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_047]
+sql:
+SELECT /*+ HASH_JOIN(@sel_1 t1@sel_1, t3) */ * FROM (SELECT t1.a, t1.b FROM t t1, t t2 WHERE t1.a = t2.a) t1, t t3 WHERE t1.b = t3.b;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:76~1:77) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_048]
+sql:
+select /*+ MERGE_JOIN(t1, t2) */ * from t1, t2 where t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:40~1:42) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:44~1:46) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_optimizer_hints_md_0_common_000_049]
+sql:
+SELECT /*+ QB_NAME(v1_2, v2.v1@SEL_2 .@SEL_2) hash_join(t1@v1_2) hash_agg(@v1_2) */ * FROM v2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:91~1:93) /test/1/catalog1/schema1/v2/",
+      "action" : "READ"
+    }
+  ]
+}

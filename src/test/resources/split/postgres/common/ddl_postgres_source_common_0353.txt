@@ -1,0 +1,524 @@
+-- If a partitioned table being created or an existing table being attached
+-- as a partition does not have a constraint that would allow validation scan
+-- to be skipped, but an individual partition does, then the partition's
+-- validation scan is skipped.
+CREATE TABLE quuux (a int, b text) PARTITION BY LIST (a)
+;
+CREATE VIEW views AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+
+           CAST(
+             CASE WHEN pg_has_role(c.relowner, 'USAGE')
+                  THEN pg_get_viewdef(c.oid)
+                  ELSE null END
+             AS character_data) AS view_definition,
+
+           CAST(
+             CASE WHEN 'check_option=cascaded' = ANY (c.reloptions)
+                  THEN 'CASCADED'
+                  WHEN 'check_option=local' = ANY (c.reloptions)
+                  THEN 'LOCAL'
+                  ELSE 'NONE' END
+             AS character_data) AS check_option,
+
+           CAST(
+             -- (1 << CMD_UPDATE) + (1 << CMD_DELETE)
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 20 = 20
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_updatable,
+
+           CAST(
+             -- 1 << CMD_INSERT
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 8 = 8
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_insertable_into,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_UPDATE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 81 = 81)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_updatable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_DELETE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 73 = 73)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_deletable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_INSERT
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 69 = 69)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_insertable_into
+
+    FROM pg_namespace nc, pg_class c
+
+    WHERE c.relnamespace = nc.oid
+          AND c.relkind = 'v'
+          AND (NOT pg_is_other_temp_schema(nc.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES') )
+;
+create table keytbl (
+	id int4,
+	name text,
+	pubkey text,
+	seckey text
+)
+;
+CREATE TABLE my_schema_2.pts2_tens PARTITION OF my_schema_2.pts2 FOR VALUES FROM ('10') to ('100')
+;
+-- test rename for a rule defined on a partitioned table
+CREATE TABLE rules_parted_table (a int) PARTITION BY LIST (a)
+;
+VACUUM ANALYZE num_exp_div
+;
+CREATE TRIGGER test4 BEFORE UPDATE ON test1 FOR EACH ROW EXECUTE PROCEDURE test4()
+;
+VACUUM (SKIP_LOCKED) vactst
+;
+CREATE TABLE "public"."itest7a" (
+    "a" integer NOT NULL,
+    "b" "text"
+)
+;
+ALTER TABLE ONLY "public"."tbl_include_unique1"
+    ADD CONSTRAINT "tbl_include_unique1_c1_c2_c3_c4_key" UNIQUE ("c1", "c2") INCLUDE ("c3", "c4")
+;
+create or replace temp view v1 with (security_barrier = true)
+  as select * from t1
+;
+CREATE TABLE "public"."depth0" (
+    "c" "text"
+)
+;
+CREATE TABLE "public"."text_tbl" (
+    "f1" "text"
+)
+;
+DROP FUNCTION merge_sf_test2
+;
+CREATE AGGREGATE case_agg(float8)
+(
+	"Stype" = internal,
+	"Sfunc" = ordered_set_transition,
+	"Finalfunc" = percentile_disc_final,
+	"Finalfunc_extra" = true,
+	"Finalfunc_modify" = read_write,
+	"Parallel" = safe
+)
+;
+-- Update local stats on ft2
+ANALYZE ft2
+;
+ALTER TABLE testpub_gencol REPLICA IDENTITY USING index testpub_gencol_idx
+;
+-- but now we're not allowed to reattach it
+alter table parent attach partition child for values in ('AAA')
+;
+CREATE OPERATOR FAMILY alt_opf18 USING btree
+;
+CREATE TABLE FKTABLE ( ftest1 int, ftest2 int, ftest3 int, ftest4 int,  CONSTRAINT constrname3
+			FOREIGN KEY(ftest1, ftest2, ftest3) REFERENCES PKTABLE
+			ON DELETE CASCADE ON UPDATE CASCADE)
+;
+-- For binary upgrade, set up typed tables this way.
+ALTER TABLE ONLY "public"."persons3" OF "public"."person_type"
+;
+ALTER TABLE comment ENABLE ROW LEVEL SECURITY
+;
+ANALYZE public.gtest21a
+;
+-- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."itest7c" INHERIT "public"."itest7b"
+;
+CALL consume_xid(2000)
+;
+-- Check that arrays of composites are safely detoasted when needed
+
+create temp table src (f1 text)
+;
+CREATE TABLE "fkpart5"."pk2" (
+    "a" integer CONSTRAINT "pk_a_not_null" NOT NULL
+)
+;
+-- Ensure that the next VACUUM will need to perform IO by rewriting the table
+-- first with VACUUM (FULL).
+VACUUM (FULL) test_io_vac_strategy
+;
+-- should fail
+create function bogus_func(int)
+  returns anyrange as 'select int4range(1,10)' language sql
+;
+create function funcA() returns trigger as $$
+begin
+  raise notice 'hello from funcA';
+  return null;
+end; $$ language plpgsql
+;
+-- ************************************************************
+-- * Support function to add/remove slots of Hub
+-- ************************************************************
+create function tg_hub_adjustslots(hname bpchar,
+                                   oldnslots integer,
+                                   newnslots integer)
+returns integer as '
+begin
+    if newnslots = oldnslots then
+        return 0;
+    end if;
+    if newnslots < oldnslots then
+        delete from HSlot where hubname = hname and slotno > newnslots;
+	return 0;
+    end if;
+    for i in oldnslots + 1 .. newnslots loop
+        insert into HSlot (slotname, hubname, slotno, slotlink)
+		values (''HS.dummy'', hname, i, '''');
+    end loop;
+    return 0;
+end
+' language plpgsql
+;
+-- Check that unknown literals are converted to "text" in CREATE VIEW,
+-- so that we don't end up with unknown-type columns.
+
+CREATE VIEW unspecified_types AS
+  SELECT 42 as i, 42.5 as num, 'foo' as u, 'foo'::unknown as u2, null as n
+;
+ALTER TABLE ONLY "public"."mlparted3" DROP COLUMN "........pg.dropped.4........"
+;
+/* src/test/modules/test_extensions/test_ext_req_schema1--1.0.sql */
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION dep_req1() RETURNS text
+LANGUAGE SQL AS $$ SELECT 'req1' $$
+;
+CREATE DEFAULT CONVERSION public.mydef2 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8
+;
+VACUUM (FREEZE) pg_catalog.pg_ts_config_map
+;
+CREATE FUNCTION gbt_int8_sortsupport(internal)
+RETURNS void
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE PARALLEL SAFE STRICT
+;
+CREATE TABLE t2 (c float) INHERITS (t1)
+;
+create temp table t3 (a int, b int, c int, primary key(a, b) deferrable)
+;
+CREATE TYPE public.tst_comp_enum_t AS (a FLOAT, b public.tst_enum_t, c INTEGER)
+;
+CREATE FUNCTION f1 () RETURNS text
+    AS 'SELECT sepgsql_getcon()'
+    LANGUAGE sql
+;
+ALTER TABLE split_alter_table.base_table ENABLE ALWAYS TRIGGER base_table_bi
+;
+VACUUM (TRUNCATE FALSE) pg_catalog.pg_constraint
+;
+DROP TABLE analyze_table
+;
+CREATE DOMAIN testboolxmldomain AS bool
+;
+CREATE INDEX t1_btree ON s4.t1 USING BTREE (i)
+;
+-- fail - user-defined types are not allowed
+CREATE TYPE rf_bug_status AS ENUM ('new', 'open', 'closed')
+;
+ALTER TABLE measurement FORCE ROW LEVEL SECURITY
+;
+ALTER TABLE ONLY "public"."prt2_e" ATTACH PARTITION "public"."prt2_e_p1" FOR VALUES FROM (0) TO (250)
+;
+DROP SEQUENCE IF EXISTS test_sequence_exists
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] -- If a partitioned table being created or an existing table being attached
+-- as a partition does not have a constraint that would allow validation scan
+-- to be skipped, but an individual partition does, then the partition's
+-- validation scan is skipped.
+CREATE TABLE quuux (a int, b text) PARTITION BY LIST (a)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW views AS
+    SELECT CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(c.relname AS sql_identifier) AS table_name,
+
+           CAST(
+             CASE WHEN pg_has_role(c.relowner, 'USAGE')
+                  THEN pg_get_viewdef(c.oid)
+                  ELSE null END
+             AS character_data) AS view_definition,
+
+           CAST(
+             CASE WHEN 'check_option=cascaded' = ANY (c.reloptions)
+                  THEN 'CASCADED'
+                  WHEN 'check_option=local' = ANY (c.reloptions)
+                  THEN 'LOCAL'
+                  ELSE 'NONE' END
+             AS character_data) AS check_option,
+
+           CAST(
+             -- (1 << CMD_UPDATE) + (1 << CMD_DELETE)
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 20 = 20
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_updatable,
+
+           CAST(
+             -- 1 << CMD_INSERT
+             CASE WHEN pg_relation_is_updatable(c.oid, false) & 8 = 8
+                  THEN 'YES' ELSE 'NO' END
+             AS yes_or_no) AS is_insertable_into,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_UPDATE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 81 = 81)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_updatable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_DELETE
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 73 = 73)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_deletable,
+
+           CAST(
+             -- TRIGGER_TYPE_ROW + TRIGGER_TYPE_INSTEAD + TRIGGER_TYPE_INSERT
+             CASE WHEN EXISTS (SELECT 1 FROM pg_trigger WHERE tgrelid = c.oid AND tgtype & 69 = 69)
+                  THEN 'YES' ELSE 'NO' END
+           AS yes_or_no) AS is_trigger_insertable_into
+
+    FROM pg_namespace nc, pg_class c
+
+    WHERE c.relnamespace = nc.oid
+          AND c.relkind = 'v'
+          AND (NOT pg_is_other_temp_schema(nc.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_table_privilege(c.oid, 'SELECT, INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'SELECT, INSERT, UPDATE, REFERENCES') )
+;
+----------
+[CREATE_TABLE] create table keytbl (
+	id int4,
+	name text,
+	pubkey text,
+	seckey text
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE my_schema_2.pts2_tens PARTITION OF my_schema_2.pts2 FOR VALUES FROM ('10') to ('100')
+;
+----------
+[CREATE_TABLE] -- test rename for a rule defined on a partitioned table
+CREATE TABLE rules_parted_table (a int) PARTITION BY LIST (a)
+;
+----------
+[ADMIN_TABLE] VACUUM ANALYZE num_exp_div
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER test4 BEFORE UPDATE ON test1 FOR EACH ROW EXECUTE PROCEDURE test4()
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_LOCKED) vactst
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."itest7a" (
+    "a" integer NOT NULL,
+    "b" "text"
+)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "public"."tbl_include_unique1"
+    ADD CONSTRAINT "tbl_include_unique1_c1_c2_c3_c4_key" UNIQUE ("c1", "c2") INCLUDE ("c3", "c4")
+;
+----------
+[CREATE_VIEW(SELECT)] create or replace temp view v1 with (security_barrier = true)
+  as select * from t1
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."depth0" (
+    "c" "text"
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."text_tbl" (
+    "f1" "text"
+)
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION merge_sf_test2
+;
+----------
+[CREATE_PROG_OBJ] CREATE AGGREGATE case_agg(float8)
+(
+	"Stype" = internal,
+	"Sfunc" = ordered_set_transition,
+	"Finalfunc" = percentile_disc_final,
+	"Finalfunc_extra" = true,
+	"Finalfunc_modify" = read_write,
+	"Parallel" = safe
+)
+;
+----------
+[ADMIN_TABLE] -- Update local stats on ft2
+ANALYZE ft2
+;
+----------
+[ALTER_TABLE] ALTER TABLE testpub_gencol REPLICA IDENTITY USING index testpub_gencol_idx
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- but now we're not allowed to reattach it
+alter table parent attach partition child for values in ('AAA')
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR FAMILY alt_opf18 USING btree
+;
+----------
+[CREATE_TABLE] CREATE TABLE FKTABLE ( ftest1 int, ftest2 int, ftest3 int, ftest4 int,  CONSTRAINT constrname3
+			FOREIGN KEY(ftest1, ftest2, ftest3) REFERENCES PKTABLE
+			ON DELETE CASCADE ON UPDATE CASCADE)
+;
+----------
+[ALTER_TABLE] -- For binary upgrade, set up typed tables this way.
+ALTER TABLE ONLY "public"."persons3" OF "public"."person_type"
+;
+----------
+[ALTER_TABLE] ALTER TABLE comment ENABLE ROW LEVEL SECURITY
+;
+----------
+[ADMIN_TABLE] ANALYZE public.gtest21a
+;
+----------
+[ALTER_TABLE] -- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."itest7c" INHERIT "public"."itest7b"
+;
+----------
+[CALL_PROG_OBJ] CALL consume_xid(2000)
+;
+----------
+[CREATE_TABLE] -- Check that arrays of composites are safely detoasted when needed
+
+create temp table src (f1 text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "fkpart5"."pk2" (
+    "a" integer CONSTRAINT "pk_a_not_null" NOT NULL
+)
+;
+----------
+[ADMIN_TABLE] -- Ensure that the next VACUUM will need to perform IO by rewriting the table
+-- first with VACUUM (FULL).
+VACUUM (FULL) test_io_vac_strategy
+;
+----------
+[CREATE_PROG_OBJ] -- should fail
+create function bogus_func(int)
+  returns anyrange as 'select int4range(1,10)' language sql
+;
+----------
+[CREATE_PROG_OBJ] create function funcA() returns trigger as $$
+begin
+  raise notice 'hello from funcA';
+  return null;
+end; $$ language plpgsql
+;
+----------
+[CREATE_PROG_OBJ] -- ************************************************************
+-- * Support function to add/remove slots of Hub
+-- ************************************************************
+create function tg_hub_adjustslots(hname bpchar,
+                                   oldnslots integer,
+                                   newnslots integer)
+returns integer as '
+begin
+    if newnslots = oldnslots then
+        return 0;
+    end if;
+    if newnslots < oldnslots then
+        delete from HSlot where hubname = hname and slotno > newnslots;
+	return 0;
+    end if;
+    for i in oldnslots + 1 .. newnslots loop
+        insert into HSlot (slotname, hubname, slotno, slotlink)
+		values (''HS.dummy'', hname, i, '''');
+    end loop;
+    return 0;
+end
+' language plpgsql
+;
+----------
+[CREATE_VIEW(SELECT)] -- Check that unknown literals are converted to "text" in CREATE VIEW,
+-- so that we don't end up with unknown-type columns.
+
+CREATE VIEW unspecified_types AS
+  SELECT 42 as i, 42.5 as num, 'foo' as u, 'foo'::unknown as u2, null as n
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE ONLY "public"."mlparted3" DROP COLUMN "........pg.dropped.4........"
+;
+----------
+[CREATE_PROG_OBJ] /* src/test/modules/test_extensions/test_ext_req_schema1--1.0.sql */
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION dep_req1() RETURNS text
+LANGUAGE SQL AS $$ SELECT 'req1' $$
+;
+----------
+[CREATE_POLICY] CREATE DEFAULT CONVERSION public.mydef2 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8
+;
+----------
+[ADMIN_TABLE] VACUUM (FREEZE) pg_catalog.pg_ts_config_map
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_int8_sortsupport(internal)
+RETURNS void
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE PARALLEL SAFE STRICT
+;
+----------
+[CREATE_TABLE] CREATE TABLE t2 (c float) INHERITS (t1)
+;
+----------
+[CREATE_TABLE] create temp table t3 (a int, b int, c int, primary key(a, b) deferrable)
+;
+----------
+[CREATE_TYPE] CREATE TYPE public.tst_comp_enum_t AS (a FLOAT, b public.tst_enum_t, c INTEGER)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION f1 () RETURNS text
+    AS 'SELECT sepgsql_getcon()'
+    LANGUAGE sql
+;
+----------
+[ALTER_TABLE] ALTER TABLE split_alter_table.base_table ENABLE ALWAYS TRIGGER base_table_bi
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) pg_catalog.pg_constraint
+;
+----------
+[DROP_TABLE] DROP TABLE analyze_table
+;
+----------
+[CREATE_TYPE] CREATE DOMAIN testboolxmldomain AS bool
+;
+----------
+[ADD_INDEX] CREATE INDEX t1_btree ON s4.t1 USING BTREE (i)
+;
+----------
+[CREATE_TYPE] -- fail - user-defined types are not allowed
+CREATE TYPE rf_bug_status AS ENUM ('new', 'open', 'closed')
+;
+----------
+[ALTER_TABLE] ALTER TABLE measurement FORCE ROW LEVEL SECURITY
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "public"."prt2_e" ATTACH PARTITION "public"."prt2_e_p1" FOR VALUES FROM (0) TO (250)
+;
+----------
+[DROP_SEQUENCE] DROP SEQUENCE IF EXISTS test_sequence_exists
+;

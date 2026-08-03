@@ -1,0 +1,99 @@
+[create_table__common_tidb_upstream_correlated_subquery_optimization_md_0_000]
+sql:
+create table t1(a int, b int);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_correlated_subquery_optimization_md_0_001]
+sql:
+insert into mysql.opt_rule_blacklist values("decorrelate");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:36) /test/1/catalog1/mysql/opt_rule_blacklist/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_correlated_subquery_optimization_md_0_002]
+sql:
+explain select * from t1 where t1.a < (select sum(t2.a) from t2 where t2.b = t1.b);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(1:22~1:24) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:46~1:49) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:61~1:63) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_correlated_subquery_optimization_md_0_003]
+sql:
+create table t2(a int, b int, index idx(b));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:36~1:39) /test/1/catalog1/schema1/idx/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:15) /test/1/catalog1/schema1/t2/"
+    },
+    {
+      "subject": "Table(1:13~1:15) /test/1/catalog1/schema1/t2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_correlated_subquery_optimization_md_0_004]
+sql:
+explain select * from t1 where t1.a < (select /*+ NO_DECORRELATE() */ sum(t2.a) from t2 where t2.b = t1.b);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(1:22~1:24) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:70~1:73) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:85~1:87) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}

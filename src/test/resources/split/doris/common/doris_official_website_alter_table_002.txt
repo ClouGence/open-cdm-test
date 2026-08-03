@@ -1,0 +1,440 @@
+-- 维度表：数据量小，变动不大，设置 1 年 TTL 确保常驻缓存
+ALTER TABLE dimension_table SET ("file_cache_ttl_seconds" = "31536000");
+
+-- 事实表：每日全量导入，设置 1 天 TTL 与导入周期对齐
+ALTER TABLE fact_table SET ("file_cache_ttl_seconds" = "86400");
+-- Range 分区：LESS THAN 形式
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01");
+
+-- Range 分区：固定区间形式
+ALTER TABLE tbl2 ADD TEMPORARY PARTITION tp1 VALUES [("2020-01-01"), ("2020-02-01"));
+
+-- Range 分区：自定义副本数与分桶
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+
+-- List 分区：单列枚举
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai");
+
+-- List 分区：多列枚举
+ALTER TABLE tbl4 ADD TEMPORARY PARTITION tp1 VALUES IN ((1, "Beijing"), (1, "Shanghai"));
+
+-- List 分区：自定义副本数与分桶
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+-- 等数量替换
+ALTER TABLE tbl1 REPLACE PARTITION (p1) WITH TEMPORARY PARTITION (tp1);
+
+-- 多对多替换
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2, tp3);
+
+-- 替换并指定参数
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2)
+PROPERTIES (
+    "strict_range" = "false",
+    "use_temp_partition_name" = "true"
+);
+ALTER TABLE example_db.my_table ADD PARTITION p3 VALUES LESS THAN ('30');
+-- p3 将使用 10 个分桶；已有分区不受影响
+;
+-- 原表建表时使用 BUCKETS AUTO
+ALTER TABLE example_db.my_auto_auto_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 5;
+-- 新分区将使用 5 个分桶
+
+ALTER TABLE example_db.my_auto_auto_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+-- 新分区将恢复为系统自动决定分桶数
+;
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 4;
+ALTER TABLE example_db.my_table ADD PARTITION p2 VALUES LESS THAN ('20');
+-- p2 使用 4 个分桶
+
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+ALTER TABLE example_db.my_table ADD PARTITION p3 VALUES LESS THAN ('30');
+-- p3 使用系统自动决定的分桶数
+
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 6;
+ALTER TABLE example_db.my_table ADD PARTITION p4 VALUES LESS THAN ('40');
+-- p4 使用 6 个分桶
+;
+-- 将会失败，错误信息："Cannot change default bucket number of colocate table"
+ALTER TABLE example_db.my_colocate_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+-- 将会失败，错误信息："Only support change partitioned table's distribution"
+ALTER TABLE example_db.my_unpartitioned_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+-- 原表使用 HASH 分桶，改为 RANDOM 将会失败
+-- 错误信息："Cannot change distribution type"
+ALTER TABLE example_db.my_hash_table MODIFY DISTRIBUTION DISTRIBUTED BY RANDOM BUCKETS 10;
+-- 原表使用 HASH(k1)，改为 HASH(k2) 将会失败
+-- 错误信息："Cannot assign hash distribution with different distribution cols"
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k2) BUCKETS 10;
+ALTER TABLE example_db.my_table ADD PARTITIONS FROM (1) TO (100) INTERVAL 10;
+ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 YEAR;
+ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 MONTH;
+ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 WEEK;
+ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 DAY;
+ALTER TABLE example_db.my_table set (
+  "dynamic_partition.enable" = "true", 
+  "dynamic_partition.time_unit" = "DAY", 
+  "dynamic_partition.end" = "3", 
+  "dynamic_partition.prefix" = "p", 
+  "dynamic_partition.buckets" = "32"
+);
+ALTER TABLE example_db.my_table SET (
+  "bloom_filter_columns"="k1,k2,k3"
+);
+ALTER TABLE example_db.my_table
+DROP COLUMN col2
+PROPERTIES (
+  "bloom_filter_columns"="k1,k2,k3"
+);
+ALTER TABLE example_db.my_table set (
+  "distribution_type" = "random"
+);
+ALTER TABLE example_db.my_table set (
+  "dynamic_partition.enable" = "false"
+);
+ALTER TABLE tbl1 REPLACE WITH TABLE tbl2 PROPERTIES('swap' = 'true') ;
+ALTER TABLE tbl1 REPLACE WITH TABLE tbl2 PROPERTIES('swap' = 'false') ;
+ALTER TABLE tbl1 SET ("dynamic_partition.enable"="true")
+;
+ALTER TABLE tbl1
+ADD COLUMN k4 INT default "1" to rollup1,
+ADD COLUMN k4 INT default "1" to rollup2,
+ADD COLUMN k5 INT default "1" to rollup2;
+alter table example_tbl modify column k3 varchar(50) key null comment 'to 50'
+;
+ALTER TABLE table1 ADD COLUMN uv BIGINT SUM DEFAULT '0' after pv;
+ALTER TABLE table1 ADD ROLLUP rollup_city(citycode, pv);
+ALTER TABLE site_visit ADD ROLLUP rollup_city(city, pv);
+ALTER TABLE session_data ADD ROLLUP rollup_brower(brower,province,ip,url) DUPLICATE KEY(brower,province);
+ALTER TABLE example_db.my_table
+ADD COLUMN new_col INT KEY DEFAULT "0" AFTER col1
+TO example_rollup_index;
+ALTER TABLE example_db.my_table   
+ADD COLUMN new_col INT DEFAULT "0" AFTER col1    
+TO example_rollup_index;
+ALTER TABLE example_db.my_table   
+ADD COLUMN new_col INT SUM DEFAULT "0" AFTER col1    
+TO example_rollup_index;
+ALTER TABLE example_db.my_table
+ADD COLUMN (col1 INT DEFAULT "1", col2 FLOAT SUM DEFAULT "2.3")
+TO example_rollup_index;
+ALTER TABLE example_db.my_table
+DROP COLUMN col2
+FROM example_rollup_index;
+ALTER TABLE example_db.my_table 
+MODIFY COLUMN col1 BIGINT KEY DEFAULT "1" AFTER col2;
+ALTER TABLE example_db.my_table 
+MODIFY COLUMN val1 VARCHAR(64) REPLACE DEFAULT "abc";
+ALTER TABLE example_db.my_table
+ORDER BY (k3,k1,k2,v2,v1)
+FROM example_rollup_index;
+ALTER TABLE example_db.my_table
+ADD COLUMN v2 INT MAX DEFAULT "0" AFTER k2 TO example_rollup_index,
+ORDER BY (k3,k1,k2,v2,v1) FROM example_rollup_index;
+ALTER TABLE example_db.mysql_table SET ("replication_num" = "2");
+ALTER TABLE example_db.mysql_table SET ("default.replication_num" = "2");
+ALTER TABLE example_db.mysql_table SET ("replication_allocation" = "tag.location.tag1: 1");
+ALTER TABLE example_db.mysql_table SET ("default.replication_allocation" = "tag.location.tag1: 1");
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01");
+
+ALTER TABLE tbl2 ADD TEMPORARY PARTITION tp1 VALUES [("2020-01-01"), ("2020-02-01"));
+
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai");
+
+ALTER TABLE tbl4 ADD TEMPORARY PARTITION tp1 VALUES IN ((1, "Beijing"), (1, "Shanghai"));
+
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+ALTER TABLE test_table1
+SET ( 'min_load_replica_num' = '1');
+ALTER TABLE create_table_not_have_policy set ("storage_policy" = "test_policy");
+ALTER TABLE create_table_partition MODIFY PARTITION (*) SET("storage_policy"="test_policy");
+ALTER TABLE example_range_tbl ADD  PARTITION p201704 VALUES LESS THAN("2020-05-01") DISTRIBUTED BY HASH(`user_id`) BUCKETS 5;
+ALTER TABLE example_db.my_table
+ADD COLUMN (c1 INT DEFAULT "1", c2 FLOAT SUM DEFAULT "0")
+TO example_rollup_index;
+ALTER TABLE example_db.my_table
+DROP COLUMN col3
+FROM example_rollup_index;
+ALTER TABLE example_db.my_table 
+MODIFY COLUMN col5 VARCHAR(64) REPLACE DEFAULT "abc";
+ALTER TABLE example_db.my_table
+MODIFY COLUMN col3 varchar(50) KEY NULL comment 'to 50'
+;
+ALTER TABLE example_db.my_table
+ADD COLUMN v2 INT MAX DEFAULT "0" TO example_rollup_index,
+ORDER BY (k3,k1,k2,v2,v1) FROM example_rollup_index;
+ALTER TABLE tbl1 REPLACE PARTITION (p1) WITH TEMPORARY PARTITION (tp1);
+
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2, tp3);
+
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2)
+PROPERTIES (
+  "strict_range" = "false",
+  "use_temp_partition_name" = "true"
+);
+ALTER TABLE example_db.my_table SET (
+    "bloom_filter_columns"="k1,k2,k3"
+  );
+ALTER TABLE example_db.my_table
+  DROP COLUMN col2
+  PROPERTIES (
+    "bloom_filter_columns"="k1,k2,k3"
+  );
+ALTER TABLE example_db.my_table set (
+    "distribution_type" = "random"
+  );
+ALTER TABLE example_db.my_table set (
+    "dynamic_partition.enable" = "false"
+  );
+------------------------------------------------------------------------------------------
+[ALTER_TABLE] -- 维度表：数据量小，变动不大，设置 1 年 TTL 确保常驻缓存
+ALTER TABLE dimension_table SET ("file_cache_ttl_seconds" = "31536000");
+----------
+[ALTER_TABLE] -- 事实表：每日全量导入，设置 1 天 TTL 与导入周期对齐
+ALTER TABLE fact_table SET ("file_cache_ttl_seconds" = "86400");
+----------
+[ALTER_TABLE|ADD_PARTITION] -- Range 分区：LESS THAN 形式
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01");
+----------
+[ALTER_TABLE|ADD_PARTITION] -- Range 分区：固定区间形式
+ALTER TABLE tbl2 ADD TEMPORARY PARTITION tp1 VALUES [("2020-01-01"), ("2020-02-01"));
+----------
+[ALTER_TABLE|ADD_PARTITION] -- Range 分区：自定义副本数与分桶
+ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+----------
+[ALTER_TABLE|ADD_PARTITION] -- List 分区：单列枚举
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai");
+----------
+[ALTER_TABLE|ADD_PARTITION] -- List 分区：多列枚举
+ALTER TABLE tbl4 ADD TEMPORARY PARTITION tp1 VALUES IN ((1, "Beijing"), (1, "Shanghai"));
+----------
+[ALTER_TABLE|ADD_PARTITION] -- List 分区：自定义副本数与分桶
+ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- 等数量替换
+ALTER TABLE tbl1 REPLACE PARTITION (p1) WITH TEMPORARY PARTITION (tp1);
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- 多对多替换
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2, tp3);
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- 替换并指定参数
+ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2)
+PROPERTIES (
+    "strict_range" = "false",
+    "use_temp_partition_name" = "true"
+);
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITION p3 VALUES LESS THAN ('30');
+----------
+[ALTER_TABLE] -- 原表建表时使用 BUCKETS AUTO
+ALTER TABLE example_db.my_auto_auto_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 5;
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_auto_auto_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 4;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITION p2 VALUES LESS THAN ('20');
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS AUTO;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITION p3 VALUES LESS THAN ('30');
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 6;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITION p4 VALUES LESS THAN ('40');
+----------
+[ALTER_TABLE] -- 将会失败，错误信息："Cannot change default bucket number of colocate table"
+ALTER TABLE example_db.my_colocate_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+----------
+[ALTER_TABLE] -- 将会失败，错误信息："Only support change partitioned table's distribution"
+ALTER TABLE example_db.my_unpartitioned_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k1) BUCKETS 10;
+----------
+[ALTER_TABLE] -- 原表使用 HASH 分桶，改为 RANDOM 将会失败
+-- 错误信息："Cannot change distribution type"
+ALTER TABLE example_db.my_hash_table MODIFY DISTRIBUTION DISTRIBUTED BY RANDOM BUCKETS 10;
+----------
+[ALTER_TABLE] -- 原表使用 HASH(k1)，改为 HASH(k2) 将会失败
+-- 错误信息："Cannot assign hash distribution with different distribution cols"
+ALTER TABLE example_db.my_table MODIFY DISTRIBUTION DISTRIBUTED BY HASH(k2) BUCKETS 10;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITIONS FROM (1) TO (100) INTERVAL 10;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 YEAR;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 MONTH;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 WEEK;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_db.my_table ADD PARTITIONS FROM ("2023-01-01") TO ("2025-01-01") INTERVAL 1 DAY;
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table set (
+  "dynamic_partition.enable" = "true", 
+  "dynamic_partition.time_unit" = "DAY", 
+  "dynamic_partition.end" = "3", 
+  "dynamic_partition.prefix" = "p", 
+  "dynamic_partition.buckets" = "32"
+);
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table SET (
+  "bloom_filter_columns"="k1,k2,k3"
+);
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE example_db.my_table
+DROP COLUMN col2
+PROPERTIES (
+  "bloom_filter_columns"="k1,k2,k3"
+);
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table set (
+  "distribution_type" = "random"
+);
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table set (
+  "dynamic_partition.enable" = "false"
+);
+----------
+[ALTER_TABLE] ALTER TABLE tbl1 REPLACE WITH TABLE tbl2 PROPERTIES('swap' = 'true')
+----------
+[ALTER_TABLE] ALTER TABLE tbl1 REPLACE WITH TABLE tbl2 PROPERTIES('swap' = 'false')
+----------
+[ALTER_TABLE] ALTER TABLE tbl1 SET ("dynamic_partition.enable"="true")
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE tbl1
+ADD COLUMN k4 INT default "1" to rollup1,
+ADD COLUMN k4 INT default "1" to rollup2,
+ADD COLUMN k5 INT default "1" to rollup2;
+----------
+[ALTER_TABLE|ALTER_COLUMN|COMMENT_COLUMN] alter table example_tbl modify column k3 varchar(50) key null comment 'to 50'
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE table1 ADD COLUMN uv BIGINT SUM DEFAULT '0' after pv;
+----------
+[ALTER_TABLE|ADD_INDEX] ALTER TABLE table1 ADD ROLLUP rollup_city(citycode, pv);
+----------
+[ALTER_TABLE|ADD_INDEX] ALTER TABLE site_visit ADD ROLLUP rollup_city(city, pv);
+----------
+[ALTER_TABLE|ADD_INDEX] ALTER TABLE session_data ADD ROLLUP rollup_brower(brower,province,ip,url) DUPLICATE KEY(brower,province);
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE example_db.my_table
+ADD COLUMN new_col INT KEY DEFAULT "0" AFTER col1
+TO example_rollup_index;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE example_db.my_table   
+ADD COLUMN new_col INT DEFAULT "0" AFTER col1    
+TO example_rollup_index;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE example_db.my_table   
+ADD COLUMN new_col INT SUM DEFAULT "0" AFTER col1    
+TO example_rollup_index;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE example_db.my_table
+ADD COLUMN (col1 INT DEFAULT "1", col2 FLOAT SUM DEFAULT "2.3")
+TO example_rollup_index;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE example_db.my_table
+DROP COLUMN col2
+FROM example_rollup_index;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE example_db.my_table 
+MODIFY COLUMN col1 BIGINT KEY DEFAULT "1" AFTER col2;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE example_db.my_table 
+MODIFY COLUMN val1 VARCHAR(64) REPLACE DEFAULT "abc";
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE example_db.my_table
+ORDER BY (k3,k1,k2,v2,v1)
+FROM example_rollup_index;
+----------
+[ALTER_TABLE|ADD_COLUMN|ALTER_COLUMN] ALTER TABLE example_db.my_table
+ADD COLUMN v2 INT MAX DEFAULT "0" AFTER k2 TO example_rollup_index,
+ORDER BY (k3,k1,k2,v2,v1) FROM example_rollup_index;
+----------
+[ALTER_TABLE] ALTER TABLE example_db.mysql_table SET ("replication_num" = "2");
+----------
+[ALTER_TABLE] ALTER TABLE example_db.mysql_table SET ("default.replication_num" = "2");
+----------
+[ALTER_TABLE] ALTER TABLE example_db.mysql_table SET ("replication_allocation" = "tag.location.tag1: 1");
+----------
+[ALTER_TABLE] ALTER TABLE example_db.mysql_table SET ("default.replication_allocation" = "tag.location.tag1: 1");
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01");
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE tbl2 ADD TEMPORARY PARTITION tp1 VALUES [("2020-01-01"), ("2020-02-01"));
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE tbl1 ADD TEMPORARY PARTITION tp1 VALUES LESS THAN("2020-02-01")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai");
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE tbl4 ADD TEMPORARY PARTITION tp1 VALUES IN ((1, "Beijing"), (1, "Shanghai"));
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE tbl3 ADD TEMPORARY PARTITION tp1 VALUES IN ("Beijing", "Shanghai")
+("replication_num" = "1")
+DISTRIBUTED BY HASH(k1) BUCKETS 5;
+----------
+[ALTER_TABLE] ALTER TABLE test_table1
+SET ( 'min_load_replica_num' = '1');
+----------
+[ALTER_TABLE] ALTER TABLE create_table_not_have_policy set ("storage_policy" = "test_policy");
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE create_table_partition MODIFY PARTITION (*) SET("storage_policy"="test_policy");
+----------
+[ALTER_TABLE|ADD_PARTITION] ALTER TABLE example_range_tbl ADD  PARTITION p201704 VALUES LESS THAN("2020-05-01") DISTRIBUTED BY HASH(`user_id`) BUCKETS 5;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE example_db.my_table
+ADD COLUMN (c1 INT DEFAULT "1", c2 FLOAT SUM DEFAULT "0")
+TO example_rollup_index;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE example_db.my_table
+DROP COLUMN col3
+FROM example_rollup_index;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE example_db.my_table 
+MODIFY COLUMN col5 VARCHAR(64) REPLACE DEFAULT "abc";
+----------
+[ALTER_TABLE|ALTER_COLUMN|COMMENT_COLUMN] ALTER TABLE example_db.my_table
+MODIFY COLUMN col3 varchar(50) KEY NULL comment 'to 50'
+----------
+[ALTER_TABLE|ADD_COLUMN|ALTER_COLUMN] ALTER TABLE example_db.my_table
+ADD COLUMN v2 INT MAX DEFAULT "0" TO example_rollup_index,
+ORDER BY (k3,k1,k2,v2,v1) FROM example_rollup_index;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE tbl1 REPLACE PARTITION (p1) WITH TEMPORARY PARTITION (tp1);
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2, tp3);
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE tbl1 REPLACE PARTITION (p1, p2) WITH TEMPORARY PARTITION (tp1, tp2)
+PROPERTIES (
+  "strict_range" = "false",
+  "use_temp_partition_name" = "true"
+);
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table SET (
+    "bloom_filter_columns"="k1,k2,k3"
+  );
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE example_db.my_table
+  DROP COLUMN col2
+  PROPERTIES (
+    "bloom_filter_columns"="k1,k2,k3"
+  );
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table set (
+    "distribution_type" = "random"
+  );
+----------
+[ALTER_TABLE] ALTER TABLE example_db.my_table set (
+    "dynamic_partition.enable" = "false"
+  );

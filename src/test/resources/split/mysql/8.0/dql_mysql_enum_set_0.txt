@@ -1,0 +1,76 @@
+WITH enum_set_cte AS (
+          SELECT id,e_basic,e_basic+0 AS e_index,s_basic,s_basic+0 AS s_mask
+          FROM split_type_enum_set.es_core
+        ),
+        filtered AS (
+          SELECT * FROM enum_set_cte WHERE (s_mask & 1) = 1
+        )
+        SELECT id,e_basic,s_basic
+        FROM filtered
+        WHERE e_index >= 1
+        ORDER BY e_index,id;
+WITH RECURSIVE enum_indexes(n) AS (
+          SELECT 1
+          UNION ALL
+          SELECT n+1 FROM enum_indexes WHERE n < 6
+        )
+        SELECT enum_indexes.n,e.id,e.e_basic
+        FROM enum_indexes
+        LEFT JOIN split_type_enum_set.es_core AS e
+          ON e.e_basic+0=enum_indexes.n
+        ORDER BY enum_indexes.n,e.id;
+SELECT id,e_basic,s_basic,
+               ROW_NUMBER() OVER (
+                 PARTITION BY e_basic ORDER BY s_basic+0,id
+               ) AS rn,
+               SUM(s_basic+0) OVER (
+                 ORDER BY e_basic
+                 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+               ) AS running_mask
+        FROM split_type_enum_set.es_core
+        ORDER BY e_basic,rn;
+SELECT LEAD(e_basic) OVER (ORDER BY e_basic)
+        FROM split_type_enum_set.es_core
+        GROUP BY e_basic WITH ROLLUP
+        EXCEPT
+        SELECT NULL;
+------------------------------------------------------------------------------------------
+[SELECT] WITH enum_set_cte AS (
+          SELECT id,e_basic,e_basic+0 AS e_index,s_basic,s_basic+0 AS s_mask
+          FROM split_type_enum_set.es_core
+        ),
+        filtered AS (
+          SELECT * FROM enum_set_cte WHERE (s_mask & 1) = 1
+        )
+        SELECT id,e_basic,s_basic
+        FROM filtered
+        WHERE e_index >= 1
+        ORDER BY e_index,id;
+----------
+[SELECT] WITH RECURSIVE enum_indexes(n) AS (
+          SELECT 1
+          UNION ALL
+          SELECT n+1 FROM enum_indexes WHERE n < 6
+        )
+        SELECT enum_indexes.n,e.id,e.e_basic
+        FROM enum_indexes
+        LEFT JOIN split_type_enum_set.es_core AS e
+          ON e.e_basic+0=enum_indexes.n
+        ORDER BY enum_indexes.n,e.id;
+----------
+[SELECT] SELECT id,e_basic,s_basic,
+               ROW_NUMBER() OVER (
+                 PARTITION BY e_basic ORDER BY s_basic+0,id
+               ) AS rn,
+               SUM(s_basic+0) OVER (
+                 ORDER BY e_basic
+                 ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+               ) AS running_mask
+        FROM split_type_enum_set.es_core
+        ORDER BY e_basic,rn;
+----------
+[SELECT] SELECT LEAD(e_basic) OVER (ORDER BY e_basic)
+        FROM split_type_enum_set.es_core
+        GROUP BY e_basic WITH ROLLUP
+        EXCEPT
+        SELECT NULL;

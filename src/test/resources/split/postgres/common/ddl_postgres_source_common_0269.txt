@@ -1,0 +1,826 @@
+CREATE TABLE attmp5 (a int, b int)
+;
+CREATE TABLE "public"."regress_constr_partitioned" (
+    "a" integer
+)
+PARTITION BY LIST ("a")
+;
+CREATE FOREIGN TABLE reind_fdw_10_20 PARTITION OF reind_fdw_parent
+  FOR VALUES FROM (10) TO (20)
+  SERVER loopback OPTIONS (table_name 'reind_local_10_20')
+;
+create function convslot_trig2()
+returns trigger
+language plpgsql
+AS $$
+begin
+raise notice 'trigger = %, new table = %',
+          TG_NAME,
+          (select string_agg(new_table::text, ', ' order by col1) from new_table);
+return null;
+end; $$
+;
+DROP SCHEMA alt_nsp2 CASCADE
+;
+CREATE VIEW pg_statio_all_tables AS
+    SELECT
+            C.oid AS relid,
+            N.nspname AS schemaname,
+            C.relname AS relname,
+            pg_stat_get_blocks_fetched(C.oid) -
+                    pg_stat_get_blocks_hit(C.oid) AS heap_blks_read,
+            pg_stat_get_blocks_hit(C.oid) AS heap_blks_hit,
+            I.idx_blks_read AS idx_blks_read,
+            I.idx_blks_hit AS idx_blks_hit,
+            pg_stat_get_blocks_fetched(T.oid) -
+                    pg_stat_get_blocks_hit(T.oid) AS toast_blks_read,
+            pg_stat_get_blocks_hit(T.oid) AS toast_blks_hit,
+            X.idx_blks_read AS tidx_blks_read,
+            X.idx_blks_hit AS tidx_blks_hit
+    FROM pg_class C LEFT JOIN
+            pg_class T ON C.reltoastrelid = T.oid
+            LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+            LEFT JOIN LATERAL (
+              SELECT sum(pg_stat_get_blocks_fetched(indexrelid) -
+                         pg_stat_get_blocks_hit(indexrelid))::bigint
+                     AS idx_blks_read,
+                     sum(pg_stat_get_blocks_hit(indexrelid))::bigint
+                     AS idx_blks_hit
+              FROM pg_index WHERE indrelid = C.oid ) I ON true
+            LEFT JOIN LATERAL (
+              SELECT sum(pg_stat_get_blocks_fetched(indexrelid) -
+                         pg_stat_get_blocks_hit(indexrelid))::bigint
+                     AS idx_blks_read,
+                     sum(pg_stat_get_blocks_hit(indexrelid))::bigint
+                     AS idx_blks_hit
+              FROM pg_index WHERE indrelid = T.oid ) X ON true
+    WHERE C.relkind IN ('r', 't', 'm')
+;
+CREATE TRIGGER "before_upd_a_stmt_trig" BEFORE UPDATE OF "a" ON "public"."main_table" FOR EACH STATEMENT EXECUTE FUNCTION "public"."trigger_func"('before_upd_a_stmt')
+;
+create table more_derived (like derived, b int) inherits (derived)
+;
+create schema sch1
+;
+-- renaming constraints with cache reset of target relation
+CREATE TABLE constraint_rename_cache (a int,
+  CONSTRAINT chk_a CHECK (a > 0),
+  PRIMARY KEY (a))
+;
+CREATE FUNCTION test_relpath()
+    RETURNS void
+    AS '/src/src/test/regress/regress.so'
+    LANGUAGE C
+;
+CREATE DATABASE regression_tbd
+	ENCODING utf8 LC_COLLATE "C" LC_CTYPE "C" TEMPLATE template0
+;
+truncate base_tab_def
+;
+create function test_strict(text) returns text as
+    'select coalesce($1, ''got passed a null'');'
+    language sql returns null on null input
+;
+VACUUM (TRUNCATE FALSE) pg_catalog.pg_largeobject
+;
+ALTER OPERATOR FAMILY gist_float8_ops USING gist ADD
+	OPERATOR	6	<> (float8, float8) ,
+	OPERATOR	15	<-> (float8, float8) FOR ORDER BY pg_catalog.float_ops ,
+	FUNCTION	8 (float8, float8) gbt_float8_distance (internal, float8, int2, oid, internal) ,
+	FUNCTION	9 (float8, float8) gbt_float8_fetch (internal)
+;
+create type somecomposite as (f1 float8, f2 float8)
+;
+create view rtest_vview1 as select a, b from rtest_view1 X
+	where 0 < (select count(*) from rtest_view2 Y where Y.a = X.a)
+;
+-- DETERMINISTIC
+CREATE COLLATION coll_dup_chk (DETERMINISTIC = TRUE, DETERMINISTIC = NONSENSE, LOCALE = '')
+;
+create or replace function rttest()
+returns setof int as $$
+begin
+  return query execute 'select 10 into no_such_table';
+end;
+$$ language plpgsql
+;
+DROP SCHEMA test_func_dep1
+;
+CREATE FUNCTION echo_me(anyenum) RETURNS text AS $$
+BEGIN
+RETURN $1::text || 'omg';
+END
+$$ LANGUAGE plpgsql
+;
+TRUNCATE TABLE trunc_c,truncate_a,trunc_d,trunc_e
+;
+create function tattle(x int, y int) returns bool
+volatile language plpgsql as $$
+begin
+  raise notice 'x = %, y = %', x, y;
+  return x > y;
+end$$
+;
+-- brin_page_items() added a new "empty" flag in 1.12, make sure we detect
+-- an old function definition
+ALTER EXTENSION pageinspect UPDATE TO '1.11'
+;
+CREATE TABLESPACE tblspc2 LOCATION '/tmp/6rkcUeuPpi/tempdir/tbl=spc2'
+;
+CREATE TEXT SEARCH DICTIONARY "public"."synonym" (
+    TEMPLATE = "pg_catalog"."synonym",
+    synonyms = 'synonym_sample', casesensitive = 'off' )
+;
+-- another sort of polymorphic aggregate
+
+CREATE AGGREGATE array_larger_accum (anyarray)
+(
+    sfunc = array_larger,
+    stype = anyarray,
+    initcond = '{}'
+)
+;
+ALTER SUBSCRIPTION regress_testsub SET (streaming = true)
+;
+drop domain jsb_i_not_null, jsb_i_gt_1
+;
+-- fail - partitioned table
+ALTER PUBLICATION testpub_fortbl ADD TABLE testpub_parted
+;
+CREATE FUNCTION priv_testfunc5a(a priv_testdomain1) RETURNS int LANGUAGE SQL AS $$ SELECT $1 $$
+;
+create view rtest_vview4 as select X.a, X.b, count(Y.a) as refcount
+	from rtest_view1 X, rtest_view2 Y
+	where X.a = Y.a
+	group by X.a, X.b
+;
+VACUUM (PARALLEL 2) pg_catalog.pg_statistic_ext
+;
+ANALYZE pg_temp_10.pg_temp_26514_2
+;
+ALTER TABLE pg_toast.pg_toast_28176 RENAME TO reind_con_toast
+;
+CREATE TABLESPACE regress_create_idx_tblspace LOCATION ''
+;
+DROP EVENT TRIGGER regress_reindex_end
+;
+CREATE SUBSCRIPTION test_tab2_sub CONNECTION 'port=23484 host=/tmp/9wdFsXQ8IT dbname=postgres' PUBLICATION test_tab2_pub
+;
+CREATE FUNCTION isngt(ismn, ismn13)
+	RETURNS boolean
+	AS 'int8gt'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+DROP SUBSCRIPTION tap_sub_sch
+;
+CREATE INDEX t2_spgist ON s5.t2 USING SPGIST (ir)
+;
+CREATE TABLE spc_hint (id int)
+;
+create table idxpart1 partition of idxpart for values from (0) to (500)
+;
+CREATE VIEW pg_seclabels AS
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    CASE WHEN rel.relkind IN ('r', 'p') THEN 'table'::text
+         WHEN rel.relkind = 'v' THEN 'view'::text
+         WHEN rel.relkind = 'm' THEN 'materialized view'::text
+         WHEN rel.relkind = 'S' THEN 'sequence'::text
+         WHEN rel.relkind = 'f' THEN 'foreign table'::text END AS objtype,
+    rel.relnamespace AS objnamespace,
+    CASE WHEN pg_table_is_visible(rel.oid)
+         THEN quote_ident(rel.relname)
+         ELSE quote_ident(nsp.nspname) || '.' || quote_ident(rel.relname)
+         END AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_class rel ON l.classoid = rel.tableoid AND l.objoid = rel.oid
+    JOIN pg_namespace nsp ON rel.relnamespace = nsp.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'column'::text AS objtype,
+    rel.relnamespace AS objnamespace,
+    CASE WHEN pg_table_is_visible(rel.oid)
+         THEN quote_ident(rel.relname)
+         ELSE quote_ident(nsp.nspname) || '.' || quote_ident(rel.relname)
+         END || '.' || att.attname AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_class rel ON l.classoid = rel.tableoid AND l.objoid = rel.oid
+    JOIN pg_attribute att
+         ON rel.oid = att.attrelid AND l.objsubid = att.attnum
+    JOIN pg_namespace nsp ON rel.relnamespace = nsp.oid
+WHERE
+    l.objsubid != 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    CASE pro.prokind
+            WHEN 'a' THEN 'aggregate'::text
+            WHEN 'f' THEN 'function'::text
+            WHEN 'p' THEN 'procedure'::text
+            WHEN 'w' THEN 'window'::text END AS objtype,
+    pro.pronamespace AS objnamespace,
+    CASE WHEN pg_function_is_visible(pro.oid)
+         THEN quote_ident(pro.proname)
+         ELSE quote_ident(nsp.nspname) || '.' || quote_ident(pro.proname)
+    END || '(' || pg_catalog.pg_get_function_arguments(pro.oid) || ')' AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_proc pro ON l.classoid = pro.tableoid AND l.objoid = pro.oid
+    JOIN pg_namespace nsp ON pro.pronamespace = nsp.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    CASE WHEN typ.typtype = 'd' THEN 'domain'::text
+    ELSE 'type'::text END AS objtype,
+    typ.typnamespace AS objnamespace,
+    CASE WHEN pg_type_is_visible(typ.oid)
+    THEN quote_ident(typ.typname)
+    ELSE quote_ident(nsp.nspname) || '.' || quote_ident(typ.typname)
+    END AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_type typ ON l.classoid = typ.tableoid AND l.objoid = typ.oid
+    JOIN pg_namespace nsp ON typ.typnamespace = nsp.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'large object'::text AS objtype,
+    NULL::oid AS objnamespace,
+    l.objoid::text AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_largeobject_metadata lom ON l.objoid = lom.oid
+WHERE
+    l.classoid = 'pg_catalog.pg_largeobject'::regclass AND l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'language'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(lan.lanname) AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_language lan ON l.classoid = lan.tableoid AND l.objoid = lan.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'schema'::text AS objtype,
+    nsp.oid AS objnamespace,
+    quote_ident(nsp.nspname) AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_namespace nsp ON l.classoid = nsp.tableoid AND l.objoid = nsp.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'event trigger'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(evt.evtname) AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_event_trigger evt ON l.classoid = evt.tableoid
+        AND l.objoid = evt.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'publication'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(p.pubname) AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_publication p ON l.classoid = p.tableoid AND l.objoid = p.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, 0::int4 AS objsubid,
+    'subscription'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(s.subname) AS objname,
+    l.provider, l.label
+FROM
+    pg_shseclabel l
+    JOIN pg_subscription s ON l.classoid = s.tableoid AND l.objoid = s.oid
+UNION ALL
+SELECT
+    l.objoid, l.classoid, 0::int4 AS objsubid,
+    'database'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(dat.datname) AS objname,
+    l.provider, l.label
+FROM
+    pg_shseclabel l
+    JOIN pg_database dat ON l.classoid = dat.tableoid AND l.objoid = dat.oid
+UNION ALL
+SELECT
+    l.objoid, l.classoid, 0::int4 AS objsubid,
+    'tablespace'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(spc.spcname) AS objname,
+    l.provider, l.label
+FROM
+    pg_shseclabel l
+    JOIN pg_tablespace spc ON l.classoid = spc.tableoid AND l.objoid = spc.oid
+UNION ALL
+SELECT
+    l.objoid, l.classoid, 0::int4 AS objsubid,
+    'role'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(rol.rolname) AS objname,
+    l.provider, l.label
+FROM
+    pg_shseclabel l
+    JOIN pg_authid rol ON l.classoid = rol.tableoid AND l.objoid = rol.oid
+;
+create function anyctest(anycompatiblerange, anycompatiblerange)
+returns anycompatible as $$
+  select lower($1) + upper($2)
+$$ language sql
+;
+do $$
+begin
+  for i in 1..3 by 0 loop
+    raise notice '1..3 by 0: i = %', i;
+  end loop;
+end$$
+;
+CREATE SUBSCRIPTION testsub CONNECTION $$port=25078 host=/tmp/sxNfZEUQ8y dbname='d1'$$ PUBLICATION testpub WITH (create_slot=false, slot_name='testslot')
+;
+CREATE TABLE base_tbl (a int, b int DEFAULT 10)
+;
+create or replace function outer_func(int)
+returns int as $$
+declare
+  myresult int;
+begin
+  raise notice 'calling down into inner_func()';
+  myresult := inner_func($1);
+  raise notice 'inner_func() done';
+  return myresult;
+end;
+$$ language plpgsql
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] CREATE TABLE attmp5 (a int, b int)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."regress_constr_partitioned" (
+    "a" integer
+)
+PARTITION BY LIST ("a")
+;
+----------
+[CREATE_TABLE] CREATE FOREIGN TABLE reind_fdw_10_20 PARTITION OF reind_fdw_parent
+  FOR VALUES FROM (10) TO (20)
+  SERVER loopback OPTIONS (table_name 'reind_local_10_20')
+;
+----------
+[CREATE_PROG_OBJ] create function convslot_trig2()
+returns trigger
+language plpgsql
+AS $$
+begin
+raise notice 'trigger = %, new table = %',
+          TG_NAME,
+          (select string_agg(new_table::text, ', ' order by col1) from new_table);
+return null;
+end; $$
+;
+----------
+[DROP_SCHEMA] DROP SCHEMA alt_nsp2 CASCADE
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW pg_statio_all_tables AS
+    SELECT
+            C.oid AS relid,
+            N.nspname AS schemaname,
+            C.relname AS relname,
+            pg_stat_get_blocks_fetched(C.oid) -
+                    pg_stat_get_blocks_hit(C.oid) AS heap_blks_read,
+            pg_stat_get_blocks_hit(C.oid) AS heap_blks_hit,
+            I.idx_blks_read AS idx_blks_read,
+            I.idx_blks_hit AS idx_blks_hit,
+            pg_stat_get_blocks_fetched(T.oid) -
+                    pg_stat_get_blocks_hit(T.oid) AS toast_blks_read,
+            pg_stat_get_blocks_hit(T.oid) AS toast_blks_hit,
+            X.idx_blks_read AS tidx_blks_read,
+            X.idx_blks_hit AS tidx_blks_hit
+    FROM pg_class C LEFT JOIN
+            pg_class T ON C.reltoastrelid = T.oid
+            LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+            LEFT JOIN LATERAL (
+              SELECT sum(pg_stat_get_blocks_fetched(indexrelid) -
+                         pg_stat_get_blocks_hit(indexrelid))::bigint
+                     AS idx_blks_read,
+                     sum(pg_stat_get_blocks_hit(indexrelid))::bigint
+                     AS idx_blks_hit
+              FROM pg_index WHERE indrelid = C.oid ) I ON true
+            LEFT JOIN LATERAL (
+              SELECT sum(pg_stat_get_blocks_fetched(indexrelid) -
+                         pg_stat_get_blocks_hit(indexrelid))::bigint
+                     AS idx_blks_read,
+                     sum(pg_stat_get_blocks_hit(indexrelid))::bigint
+                     AS idx_blks_hit
+              FROM pg_index WHERE indrelid = T.oid ) X ON true
+    WHERE C.relkind IN ('r', 't', 'm')
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER "before_upd_a_stmt_trig" BEFORE UPDATE OF "a" ON "public"."main_table" FOR EACH STATEMENT EXECUTE FUNCTION "public"."trigger_func"('before_upd_a_stmt')
+;
+----------
+[CREATE_TABLE] create table more_derived (like derived, b int) inherits (derived)
+;
+----------
+[CREATE_SCHEMA] create schema sch1
+;
+----------
+[CREATE_TABLE] -- renaming constraints with cache reset of target relation
+CREATE TABLE constraint_rename_cache (a int,
+  CONSTRAINT chk_a CHECK (a > 0),
+  PRIMARY KEY (a))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION test_relpath()
+    RETURNS void
+    AS '/src/src/test/regress/regress.so'
+    LANGUAGE C
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE regression_tbd
+	ENCODING utf8 LC_COLLATE "C" LC_CTYPE "C" TEMPLATE template0
+;
+----------
+[TRUNCATE_TABLE] truncate base_tab_def
+;
+----------
+[CREATE_PROG_OBJ] create function test_strict(text) returns text as
+    'select coalesce($1, ''got passed a null'');'
+    language sql returns null on null input
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) pg_catalog.pg_largeobject
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY gist_float8_ops USING gist ADD
+	OPERATOR	6	<> (float8, float8) ,
+	OPERATOR	15	<-> (float8, float8) FOR ORDER BY pg_catalog.float_ops ,
+	FUNCTION	8 (float8, float8) gbt_float8_distance (internal, float8, int2, oid, internal) ,
+	FUNCTION	9 (float8, float8) gbt_float8_fetch (internal)
+;
+----------
+[CREATE_TYPE] create type somecomposite as (f1 float8, f2 float8)
+;
+----------
+[CREATE_VIEW(SELECT)] create view rtest_vview1 as select a, b from rtest_view1 X
+	where 0 < (select count(*) from rtest_view2 Y where Y.a = X.a)
+;
+----------
+[CREATE_POLICY] -- DETERMINISTIC
+CREATE COLLATION coll_dup_chk (DETERMINISTIC = TRUE, DETERMINISTIC = NONSENSE, LOCALE = '')
+;
+----------
+[CREATE_PROG_OBJ] create or replace function rttest()
+returns setof int as $$
+begin
+  return query execute 'select 10 into no_such_table';
+end;
+$$ language plpgsql
+;
+----------
+[DROP_SCHEMA] DROP SCHEMA test_func_dep1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION echo_me(anyenum) RETURNS text AS $$
+BEGIN
+RETURN $1::text || 'omg';
+END
+$$ LANGUAGE plpgsql
+;
+----------
+[TRUNCATE_TABLE] TRUNCATE TABLE trunc_c,truncate_a,trunc_d,trunc_e
+;
+----------
+[CREATE_PROG_OBJ] create function tattle(x int, y int) returns bool
+volatile language plpgsql as $$
+begin
+  raise notice 'x = %, y = %', x, y;
+  return x > y;
+end$$
+;
+----------
+[ALTER_LIBRARY] -- brin_page_items() added a new "empty" flag in 1.12, make sure we detect
+-- an old function definition
+ALTER EXTENSION pageinspect UPDATE TO '1.11'
+;
+----------
+[CREATE_TABLESPACE] CREATE TABLESPACE tblspc2 LOCATION '/tmp/6rkcUeuPpi/tempdir/tbl=spc2'
+;
+----------
+[CREATE_POLICY] CREATE TEXT SEARCH DICTIONARY "public"."synonym" (
+    TEMPLATE = "pg_catalog"."synonym",
+    synonyms = 'synonym_sample', casesensitive = 'off' )
+;
+----------
+[CREATE_PROG_OBJ] -- another sort of polymorphic aggregate
+
+CREATE AGGREGATE array_larger_accum (anyarray)
+(
+    sfunc = array_larger,
+    stype = anyarray,
+    initcond = '{}'
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION regress_testsub SET (streaming = true)
+;
+----------
+[DROP_TYPE] drop domain jsb_i_not_null, jsb_i_gt_1
+;
+----------
+[ALTER_PUB_SUB] -- fail - partitioned table
+ALTER PUBLICATION testpub_fortbl ADD TABLE testpub_parted
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION priv_testfunc5a(a priv_testdomain1) RETURNS int LANGUAGE SQL AS $$ SELECT $1 $$
+;
+----------
+[CREATE_VIEW(SELECT)] create view rtest_vview4 as select X.a, X.b, count(Y.a) as refcount
+	from rtest_view1 X, rtest_view2 Y
+	where X.a = Y.a
+	group by X.a, X.b
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 2) pg_catalog.pg_statistic_ext
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_10.pg_temp_26514_2
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_28176 RENAME TO reind_con_toast
+;
+----------
+[CREATE_TABLESPACE] CREATE TABLESPACE regress_create_idx_tblspace LOCATION ''
+;
+----------
+[DROP_TRIGGER] DROP EVENT TRIGGER regress_reindex_end
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION test_tab2_sub CONNECTION 'port=23484 host=/tmp/9wdFsXQ8IT dbname=postgres' PUBLICATION test_tab2_pub
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isngt(ismn, ismn13)
+	RETURNS boolean
+	AS 'int8gt'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[DROP_PUB_SUB] DROP SUBSCRIPTION tap_sub_sch
+;
+----------
+[ADD_INDEX] CREATE INDEX t2_spgist ON s5.t2 USING SPGIST (ir)
+;
+----------
+[CREATE_TABLE] CREATE TABLE spc_hint (id int)
+;
+----------
+[CREATE_TABLE] create table idxpart1 partition of idxpart for values from (0) to (500)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW pg_seclabels AS
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    CASE WHEN rel.relkind IN ('r', 'p') THEN 'table'::text
+         WHEN rel.relkind = 'v' THEN 'view'::text
+         WHEN rel.relkind = 'm' THEN 'materialized view'::text
+         WHEN rel.relkind = 'S' THEN 'sequence'::text
+         WHEN rel.relkind = 'f' THEN 'foreign table'::text END AS objtype,
+    rel.relnamespace AS objnamespace,
+    CASE WHEN pg_table_is_visible(rel.oid)
+         THEN quote_ident(rel.relname)
+         ELSE quote_ident(nsp.nspname) || '.' || quote_ident(rel.relname)
+         END AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_class rel ON l.classoid = rel.tableoid AND l.objoid = rel.oid
+    JOIN pg_namespace nsp ON rel.relnamespace = nsp.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'column'::text AS objtype,
+    rel.relnamespace AS objnamespace,
+    CASE WHEN pg_table_is_visible(rel.oid)
+         THEN quote_ident(rel.relname)
+         ELSE quote_ident(nsp.nspname) || '.' || quote_ident(rel.relname)
+         END || '.' || att.attname AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_class rel ON l.classoid = rel.tableoid AND l.objoid = rel.oid
+    JOIN pg_attribute att
+         ON rel.oid = att.attrelid AND l.objsubid = att.attnum
+    JOIN pg_namespace nsp ON rel.relnamespace = nsp.oid
+WHERE
+    l.objsubid != 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    CASE pro.prokind
+            WHEN 'a' THEN 'aggregate'::text
+            WHEN 'f' THEN 'function'::text
+            WHEN 'p' THEN 'procedure'::text
+            WHEN 'w' THEN 'window'::text END AS objtype,
+    pro.pronamespace AS objnamespace,
+    CASE WHEN pg_function_is_visible(pro.oid)
+         THEN quote_ident(pro.proname)
+         ELSE quote_ident(nsp.nspname) || '.' || quote_ident(pro.proname)
+    END || '(' || pg_catalog.pg_get_function_arguments(pro.oid) || ')' AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_proc pro ON l.classoid = pro.tableoid AND l.objoid = pro.oid
+    JOIN pg_namespace nsp ON pro.pronamespace = nsp.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    CASE WHEN typ.typtype = 'd' THEN 'domain'::text
+    ELSE 'type'::text END AS objtype,
+    typ.typnamespace AS objnamespace,
+    CASE WHEN pg_type_is_visible(typ.oid)
+    THEN quote_ident(typ.typname)
+    ELSE quote_ident(nsp.nspname) || '.' || quote_ident(typ.typname)
+    END AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_type typ ON l.classoid = typ.tableoid AND l.objoid = typ.oid
+    JOIN pg_namespace nsp ON typ.typnamespace = nsp.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'large object'::text AS objtype,
+    NULL::oid AS objnamespace,
+    l.objoid::text AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_largeobject_metadata lom ON l.objoid = lom.oid
+WHERE
+    l.classoid = 'pg_catalog.pg_largeobject'::regclass AND l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'language'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(lan.lanname) AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_language lan ON l.classoid = lan.tableoid AND l.objoid = lan.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'schema'::text AS objtype,
+    nsp.oid AS objnamespace,
+    quote_ident(nsp.nspname) AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_namespace nsp ON l.classoid = nsp.tableoid AND l.objoid = nsp.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'event trigger'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(evt.evtname) AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_event_trigger evt ON l.classoid = evt.tableoid
+        AND l.objoid = evt.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, l.objsubid,
+    'publication'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(p.pubname) AS objname,
+    l.provider, l.label
+FROM
+    pg_seclabel l
+    JOIN pg_publication p ON l.classoid = p.tableoid AND l.objoid = p.oid
+WHERE
+    l.objsubid = 0
+UNION ALL
+SELECT
+    l.objoid, l.classoid, 0::int4 AS objsubid,
+    'subscription'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(s.subname) AS objname,
+    l.provider, l.label
+FROM
+    pg_shseclabel l
+    JOIN pg_subscription s ON l.classoid = s.tableoid AND l.objoid = s.oid
+UNION ALL
+SELECT
+    l.objoid, l.classoid, 0::int4 AS objsubid,
+    'database'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(dat.datname) AS objname,
+    l.provider, l.label
+FROM
+    pg_shseclabel l
+    JOIN pg_database dat ON l.classoid = dat.tableoid AND l.objoid = dat.oid
+UNION ALL
+SELECT
+    l.objoid, l.classoid, 0::int4 AS objsubid,
+    'tablespace'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(spc.spcname) AS objname,
+    l.provider, l.label
+FROM
+    pg_shseclabel l
+    JOIN pg_tablespace spc ON l.classoid = spc.tableoid AND l.objoid = spc.oid
+UNION ALL
+SELECT
+    l.objoid, l.classoid, 0::int4 AS objsubid,
+    'role'::text AS objtype,
+    NULL::oid AS objnamespace,
+    quote_ident(rol.rolname) AS objname,
+    l.provider, l.label
+FROM
+    pg_shseclabel l
+    JOIN pg_authid rol ON l.classoid = rol.tableoid AND l.objoid = rol.oid
+;
+----------
+[CREATE_PROG_OBJ] create function anyctest(anycompatiblerange, anycompatiblerange)
+returns anycompatible as $$
+  select lower($1) + upper($2)
+$$ language sql
+;
+----------
+[BLOCK] do $$
+begin
+  for i in 1..3 by 0 loop
+    raise notice '1..3 by 0: i = %', i;
+  end loop;
+end$$
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION testsub CONNECTION $$port=25078 host=/tmp/sxNfZEUQ8y dbname='d1'$$ PUBLICATION testpub WITH (create_slot=false, slot_name='testslot')
+;
+----------
+[CREATE_TABLE] CREATE TABLE base_tbl (a int, b int DEFAULT 10)
+;
+----------
+[CREATE_PROG_OBJ] create or replace function outer_func(int)
+returns int as $$
+declare
+  myresult int;
+begin
+  raise notice 'calling down into inner_func()';
+  myresult := inner_func($1);
+  raise notice 'inner_func() done';
+  return myresult;
+end;
+$$ language plpgsql
+;

@@ -1,0 +1,480 @@
+CREATE VIEW view_unnamed_ss AS
+SELECT * FROM (SELECT * FROM (SELECT abs(f1) AS a1 FROM int4_tbl)),
+              (SELECT * FROM int8_tbl)
+  WHERE a1 < 10 AND q1 > a1 ORDER BY q1, q2
+;
+-- fails
+
+-- SET STORAGE may need to add a TOAST table
+create table test_storage (a text, c text storage plain)
+;
+CREATE VIEW json_arrayagg_view AS
+SELECT JSON_ARRAYAGG(('111' || i)::bytea FORMAT JSON NULL ON NULL RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+-- Test matching of locking clause to correct alias
+
+CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+CREATE VIEW json_objectagg_view AS
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+CREATE VIEW xmlview10 AS SELECT xmlserialize(document '<foo><bar>42</bar></foo>' AS text indent)
+;
+CREATE FUNCTION _pg_numeric_scale(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (21, 23, 20) THEN 0
+       WHEN $1 IN (1700) THEN
+            CASE WHEN $2 = -1
+                 THEN null
+                 ELSE ($2 - 4) & 0xFFFF
+                 END
+       ELSE null
+  END
+;
+CREATE FUNCTION _pg_numeric_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE $1
+         WHEN 21 /*int2*/ THEN 16
+         WHEN 23 /*int4*/ THEN 32
+         WHEN 20 /*int8*/ THEN 64
+         WHEN 1700 /*numeric*/ THEN
+              CASE WHEN $2 = -1
+                   THEN null
+                   ELSE (($2 - 4) >> 16) & 0xFFFF
+                   END
+         WHEN 700 /*float4*/ THEN 24 /*FLT_MANT_DIG*/
+         WHEN 701 /*float8*/ THEN 53 /*DBL_MANT_DIG*/
+         ELSE null
+  END
+;
+CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+CREATE VIEW is_json_view AS
+SELECT '1' IS JSON AS "any", ('1' || i) IS JSON SCALAR AS "scalar", '[]' IS NOT JSON ARRAY AS "array", '{}' IS JSON OBJECT WITH UNIQUE AS "object" FROM generate_series(1, 3) i
+;
+CREATE VIEW json_array_view AS
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+CREATE FUNCTION _pg_datetime_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1082) /* date */
+           THEN 0
+       WHEN $1 IN (1083, 1114, 1184, 1266) /* time, timestamp, same + tz */
+           THEN CASE WHEN $2 < 0 THEN 6 ELSE $2 END
+       WHEN $1 IN (1186) /* interval */
+           THEN CASE WHEN $2 < 0 OR $2 & 0xFFFF = 0xFFFF THEN 6 ELSE $2 & 0xFFFF END
+       ELSE null
+  END
+;
+-- pg_column_toast_chunk_id
+CREATE TABLE test_chunk_id (a TEXT, b TEXT STORAGE EXTERNAL)
+;
+CREATE TABLE test_chunk_id (a TEXT, b TEXT STORAGE EXTERNAL)
+;
+CREATE VIEW xmlview11 AS SELECT xmlserialize(document '<foo><bar>42</bar></foo>' AS character varying no indent)
+;
+create table test_storage (a text, c text storage plain)
+;
+CREATE VIEW json_array_subquery_view AS
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+CREATE VIEW json_object_view AS
+SELECT JSON_OBJECT('foo' : '1' FORMAT JSON, 'bar' : 'baz' RETURNING json)
+;
+CREATE TABLE not_leftmost (c text STORAGE PLAIN)
+;
+CREATE TABLE t (
+        id int,
+        data text STORAGE PLAIN
+    ) WITH (autovacuum_enabled = false)
+;
+-- check STORAGE correctness
+create table test_storage_failed (a text, b int storage extended)
+;
+alter table test_storage alter a set storage default
+;
+create table test_storage_failed (a text, b int storage extended)
+;
+ALTER TABLE testpub_rf_tbl7 ALTER COLUMN y SET EXPRESSION AS (x * testpub_rf_func2())
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime("HH:MI TZH") < $x' PASSING '12:34'::timetz AS x))
+;
+ALTER TABLE gtest23b ALTER COLUMN b SET EXPRESSION AS (a * 1)
+;
+-- Test setting merges and hashes
+ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+ALTER TABLE heaptable SET ACCESS METHOD DEFAULT, SET ACCESS METHOD heap2
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime("HH:MI TZH") < $y' PASSING '12:34'::timetz AS x))
+;
+ALTER TABLE gtest31_1 ALTER COLUMN b SET EXPRESSION AS ('hello2')
+;
+ALTER TABLE gtest25 ADD COLUMN b int GENERATED ALWAYS AS (a * 2) STORED, ALTER COLUMN b SET EXPRESSION AS (a * 3)
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$[1, $.a ? (@.datetime("HH:MI") == $x)]' PASSING '12:34'::time AS x))
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime() < $x' PASSING '1234'::int AS x))
+;
+ALTER TABLE am_partitioned SET ACCESS METHOD DEFAULT
+;
+alter domain connotnull add not null
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime() < $x' PASSING '12:34'::timetz AS x))
+;
+ALTER TABLE heaptable SET ACCESS METHOD DEFAULT
+;
+CREATE VIEW jsonb_table_view5 AS
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			exists1 bool EXISTS PATH '$.aaa',
+			exists2 int EXISTS PATH '$.aaa' TRUE ON ERROR,
+			exists3 text EXISTS PATH 'strict $.aaa' UNKNOWN ON ERROR))
+;
+CREATE FUNCTION merge_sf_test2()
+ RETURNS void
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN NOT MATCHED
+   THEN INSERT (data, id)
+   VALUES (s.a, s.a)
+WHEN MATCHED
+   THEN UPDATE SET data = s.b
+WHEN NOT MATCHED BY SOURCE
+   THEN DELETE;
+END
+;
+-- these constraints can also be added and removed by name
+alter domain dnotnulltest add constraint dnotnulltest_notnull not null
+;
+ALTER TABLE gtest20 ALTER COLUMN b SET EXPRESSION AS (a * 3)
+;
+-- check that non-commutable hash clauses do not lead to error
+alter operator = (int8, int8alias1) set (hashes)
+;
+-- Partitioned table with relam at 0
+ALTER TABLE am_partitioned SET ACCESS METHOD DEFAULT
+;
+CREATE OR REPLACE VIEW jsonb_table_view7 AS
+SELECT sub.* FROM s,
+	(values(23)) x(x),
+	generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y
+	COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[2]' COLUMNS (NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$' WITHOUT WRAPPER OMIT QUOTES)),
+		NESTED PATH '$.a.za[1]' COLUMNS (d json PATH '$ ? (@.z21[*] == ($"x" -1))' WITH WRAPPER),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' as z1 COLUMNS (a int PATH '$' KEEP QUOTES)),
+		NESTED PATH '$.a.za[1]' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" +121))' as z21 COLUMNS (b int PATH '$ ? (@ > ($"x" +111))' DEFAULT 0 ON EMPTY))
+	)) sub
+;
+CREATE VIEW timetz_local_view AS
+  SELECT f1 AS dat,
+       timezone(f1) AS dat_func,
+       f1 AT LOCAL AS dat_at_local,
+       f1 AT TIME ZONE current_setting('TimeZone') AS dat_at_tz,
+       f1 AT TIME ZONE INTERVAL '00:00' AS dat_at_int
+  FROM TIMETZ_TBL
+  ORDER BY f1
+;
+ALTER TABLE split_alter18.current_table ALTER COLUMN calc SET EXPRESSION AS (amount * 3)
+;
+CREATE VIEW json_table_view8 AS SELECT * from JSON_TABLE('"a"', '$' COLUMNS (a text PATH '$') EMPTY ON ERROR)
+;
+ALTER TABLE gtest31_1 ALTER COLUMN b SET EXPRESSION AS ('hello1')
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.date() < $x' PASSING '1234'::int AS x))
+;
+------------------------------------------------------------------------------------------
+[CREATE_VIEW(SELECT)] CREATE VIEW view_unnamed_ss AS
+SELECT * FROM (SELECT * FROM (SELECT abs(f1) AS a1 FROM int4_tbl)),
+              (SELECT * FROM int8_tbl)
+  WHERE a1 < 10 AND q1 > a1 ORDER BY q1, q2
+;
+----------
+[CREATE_TABLE] -- fails
+
+-- SET STORAGE may need to add a TOAST table
+create table test_storage (a text, c text storage plain)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_arrayagg_view AS
+SELECT JSON_ARRAYAGG(('111' || i)::bytea FORMAT JSON NULL ON NULL RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[CREATE_VIEW(SELECT,QUERY_LOCK)] -- Test matching of locking clause to correct alias
+
+CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_objectagg_view AS
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW xmlview10 AS SELECT xmlserialize(document '<foo><bar>42</bar></foo>' AS text indent)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_numeric_scale(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (21, 23, 20) THEN 0
+       WHEN $1 IN (1700) THEN
+            CASE WHEN $2 = -1
+                 THEN null
+                 ELSE ($2 - 4) & 0xFFFF
+                 END
+       ELSE null
+  END
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_numeric_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE $1
+         WHEN 21 /*int2*/ THEN 16
+         WHEN 23 /*int4*/ THEN 32
+         WHEN 20 /*int8*/ THEN 64
+         WHEN 1700 /*numeric*/ THEN
+              CASE WHEN $2 = -1
+                   THEN null
+                   ELSE (($2 - 4) >> 16) & 0xFFFF
+                   END
+         WHEN 700 /*float4*/ THEN 24 /*FLT_MANT_DIG*/
+         WHEN 701 /*float8*/ THEN 53 /*DBL_MANT_DIG*/
+         ELSE null
+  END
+;
+----------
+[CREATE_VIEW(SELECT,QUERY_LOCK)] CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW is_json_view AS
+SELECT '1' IS JSON AS "any", ('1' || i) IS JSON SCALAR AS "scalar", '[]' IS NOT JSON ARRAY AS "array", '{}' IS JSON OBJECT WITH UNIQUE AS "object" FROM generate_series(1, 3) i
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_array_view AS
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_datetime_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1082) /* date */
+           THEN 0
+       WHEN $1 IN (1083, 1114, 1184, 1266) /* time, timestamp, same + tz */
+           THEN CASE WHEN $2 < 0 THEN 6 ELSE $2 END
+       WHEN $1 IN (1186) /* interval */
+           THEN CASE WHEN $2 < 0 OR $2 & 0xFFFF = 0xFFFF THEN 6 ELSE $2 & 0xFFFF END
+       ELSE null
+  END
+;
+----------
+[CREATE_TABLE] -- pg_column_toast_chunk_id
+CREATE TABLE test_chunk_id (a TEXT, b TEXT STORAGE EXTERNAL)
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_chunk_id (a TEXT, b TEXT STORAGE EXTERNAL)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW xmlview11 AS SELECT xmlserialize(document '<foo><bar>42</bar></foo>' AS character varying no indent)
+;
+----------
+[CREATE_TABLE] create table test_storage (a text, c text storage plain)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_array_subquery_view AS
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_object_view AS
+SELECT JSON_OBJECT('foo' : '1' FORMAT JSON, 'bar' : 'baz' RETURNING json)
+;
+----------
+[CREATE_TABLE] CREATE TABLE not_leftmost (c text STORAGE PLAIN)
+;
+----------
+[CREATE_TABLE] CREATE TABLE t (
+        id int,
+        data text STORAGE PLAIN
+    ) WITH (autovacuum_enabled = false)
+;
+----------
+[CREATE_TABLE] -- check STORAGE correctness
+create table test_storage_failed (a text, b int storage extended)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table test_storage alter a set storage default
+;
+----------
+[CREATE_TABLE] create table test_storage_failed (a text, b int storage extended)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE testpub_rf_tbl7 ALTER COLUMN y SET EXPRESSION AS (x * testpub_rf_func2())
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime("HH:MI TZH") < $x' PASSING '12:34'::timetz AS x))
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest23b ALTER COLUMN b SET EXPRESSION AS (a * 1)
+;
+----------
+[ALTER_PROG_OBJ] -- Test setting merges and hashes
+ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+----------
+[ALTER_TABLE] ALTER TABLE heaptable SET ACCESS METHOD DEFAULT, SET ACCESS METHOD heap2
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime("HH:MI TZH") < $y' PASSING '12:34'::timetz AS x))
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest31_1 ALTER COLUMN b SET EXPRESSION AS ('hello2')
+;
+----------
+[ALTER_TABLE|ADD_COLUMN|ALTER_COLUMN] ALTER TABLE gtest25 ADD COLUMN b int GENERATED ALWAYS AS (a * 2) STORED, ALTER COLUMN b SET EXPRESSION AS (a * 3)
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$[1, $.a ? (@.datetime("HH:MI") == $x)]' PASSING '12:34'::time AS x))
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime() < $x' PASSING '1234'::int AS x))
+;
+----------
+[ALTER_TABLE] ALTER TABLE am_partitioned SET ACCESS METHOD DEFAULT
+;
+----------
+[ALTER_TYPE] alter domain connotnull add not null
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime() < $x' PASSING '12:34'::timetz AS x))
+;
+----------
+[ALTER_TABLE] ALTER TABLE heaptable SET ACCESS METHOD DEFAULT
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW jsonb_table_view5 AS
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			exists1 bool EXISTS PATH '$.aaa',
+			exists2 int EXISTS PATH '$.aaa' TRUE ON ERROR,
+			exists3 text EXISTS PATH 'strict $.aaa' UNKNOWN ON ERROR))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION merge_sf_test2()
+ RETURNS void
+ LANGUAGE sql
+BEGIN ATOMIC
+ MERGE INTO sf_target t
+   USING rule_merge1 s
+   ON (s.a = t.id)
+WHEN NOT MATCHED
+   THEN INSERT (data, id)
+   VALUES (s.a, s.a)
+WHEN MATCHED
+   THEN UPDATE SET data = s.b
+WHEN NOT MATCHED BY SOURCE
+   THEN DELETE;
+END
+;
+----------
+[ALTER_TYPE] -- these constraints can also be added and removed by name
+alter domain dnotnulltest add constraint dnotnulltest_notnull not null
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest20 ALTER COLUMN b SET EXPRESSION AS (a * 3)
+;
+----------
+[ALTER_PROG_OBJ] -- check that non-commutable hash clauses do not lead to error
+alter operator = (int8, int8alias1) set (hashes)
+;
+----------
+[ALTER_TABLE] -- Partitioned table with relam at 0
+ALTER TABLE am_partitioned SET ACCESS METHOD DEFAULT
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE OR REPLACE VIEW jsonb_table_view7 AS
+SELECT sub.* FROM s,
+	(values(23)) x(x),
+	generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y
+	COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[2]' COLUMNS (NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$' WITHOUT WRAPPER OMIT QUOTES)),
+		NESTED PATH '$.a.za[1]' COLUMNS (d json PATH '$ ? (@.z21[*] == ($"x" -1))' WITH WRAPPER),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' as z1 COLUMNS (a int PATH '$' KEEP QUOTES)),
+		NESTED PATH '$.a.za[1]' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" +121))' as z21 COLUMNS (b int PATH '$ ? (@ > ($"x" +111))' DEFAULT 0 ON EMPTY))
+	)) sub
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW timetz_local_view AS
+  SELECT f1 AS dat,
+       timezone(f1) AS dat_func,
+       f1 AT LOCAL AS dat_at_local,
+       f1 AT TIME ZONE current_setting('TimeZone') AS dat_at_tz,
+       f1 AT TIME ZONE INTERVAL '00:00' AS dat_at_int
+  FROM TIMETZ_TBL
+  ORDER BY f1
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE split_alter18.current_table ALTER COLUMN calc SET EXPRESSION AS (amount * 3)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_table_view8 AS SELECT * from JSON_TABLE('"a"', '$' COLUMNS (a text PATH '$') EMPTY ON ERROR)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest31_1 ALTER COLUMN b SET EXPRESSION AS ('hello1')
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.date() < $x' PASSING '1234'::int AS x))
+;

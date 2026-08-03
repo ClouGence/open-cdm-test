@@ -1,0 +1,610 @@
+CREATE PUBLICATION pub_mix_5 FOR TABLE test_mix_3 (a, b, c)
+;
+CREATE TABLE gtest23x (a int PRIMARY KEY, b int GENERATED ALWAYS AS (a * 2) VIRTUAL REFERENCES gtest23a (x) ON DELETE SET NULL)
+;
+create table notnull_tbl2 (a serial, constraint foo not null a)
+;
+-- ALTER CONSTRAINT NO INHERIT should work on top-level constraints
+alter table inh_nn1 alter constraint inh_nn1_f1_not_null no inherit
+;
+CREATE TABLE temporal_partitioned_mltrng (
+  id int4range,
+  valid_at datemultirange,
+  name text,
+  CONSTRAINT temporal_paritioned_mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+) PARTITION BY LIST (id)
+;
+CREATE TABLE FKTABLE (
+  tid int, id int,
+  fk_id_del_set_null int,
+  fk_id_del_set_default int DEFAULT 0,
+  FOREIGN KEY (tid, fk_id_del_set_null) REFERENCES PKTABLE ON DELETE SET NULL (fk_id_del_set_null),
+  -- this tests handling of duplicate entries in SET DEFAULT column list
+  FOREIGN KEY (tid, fk_id_del_set_default) REFERENCES PKTABLE ON DELETE SET DEFAULT (fk_id_del_set_default, fk_id_del_set_default)
+)
+;
+ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA pub_test1, pub_test2
+;
+CREATE PUBLICATION pub1 FOR TABLES IN SCHEMA s1
+;
+CREATE TABLE temporal_rng (
+  id integer,
+  valid_at daterange,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+ALTER TABLE gtest29 ALTER COLUMN b DROP EXPRESSION
+;
+-- ok - can use row filter for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk WHERE (a > 99)
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 (a)
+;
+create index tstidx on ltreetest using gist (t gist_ltree_ops(siglen=2024))
+;
+CREATE TABLE test_jsonb_constraints (
+	js text,
+	i int,
+	x jsonb DEFAULT JSON_QUERY(jsonb '[1,2]', '$[*]' WITH WRAPPER)
+	CONSTRAINT test_jsonb_constraint1
+		CHECK (js IS JSON)
+	CONSTRAINT test_jsonb_constraint2
+		CHECK (JSON_EXISTS(js::jsonb, '$.a' PASSING i + 5 AS int, i::text AS "TXT", array[1,2,3] as arr))
+	CONSTRAINT test_jsonb_constraint3
+		CHECK (JSON_VALUE(js::jsonb, '$.a' RETURNING int DEFAULT '12' ON EMPTY ERROR ON ERROR) > i)
+	CONSTRAINT test_jsonb_constraint4
+		CHECK (JSON_QUERY(js::jsonb, '$.a' WITH CONDITIONAL WRAPPER EMPTY OBJECT ON ERROR) = jsonb '[10]')
+	CONSTRAINT test_jsonb_constraint5
+		CHECK (JSON_QUERY(js::jsonb, '$.a' RETURNING char(5) OMIT QUOTES EMPTY ARRAY ON EMPTY) >  'a' COLLATE "C")
+)
+;
+ALTER TABLE temporal_fk2_rng2rng
+  ADD CONSTRAINT temporal_fk2_rng2rng_fk
+  FOREIGN KEY (parent_id1, parent_id2, PERIOD valid_at)
+  REFERENCES temporal_rng2 (id1, id2, PERIOD valid_at)
+;
+ALTER TABLE heaptable SET ACCESS METHOD heap2
+;
+ALTER TABLE range_parted2 DETACH PARTITION part_rp100 CONCURRENTLY
+;
+CREATE VIEW xmlview11 AS SELECT xmlserialize(document '<foo><bar>42</bar></foo>' AS character varying no indent)
+;
+CREATE OR REPLACE FUNCTION age(timestamptz)
+ RETURNS interval
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN age(cast(current_date as timestamptz), $1)
+;
+ALTER TABLE notnull_tbl1_upg ADD CONSTRAINT nn NOT NULL a NOT VALID
+;
+CREATE OR REPLACE FUNCTION timedate_pl(time, date)
+ RETURNS timestamp
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+CREATE PUBLICATION testpub_for_tbl_schema FOR TABLES IN SCHEMA pub_test, TABLE pub_test.testpub_nopk
+;
+ALTER TABLE d_listp DETACH PARTITION d_listp2 CONCURRENTLY
+;
+-- reference to system column not allowed in generated column
+-- (except tableoid, which we test below)
+CREATE TABLE gtest_err_6a (a int PRIMARY KEY, b bool GENERATED ALWAYS AS (xmin <> 37) VIRTUAL)
+;
+CREATE FUNCTION "public"."fipshash"("bytea") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE STRICT LEAKPROOF PARALLEL SAFE
+    RETURN "substr"("encode"("sha256"($1), 'hex'::"text"), 1, 32)
+;
+ALTER TABLE temporal_partitioned_fk_rng2rng
+  DROP CONSTRAINT temporal_partitioned_fk_rng2rng_fk,
+  ADD CONSTRAINT temporal_partitioned_fk_rng2rng_fk
+    FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_partitioned_rng
+    ON DELETE SET NULL ON UPDATE SET NULL
+;
+CREATE OR REPLACE FUNCTION interval_pl_date(interval, date)
+ RETURNS timestamp
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+-- Modifying other attributes of a constraint should not affect its enforceability, and vice versa
+ALTER TABLE FKTABLE ADD CONSTRAINT fk_con FOREIGN KEY(ftest1, ftest2) REFERENCES PKTABLE NOT VALID NOT ENFORCED
+;
+ALTER TABLE "public"."insert_tbl"
+    ADD CONSTRAINT "ne_insert_tbl_con" CHECK ((("x" + "z") = 1)) NOT ENFORCED
+;
+-- reverse-listing of various special function syntaxes required by SQL
+
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb
+;
+CREATE TABLE tab_core_types AS SELECT
+  '(11,12)'::point,
+  '(1,1),(2,2)'::line,
+  '((11,11),(12,12))'::lseg,
+  '((11,11),(13,13))'::box,
+  '((11,12),(13,13),(14,14))'::path AS openedpath,
+  '[(11,12),(13,13),(14,14)]'::path AS closedpath,
+  '((11,12),(13,13),(14,14))'::polygon,
+  '1,1,1'::circle,
+  'today'::date,
+  'now'::time,
+  'now'::timestamp,
+  'now'::timetz,
+  'now'::timestamptz,
+  '12 seconds'::interval,
+  '{"reason":"because"}'::json,
+  '{"when":"now"}'::jsonb,
+  '$.a[*] ? (@ > 2)'::jsonpath,
+  '127.0.0.1'::inet,
+  '127.0.0.0/8'::cidr,
+  '00:01:03:86:1c:ba'::macaddr8,
+  '00:01:03:86:1c:ba'::macaddr,
+  2::int2, 4::int4, 8::int8,
+  4::float4, '8'::float8, pi()::numeric,
+  'foo'::"char",
+  'c'::bpchar,
+  'abc'::varchar,
+  'name'::name,
+  'txt'::text,
+  true::bool,
+  E'\\xDEADBEEF'::bytea,
+  B'10001'::bit,
+  B'10001'::varbit AS varbit,
+  '12.34'::money,
+  'abc'::refcursor,
+  '1 2'::int2vector,
+  '1 2'::oidvector,
+  format('%I=UC/%I', USER, USER)::aclitem AS aclitem,
+  'a fat cat sat on a mat and ate a fat rat'::tsvector,
+  'fat & rat'::tsquery,
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
+  '11'::xid8,
+  'pg_class'::regclass,
+  'regtype'::regtype type,
+  'pg_monitor'::regrole,
+  'pg_class'::regclass::oid,
+  '(1,1)'::tid, '2'::xid, '3'::cid,
+  '10:20:10,14,15'::txid_snapshot,
+  '10:20:10,14,15'::pg_snapshot,
+  '16/B374D848'::pg_lsn,
+  1::information_schema.cardinal_number,
+  'l'::information_schema.character_data,
+  'n'::information_schema.sql_identifier,
+  'now'::information_schema.time_stamp,
+  'YES'::information_schema.yes_or_no,
+  'venus'::planets,
+  'i16'::insenum,
+  '(1,2)'::int4range, '{(1,2)}'::int4multirange,
+  '(3,4)'::int8range, '{(3,4)}'::int8multirange,
+  '(1,2)'::float8range, '{(1,2)}'::float8multirange,
+  '(3,4)'::numrange, '{(3,4)}'::nummultirange,
+  '(a,b)'::textrange, '{(a,b)}'::textmultirange,
+  '(12.34, 56.78)'::cashrange, '{(12.34, 56.78)}'::cashmultirange,
+  '(2020-01-02, 2021-02-03)'::daterange,
+  '{(2020-01-02, 2021-02-03)}'::datemultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tsrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tsmultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tstzrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tstzmultirange,
+  arrayrange(ARRAY[1,2], ARRAY[2,1]),
+  arraymultirange(arrayrange(ARRAY[1,2], ARRAY[2,1]))
+;
+CREATE FUNCTION _pg_truetypmod(pg_attribute, pg_type) RETURNS int4
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN CASE WHEN $2.typtype = 'd' THEN $2.typtypmod ELSE $1.atttypmod END
+;
+-- 1b. REPLICA IDENTITY is DEFAULT and table has no PK
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_nopk (a)
+;
+-- fail - non-immutable functions are not allowed. random() is volatile.
+ALTER PUBLICATION testpub5 ADD TABLE testpub_rf_tbl1 WHERE (a < random())
+;
+ALTER TABLE temporal_fk_rng2rng
+  ADD CONSTRAINT temporal_fk_rng2rng_fk
+    FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng
+    ON DELETE SET NULL ON UPDATE SET NULL
+;
+CREATE PUBLICATION tap_pub_viaroot_1 FOR TABLE tab_rowfilter_viaroot_part WHERE (a > 15) WITH (publish_via_partition_root)
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$[1, $.a ? (@.datetime() == $x)]' PASSING '12:34'::time AS x))
+;
+alter view aliased_order_by rename column x3 to x1
+;
+create table test_storage (a text, c text storage plain)
+;
+ALTER TYPE ltree SET ( RECEIVE = ltree_recv, SEND = ltree_send )
+;
+CREATE TABLE gtest_rule (a int, b int GENERATED ALWAYS AS (a * 2) VIRTUAL)
+;
+-- PK with two columns plus a multirange:
+CREATE TABLE temporal_mltrng2 (
+  id1 int4range,
+  id2 int4range,
+  valid_at datemultirange,
+  CONSTRAINT temporal_mltrng2_pk PRIMARY KEY (id1, id2, valid_at WITHOUT OVERLAPS)
+)
+;
+CREATE TABLE split_pg18.generated_virtual_table (
+    id integer,
+    amount integer,
+    doubled integer GENERATED ALWAYS AS (amount * 2) VIRTUAL,
+    CONSTRAINT amount_positive CHECK (amount > 0) NOT ENFORCED
+)
+;
+CREATE INDEX wowidx2 ON test_tsvector USING gist (a tsvector_ops(siglen=1))
+;
+DROP DATABASE IF EXISTS split_db18_builtin WITH (FORCE)
+;
+CREATE VIEW json_array_subquery_view AS
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+CREATE PUBLICATION testpub_syntax2 FOR TABLE testpub_rf_tbl1, testpub_rf_schema1.testpub_rf_tbl5 WHERE (h < 999) WITH (publish = 'insert')
+;
+CREATE TABLE gtest28a (
+  a int,
+  b int,
+  c int,
+  x int GENERATED ALWAYS AS (b * 2) VIRTUAL
+)
+;
+create table notnull_tbl_fail (a int generated by default as identity not null no inherit)
+;
+-- Generated columns in column list, when 'publish_generated_columns'='none'
+CREATE PUBLICATION pub1 FOR table gencols(a, gen1) WITH (publish_generated_columns = none)
+;
+------------------------------------------------------------------------------------------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_mix_5 FOR TABLE test_mix_3 (a, b, c)
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest23x (a int PRIMARY KEY, b int GENERATED ALWAYS AS (a * 2) VIRTUAL REFERENCES gtest23a (x) ON DELETE SET NULL)
+;
+----------
+[CREATE_TABLE] create table notnull_tbl2 (a serial, constraint foo not null a)
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT] -- ALTER CONSTRAINT NO INHERIT should work on top-level constraints
+alter table inh_nn1 alter constraint inh_nn1_f1_not_null no inherit
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_partitioned_mltrng (
+  id int4range,
+  valid_at datemultirange,
+  name text,
+  CONSTRAINT temporal_paritioned_mltrng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+) PARTITION BY LIST (id)
+;
+----------
+[CREATE_TABLE] CREATE TABLE FKTABLE (
+  tid int, id int,
+  fk_id_del_set_null int,
+  fk_id_del_set_default int DEFAULT 0,
+  FOREIGN KEY (tid, fk_id_del_set_null) REFERENCES PKTABLE ON DELETE SET NULL (fk_id_del_set_null),
+  -- this tests handling of duplicate entries in SET DEFAULT column list
+  FOREIGN KEY (tid, fk_id_del_set_default) REFERENCES PKTABLE ON DELETE SET DEFAULT (fk_id_del_set_default, fk_id_del_set_default)
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA pub_test1, pub_test2
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub1 FOR TABLES IN SCHEMA s1
+;
+----------
+[CREATE_TABLE] CREATE TABLE temporal_rng (
+  id integer,
+  valid_at daterange,
+  CONSTRAINT temporal_rng_pk PRIMARY KEY (id, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest29 ALTER COLUMN b DROP EXPRESSION
+;
+----------
+[ALTER_PUB_SUB] -- ok - can use row filter for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk WHERE (a > 99)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 (a)
+;
+----------
+[ADD_INDEX] create index tstidx on ltreetest using gist (t gist_ltree_ops(siglen=2024))
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_jsonb_constraints (
+	js text,
+	i int,
+	x jsonb DEFAULT JSON_QUERY(jsonb '[1,2]', '$[*]' WITH WRAPPER)
+	CONSTRAINT test_jsonb_constraint1
+		CHECK (js IS JSON)
+	CONSTRAINT test_jsonb_constraint2
+		CHECK (JSON_EXISTS(js::jsonb, '$.a' PASSING i + 5 AS int, i::text AS "TXT", array[1,2,3] as arr))
+	CONSTRAINT test_jsonb_constraint3
+		CHECK (JSON_VALUE(js::jsonb, '$.a' RETURNING int DEFAULT '12' ON EMPTY ERROR ON ERROR) > i)
+	CONSTRAINT test_jsonb_constraint4
+		CHECK (JSON_QUERY(js::jsonb, '$.a' WITH CONDITIONAL WRAPPER EMPTY OBJECT ON ERROR) = jsonb '[10]')
+	CONSTRAINT test_jsonb_constraint5
+		CHECK (JSON_QUERY(js::jsonb, '$.a' RETURNING char(5) OMIT QUOTES EMPTY ARRAY ON EMPTY) >  'a' COLLATE "C")
+)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE temporal_fk2_rng2rng
+  ADD CONSTRAINT temporal_fk2_rng2rng_fk
+  FOREIGN KEY (parent_id1, parent_id2, PERIOD valid_at)
+  REFERENCES temporal_rng2 (id1, id2, PERIOD valid_at)
+;
+----------
+[ALTER_TABLE] ALTER TABLE heaptable SET ACCESS METHOD heap2
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE range_parted2 DETACH PARTITION part_rp100 CONCURRENTLY
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW xmlview11 AS SELECT xmlserialize(document '<foo><bar>42</bar></foo>' AS character varying no indent)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION age(timestamptz)
+ RETURNS interval
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN age(cast(current_date as timestamptz), $1)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE notnull_tbl1_upg ADD CONSTRAINT nn NOT NULL a NOT VALID
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION timedate_pl(time, date)
+ RETURNS timestamp
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_for_tbl_schema FOR TABLES IN SCHEMA pub_test, TABLE pub_test.testpub_nopk
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE d_listp DETACH PARTITION d_listp2 CONCURRENTLY
+;
+----------
+[CREATE_TABLE] -- reference to system column not allowed in generated column
+-- (except tableoid, which we test below)
+CREATE TABLE gtest_err_6a (a int PRIMARY KEY, b bool GENERATED ALWAYS AS (xmin <> 37) VIRTUAL)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."fipshash"("bytea") RETURNS "text"
+    LANGUAGE "sql" IMMUTABLE STRICT LEAKPROOF PARALLEL SAFE
+    RETURN "substr"("encode"("sha256"($1), 'hex'::"text"), 1, 32)
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT|ADD_CONSTRAINT] ALTER TABLE temporal_partitioned_fk_rng2rng
+  DROP CONSTRAINT temporal_partitioned_fk_rng2rng_fk,
+  ADD CONSTRAINT temporal_partitioned_fk_rng2rng_fk
+    FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_partitioned_rng
+    ON DELETE SET NULL ON UPDATE SET NULL
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION interval_pl_date(interval, date)
+ RETURNS timestamp
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] -- Modifying other attributes of a constraint should not affect its enforceability, and vice versa
+ALTER TABLE FKTABLE ADD CONSTRAINT fk_con FOREIGN KEY(ftest1, ftest2) REFERENCES PKTABLE NOT VALID NOT ENFORCED
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE "public"."insert_tbl"
+    ADD CONSTRAINT "ne_insert_tbl_con" CHECK ((("x" + "z") = 1)) NOT ENFORCED
+;
+----------
+[CREATE_VIEW(SELECT)] -- reverse-listing of various special function syntaxes required by SQL
+
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE tab_core_types AS SELECT
+  '(11,12)'::point,
+  '(1,1),(2,2)'::line,
+  '((11,11),(12,12))'::lseg,
+  '((11,11),(13,13))'::box,
+  '((11,12),(13,13),(14,14))'::path AS openedpath,
+  '[(11,12),(13,13),(14,14)]'::path AS closedpath,
+  '((11,12),(13,13),(14,14))'::polygon,
+  '1,1,1'::circle,
+  'today'::date,
+  'now'::time,
+  'now'::timestamp,
+  'now'::timetz,
+  'now'::timestamptz,
+  '12 seconds'::interval,
+  '{"reason":"because"}'::json,
+  '{"when":"now"}'::jsonb,
+  '$.a[*] ? (@ > 2)'::jsonpath,
+  '127.0.0.1'::inet,
+  '127.0.0.0/8'::cidr,
+  '00:01:03:86:1c:ba'::macaddr8,
+  '00:01:03:86:1c:ba'::macaddr,
+  2::int2, 4::int4, 8::int8,
+  4::float4, '8'::float8, pi()::numeric,
+  'foo'::"char",
+  'c'::bpchar,
+  'abc'::varchar,
+  'name'::name,
+  'txt'::text,
+  true::bool,
+  E'\\xDEADBEEF'::bytea,
+  B'10001'::bit,
+  B'10001'::varbit AS varbit,
+  '12.34'::money,
+  'abc'::refcursor,
+  '1 2'::int2vector,
+  '1 2'::oidvector,
+  format('%I=UC/%I', USER, USER)::aclitem AS aclitem,
+  'a fat cat sat on a mat and ate a fat rat'::tsvector,
+  'fat & rat'::tsquery,
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
+  '11'::xid8,
+  'pg_class'::regclass,
+  'regtype'::regtype type,
+  'pg_monitor'::regrole,
+  'pg_class'::regclass::oid,
+  '(1,1)'::tid, '2'::xid, '3'::cid,
+  '10:20:10,14,15'::txid_snapshot,
+  '10:20:10,14,15'::pg_snapshot,
+  '16/B374D848'::pg_lsn,
+  1::information_schema.cardinal_number,
+  'l'::information_schema.character_data,
+  'n'::information_schema.sql_identifier,
+  'now'::information_schema.time_stamp,
+  'YES'::information_schema.yes_or_no,
+  'venus'::planets,
+  'i16'::insenum,
+  '(1,2)'::int4range, '{(1,2)}'::int4multirange,
+  '(3,4)'::int8range, '{(3,4)}'::int8multirange,
+  '(1,2)'::float8range, '{(1,2)}'::float8multirange,
+  '(3,4)'::numrange, '{(3,4)}'::nummultirange,
+  '(a,b)'::textrange, '{(a,b)}'::textmultirange,
+  '(12.34, 56.78)'::cashrange, '{(12.34, 56.78)}'::cashmultirange,
+  '(2020-01-02, 2021-02-03)'::daterange,
+  '{(2020-01-02, 2021-02-03)}'::datemultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tsrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tsmultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tstzrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tstzmultirange,
+  arrayrange(ARRAY[1,2], ARRAY[2,1]),
+  arraymultirange(arrayrange(ARRAY[1,2], ARRAY[2,1]))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_truetypmod(pg_attribute, pg_type) RETURNS int4
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN CASE WHEN $2.typtype = 'd' THEN $2.typtypmod ELSE $1.atttypmod END
+;
+----------
+[ALTER_PUB_SUB] -- 1b. REPLICA IDENTITY is DEFAULT and table has no PK
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_nopk (a)
+;
+----------
+[ALTER_PUB_SUB] -- fail - non-immutable functions are not allowed. random() is volatile.
+ALTER PUBLICATION testpub5 ADD TABLE testpub_rf_tbl1 WHERE (a < random())
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE temporal_fk_rng2rng
+  ADD CONSTRAINT temporal_fk_rng2rng_fk
+    FOREIGN KEY (parent_id, PERIOD valid_at)
+    REFERENCES temporal_rng
+    ON DELETE SET NULL ON UPDATE SET NULL
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_viaroot_1 FOR TABLE tab_rowfilter_viaroot_part WHERE (a > 15) WITH (publish_via_partition_root)
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$[1, $.a ? (@.datetime() == $x)]' PASSING '12:34'::time AS x))
+;
+----------
+[RENAME_COLUMN] alter view aliased_order_by rename column x3 to x1
+;
+----------
+[CREATE_TABLE] create table test_storage (a text, c text storage plain)
+;
+----------
+[ALTER_TYPE] ALTER TYPE ltree SET ( RECEIVE = ltree_recv, SEND = ltree_send )
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_rule (a int, b int GENERATED ALWAYS AS (a * 2) VIRTUAL)
+;
+----------
+[CREATE_TABLE] -- PK with two columns plus a multirange:
+CREATE TABLE temporal_mltrng2 (
+  id1 int4range,
+  id2 int4range,
+  valid_at datemultirange,
+  CONSTRAINT temporal_mltrng2_pk PRIMARY KEY (id1, id2, valid_at WITHOUT OVERLAPS)
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE split_pg18.generated_virtual_table (
+    id integer,
+    amount integer,
+    doubled integer GENERATED ALWAYS AS (amount * 2) VIRTUAL,
+    CONSTRAINT amount_positive CHECK (amount > 0) NOT ENFORCED
+)
+;
+----------
+[ADD_INDEX] CREATE INDEX wowidx2 ON test_tsvector USING gist (a tsvector_ops(siglen=1))
+;
+----------
+[DROP_CATALOG] DROP DATABASE IF EXISTS split_db18_builtin WITH (FORCE)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_array_subquery_view AS
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_syntax2 FOR TABLE testpub_rf_tbl1, testpub_rf_schema1.testpub_rf_tbl5 WHERE (h < 999) WITH (publish = 'insert')
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest28a (
+  a int,
+  b int,
+  c int,
+  x int GENERATED ALWAYS AS (b * 2) VIRTUAL
+)
+;
+----------
+[CREATE_TABLE] create table notnull_tbl_fail (a int generated by default as identity not null no inherit)
+;
+----------
+[CREATE_PUB_SUB] -- Generated columns in column list, when 'publish_generated_columns'='none'
+CREATE PUBLICATION pub1 FOR table gencols(a, gen1) WITH (publish_generated_columns = none)
+;

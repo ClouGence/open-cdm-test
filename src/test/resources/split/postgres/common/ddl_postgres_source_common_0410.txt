@@ -1,0 +1,552 @@
+ALTER TABLE pg_toast.pg_toast_30607 RENAME TO reind_con_toast
+;
+CREATE INDEX "sp_kd_ind" ON "public"."kd_point_tbl" USING "spgist" ("p" "kd_point_ops")
+;
+CREATE TABLE "public"."circle_tbl" (
+    "f1" "circle"
+)
+;
+CREATE FUNCTION gbt_bool_sortsupport(internal)
+RETURNS void
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE PARALLEL SAFE STRICT
+;
+COMMENT ON CONSTRAINT noinh_con_copy_c_not_null ON noinh_con_copy IS 'not null c no inherit'
+;
+CREATE INDEX ON syscol_table ((ctid >= '(1000,0)'))
+;
+VACUUM (FULL) pg_catalog.pg_operator
+;
+-- c1.f1 is still there, but no longer inherited
+alter table c1 drop column f1
+;
+drop table cchild
+;
+CREATE SEQUENCE tid_seq
+;
+-- Check that DEFAULT expressions in SQL/JSON functions use the same collation
+-- as the RETURNING type.  Mismatched collations should raise an error.
+CREATE DOMAIN d1 AS text COLLATE case_insensitive
+;
+CREATE TABLE noinh_con_copy (a int CHECK (a > 0) NO INHERIT)
+;
+ALTER TABLE vtype ADD COLUMN b DOUBLE PRECISION DEFAULT 0.2
+;
+ALTER TABLE ONLY "regress_indexing"."pk" ATTACH PARTITION "regress_indexing"."pk3" FOR VALUES FROM (2000) TO (3000)
+;
+/*
+ * 6.69
+ * TRIGGER_COLUMN_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 6.70
+ * TRIGGER_PERIOD_USAGE view
+ */
+
+-- feature not supported
+
+
+/*
+ * 6.71
+ * TRIGGER_ROUTINE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 6.72
+ * TRIGGER_SEQUENCE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 6.73
+ * TRIGGER_TABLE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 6.74
+ * TRIGGERS view
+ */
+
+CREATE VIEW triggers AS
+    SELECT CAST(current_database() AS sql_identifier) AS trigger_catalog,
+           CAST(n.nspname AS sql_identifier) AS trigger_schema,
+           CAST(t.tgname AS sql_identifier) AS trigger_name,
+           CAST(em.text AS character_data) AS event_manipulation,
+           CAST(current_database() AS sql_identifier) AS event_object_catalog,
+           CAST(n.nspname AS sql_identifier) AS event_object_schema,
+           CAST(c.relname AS sql_identifier) AS event_object_table,
+           CAST(
+             -- To determine action order, partition by schema, table,
+             -- event_manipulation (INSERT/DELETE/UPDATE), ROW/STATEMENT (1),
+             -- BEFORE/AFTER (66), then order by trigger name.  It's preferable
+             -- to partition by view output columns, so that query constraints
+             -- can be pushed down below the window function.
+             rank() OVER (PARTITION BY CAST(n.nspname AS sql_identifier),
+                                       CAST(c.relname AS sql_identifier),
+                                       em.num,
+                                       t.tgtype & 1,
+                                       t.tgtype & 66
+                                       ORDER BY t.tgname)
+             AS cardinal_number) AS action_order,
+           CAST(
+             CASE WHEN pg_has_role(c.relowner, 'USAGE')
+               THEN (regexp_match(pg_get_triggerdef(t.oid), E'.{35,} WHEN \\((.+)\\) EXECUTE FUNCTION'))[1]
+               ELSE null END
+             AS character_data) AS action_condition,
+           CAST(
+             substring(pg_get_triggerdef(t.oid) from
+                       position('EXECUTE FUNCTION' in substring(pg_get_triggerdef(t.oid) from 48)) + 47)
+             AS character_data) AS action_statement,
+           CAST(
+             -- hard-wired reference to TRIGGER_TYPE_ROW
+             CASE t.tgtype & 1 WHEN 1 THEN 'ROW' ELSE 'STATEMENT' END
+             AS character_data) AS action_orientation,
+           CAST(
+             -- hard-wired refs to TRIGGER_TYPE_BEFORE, TRIGGER_TYPE_INSTEAD
+             CASE t.tgtype & 66 WHEN 2 THEN 'BEFORE' WHEN 64 THEN 'INSTEAD OF' ELSE 'AFTER' END
+             AS character_data) AS action_timing,
+           CAST(tgoldtable AS sql_identifier) AS action_reference_old_table,
+           CAST(tgnewtable AS sql_identifier) AS action_reference_new_table,
+           CAST(null AS sql_identifier) AS action_reference_old_row,
+           CAST(null AS sql_identifier) AS action_reference_new_row,
+           CAST(null AS time_stamp) AS created
+
+    FROM pg_namespace n, pg_class c, pg_trigger t,
+         -- hard-wired refs to TRIGGER_TYPE_INSERT, TRIGGER_TYPE_DELETE,
+         -- TRIGGER_TYPE_UPDATE; we intentionally omit TRIGGER_TYPE_TRUNCATE
+         (VALUES (4, 'INSERT'),
+                 (8, 'DELETE'),
+                 (16, 'UPDATE')) AS em (num, text)
+
+    WHERE n.oid = c.relnamespace
+          AND c.oid = t.tgrelid
+          AND t.tgtype & em.num <> 0
+          AND NOT t.tgisinternal
+          AND (NOT pg_is_other_temp_schema(n.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'INSERT, UPDATE, REFERENCES') )
+;
+CREATE EXTENSION IF NOT EXISTS dblink
+;
+-- This shouldn't (mixed up columns)
+CREATE TABLE PKTABLE (ptest1 int, ptest2 inet, ptest3 int, ptest4 inet, PRIMARY KEY(ptest1, ptest2), FOREIGN KEY(ptest3,
+ptest4) REFERENCES pktable(ptest2, ptest1))
+;
+drop table inh_lp cascade
+;
+CREATE OPERATOR #@# (
+   leftarg = int8,		-- right unary
+   procedure = factorial
+)
+;
+-- Cross-type checks for reloption values
+-- Integer
+ALTER INDEX dummy_test_idx SET (option_int = 3.3)
+;
+DROP TRIGGER insert_when ON main_table
+;
+VACUUM (PROCESS_MAIN FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_largeobject
+;
+CREATE INDEX t1_gin ON s3.t1 USING GIN (ia)
+;
+create cast (bigint as xfloat8) without function
+;
+create table tab_part_create (a int) partition by list (a)
+;
+DROP TABLE tid_part
+;
+create function doubledecrement(p1 pos_int) returns pos_int as $$
+declare v pos_int;
+begin
+    return p1;
+end$$ language plpgsql
+;
+ANALYZE public.transition_table_level2
+;
+CREATE TEMP TABLE pg_temp_4.pg_temp_29539_2 (tid pg_catalog.tid)
+;
+-- This tests the issue described in match_pattern_prefix().  In the
+-- absence of that check, the case_insensitive tests below would
+-- return no rows where they should logically return one.
+CREATE TABLE test4c (x text COLLATE case_insensitive)
+;
+CREATE SEQUENCE "public"."sequence_test5"
+    AS smallint
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+;
+/* contrib/btree_gist/btree_gist--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION gbtreekey4_in(cstring)
+RETURNS gbtreekey4
+AS '$libdir/btree_gist', 'gbtreekey_in'
+LANGUAGE C IMMUTABLE STRICT
+;
+COMMENT ON INDEX six IS ''
+;
+CREATE FUNCTION gbt_numeric_picksplit(internal, internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+drop table rules_fooview cascade
+;
+DROP TABLE tbl2
+;
+create view at_view_1 as select * from at_base_table bt
+;
+CREATE INDEX collate_test1_idx3 ON collate_test1 ((b COLLATE "POSIX"))
+;
+-- fails
+create domain array_of_recur1 as recur1[]
+;
+ALTER DATABASE "isolation_regression" SET lc_numeric TO 'C'
+;
+ANALYZE (SKIP_LOCKED) pg_catalog.pg_replication_origin
+;
+SECURITY LABEL ON TABLE dummy_seclabel_tbl1 IS 'classified'
+;
+-- OK
+CREATE TEMP TABLE explicitly_temp (a int primary key)
+;
+CREATE MATERIALIZED VIEW s4.t2_mv AS SELECT * FROM s4.t2
+;
+CREATE TABLE PRIMARY_TBL (i int, t text,
+	PRIMARY KEY(i,t))
+;
+CREATE FUNCTION isneq(ean13, ean13)
+	RETURNS boolean
+	AS 'int8eq'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+ALTER INDEX pg_toast.pg_toast_31068_index RENAME TO reind_con_toast_idx
+;
+ANALYZE pg_catalog.pg_amop
+;
+DROP TABLE pg_temp_9.pg_temp_26805_2, pg_temp_9.pg_temp_26805
+;
+ALTER TABLE testschema.test_default_tab ALTER id TYPE int
+;
+------------------------------------------------------------------------------------------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_30607 RENAME TO reind_con_toast
+;
+----------
+[ADD_INDEX] CREATE INDEX "sp_kd_ind" ON "public"."kd_point_tbl" USING "spgist" ("p" "kd_point_ops")
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."circle_tbl" (
+    "f1" "circle"
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_bool_sortsupport(internal)
+RETURNS void
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE PARALLEL SAFE STRICT
+;
+----------
+[COMMENT_CONSTRAINT] COMMENT ON CONSTRAINT noinh_con_copy_c_not_null ON noinh_con_copy IS 'not null c no inherit'
+;
+----------
+[ADD_INDEX] CREATE INDEX ON syscol_table ((ctid >= '(1000,0)'))
+;
+----------
+[ADMIN_TABLE] VACUUM (FULL) pg_catalog.pg_operator
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] -- c1.f1 is still there, but no longer inherited
+alter table c1 drop column f1
+;
+----------
+[DROP_TABLE] drop table cchild
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE tid_seq
+;
+----------
+[CREATE_TYPE] -- Check that DEFAULT expressions in SQL/JSON functions use the same collation
+-- as the RETURNING type.  Mismatched collations should raise an error.
+CREATE DOMAIN d1 AS text COLLATE case_insensitive
+;
+----------
+[CREATE_TABLE] CREATE TABLE noinh_con_copy (a int CHECK (a > 0) NO INHERIT)
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE vtype ADD COLUMN b DOUBLE PRECISION DEFAULT 0.2
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "regress_indexing"."pk" ATTACH PARTITION "regress_indexing"."pk3" FOR VALUES FROM (2000) TO (3000)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 6.69
+ * TRIGGER_COLUMN_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 6.70
+ * TRIGGER_PERIOD_USAGE view
+ */
+
+-- feature not supported
+
+
+/*
+ * 6.71
+ * TRIGGER_ROUTINE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 6.72
+ * TRIGGER_SEQUENCE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 6.73
+ * TRIGGER_TABLE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 6.74
+ * TRIGGERS view
+ */
+
+CREATE VIEW triggers AS
+    SELECT CAST(current_database() AS sql_identifier) AS trigger_catalog,
+           CAST(n.nspname AS sql_identifier) AS trigger_schema,
+           CAST(t.tgname AS sql_identifier) AS trigger_name,
+           CAST(em.text AS character_data) AS event_manipulation,
+           CAST(current_database() AS sql_identifier) AS event_object_catalog,
+           CAST(n.nspname AS sql_identifier) AS event_object_schema,
+           CAST(c.relname AS sql_identifier) AS event_object_table,
+           CAST(
+             -- To determine action order, partition by schema, table,
+             -- event_manipulation (INSERT/DELETE/UPDATE), ROW/STATEMENT (1),
+             -- BEFORE/AFTER (66), then order by trigger name.  It's preferable
+             -- to partition by view output columns, so that query constraints
+             -- can be pushed down below the window function.
+             rank() OVER (PARTITION BY CAST(n.nspname AS sql_identifier),
+                                       CAST(c.relname AS sql_identifier),
+                                       em.num,
+                                       t.tgtype & 1,
+                                       t.tgtype & 66
+                                       ORDER BY t.tgname)
+             AS cardinal_number) AS action_order,
+           CAST(
+             CASE WHEN pg_has_role(c.relowner, 'USAGE')
+               THEN (regexp_match(pg_get_triggerdef(t.oid), E'.{35,} WHEN \\((.+)\\) EXECUTE FUNCTION'))[1]
+               ELSE null END
+             AS character_data) AS action_condition,
+           CAST(
+             substring(pg_get_triggerdef(t.oid) from
+                       position('EXECUTE FUNCTION' in substring(pg_get_triggerdef(t.oid) from 48)) + 47)
+             AS character_data) AS action_statement,
+           CAST(
+             -- hard-wired reference to TRIGGER_TYPE_ROW
+             CASE t.tgtype & 1 WHEN 1 THEN 'ROW' ELSE 'STATEMENT' END
+             AS character_data) AS action_orientation,
+           CAST(
+             -- hard-wired refs to TRIGGER_TYPE_BEFORE, TRIGGER_TYPE_INSTEAD
+             CASE t.tgtype & 66 WHEN 2 THEN 'BEFORE' WHEN 64 THEN 'INSTEAD OF' ELSE 'AFTER' END
+             AS character_data) AS action_timing,
+           CAST(tgoldtable AS sql_identifier) AS action_reference_old_table,
+           CAST(tgnewtable AS sql_identifier) AS action_reference_new_table,
+           CAST(null AS sql_identifier) AS action_reference_old_row,
+           CAST(null AS sql_identifier) AS action_reference_new_row,
+           CAST(null AS time_stamp) AS created
+
+    FROM pg_namespace n, pg_class c, pg_trigger t,
+         -- hard-wired refs to TRIGGER_TYPE_INSERT, TRIGGER_TYPE_DELETE,
+         -- TRIGGER_TYPE_UPDATE; we intentionally omit TRIGGER_TYPE_TRUNCATE
+         (VALUES (4, 'INSERT'),
+                 (8, 'DELETE'),
+                 (16, 'UPDATE')) AS em (num, text)
+
+    WHERE n.oid = c.relnamespace
+          AND c.oid = t.tgrelid
+          AND t.tgtype & em.num <> 0
+          AND NOT t.tgisinternal
+          AND (NOT pg_is_other_temp_schema(n.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'INSERT, UPDATE, REFERENCES') )
+;
+----------
+[CREATE_LIBRARY] CREATE EXTENSION IF NOT EXISTS dblink
+;
+----------
+[CREATE_TABLE] -- This shouldn't (mixed up columns)
+CREATE TABLE PKTABLE (ptest1 int, ptest2 inet, ptest3 int, ptest4 inet, PRIMARY KEY(ptest1, ptest2), FOREIGN KEY(ptest3,
+ptest4) REFERENCES pktable(ptest2, ptest1))
+;
+----------
+[DROP_TABLE] drop table inh_lp cascade
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR #@# (
+   leftarg = int8,		-- right unary
+   procedure = factorial
+)
+;
+----------
+[ALTER_INDEX] -- Cross-type checks for reloption values
+-- Integer
+ALTER INDEX dummy_test_idx SET (option_int = 3.3)
+;
+----------
+[DROP_TRIGGER] DROP TRIGGER insert_when ON main_table
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_MAIN FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_largeobject
+;
+----------
+[ADD_INDEX] CREATE INDEX t1_gin ON s3.t1 USING GIN (ia)
+;
+----------
+[CREATE_PROG_OBJ] create cast (bigint as xfloat8) without function
+;
+----------
+[CREATE_TABLE] create table tab_part_create (a int) partition by list (a)
+;
+----------
+[DROP_TABLE] DROP TABLE tid_part
+;
+----------
+[CREATE_PROG_OBJ] create function doubledecrement(p1 pos_int) returns pos_int as $$
+declare v pos_int;
+begin
+    return p1;
+end$$ language plpgsql
+;
+----------
+[ADMIN_TABLE] ANALYZE public.transition_table_level2
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE pg_temp_4.pg_temp_29539_2 (tid pg_catalog.tid)
+;
+----------
+[CREATE_TABLE] -- This tests the issue described in match_pattern_prefix().  In the
+-- absence of that check, the case_insensitive tests below would
+-- return no rows where they should logically return one.
+CREATE TABLE test4c (x text COLLATE case_insensitive)
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE "public"."sequence_test5"
+    AS smallint
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+;
+----------
+[CREATE_PROG_OBJ] /* contrib/btree_gist/btree_gist--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION gbtreekey4_in(cstring)
+RETURNS gbtreekey4
+AS '$libdir/btree_gist', 'gbtreekey_in'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[COMMENT_INDEX] COMMENT ON INDEX six IS ''
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_numeric_picksplit(internal, internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[DROP_TABLE] drop table rules_fooview cascade
+;
+----------
+[DROP_TABLE] DROP TABLE tbl2
+;
+----------
+[CREATE_VIEW(SELECT)] create view at_view_1 as select * from at_base_table bt
+;
+----------
+[ADD_INDEX] CREATE INDEX collate_test1_idx3 ON collate_test1 ((b COLLATE "POSIX"))
+;
+----------
+[CREATE_TYPE] -- fails
+create domain array_of_recur1 as recur1[]
+;
+----------
+[ALTER_CATALOG] ALTER DATABASE "isolation_regression" SET lc_numeric TO 'C'
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) pg_catalog.pg_replication_origin
+;
+----------
+[UNKNOWN] SECURITY LABEL ON TABLE dummy_seclabel_tbl1 IS 'classified'
+;
+----------
+[CREATE_TABLE] -- OK
+CREATE TEMP TABLE explicitly_temp (a int primary key)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW s4.t2_mv AS SELECT * FROM s4.t2
+;
+----------
+[CREATE_TABLE] CREATE TABLE PRIMARY_TBL (i int, t text,
+	PRIMARY KEY(i,t))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isneq(ean13, ean13)
+	RETURNS boolean
+	AS 'int8eq'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_31068_index RENAME TO reind_con_toast_idx
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_catalog.pg_amop
+;
+----------
+[DROP_TABLE] DROP TABLE pg_temp_9.pg_temp_26805_2, pg_temp_9.pg_temp_26805
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE testschema.test_default_tab ALTER id TYPE int
+;

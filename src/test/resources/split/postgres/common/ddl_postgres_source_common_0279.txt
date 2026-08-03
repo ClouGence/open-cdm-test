@@ -1,0 +1,478 @@
+ALTER TABLE split_alter_table.base_table FORCE ROW LEVEL SECURITY
+;
+CREATE OR REPLACE FUNCTION test_slru_page_truncate(bigint) RETURNS VOID
+  AS '$libdir/test_slru', 'test_slru_page_truncate' LANGUAGE C
+;
+COMMENT ON LARGE OBJECT 2121 IS 'testing comments'
+;
+CREATE SEQUENCE IF NOT EXISTS ext_cine_seq
+;
+CREATE TABLE t1 (a int, b float, c text)
+;
+DROP TABLE shared_pg_buffercache
+;
+CREATE VIEW referential_constraints AS
+    SELECT CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(ncon.nspname AS sql_identifier) AS constraint_schema,
+           CAST(con.conname AS sql_identifier) AS constraint_name,
+           CAST(
+             CASE WHEN npkc.nspname IS NULL THEN NULL
+                  ELSE current_database() END
+             AS sql_identifier) AS unique_constraint_catalog,
+           CAST(npkc.nspname AS sql_identifier) AS unique_constraint_schema,
+           CAST(pkc.conname AS sql_identifier) AS unique_constraint_name,
+
+           CAST(
+             CASE con.confmatchtype WHEN 'f' THEN 'FULL'
+                                    WHEN 'p' THEN 'PARTIAL'
+                                    WHEN 's' THEN 'NONE' END
+             AS character_data) AS match_option,
+
+           CAST(
+             CASE con.confupdtype WHEN 'c' THEN 'CASCADE'
+                                  WHEN 'n' THEN 'SET NULL'
+                                  WHEN 'd' THEN 'SET DEFAULT'
+                                  WHEN 'r' THEN 'RESTRICT'
+                                  WHEN 'a' THEN 'NO ACTION' END
+             AS character_data) AS update_rule,
+
+           CAST(
+             CASE con.confdeltype WHEN 'c' THEN 'CASCADE'
+                                  WHEN 'n' THEN 'SET NULL'
+                                  WHEN 'd' THEN 'SET DEFAULT'
+                                  WHEN 'r' THEN 'RESTRICT'
+                                  WHEN 'a' THEN 'NO ACTION' END
+             AS character_data) AS delete_rule
+
+    FROM (pg_namespace ncon
+          INNER JOIN pg_constraint con ON ncon.oid = con.connamespace
+          INNER JOIN pg_class c ON con.conrelid = c.oid AND con.contype = 'f')
+         LEFT JOIN pg_depend d1  -- find constraint's dependency on an index
+          ON d1.objid = con.oid AND d1.classid = 'pg_constraint'::regclass
+             AND d1.refclassid = 'pg_class'::regclass AND d1.refobjsubid = 0
+         LEFT JOIN pg_depend d2  -- find pkey/unique constraint for that index
+          ON d2.refclassid = 'pg_constraint'::regclass
+             AND d2.classid = 'pg_class'::regclass
+             AND d2.objid = d1.refobjid AND d2.objsubid = 0
+             AND d2.deptype = 'i'
+         LEFT JOIN pg_constraint pkc ON pkc.oid = d2.refobjid
+            AND pkc.contype IN ('p', 'u')
+            AND pkc.conrelid = con.confrelid
+         LEFT JOIN pg_namespace npkc ON pkc.connamespace = npkc.oid
+
+    WHERE pg_has_role(c.relowner, 'USAGE')
+          -- SELECT privilege omitted, per SQL standard
+          OR has_table_privilege(c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+          OR has_any_column_privilege(c.oid, 'INSERT, UPDATE, REFERENCES')
+;
+--
+-- test insertion through view
+--
+
+create table insertconflict (f1 int primary key, f2 text)
+;
+CREATE FUNCTION balkifnull(int8, int4)
+RETURNS int8
+STRICT
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF $1 IS NULL THEN
+       RAISE 'erroneously called with NULL argument';
+    END IF;
+    RETURN NULL;
+END$$
+;
+drop index idxpart_idx
+;
+DROP TABLE testpub_tbl_both_filters
+;
+-- should fail, event triggers cannot have declared arguments
+create function test_event_trigger_arg(name text)
+returns event_trigger as $$ BEGIN RETURN 1; END $$ language plpgsql
+;
+DROP TABLE unlogged1, public.unlogged2
+;
+create table trigpart42 (like trigpart)
+;
+ALTER TABLE attmp ADD COLUMN p boolean
+;
+-- clean up
+DROP TABLE guid1, guid2 CASCADE
+;
+--
+-- Test GiST indexes.
+--
+-- There are other tests to test different GiST opclasses. This is for
+-- testing GiST code itself. Vacuuming in particular.
+
+create table gist_point_tbl(id int4, p point)
+;
+alter view base_tab_def_view alter b set default 'View default'
+;
+ANALYZE (SKIP_LOCKED) pg_catalog.pg_trigger
+;
+/* src/test/modules/test_extensions/test_ext_cor--1.0.sql */
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+-- It's generally bad style to use CREATE OR REPLACE unnecessarily.
+-- Test what happens if an extension does it anyway.
+
+CREATE OR REPLACE FUNCTION ext_cor_func() RETURNS text
+  AS $$ SELECT 'ext_cor_func: from extension'::text $$ LANGUAGE sql
+;
+VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_depend
+;
+CREATE FUNCTION gbt_date_consistent(internal,date,int2,oid,internal)
+RETURNS bool
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+ALTER TABLE ONLY "public"."gtest10a" DROP COLUMN "........pg.dropped.2........"
+;
+VACUUM brintest_bloom
+;
+--
+-- create some test data and test the operators
+--
+
+CREATE TABLE nummultirange_test (nmr NUMMULTIRANGE)
+;
+CREATE TABLE test12pk (x text COLLATE case_insensitive PRIMARY KEY)
+;
+CREATE TABLE prt4_n (a int, b int, c text) PARTITION BY RANGE(a)
+;
+ANALYZE public.textrange_test
+;
+CREATE TABLE c2 (a integer)
+;
+VACUUM pg_catalog.pg_publication_rel
+;
+CREATE FUNCTION tab1_trigger_func() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.d := NEW.a + 10;
+  RETURN NEW;
+END $$
+;
+drop view tt14v
+;
+-- parallel vacuum disabled for temp tables
+VACUUM (PARALLEL 0, FULL TRUE) tmp
+;
+-- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."stud_emp" INHERIT "public"."emp"
+;
+-- Check that indisreplident updates are preserved.
+CREATE TABLE concur_replident(i int NOT NULL)
+;
+CREATE SCHEMA regress_tenant2_schema AUTHORIZATION regress_tenant2
+;
+CREATE TABLE test_tbl1 (x int, y text)
+;
+--
+-- Check that index creation (or DDL in general) is prohibited in a trigger
+--
+
+create table trigger_ddl_table (
+   col1 integer,
+   col2 integer
+)
+;
+CREATE TABLE part_rp PARTITION OF range_parted2 FOR VALUES FROM (0) to (100)
+;
+VACUUM pg_catalog.pg_largeobject
+;
+create trigger trig_upd_before_child before update on parted_stmt_trig1
+  for each row execute procedure trigger_notice()
+;
+create table parted_irreg (fd int, a int, fd2 int, b text)
+  partition by range (b)
+;
+CREATE TABLE SUBSELECT_TBL (
+  f1 integer,
+  f2 integer,
+  f3 float
+)
+;
+create table base_tbl(a int unique, b text, c float)
+;
+-- get the data back in with copy
+truncate copytest2
+;
+CREATE OR REPLACE RULE bug6051_ins AS ON INSERT TO bug6051 DO INSTEAD
+ INSERT INTO bug6051_2
+ SELECT NEW.i
+;
+CREATE TABLE tableam_parted_heap2 (a text, b int) PARTITION BY list (a)
+;
+create table pph_arrpart1 partition of pph_arrpart for values with (modulus 2, remainder 0)
+;
+CREATE COLLATION test3 (provider = icu, lc_collate = 'en_US.utf8')
+;
+ALTER INDEX pg_toast.pg_toast_31014_index RENAME TO reind_con_toast_idx
+;
+------------------------------------------------------------------------------------------
+[ALTER_TABLE] ALTER TABLE split_alter_table.base_table FORCE ROW LEVEL SECURITY
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION test_slru_page_truncate(bigint) RETURNS VOID
+  AS '$libdir/test_slru', 'test_slru_page_truncate' LANGUAGE C
+;
+----------
+[UNKNOWN] COMMENT ON LARGE OBJECT 2121 IS 'testing comments'
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE IF NOT EXISTS ext_cine_seq
+;
+----------
+[CREATE_TABLE] CREATE TABLE t1 (a int, b float, c text)
+;
+----------
+[DROP_TABLE] DROP TABLE shared_pg_buffercache
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW referential_constraints AS
+    SELECT CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(ncon.nspname AS sql_identifier) AS constraint_schema,
+           CAST(con.conname AS sql_identifier) AS constraint_name,
+           CAST(
+             CASE WHEN npkc.nspname IS NULL THEN NULL
+                  ELSE current_database() END
+             AS sql_identifier) AS unique_constraint_catalog,
+           CAST(npkc.nspname AS sql_identifier) AS unique_constraint_schema,
+           CAST(pkc.conname AS sql_identifier) AS unique_constraint_name,
+
+           CAST(
+             CASE con.confmatchtype WHEN 'f' THEN 'FULL'
+                                    WHEN 'p' THEN 'PARTIAL'
+                                    WHEN 's' THEN 'NONE' END
+             AS character_data) AS match_option,
+
+           CAST(
+             CASE con.confupdtype WHEN 'c' THEN 'CASCADE'
+                                  WHEN 'n' THEN 'SET NULL'
+                                  WHEN 'd' THEN 'SET DEFAULT'
+                                  WHEN 'r' THEN 'RESTRICT'
+                                  WHEN 'a' THEN 'NO ACTION' END
+             AS character_data) AS update_rule,
+
+           CAST(
+             CASE con.confdeltype WHEN 'c' THEN 'CASCADE'
+                                  WHEN 'n' THEN 'SET NULL'
+                                  WHEN 'd' THEN 'SET DEFAULT'
+                                  WHEN 'r' THEN 'RESTRICT'
+                                  WHEN 'a' THEN 'NO ACTION' END
+             AS character_data) AS delete_rule
+
+    FROM (pg_namespace ncon
+          INNER JOIN pg_constraint con ON ncon.oid = con.connamespace
+          INNER JOIN pg_class c ON con.conrelid = c.oid AND con.contype = 'f')
+         LEFT JOIN pg_depend d1  -- find constraint's dependency on an index
+          ON d1.objid = con.oid AND d1.classid = 'pg_constraint'::regclass
+             AND d1.refclassid = 'pg_class'::regclass AND d1.refobjsubid = 0
+         LEFT JOIN pg_depend d2  -- find pkey/unique constraint for that index
+          ON d2.refclassid = 'pg_constraint'::regclass
+             AND d2.classid = 'pg_class'::regclass
+             AND d2.objid = d1.refobjid AND d2.objsubid = 0
+             AND d2.deptype = 'i'
+         LEFT JOIN pg_constraint pkc ON pkc.oid = d2.refobjid
+            AND pkc.contype IN ('p', 'u')
+            AND pkc.conrelid = con.confrelid
+         LEFT JOIN pg_namespace npkc ON pkc.connamespace = npkc.oid
+
+    WHERE pg_has_role(c.relowner, 'USAGE')
+          -- SELECT privilege omitted, per SQL standard
+          OR has_table_privilege(c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+          OR has_any_column_privilege(c.oid, 'INSERT, UPDATE, REFERENCES')
+;
+----------
+[CREATE_TABLE] --
+-- test insertion through view
+--
+
+create table insertconflict (f1 int primary key, f2 text)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION balkifnull(int8, int4)
+RETURNS int8
+STRICT
+LANGUAGE plpgsql AS $$
+BEGIN
+    IF $1 IS NULL THEN
+       RAISE 'erroneously called with NULL argument';
+    END IF;
+    RETURN NULL;
+END$$
+;
+----------
+[DROP_INDEX] drop index idxpart_idx
+;
+----------
+[DROP_TABLE] DROP TABLE testpub_tbl_both_filters
+;
+----------
+[CREATE_PROG_OBJ] -- should fail, event triggers cannot have declared arguments
+create function test_event_trigger_arg(name text)
+returns event_trigger as $$ BEGIN RETURN 1; END $$ language plpgsql
+;
+----------
+[DROP_TABLE] DROP TABLE unlogged1, public.unlogged2
+;
+----------
+[CREATE_TABLE] create table trigpart42 (like trigpart)
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE attmp ADD COLUMN p boolean
+;
+----------
+[DROP_TABLE] -- clean up
+DROP TABLE guid1, guid2 CASCADE
+;
+----------
+[CREATE_TABLE] --
+-- Test GiST indexes.
+--
+-- There are other tests to test different GiST opclasses. This is for
+-- testing GiST code itself. Vacuuming in particular.
+
+create table gist_point_tbl(id int4, p point)
+;
+----------
+[ALTER_VIEW|ALTER_COLUMN] alter view base_tab_def_view alter b set default 'View default'
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) pg_catalog.pg_trigger
+;
+----------
+[CREATE_PROG_OBJ] /* src/test/modules/test_extensions/test_ext_cor--1.0.sql */
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+-- It's generally bad style to use CREATE OR REPLACE unnecessarily.
+-- Test what happens if an extension does it anyway.
+
+CREATE OR REPLACE FUNCTION ext_cor_func() RETURNS text
+  AS $$ SELECT 'ext_cor_func: from extension'::text $$ LANGUAGE sql
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_depend
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_date_consistent(internal,date,int2,oid,internal)
+RETURNS bool
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE ONLY "public"."gtest10a" DROP COLUMN "........pg.dropped.2........"
+;
+----------
+[ADMIN_TABLE] VACUUM brintest_bloom
+;
+----------
+[CREATE_TABLE] --
+-- create some test data and test the operators
+--
+
+CREATE TABLE nummultirange_test (nmr NUMMULTIRANGE)
+;
+----------
+[CREATE_TABLE] CREATE TABLE test12pk (x text COLLATE case_insensitive PRIMARY KEY)
+;
+----------
+[CREATE_TABLE] CREATE TABLE prt4_n (a int, b int, c text) PARTITION BY RANGE(a)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.textrange_test
+;
+----------
+[CREATE_TABLE] CREATE TABLE c2 (a integer)
+;
+----------
+[ADMIN_TABLE] VACUUM pg_catalog.pg_publication_rel
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION tab1_trigger_func() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  NEW.d := NEW.a + 10;
+  RETURN NEW;
+END $$
+;
+----------
+[DROP_VIEW] drop view tt14v
+;
+----------
+[ADMIN_TABLE] -- parallel vacuum disabled for temp tables
+VACUUM (PARALLEL 0, FULL TRUE) tmp
+;
+----------
+[ALTER_TABLE] -- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."stud_emp" INHERIT "public"."emp"
+;
+----------
+[CREATE_TABLE] -- Check that indisreplident updates are preserved.
+CREATE TABLE concur_replident(i int NOT NULL)
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA regress_tenant2_schema AUTHORIZATION regress_tenant2
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_tbl1 (x int, y text)
+;
+----------
+[CREATE_TABLE] --
+-- Check that index creation (or DDL in general) is prohibited in a trigger
+--
+
+create table trigger_ddl_table (
+   col1 integer,
+   col2 integer
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE part_rp PARTITION OF range_parted2 FOR VALUES FROM (0) to (100)
+;
+----------
+[ADMIN_TABLE] VACUUM pg_catalog.pg_largeobject
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger trig_upd_before_child before update on parted_stmt_trig1
+  for each row execute procedure trigger_notice()
+;
+----------
+[CREATE_TABLE] create table parted_irreg (fd int, a int, fd2 int, b text)
+  partition by range (b)
+;
+----------
+[CREATE_TABLE] CREATE TABLE SUBSELECT_TBL (
+  f1 integer,
+  f2 integer,
+  f3 float
+)
+;
+----------
+[CREATE_TABLE] create table base_tbl(a int unique, b text, c float)
+;
+----------
+[TRUNCATE_TABLE] -- get the data back in with copy
+truncate copytest2
+;
+----------
+[CREATE_POLICY] CREATE OR REPLACE RULE bug6051_ins AS ON INSERT TO bug6051 DO INSTEAD
+ INSERT INTO bug6051_2
+ SELECT NEW.i
+;
+----------
+[CREATE_TABLE] CREATE TABLE tableam_parted_heap2 (a text, b int) PARTITION BY list (a)
+;
+----------
+[CREATE_TABLE] create table pph_arrpart1 partition of pph_arrpart for values with (modulus 2, remainder 0)
+;
+----------
+[CREATE_POLICY] CREATE COLLATION test3 (provider = icu, lc_collate = 'en_US.utf8')
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_31014_index RENAME TO reind_con_toast_idx
+;

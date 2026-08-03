@@ -1,0 +1,142 @@
+[create_table__common_tidb_upstream_tidb_lightning_error_resolution_md_0_000]
+sql:
+CREATE TABLE conflict_records (
+    task_id     bigint NOT NULL,
+    create_time datetime(6) NOT NULL DEFAULT now(6),
+    table_name  varchar(261) NOT NULL,
+    path        varchar(2048) NOT NULL,
+    offset      bigint NOT NULL,
+    error       text NOT NULL,
+    row_id      bigint NOT NULL COMMENT 'the row id of the conflicted row',
+    row_data    text NOT NULL COMMENT 'the row data of the conflicted row',
+    KEY (task_id, table_name)
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(10:4~10:29) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:29) /test/1/catalog1/schema1/conflict_records/"
+    },
+    {
+      "subject": "Function(3:45~3:48) /test/1/catalog1/schema1/now/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:13~1:29) /test/1/catalog1/schema1/conflict_records/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_tidb_lightning_error_resolution_md_0_001]
+sql:
+CREATE TABLE type_error_v1 (
+    task_id     bigint NOT NULL,
+    create_time datetime(6) NOT NULL DEFAULT now(6),
+    table_name  varchar(261) NOT NULL,
+    path        varchar(2048) NOT NULL,
+    offset      bigint NOT NULL,
+    error       text NOT NULL,
+    row_data    text NOT NULL
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:26) /test/1/catalog1/schema1/type_error_v1/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Function(3:45~3:48) /test/1/catalog1/schema1/now/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_tidb_lightning_error_resolution_md_0_002]
+sql:
+CREATE TABLE conflict_error_v3 (
+    task_id     bigint NOT NULL,
+    create_time datetime(6) NOT NULL DEFAULT now(6),
+    table_name  varchar(261) NOT NULL,
+    index_name  varchar(128) NOT NULL,
+    key_data    text NOT NULL,
+    row_data    text NOT NULL,
+    raw_key     mediumblob NOT NULL,
+    raw_value   mediumblob NOT NULL,
+    raw_handle  mediumblob NOT NULL,
+    raw_row     mediumblob NOT NULL,
+    kv_type     tinyint NOT NULL,
+    INDEX (task_id, table_name),
+    INDEX (index_name),
+    INDEX (table_name, index_name),
+    INDEX (kv_type)
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(13:4~13:31) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:30) /test/1/catalog1/schema1/conflict_error_v3/"
+    },
+    {
+      "subject": "Index(14:4~14:22) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:30) /test/1/catalog1/schema1/conflict_error_v3/"
+    },
+    {
+      "subject": "Index(15:4~15:34) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:30) /test/1/catalog1/schema1/conflict_error_v3/"
+    },
+    {
+      "subject": "Index(16:4~16:19) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:30) /test/1/catalog1/schema1/conflict_error_v3/"
+    },
+    {
+      "subject": "Function(3:45~3:48) /test/1/catalog1/schema1/now/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:13~1:30) /test/1/catalog1/schema1/conflict_error_v3/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[create_view__common_tidb_upstream_tidb_lightning_error_resolution_md_0_003]
+sql:
+CREATE VIEW conflict_view AS
+    SELECT 0 AS is_precheck_conflict, task_id, create_time, table_name, index_name, key_data, row_data, raw_key, raw_value, raw_handle, raw_row, kv_type, NULL AS path, NULL AS offset, NULL AS error, NULL AS row_id
+    FROM conflict_error_v3
+    UNION ALL
+    SELECT 1 AS is_precheck_conflict, task_id, create_time, table_name, NULL AS index_name, NULL AS key_data, row_data, NULL AS raw_key, NULL AS raw_value, NULL AS raw_handle, NULL AS raw_row, NULL AS kv_type, path, offset, error, row_id
+    FROM conflict_records;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_VIEW": [
+    {
+      "subject": "View(1:12~1:25) /test/1/catalog1/schema1/conflict_view/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(3:9~3:26) /test/1/catalog1/schema1/conflict_error_v3/",
+        "Table(6:9~6:25) /test/1/catalog1/schema1/conflict_records/"
+      ]
+    }
+  ]
+}

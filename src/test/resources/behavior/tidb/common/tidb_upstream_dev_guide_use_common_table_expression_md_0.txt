@@ -1,0 +1,133 @@
+[select__common_tidb_upstream_dev_guide_use_common_table_expression_md_0_000]
+sql:
+WITH books_authored_by_rm AS (
+    SELECT *
+    FROM books b
+    LEFT JOIN book_authors ba ON b.id = ba.book_id
+    WHERE author_id = 2299112019
+), books_with_average_ratings AS (
+    SELECT
+        b.id AS book_id,
+        AVG(r.score) AS average_rating
+    FROM books_authored_by_rm b
+    LEFT JOIN ratings r ON b.id = r.book_id
+    GROUP BY b.id
+), books_with_orders AS (
+    SELECT
+        b.id AS book_id,
+        COUNT(*) AS orders
+    FROM books_authored_by_rm b
+    LEFT JOIN orders o ON b.id = o.book_id
+    GROUP BY b.id
+)
+SELECT
+    b.id AS `book_id`,
+    b.title AS `book_title`,
+    br.average_rating AS `average_rating`,
+    bo.orders AS `orders`
+FROM
+    books_authored_by_rm b
+    LEFT JOIN books_with_average_ratings br ON b.id = br.book_id
+    LEFT JOIN books_with_orders bo ON b.id = bo.book_id
+;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:9~3:14) /test/1/catalog1/schema1/books/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:14~4:26) /test/1/catalog1/schema1/book_authors/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(9:8~9:11) /test/1/catalog1/schema1/AVG/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(11:14~11:21) /test/1/catalog1/schema1/ratings/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(16:8~16:13) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(18:14~18:20) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_dev_guide_use_common_table_expression_md_0_001]
+sql:
+WITH top_50_eldest_authors_cte AS (
+    SELECT a.id, a.name, (IFNULL(a.death_year, YEAR(NOW())) - a.birth_year) AS age
+    FROM authors a
+    ORDER BY age DESC
+    LIMIT 50
+)
+SELECT
+    ANY_VALUE(ta.id) AS author_id,
+    ANY_VALUE(ta.age) AS author_age,
+    ANY_VALUE(ta.name) AS author_name,
+    COUNT(*) AS books
+FROM top_50_eldest_authors_cte ta
+LEFT JOIN book_authors ba ON ta.id = ba.author_id
+GROUP BY ta.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:26~2:32) /test/1/catalog1/schema1/IFNULL/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:47~2:51) /test/1/catalog1/schema1/YEAR/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:52~2:55) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:9~3:16) /test/1/catalog1/schema1/authors/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(8:4~8:13) /test/1/catalog1/schema1/ANY_VALUE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:4~11:9) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:10~13:22) /test/1/catalog1/schema1/book_authors/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_dev_guide_use_common_table_expression_md_0_002]
+sql:
+WITH RECURSIVE fibonacci (n, fib_n, next_fib_n) AS
+(
+  SELECT 1, 0, 1
+  UNION ALL
+  SELECT n + 1, next_fib_n, fib_n + next_fib_n FROM fibonacci WHERE n < 10
+)
+SELECT * FROM fibonacci;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}

@@ -1,0 +1,410 @@
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_nopk (d)
+;
+CREATE VIEW timetz_local_view AS
+  SELECT f1 AS dat,
+       timezone(f1) AS dat_func,
+       f1 AT LOCAL AS dat_at_local,
+       f1 AT TIME ZONE current_setting('TimeZone') AS dat_at_tz,
+       f1 AT TIME ZONE INTERVAL '00:00' AS dat_at_int
+  FROM TIMETZ_TBL
+  ORDER BY f1
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (c)
+;
+CREATE PUBLICATION tap_pub_inherits FOR TABLE tab_rowfilter_inherited WHERE (a > 15)
+;
+CREATE VIEW limit_thousand_v_4 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST (5::bigint) ROWS WITH TIES
+;
+-- should be able to add schema to 'FOR TABLE' publication
+ALTER PUBLICATION testpub_fortable ADD TABLES IN SCHEMA pub_test
+;
+CREATE PUBLICATION pub4 FOR TABLE t_1 (a), t_2 (b)
+	  WITH (PUBLISH_VIA_PARTITION_ROOT)
+;
+CREATE PUBLICATION pub_mix_3 FOR TABLE test_mix_2 (a, b, c)
+;
+ALTER TABLE split_alter18.current_table ALTER COLUMN calc SET EXPRESSION AS (amount * 3)
+;
+CREATE PUBLICATION testpubpart_forschema FOR TABLES IN SCHEMA pub_testpart1
+;
+-- doesn't work for the default partition
+ALTER TABLE range_parted2 DETACH PARTITION part_rpd CONCURRENTLY
+;
+ALTER PUBLICATION split_pub18_schema DROP TABLES IN SCHEMA split_pub18_b
+;
+CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+/* contrib/earthdistance/earthdistance--1.1--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via ALTER EXTENSION
+
+
+CREATE OR REPLACE FUNCTION earth() RETURNS float8
+LANGUAGE SQL IMMUTABLE PARALLEL SAFE
+RETURN '6378168'::float8
+;
+create function fipshash(bytea)
+    returns text
+    strict immutable parallel safe leakproof
+    return substr(encode(sha256($1), 'hex'), 1, 32)
+;
+CREATE VIEW is_json_view AS
+SELECT '1' IS JSON AS "any", ('1' || i) IS JSON SCALAR AS "scalar", '[]' IS NOT JSON ARRAY AS "array", '{}' IS JSON OBJECT WITH UNIQUE AS "object" FROM generate_series(1, 3) i
+;
+-- ok - can use row filter for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk WHERE (b > 99)
+;
+CREATE INDEX trgm_idx ON public.test_trgm USING gist (t gist_trgm_ops (siglen='2024'))
+;
+-- ok - immutable built-in functions are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl4 WHERE (length(g) < 6)
+;
+ALTER PUBLICATION testpub_tbl9 SET TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+ALTER PUBLICATION pub3 ADD TABLES IN SCHEMA dump_test
+;
+CREATE INDEX wowidx ON test_tsvector USING gist (a tsvector_ops(siglen=484))
+;
+ALTER PUBLICATION testpub_col_list ADD TABLE testpub_tbl8 (a, b)
+;
+CREATE PUBLICATION tap_pub_5b FOR TABLE tab_rowfilter_partition WHERE (a > 10)
+;
+-- add a schema which is already added to the publication
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test1
+;
+-- fail - cannot use column list for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk (a)
+;
+-- fail - row filter expression is not simple
+CREATE PUBLICATION testpub6 FOR TABLE testpub_rf_tbl1 WHERE (a IN (SELECT generate_series(1,5)))
+;
+CREATE FUNCTION dep_req2() RETURNS text
+BEGIN ATOMIC
+  SELECT test_s_dep.dep_req1() || ' req2';
+END
+;
+-- alter publication set non-existent schema
+ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA non_existent_schema
+;
+-- ok: the column list changes, make sure the catalog gets updated
+ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl7 (a, c)
+;
+CREATE VIEW json_table_view8 AS SELECT * from JSON_TABLE('"a"', '$' COLUMNS (a text PATH '$') EMPTY ON ERROR)
+;
+ALTER TABLE gtest31_1 ALTER COLUMN b SET EXPRESSION AS ('hello1')
+;
+CREATE FUNCTION unbounded(x int) RETURNS int LANGUAGE SQL IMMUTABLE RETURN x
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (e < AVG(e))
+;
+create index trgm_idx on test_trgm using gist (t gist_trgm_ops(siglen=2025))
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE ((a, a + 1) < (2, 3))
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.date() < $x' PASSING '1234'::int AS x))
+;
+CREATE OR REPLACE FUNCTION pg_relation_size(regclass)
+ RETURNS bigint
+ LANGUAGE sql
+ PARALLEL SAFE STRICT COST 1
+RETURN pg_relation_size($1, 'main')
+;
+CREATE VIEW json_array_view AS
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+ALTER TABLE d_lp_fk DETACH PARTITION d_lp_fk_1 CONCURRENTLY
+;
+create index tstidx on ltreetest using gist (t gist_ltree_ops(siglen=2028))
+;
+CREATE FUNCTION ess_func(int) RETURNS text
+BEGIN ATOMIC
+  SELECT f3 FROM ess_table WHERE f1 = $1;
+END
+;
+CREATE TABLE dump_test.test_table (
+						   col1 serial primary key,
+						   col2 text COMPRESSION pglz,
+						   col3 text,
+						   col4 text,
+						   CHECK (col1 <= 1000)
+					   ) WITH (autovacuum_enabled = false, fillfactor=80)
+;
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb
+;
+ALTER TABLE gtest29 ALTER COLUMN a DROP EXPRESSION
+;
+-- works fine
+ALTER TABLE range_parted2 DETACH PARTITION part_rp CONCURRENTLY
+;
+CREATE PUBLICATION testpub1_forschema1 FOR TABLES IN SCHEMA testpub_view
+;
+ALTER PUBLICATION testpub5 DROP TABLE testpub_rf_tbl1 WHERE (e < 27)
+;
+CREATE OR REPLACE FUNCTION sec_to_gc(float8)
+RETURNS float8
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN CASE
+  WHEN $1 < '0'::float8 THEN '0'::float8
+  WHEN $1 / ('2'::float8 * earth()) > '1'::float8 THEN pi() * earth()
+  ELSE '2'::float8 * earth() * asin($1 / ('2'::float8 * earth()))
+END
+;
+ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA pub_test1, pub_test1
+;
+------------------------------------------------------------------------------------------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_nopk (d)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW timetz_local_view AS
+  SELECT f1 AS dat,
+       timezone(f1) AS dat_func,
+       f1 AT LOCAL AS dat_at_local,
+       f1 AT TIME ZONE current_setting('TimeZone') AS dat_at_tz,
+       f1 AT TIME ZONE INTERVAL '00:00' AS dat_at_int
+  FROM TIMETZ_TBL
+  ORDER BY f1
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (c)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_inherits FOR TABLE tab_rowfilter_inherited WHERE (a > 15)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW limit_thousand_v_4 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST (5::bigint) ROWS WITH TIES
+;
+----------
+[ALTER_PUB_SUB] -- should be able to add schema to 'FOR TABLE' publication
+ALTER PUBLICATION testpub_fortable ADD TABLES IN SCHEMA pub_test
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub4 FOR TABLE t_1 (a), t_2 (b)
+	  WITH (PUBLISH_VIA_PARTITION_ROOT)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_mix_3 FOR TABLE test_mix_2 (a, b, c)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE split_alter18.current_table ALTER COLUMN calc SET EXPRESSION AS (amount * 3)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpubpart_forschema FOR TABLES IN SCHEMA pub_testpart1
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- doesn't work for the default partition
+ALTER TABLE range_parted2 DETACH PARTITION part_rpd CONCURRENTLY
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION split_pub18_schema DROP TABLES IN SCHEMA split_pub18_b
+;
+----------
+[CREATE_VIEW(SELECT,QUERY_LOCK)] CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+----------
+[CREATE_PROG_OBJ] /* contrib/earthdistance/earthdistance--1.1--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via ALTER EXTENSION
+
+
+CREATE OR REPLACE FUNCTION earth() RETURNS float8
+LANGUAGE SQL IMMUTABLE PARALLEL SAFE
+RETURN '6378168'::float8
+;
+----------
+[CREATE_PROG_OBJ] create function fipshash(bytea)
+    returns text
+    strict immutable parallel safe leakproof
+    return substr(encode(sha256($1), 'hex'), 1, 32)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW is_json_view AS
+SELECT '1' IS JSON AS "any", ('1' || i) IS JSON SCALAR AS "scalar", '[]' IS NOT JSON ARRAY AS "array", '{}' IS JSON OBJECT WITH UNIQUE AS "object" FROM generate_series(1, 3) i
+;
+----------
+[ALTER_PUB_SUB] -- ok - can use row filter for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk WHERE (b > 99)
+;
+----------
+[ADD_INDEX] CREATE INDEX trgm_idx ON public.test_trgm USING gist (t gist_trgm_ops (siglen='2024'))
+;
+----------
+[ALTER_PUB_SUB] -- ok - immutable built-in functions are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl4 WHERE (length(g) < 6)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_tbl9 SET TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub3 ADD TABLES IN SCHEMA dump_test
+;
+----------
+[ADD_INDEX] CREATE INDEX wowidx ON test_tsvector USING gist (a tsvector_ops(siglen=484))
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_col_list ADD TABLE testpub_tbl8 (a, b)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_5b FOR TABLE tab_rowfilter_partition WHERE (a > 10)
+;
+----------
+[ALTER_PUB_SUB] -- add a schema which is already added to the publication
+ALTER PUBLICATION testpub1_forschema ADD TABLES IN SCHEMA pub_test1
+;
+----------
+[ALTER_PUB_SUB] -- fail - cannot use column list for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk (a)
+;
+----------
+[CREATE_PUB_SUB] -- fail - row filter expression is not simple
+CREATE PUBLICATION testpub6 FOR TABLE testpub_rf_tbl1 WHERE (a IN (SELECT generate_series(1,5)))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION dep_req2() RETURNS text
+BEGIN ATOMIC
+  SELECT test_s_dep.dep_req1() || ' req2';
+END
+;
+----------
+[ALTER_PUB_SUB] -- alter publication set non-existent schema
+ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA non_existent_schema
+;
+----------
+[ALTER_PUB_SUB] -- ok: the column list changes, make sure the catalog gets updated
+ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl7 (a, c)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_table_view8 AS SELECT * from JSON_TABLE('"a"', '$' COLUMNS (a text PATH '$') EMPTY ON ERROR)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest31_1 ALTER COLUMN b SET EXPRESSION AS ('hello1')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION unbounded(x int) RETURNS int LANGUAGE SQL IMMUTABLE RETURN x
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (e < AVG(e))
+;
+----------
+[ADD_INDEX] create index trgm_idx on test_trgm using gist (t gist_trgm_ops(siglen=2025))
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE ((a, a + 1) < (2, 3))
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.date() < $x' PASSING '1234'::int AS x))
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION pg_relation_size(regclass)
+ RETURNS bigint
+ LANGUAGE sql
+ PARALLEL SAFE STRICT COST 1
+RETURN pg_relation_size($1, 'main')
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_array_view AS
+SELECT JSON_ARRAY('1' FORMAT JSON, 2 RETURNING json)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE d_lp_fk DETACH PARTITION d_lp_fk_1 CONCURRENTLY
+;
+----------
+[ADD_INDEX] create index tstidx on ltreetest using gist (t gist_ltree_ops(siglen=2028))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ess_func(int) RETURNS text
+BEGIN ATOMIC
+  SELECT f3 FROM ess_table WHERE f1 = $1;
+END
+;
+----------
+[CREATE_TABLE] CREATE TABLE dump_test.test_table (
+						   col1 serial primary key,
+						   col2 text COMPRESSION pglz,
+						   col3 text,
+						   col4 text,
+						   CHECK (col1 <= 1000)
+					   ) WITH (autovacuum_enabled = false, fillfactor=80)
+;
+----------
+[CREATE_VIEW(SELECT)] create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest29 ALTER COLUMN a DROP EXPRESSION
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- works fine
+ALTER TABLE range_parted2 DETACH PARTITION part_rp CONCURRENTLY
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub1_forschema1 FOR TABLES IN SCHEMA testpub_view
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 DROP TABLE testpub_rf_tbl1 WHERE (e < 27)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION sec_to_gc(float8)
+RETURNS float8
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN CASE
+  WHEN $1 < '0'::float8 THEN '0'::float8
+  WHEN $1 / ('2'::float8 * earth()) > '1'::float8 THEN pi() * earth()
+  ELSE '2'::float8 * earth() * asin($1 / ('2'::float8 * earth()))
+END
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA pub_test1, pub_test1
+;

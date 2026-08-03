@@ -1,0 +1,2758 @@
+[doris_official_source_files_select_017__select__0001]
+sql:
+SELECT * FROM store_sales
+ORDER BY ss_sold_date_sk DESC, ss_sold_time_sk DESC, ss_item_sk DESC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0002]
+sql:
+SELECT * FROM store_sales
+ORDER BY ss_sold_date_sk DESC, ss_sold_time_sk DESC, ss_item_sk DESC, ss_customer_sk DESC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:25) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0003]
+sql:
+WITH
+  frequent_ss_items AS (
+   SELECT
+     substr(i_item_desc, 1, 30) itemdesc
+   , i_item_sk item_sk
+   , d_date solddate
+   , count(*) cnt
+   FROM
+     store_sales
+   , date_dim
+   , item
+   WHERE (ss_sold_date_sk = d_date_sk)
+      AND (ss_item_sk = i_item_sk)
+      AND (d_year IN (2000   , (2000 + 1)   , (2000 + 2)   , (2000 + 3)))
+   GROUP BY substr(i_item_desc, 1, 30), i_item_sk, d_date
+   HAVING (count(*) > 4)
+)
+, max_store_sales AS (
+   SELECT max(csales) tpcds_cmax
+   FROM
+     (
+      SELECT
+        c_customer_sk
+      , sum((ss_quantity * ss_sales_price)) csales
+      FROM
+        store_sales
+      , customer
+      , date_dim
+      WHERE (ss_customer_sk = c_customer_sk)
+         AND (ss_sold_date_sk = d_date_sk)
+         AND (d_year IN (2000      , (2000 + 1)      , (2000 + 2)      , (2000 + 3)))
+      GROUP BY c_customer_sk
+   ) x
+)
+, best_ss_customer AS (
+   SELECT
+     c_customer_sk
+   , sum((ss_quantity * ss_sales_price)) ssales
+   FROM
+     store_sales
+   , customer
+   WHERE (ss_customer_sk = c_customer_sk)
+   GROUP BY c_customer_sk
+   HAVING (sum((ss_quantity * ss_sales_price)) > ((50 / CAST('100.0' AS DECIMAL(5,1))) * (
+            SELECT *
+            FROM
+              max_store_sales
+         )))
+)
+SELECT sum(sales)
+FROM
+  (
+   SELECT (cs_quantity * cs_list_price) sales
+   FROM
+     catalog_sales
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (cs_sold_date_sk = d_date_sk)
+      AND (cs_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (cs_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+UNION ALL    SELECT (ws_quantity * ws_list_price) sales
+   FROM
+     web_sales
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (ws_sold_date_sk = d_date_sk)
+      AND (ws_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (ws_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+) y
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:5~4:11) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:5~7:10) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(9:5~9:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:5~10:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:5~11:9) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(15:12~15:18) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(16:11~16:16) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(19:10~19:13) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(24:8~24:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(26:8~26:19) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(27:8~27:16) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(28:8~28:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(38:5~38:8) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(40:5~40:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(41:5~41:13) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(44:11~44:14) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(47:14~47:29) /test/1/catalog1/schema1/max_store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(50:7~50:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(55:5~55:18) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(56:5~56:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(63:8~63:25) /test/1/catalog1/schema1/frequent_ss_items/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(68:8~68:24) /test/1/catalog1/schema1/best_ss_customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(72:5~72:14) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(73:5~73:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(80:8~80:25) /test/1/catalog1/schema1/frequent_ss_items/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(85:8~85:24) /test/1/catalog1/schema1/best_ss_customer/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0004]
+sql:
+WITH
+  frequent_ss_items AS (
+   SELECT
+     substr(i_item_desc, 1, 30) itemdesc
+   , i_item_sk item_sk
+   , d_date solddate
+   , count(*) cnt
+   FROM
+     store_sales
+   , date_dim
+   , item
+   WHERE (ss_sold_date_sk = d_date_sk)
+      AND (ss_item_sk = i_item_sk)
+      AND (d_year IN (2000   , (2000 + 1)   , (2000 + 2)   , (2000 + 3)))
+   GROUP BY substr(i_item_desc, 1, 30), i_item_sk, d_date
+   HAVING (count(*) > 4)
+)
+, max_store_sales AS (
+   SELECT max(csales) tpcds_cmax
+   FROM
+     (
+      SELECT
+        c_customer_sk
+      , sum((ss_quantity * ss_sales_price)) csales
+      FROM
+        store_sales
+      , customer
+      , date_dim
+      WHERE (ss_customer_sk = c_customer_sk)
+         AND (ss_sold_date_sk = d_date_sk)
+         AND (d_year IN (2000      , (2000 + 1)      , (2000 + 2)      , (2000 + 3)))
+      GROUP BY c_customer_sk
+   ) x
+)
+, best_ss_customer AS (
+   SELECT
+     c_customer_sk
+   , sum((ss_quantity * ss_sales_price)) ssales
+   FROM
+     store_sales
+   , customer
+   WHERE (ss_customer_sk = c_customer_sk)
+   GROUP BY c_customer_sk
+   HAVING (sum((ss_quantity * ss_sales_price)) > ((50 / CAST('100.0' AS DECIMAL(5,1))) * (
+            SELECT *
+            FROM
+              max_store_sales
+         )))
+)
+SELECT
+  c_last_name
+, c_first_name
+, sales
+FROM
+  (
+   SELECT
+     c_last_name
+   , c_first_name
+   , sum((cs_quantity * cs_list_price)) sales
+   FROM
+     catalog_sales
+   , customer
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (cs_sold_date_sk = d_date_sk)
+      AND (cs_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (cs_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+      AND (cs_bill_customer_sk = c_customer_sk)
+   GROUP BY c_last_name, c_first_name
+UNION ALL    SELECT
+     c_last_name
+   , c_first_name
+   , sum((ws_quantity * ws_list_price)) sales
+   FROM
+     web_sales
+   , customer
+   , date_dim
+   WHERE (d_year = 2000)
+      AND (d_moy = 2)
+      AND (ws_sold_date_sk = d_date_sk)
+      AND (ws_item_sk IN (
+      SELECT item_sk
+      FROM
+        frequent_ss_items
+   ))
+      AND (ws_bill_customer_sk IN (
+      SELECT c_customer_sk
+      FROM
+        best_ss_customer
+   ))
+      AND (ws_bill_customer_sk = c_customer_sk)
+   GROUP BY c_last_name, c_first_name
+) z 
+ORDER BY c_last_name ASC, c_first_name ASC, sales ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:5~4:11) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:5~7:10) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(9:5~9:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:5~10:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:5~11:9) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(15:12~15:18) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(16:11~16:16) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(19:10~19:13) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(24:8~24:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(26:8~26:19) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(27:8~27:16) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(28:8~28:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(38:5~38:8) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(40:5~40:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(41:5~41:13) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(44:11~44:14) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(47:14~47:29) /test/1/catalog1/schema1/max_store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(59:5~59:8) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(61:5~61:18) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(62:5~62:13) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(63:5~63:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(70:8~70:25) /test/1/catalog1/schema1/frequent_ss_items/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(75:8~75:24) /test/1/catalog1/schema1/best_ss_customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(82:5~82:8) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(84:5~84:14) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(85:5~85:13) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(86:5~86:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(93:8~93:25) /test/1/catalog1/schema1/frequent_ss_items/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(98:8~98:24) /test/1/catalog1/schema1/best_ss_customer/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0005]
+sql:
+SELECT 
+sum(cs_ext_discount_amt) 'excess discount amount'
+FROM
+  catalog_sales
+, item
+, date_dim
+WHERE (i_manufact_id = 977)
+   AND (i_item_sk = cs_item_sk)
+   AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+   AND (d_date_sk = cs_sold_date_sk)
+   AND (cs_ext_discount_amt > (
+      SELECT (CAST('1.3' AS DECIMAL(2,1)) * avg(cs_ext_discount_amt))
+      FROM
+        catalog_sales
+      , date_dim
+      WHERE (cs_item_sk = i_item_sk)
+         AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+         AND (d_date_sk = cs_sold_date_sk)
+   ))
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:0~2:3) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:2~4:15) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:2~5:6) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:2~6:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(12:44~12:47) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(14:8~14:21) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:8~15:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0006]
+sql:
+SELECT 
+sum(ws_ext_discount_amt) 'Excess Discount Amount'
+FROM
+  web_sales
+, item
+, date_dim
+WHERE (i_manufact_id = 350)
+   AND (i_item_sk = ws_item_sk)
+   AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+   AND (d_date_sk = ws_sold_date_sk)
+   AND (ws_ext_discount_amt > (
+      SELECT (CAST('1.3' AS DECIMAL(2,1)) * avg(ws_ext_discount_amt))
+      FROM
+        web_sales
+      , date_dim
+      WHERE (ws_item_sk = i_item_sk)
+         AND (d_date BETWEEN CAST('2000-01-27' AS DATE) AND (CAST('2000-01-27' AS DATE) + INTERVAL  '90' DAY))
+         AND (d_date_sk = ws_sold_date_sk)
+   ))
+ORDER BY sum(ws_ext_discount_amt) ASC
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:0~2:3) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:2~4:11) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:2~5:6) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:2~6:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(12:44~12:47) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(14:8~14:17) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:8~15:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(20:9~20:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0007]
+sql:
+select /*+ SET_VAR(query_timeout = 600) */ ref_1.`i_product_name` as c0, ref_0.`i_category_id` as c1, ref_0.`i_formulation` as c2, ref_0.`i_manager_id` as c3, ref_0.`i_product_name` as c4, ref_1.`i_product_name` as c5, ref_0.`i_size` as c6, avg( cast(42 as int)) over (partition by ref_1.`i_product_name`,ref_1.`i_product_name` order by ref_1.`i_product_name`,ref_1.`i_product_name`) as c7, ref_0.`i_brand` as c8 from regression_test_tpcds_sf1_unique_ck_p1.item as ref_0 inner join regression_test_tpcds_sf1_unique_ck_p1.item as ref_1 on (ref_0.`i_item_desc` = ref_1.`i_product_name` ) where ref_0.`i_product_name` IN ( (select `i_item_id` from regression_test_tpcds_sf1_unique_ck_p1.item limit 187) ) order by ref_0.`i_current_price`
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:241~1:244) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:418~1:461) /test/1/catalog1/regression_test_tpcds_sf1_unique_ck_p1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:482~1:525) /test/1/catalog1/regression_test_tpcds_sf1_unique_ck_p1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:645~1:688) /test/1/catalog1/regression_test_tpcds_sf1_unique_ck_p1/item/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0008]
+sql:
+select /*+ SET_VAR(query_timeout = 600) */ ref_1.`i_product_name` as c0, ref_0.`i_category_id` as c1, ref_0.`i_formulation` as c2, ref_0.`i_manager_id` as c3, ref_0.`i_product_name` as c4, ref_1.`i_product_name` as c5, ref_0.`i_size` as c6, avg( cast(42 as int)) over (partition by ref_1.`i_product_name`,ref_1.`i_product_name` order by ref_1.`i_product_name`,ref_1.`i_product_name`) as c7, ref_0.`i_brand` as c8 from regression_test_tpcds_sf1_unique_p1.item as ref_0 inner join regression_test_tpcds_sf1_unique_p1.item as ref_1 on (ref_0.`i_item_desc` = ref_1.`i_product_name` ) where ref_0.`i_product_name` IN ( (select `i_item_id` from regression_test_tpcds_sf1_unique_p1.item limit 187) ) order by ref_0.`i_current_price`
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:241~1:244) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:418~1:458) /test/1/catalog1/regression_test_tpcds_sf1_unique_p1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:479~1:519) /test/1/catalog1/regression_test_tpcds_sf1_unique_p1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:639~1:679) /test/1/catalog1/regression_test_tpcds_sf1_unique_p1/item/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0009]
+sql:
+-- tables: lineitem
+SELECT
+  l_returnflag,
+  l_linestatus,
+  sum(l_quantity)                                       AS sum_qty,
+  sum(l_extendedprice)                                  AS sum_base_price,
+  sum(l_extendedprice * (1 - l_discount))               AS sum_disc_price,
+  sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
+  avg(l_quantity)                                       AS avg_qty,
+  avg(l_extendedprice)                                  AS avg_price,
+  avg(l_discount)                                       AS avg_disc,
+  count(*)                                              AS count_order
+FROM
+  lineitem
+WHERE
+  l_shipdate <= DATE '1998-12-01' - INTERVAL '90' DAY
+GROUP BY
+l_returnflag,
+l_linestatus
+ORDER BY
+l_returnflag,
+l_linestatus
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:2~5:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:2~6:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:2~7:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:2~8:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:2~9:5) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:2~10:5) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:2~11:5) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:2~12:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(14:2~14:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0010]
+sql:
+-- tables: part,supplier,partsupp,nation,region
+SELECT
+  s_acctbal,
+  s_name,
+  n_name,
+  p_partkey,
+  p_mfgr,
+  s_address,
+  s_phone,
+  s_comment
+FROM
+  part,
+  supplier,
+  partsupp,
+  nation,
+  region
+WHERE
+  p_partkey = ps_partkey
+  AND s_suppkey = ps_suppkey
+  AND p_size = 15
+  AND p_type LIKE '%BRASS'
+  AND s_nationkey = n_nationkey
+  AND n_regionkey = r_regionkey
+  AND r_name = 'EUROPE'
+  AND ps_supplycost = (
+    SELECT min(ps_supplycost)
+    FROM
+      partsupp, supplier,
+      nation, region
+    WHERE
+      p_partkey = ps_partkey
+      AND s_suppkey = ps_suppkey
+      AND s_nationkey = n_nationkey
+      AND n_regionkey = r_regionkey
+      AND r_name = 'EUROPE'
+  )
+ORDER BY
+  s_acctbal DESC,
+  n_name,
+  s_name,
+  p_partkey
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(12:2~12:6) /test/1/catalog1/schema1/part/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:2~13:10) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(14:2~14:10) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:2~15:8) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:2~16:8) /test/1/catalog1/schema1/region/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(26:11~26:14) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(28:6~28:14) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(28:16~28:24) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:6~29:12) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:14~29:20) /test/1/catalog1/schema1/region/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0011]
+sql:
+-- tables: customer,orders,lineitem
+SELECT
+  l_orderkey,
+  sum(l_extendedprice * (1 - l_discount)) AS revenue,
+  o_orderdate,
+  o_shippriority
+FROM
+  customer,
+  orders,
+  lineitem
+WHERE
+  c_mktsegment = 'BUILDING'
+  AND c_custkey = o_custkey
+  AND l_orderkey = o_orderkey
+  AND o_orderdate < DATE '1995-03-15'
+  AND l_shipdate > DATE '1995-03-15'
+GROUP BY
+  l_orderkey,
+  o_orderdate,
+  o_shippriority
+ORDER BY
+  revenue DESC,
+  o_orderdate
+LIMIT 10
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:2~4:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:2~8:10) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:2~9:8) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:2~10:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0012]
+sql:
+-- tables: orders,lineitem
+SELECT
+  o_orderpriority,
+  count(*) AS order_count
+FROM orders
+WHERE
+  o_orderdate >= DATE '1993-07-01'
+  AND o_orderdate < DATE '1993-07-01' + INTERVAL '3' MONTH
+AND EXISTS (
+SELECT *
+FROM lineitem
+WHERE
+l_orderkey = o_orderkey
+AND l_commitdate < l_receiptdate
+)
+GROUP BY
+o_orderpriority
+ORDER BY
+o_orderpriority
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:2~4:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:5~5:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:5~11:13) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0013]
+sql:
+-- tables: customer,orders,lineitem,supplier,nation,region
+SELECT
+  n_name,
+  sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM
+  customer,
+  orders,
+  lineitem,
+  supplier,
+  nation,
+  region
+WHERE
+  c_custkey = o_custkey
+  AND l_orderkey = o_orderkey
+  AND l_suppkey = s_suppkey
+  AND c_nationkey = s_nationkey
+  AND s_nationkey = n_nationkey
+  AND n_regionkey = r_regionkey
+  AND r_name = 'ASIA'
+  AND o_orderdate >= DATE '1994-01-01'
+  AND o_orderdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+GROUP BY
+n_name
+ORDER BY
+revenue DESC
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:2~4:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:2~6:10) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:2~7:8) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:2~8:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:2~9:10) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:2~10:8) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:2~11:8) /test/1/catalog1/schema1/region/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0014]
+sql:
+SELECT sum(l_extendedprice * l_discount) AS revenue
+FROM
+  lineitem
+WHERE
+  l_shipdate >= DATE '1994-01-01'
+  AND l_shipdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+AND l_discount BETWEEN 0.06 - 0.01 AND .06 + 0.01
+AND l_quantity < 24
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:2~3:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0015]
+sql:
+-- tables: supplier,lineitem,orders,customer,nation
+SELECT
+  supp_nation,
+  cust_nation,
+  l_year,
+  sum(volume) AS revenue
+FROM (
+       SELECT
+         n1.n_name                          AS supp_nation,
+         n2.n_name                          AS cust_nation,
+         extract(YEAR FROM l_shipdate)      AS l_year,
+         l_extendedprice * (1 - l_discount) AS volume
+       FROM
+         supplier,
+         lineitem,
+         orders,
+         customer,
+         nation n1,
+         nation n2
+       WHERE
+         s_suppkey = l_suppkey
+         AND o_orderkey = l_orderkey
+         AND c_custkey = o_custkey
+         AND s_nationkey = n1.n_nationkey
+         AND c_nationkey = n2.n_nationkey
+         AND (
+           (n1.n_name = 'FRANCE' AND n2.n_name = 'GERMANY')
+           OR (n1.n_name = 'GERMANY' AND n2.n_name = 'FRANCE')
+         )
+         AND l_shipdate BETWEEN DATE '1995-01-01' AND DATE '1996-12-31'
+     ) AS shipping
+GROUP BY
+  supp_nation,
+  cust_nation,
+  l_year
+ORDER BY
+  supp_nation,
+  cust_nation,
+  l_year
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(6:2~6:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(14:9~14:17) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:9~15:17) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:9~16:15) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:9~17:17) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:9~18:15) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(19:9~19:15) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0016]
+sql:
+-- tables: part,supplier,lineitem,orders,customer,nation,region
+SELECT
+  o_year,
+  sum(CASE
+      WHEN nation = 'BRAZIL'
+        THEN volume
+      ELSE 0
+      END) / sum(volume) AS mkt_share
+FROM (
+       SELECT
+         extract(YEAR FROM o_orderdate)     AS o_year,
+         l_extendedprice * (1 - l_discount) AS volume,
+         n2.n_name                          AS nation
+       FROM
+         part,
+         supplier,
+         lineitem,
+         orders,
+         customer,
+         nation n1,
+         nation n2,
+         region
+       WHERE
+         p_partkey = l_partkey
+         AND s_suppkey = l_suppkey
+         AND l_orderkey = o_orderkey
+         AND o_custkey = c_custkey
+         AND c_nationkey = n1.n_nationkey
+         AND n1.n_regionkey = r_regionkey
+         AND r_name = 'AMERICA'
+         AND s_nationkey = n2.n_nationkey
+         AND o_orderdate BETWEEN DATE '1995-01-01' AND DATE '1996-12-31'
+         AND p_type = 'ECONOMY ANODIZED STEEL'
+     ) AS all_nations
+GROUP BY
+  o_year
+ORDER BY
+  o_year
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:2~4:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:13~8:16) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(15:9~15:13) /test/1/catalog1/schema1/part/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:9~16:17) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:9~17:17) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:9~18:15) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(19:9~19:17) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(20:9~20:15) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(21:9~21:15) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(22:9~22:15) /test/1/catalog1/schema1/region/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0017]
+sql:
+-- tables: part,supplier,lineitem,partsupp,orders,nation
+SELECT
+  nation,
+  o_year,
+  sum(amount) AS sum_profit
+FROM (
+       SELECT
+         n_name                                                          AS nation,
+         extract(YEAR FROM o_orderdate)                                  AS o_year,
+         l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity AS amount
+       FROM
+         part,
+         supplier,
+         lineitem,
+         partsupp,
+         orders,
+         nation
+       WHERE
+         s_suppkey = l_suppkey
+         AND ps_suppkey = l_suppkey
+         AND ps_partkey = l_partkey
+         AND p_partkey = l_partkey
+         AND o_orderkey = l_orderkey
+         AND s_nationkey = n_nationkey
+         AND p_name LIKE '%green%'
+     ) AS profit
+GROUP BY
+  nation,
+  o_year
+ORDER BY
+  nation,
+  o_year DESC
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:2~5:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(12:9~12:13) /test/1/catalog1/schema1/part/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:9~13:17) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(14:9~14:17) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:9~15:17) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:9~16:15) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:9~17:15) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0018]
+sql:
+-- tables: customer,orders,lineitem,nation
+SELECT
+  c_custkey,
+  c_name,
+  sum(l_extendedprice * (1 - l_discount)) AS revenue,
+  c_acctbal,
+  n_name,
+  c_address,
+  c_phone,
+  c_comment
+FROM
+  customer,
+  orders,
+  lineitem,
+  nation
+WHERE
+  c_custkey = o_custkey
+  AND l_orderkey = o_orderkey
+  AND o_orderdate >= DATE '1993-10-01'
+  AND o_orderdate < DATE '1993-10-01' + INTERVAL '3' MONTH
+  AND l_returnflag = 'R'
+  AND c_nationkey = n_nationkey
+GROUP BY
+  c_custkey,
+  c_name,
+  c_acctbal,
+  c_phone,
+  n_name,
+  c_address,
+  c_comment
+ORDER BY
+  revenue DESC
+LIMIT 20
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:2~5:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(12:2~12:10) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:2~13:8) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(14:2~14:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:2~15:8) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0019]
+sql:
+-- tables: partsupp,supplier,nation
+SELECT
+  ps_partkey,
+  sum(ps_supplycost * ps_availqty) AS value
+FROM
+  partsupp,
+  supplier,
+  nation
+WHERE
+  ps_suppkey = s_suppkey
+  AND s_nationkey = n_nationkey
+  AND n_name = 'GERMANY'
+GROUP BY
+  ps_partkey
+HAVING
+  sum(ps_supplycost * ps_availqty) > (
+    SELECT sum(ps_supplycost * ps_availqty) * 0.0001
+    FROM
+      partsupp,
+      supplier,
+      nation
+    WHERE
+      ps_suppkey = s_suppkey
+      AND s_nationkey = n_nationkey
+      AND n_name = 'GERMANY'
+  )
+ORDER BY
+  value DESC
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:2~4:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:2~6:10) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:2~7:10) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:2~8:8) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(16:2~16:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(17:11~17:14) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(19:6~19:14) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(20:6~20:14) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(21:6~21:12) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0020]
+sql:
+-- tables: orders,lineitem
+SELECT
+  l_shipmode,
+  sum(CASE
+      WHEN o_orderpriority = '1-URGENT'
+           OR o_orderpriority = '2-HIGH'
+        THEN 1
+      ELSE 0
+      END) AS high_line_count,
+  sum(CASE
+      WHEN o_orderpriority <> '1-URGENT'
+           AND o_orderpriority <> '2-HIGH'
+        THEN 1
+      ELSE 0
+      END) AS low_line_count
+FROM
+  orders,
+  lineitem
+WHERE
+  o_orderkey = l_orderkey
+  AND l_shipmode IN ('MAIL', 'SHIP')
+  AND l_commitdate < l_receiptdate
+  AND l_shipdate < l_commitdate
+  AND l_receiptdate >= DATE '1994-01-01'
+  AND l_receiptdate < DATE '1994-01-01' + INTERVAL '1' YEAR
+GROUP BY
+  l_shipmode
+ORDER BY
+  l_shipmode
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:2~4:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:2~10:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(17:2~17:8) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:2~18:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0021]
+sql:
+-- tables: customer
+SELECT
+  c_count,
+  count(*) AS custdist
+FROM (
+       SELECT
+         c_custkey,
+         count(o_orderkey) AS c_count
+       FROM
+         customer
+         LEFT OUTER JOIN orders ON
+                                  c_custkey = o_custkey
+                                  AND o_comment NOT LIKE '%special%requests%'
+       GROUP BY
+         c_custkey
+     ) AS c_orders
+GROUP BY
+  c_count
+ORDER BY
+  custdist DESC,
+  c_count DESC
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:2~4:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:9~8:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(10:9~10:17) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:25~11:31) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0022]
+sql:
+-- tables: lineitem,part
+SELECT 100.00 * sum(CASE
+                    WHEN p_type LIKE 'PROMO%'
+                      THEN l_extendedprice * (1 - l_discount)
+                    ELSE 0
+                    END) / sum(l_extendedprice * (1 - l_discount)) AS promo_revenue
+FROM
+  lineitem,
+  part
+WHERE
+  l_partkey = p_partkey
+  AND l_shipdate >= DATE '1995-09-01'
+  AND l_shipdate < DATE '1995-09-01' + INTERVAL '1' MONTH
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:16~2:19) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:27~6:30) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:2~8:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:2~9:6) /test/1/catalog1/schema1/part/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0023]
+sql:
+-- tables: lineitem,supplier
+SELECT
+  s_suppkey,
+  s_name,
+  s_address,
+  s_phone,
+  total_revenue
+FROM
+  supplier,
+  revenue1
+WHERE
+  s_suppkey = supplier_no
+  AND total_revenue = (
+    SELECT max(total_revenue)
+    FROM
+      revenue1
+  )
+ORDER BY
+  s_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(9:2~9:10) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:2~10:10) /test/1/catalog1/schema1/revenue1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(14:11~14:14) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(16:6~16:14) /test/1/catalog1/schema1/revenue1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0024]
+sql:
+-- tables: partsupp,part,supplier
+SELECT
+  p_brand,
+  p_type,
+  p_size,
+  count(DISTINCT ps_suppkey) AS supplier_cnt
+FROM
+  partsupp,
+  part
+WHERE
+  p_partkey = ps_partkey
+  AND p_brand <> 'Brand#45'
+  AND p_type NOT LIKE 'MEDIUM POLISHED%'
+  AND p_size IN (49, 14, 23, 45, 19, 3, 36, 9)
+  AND ps_suppkey NOT IN (
+    SELECT s_suppkey
+    FROM
+      supplier
+    WHERE
+      s_comment LIKE '%Customer%Complaints%'
+  )
+GROUP BY
+  p_brand,
+  p_type,
+  p_size
+ORDER BY
+  supplier_cnt DESC,
+  p_brand,
+  p_type,
+  p_size
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(6:2~6:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:2~8:10) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:2~9:6) /test/1/catalog1/schema1/part/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:6~18:14) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0025]
+sql:
+-- tables: lineitem,part
+SELECT sum(l_extendedprice) / 7.0 AS avg_yearly
+FROM
+  lineitem,
+  part
+WHERE
+  p_partkey = l_partkey
+  AND p_brand = 'Brand#23'
+  AND p_container = 'MED BOX'
+  AND l_quantity < (
+    SELECT 0.2 * avg(l_quantity)
+    FROM
+      lineitem
+    WHERE
+      l_partkey = p_partkey
+  )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:2~4:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:2~5:6) /test/1/catalog1/schema1/part/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(11:17~11:20) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:6~13:14) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0026]
+sql:
+-- tables: customer,orders,lineitem
+SELECT
+  c_name,
+  c_custkey,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice,
+  sum(l_quantity)
+FROM
+  customer,
+  orders,
+  lineitem
+WHERE
+  o_orderkey IN (
+    SELECT l_orderkey
+    FROM
+      lineitem
+    GROUP BY
+      l_orderkey
+    HAVING
+      sum(l_quantity) > 300
+  )
+  AND c_custkey = o_custkey
+  AND o_orderkey = l_orderkey
+GROUP BY
+  c_name,
+  c_custkey,
+  o_orderkey,
+  o_orderdate,
+  o_totalprice
+ORDER BY
+  o_totalprice DESC,
+  o_orderdate
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(8:2~8:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(10:2~10:10) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:2~11:8) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:2~12:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:6~17:14) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(21:6~21:9) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0027]
+sql:
+-- tables: lineitem,part
+SELECT sum(l_extendedprice * (1 - l_discount)) AS revenue
+FROM
+  lineitem,
+  part
+WHERE
+  (
+    p_partkey = l_partkey
+    AND p_brand = 'Brand#12'
+    AND p_container IN ('SM CASE', 'SM BOX', 'SM PACK', 'SM PKG')
+    AND l_quantity >= 1 AND l_quantity <= 1 + 10
+    AND p_size BETWEEN 1 AND 5
+    AND l_shipmode IN ('AIR', 'AIR REG')
+    AND l_shipinstruct = 'DELIVER IN PERSON'
+  )
+  OR
+  (
+    p_partkey = l_partkey
+    AND p_brand = 'Brand#23'
+    AND p_container IN ('MED BAG', 'MED BOX', 'MED PKG', 'MED PACK')
+    AND l_quantity >= 10 AND l_quantity <= 10 + 10
+    AND p_size BETWEEN 1 AND 10
+    AND l_shipmode IN ('AIR', 'AIR REG')
+    AND l_shipinstruct = 'DELIVER IN PERSON'
+  )
+  OR
+  (
+    p_partkey = l_partkey
+    AND p_brand = 'Brand#34'
+    AND p_container IN ('LG CASE', 'LG BOX', 'LG PACK', 'LG PKG')
+    AND l_quantity >= 20 AND l_quantity <= 20 + 10
+    AND p_size BETWEEN 1 AND 15
+    AND l_shipmode IN ('AIR', 'AIR REG')
+    AND l_shipinstruct = 'DELIVER IN PERSON'
+  )
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:2~4:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:2~5:6) /test/1/catalog1/schema1/part/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0028]
+sql:
+-- tables: supplier,nation,partsupp,lineitem,part
+SELECT
+  s_name,
+  s_address
+FROM
+  supplier, nation
+WHERE
+  s_suppkey IN (
+    SELECT ps_suppkey
+    FROM
+      partsupp
+    WHERE
+      ps_partkey IN (
+        SELECT p_partkey
+        FROM
+          part
+        WHERE
+          p_name LIKE 'forest%'
+      )
+      AND ps_availqty > (
+        SELECT 0.5 * sum(l_quantity)
+        FROM
+          lineitem
+        WHERE
+          l_partkey = ps_partkey
+          AND l_suppkey = ps_suppkey
+          AND l_shipdate >= date('1994-01-01')
+          AND l_shipdate < date('1994-01-01') + interval '1' YEAR
+)
+)
+AND s_nationkey = n_nationkey
+AND n_name = 'CANADA'
+ORDER BY s_name
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(6:2~6:10) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:12~6:18) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:6~11:14) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:10~16:14) /test/1/catalog1/schema1/part/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(21:21~21:24) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(23:10~23:18) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(27:28~27:32) /test/1/catalog1/schema1/date/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(28:27~28:31) /test/1/catalog1/schema1/date/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0029]
+sql:
+-- tables: supplier,lineitem,orders,nation
+SELECT
+  s_name,
+  count(*) AS numwait
+FROM
+  supplier,
+  lineitem l1,
+  orders,
+  nation
+WHERE
+  s_suppkey = l1.l_suppkey
+  AND o_orderkey = l1.l_orderkey
+  AND o_orderstatus = 'F'
+  AND l1.l_receiptdate > l1.l_commitdate
+  AND exists(
+    SELECT *
+    FROM
+      lineitem l2
+    WHERE
+      l2.l_orderkey = l1.l_orderkey
+      AND l2.l_suppkey <> l1.l_suppkey
+  )
+  AND NOT exists(
+    SELECT *
+    FROM
+      lineitem l3
+    WHERE
+      l3.l_orderkey = l1.l_orderkey
+      AND l3.l_suppkey <> l1.l_suppkey
+      AND l3.l_receiptdate > l3.l_commitdate
+  )
+  AND s_nationkey = n_nationkey
+  AND n_name = 'SAUDI ARABIA'
+GROUP BY
+  s_name
+ORDER BY
+  numwait DESC,
+  s_name
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:2~4:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:2~6:10) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:2~7:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:2~8:8) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:2~9:8) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:6~18:14) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(26:6~26:14) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0030]
+sql:
+-- tables: orders,customer
+SELECT
+  cntrycode,
+  count(*)       AS numcust,
+  sum(c_acctbal) AS totacctbal
+FROM (
+       SELECT
+         substr(c_phone, 1, 2) AS cntrycode,
+         c_acctbal
+       FROM
+         customer
+       WHERE
+         substr(c_phone, 1, 2) IN
+         ('13', '31', '23', '29', '30', '18', '17')
+         AND c_acctbal > (
+           SELECT avg(c_acctbal)
+           FROM
+             customer
+           WHERE
+             c_acctbal > 0.00
+             AND substr(c_phone, 1, 2) IN
+                 ('13', '31', '23', '29', '30', '18', '17')
+         )
+         AND NOT exists(
+           SELECT *
+           FROM
+             orders
+           WHERE
+             o_custkey = c_custkey
+         )
+     ) AS custsale
+GROUP BY
+  cntrycode
+ORDER BY
+  cntrycode
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:2~4:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:2~5:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:9~8:15) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(11:9~11:17) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(13:9~13:15) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(16:18~16:21) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(18:13~18:21) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(21:17~21:23) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(27:13~27:19) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0031]
+sql:
+-- tables: lineitem,supplier
+WITH revenue1 AS(
+  SELECT
+    l_suppkey AS supplier_no,
+    sum(l_extendedprice * (1 - l_discount)) AS total_revenue
+  FROM
+    lineitem
+  WHERE
+    l_shipdate >= DATE '1996-01-01'
+    AND l_shipdate < DATE '1996-01-01' + INTERVAL '3' MONTH
+  GROUP BY l_suppkey)
+
+SELECT
+  s_suppkey,
+  s_name,
+  s_address,
+  s_phone,
+  total_revenue
+FROM
+  supplier,
+  revenue1
+WHERE
+  s_suppkey = supplier_no
+  AND total_revenue = (
+    SELECT max(total_revenue)
+    FROM revenue1
+  )
+ORDER BY
+  s_suppkey
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:4~5:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:4~7:12) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(20:2~20:10) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(21:2~21:10) /test/1/catalog1/schema1/revenue1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(25:11~25:14) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(26:9~26:17) /test/1/catalog1/schema1/revenue1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0032]
+sql:
+-- tables: lineitem
+SELECT
+
+  l_returnflag,
+  l_linestatus,
+  sum(l_quantity)                                       AS sum_qty,
+  sum(l_extendedprice)                                  AS sum_base_price,
+  sum(l_extendedprice * (1 - l_discount))               AS sum_disc_price,
+  sum(l_extendedprice * (1 - l_discount) * (1 + l_tax)) AS sum_charge,
+  avg(l_quantity)                                       AS avg_qty,
+  avg(l_extendedprice)                                  AS avg_price,
+  avg(l_discount)                                       AS avg_disc,
+  count(*)                                              AS count_order
+FROM
+  lineitem
+WHERE
+  l_shipdate <= DATE '1998-12-01' - INTERVAL '90' DAY
+GROUP BY
+l_returnflag,
+l_linestatus
+ORDER BY
+l_returnflag,
+l_linestatus
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(6:2~6:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:2~7:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:2~8:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:2~9:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:2~10:5) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:2~11:5) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:2~12:5) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(13:2~13:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(15:2~15:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0033]
+sql:
+-- tables: supplier,lineitem,orders,nation
+select
+s_name, count(*) as numwait
+from orders join
+(
+  select * from
+  lineitem l2 right semi join
+  (
+    select * from
+    lineitem l3 right anti join
+    (
+      select * from
+      lineitem l1 join
+      (
+        select * from
+        supplier join nation
+        where s_nationkey = n_nationkey
+          and n_name = 'SAUDI ARABIA'
+      ) t1
+      where t1.s_suppkey = l1.l_suppkey and l1.l_receiptdate > l1.l_commitdate
+    ) t2
+    on l3.l_orderkey = t2.l_orderkey and l3.l_suppkey <> t2.l_suppkey and l3.l_receiptdate > l3.l_commitdate
+  ) t3
+  on l2.l_orderkey = t3.l_orderkey and l2.l_suppkey <> t3.l_suppkey
+) t4
+on o_orderkey = t4.l_orderkey and o_orderstatus = 'F'
+group by
+    t4.s_name
+order by
+    numwait desc,
+    t4.s_name
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:8~3:13) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:5~4:11) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:2~7:10) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:4~10:12) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:6~13:14) /test/1/catalog1/schema1/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:8~16:16) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:22~16:28) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0034]
+sql:
+SELECT
+  s_acctbal,
+  s_name,
+  n_name,
+  p_partkey,
+  p_mfgr,
+  s_address,
+  s_phone,
+  s_comment
+FROM
+  part,
+  supplier,
+  partsupp,
+  nation,
+  region
+WHERE
+  p_partkey = ps_partkey
+  AND s_suppkey = ps_suppkey
+  AND p_size = 15
+  AND p_type LIKE '%BRASS'
+  AND s_nationkey = n_nationkey
+  AND n_regionkey = r_regionkey
+  AND r_name = 'EUROPE'
+  AND ps_supplycost = (
+    SELECT min(ps_supplycost)
+    FROM
+      partsupp, supplier,
+      nation, region
+    WHERE
+      p_partkey = ps_partkey
+      AND s_suppkey = ps_suppkey
+      AND s_nationkey = n_nationkey
+      AND n_regionkey = r_regionkey
+      AND r_name = 'EUROPE'
+  )
+ORDER BY
+  s_acctbal DESC,
+  n_name,
+  s_name,
+  p_partkey
+LIMIT 100
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(11:2~11:6) /test/1/catalog1/schema1/part/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:2~12:10) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:2~13:10) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(14:2~14:8) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:2~15:8) /test/1/catalog1/schema1/region/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(25:11~25:14) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(27:6~27:14) /test/1/catalog1/schema1/partsupp/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(27:16~27:24) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(28:6~28:12) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(28:14~28:20) /test/1/catalog1/schema1/region/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0035]
+sql:
+SELECT
+  s_suppkey,
+  s_name,
+  s_address,
+  s_phone,
+  total_revenue
+FROM
+  supplier,
+  revenue1
+WHERE
+  s_suppkey = supplier_no
+  AND total_revenue = (
+    SELECT max(total_revenue)
+    FROM
+      revenue1
+  )
+ORDER BY
+  s_suppkey;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(8:2~8:10) /test/1/catalog1/schema1/supplier/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:2~9:10) /test/1/catalog1/schema1/revenue1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(13:11~13:14) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(15:6~15:14) /test/1/catalog1/schema1/revenue1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0036]
+sql:
+-- tables: supplier,lineitem,orders,nation
+SELECT /*+SEV_VAR(batch_size=3)*/
+  l1.l_orderkey okey,
+  l1.l_suppkey  skey
+FROM
+  regression_test_tpch_unique_sql_zstd_bucket1_p0.lineitem l1
+WHERE
+  l1.l_receiptdate > l1.l_commitdate
+  AND l1.L_ORDERKEY < 10000
+  AND NOT exists(
+    SELECT *
+    FROM
+      regression_test_tpch_unique_sql_zstd_bucket1_p0.lineitem l3
+    WHERE
+      l3.l_orderkey = l1.l_orderkey
+      AND l3.l_suppkey <> l1.l_suppkey
+      AND l3.l_receiptdate > l3.l_commitdate
+      AND l3.L_ORDERKEY < 10000
+  )
+ORDER BY
+  okey, skey
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(6:2~6:58) /test/1/catalog1/regression_test_tpch_unique_sql_zstd_bucket1_p0/lineitem/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:6~13:62) /test/1/catalog1/regression_test_tpch_unique_sql_zstd_bucket1_p0/lineitem/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0037]
+sql:
+SELECT COUNT(DISTINCT n_regionkey), COUNT(DISTINCT n_name), MIN(DISTINCT n_nationkey) FROM nation
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:36~1:41) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:60~1:63) /test/1/catalog1/schema1/MIN/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:91~1:97) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0038]
+sql:
+SELECT COUNT(DISTINCT n_regionkey), COUNT(DISTINCT n_regionkey) FROM nation
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:36~1:41) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:69~1:75) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0039]
+sql:
+SELECT COUNT(DISTINCT n_regionkey), COUNT(*) FROM nation
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:36~1:41) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:50~1:56) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0040]
+sql:
+SELECT DISTINCT n_regionkey FROM nation
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:33~1:39) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0041]
+sql:
+SELECT n_regionkey, COUNT(DISTINCT n_name) FROM nation
+GROUP BY n_regionkey
+HAVING n_regionkey < 4
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:20~1:25) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:48~1:54) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0042]
+sql:
+SELECT DISTINCT r_name FROM region
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:28~1:34) /test/1/catalog1/schema1/region/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0043]
+sql:
+SELECT DISTINCT n_regionkey FROM nation ORDER BY n_regionkey
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:33~1:39) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0044]
+sql:
+select count(*), count(n_regionkey), min(n_regionkey), max(n_regionkey), sum(n_regionkey) from nation
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:17~1:22) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:37~1:40) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:55~1:58) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:73~1:76) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:95~1:101) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0045]
+sql:
+select n_regionkey, count(*) from nation group by 1 having sum(n_regionkey) > 5 and sum(n_regionkey) < 20
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:20~1:25) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:34~1:40) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:59~1:62) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:84~1:87) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0046]
+sql:
+select n_regionkey, count(*), sum(n_nationkey) from nation group by 1
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:20~1:25) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:30~1:33) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:52~1:58) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0047]
+sql:
+select count(*), sum(n_nationkey) from nation where 1=2 group by n_regionkey
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:17~1:20) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:39~1:45) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0048]
+sql:
+select n_regionkey, count(*), sum(n_regionkey) from nation where n_regionkey > 2 group by 1
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:20~1:25) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:30~1:33) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:52~1:58) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0049]
+sql:
+select count(*), sum(n_nationkey) from nation where 1=2
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:17~1:20) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:39~1:45) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0050]
+sql:
+select 2 from nation group by 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:20) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0051]
+sql:
+select "oneline" from nation group by "I am a const, but not to be removed";
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:22~1:28) /test/1/catalog1/schema1/nation/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_017__select__0052]
+sql:
+select a from (select "abc" as a, '1' as b) T  group by b, a;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": []
+}

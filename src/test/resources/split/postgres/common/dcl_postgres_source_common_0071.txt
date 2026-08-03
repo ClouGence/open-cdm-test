@@ -1,0 +1,104 @@
+EXECUTE dumpOpr('18233')
+;
+EXECUTE dumpBaseType('601')
+;
+LOCK TABLE pg_catalog.pg_shseclabel IN ACCESS SHARE MODE
+;
+ALTER FOREIGN DATA WRAPPER foo OPTIONS (nonexistent 'fdw')
+;
+EXECUTE dumpTableAttach('39989')
+;
+EXECUTE dumpFunc('36864')
+;
+COPY public.sj_t4 (id, a) TO stdout
+;
+DROP USER MAPPING FOR public SERVER s8
+;
+-- regress_file_fdw_superuser owns fdw-related objects
+SET ROLE regress_file_fdw_superuser
+;
+--
+-- Check that system tables can be reindexed.
+--
+-- Note that this test currently is not included in the default
+-- schedules, as currently reindexing catalog tables can cause
+-- deadlocks:
+--
+-- * The lock upgrade between the ShareLock acquired for the reindex
+--   and RowExclusiveLock needed for pg_class/pg_index locks can
+--   trigger deadlocks.
+--
+-- * The uniqueness checks performed when reindexing a unique/primary
+--   key index possibly need to wait for the transaction of a
+--   about-to-deleted row in pg_class to commit. That can cause
+--   deadlocks because, in contrast to user tables, locks on catalog
+--   tables are routinely released before commit - therefore the lock
+--   held for reindexing doesn't guarantee that no running transaction
+--   performed modifications in the table underlying the index.
+--
+--   This is particularly problematic as such conflicts can be
+--   triggered even when run in isolation, as a previous session's
+--   temporary table cleanup might still be running (even when the
+--   session ended from a client perspective).
+
+
+-- Check reindexing of whole tables
+REINDEX TABLE pg_class
+;
+------------------------------------------------------------------------------------------
+[UNSAFE] EXECUTE dumpOpr('18233')
+;
+----------
+[UNSAFE] EXECUTE dumpBaseType('601')
+;
+----------
+[SESSION_LOCK] LOCK TABLE pg_catalog.pg_shseclabel IN ACCESS SHARE MODE
+;
+----------
+[SYSTEM_SETTING_WRITE] ALTER FOREIGN DATA WRAPPER foo OPTIONS (nonexistent 'fdw')
+;
+----------
+[UNSAFE] EXECUTE dumpTableAttach('39989')
+;
+----------
+[UNSAFE] EXECUTE dumpFunc('36864')
+;
+----------
+[DATA_EXPORT] COPY public.sj_t4 (id, a) TO stdout
+;
+----------
+[REVOKE] DROP USER MAPPING FOR public SERVER s8
+;
+----------
+[SWITCH_ROLE] -- regress_file_fdw_superuser owns fdw-related objects
+SET ROLE regress_file_fdw_superuser
+;
+----------
+[ADMIN] --
+-- Check that system tables can be reindexed.
+--
+-- Note that this test currently is not included in the default
+-- schedules, as currently reindexing catalog tables can cause
+-- deadlocks:
+--
+-- * The lock upgrade between the ShareLock acquired for the reindex
+--   and RowExclusiveLock needed for pg_class/pg_index locks can
+--   trigger deadlocks.
+--
+-- * The uniqueness checks performed when reindexing a unique/primary
+--   key index possibly need to wait for the transaction of a
+--   about-to-deleted row in pg_class to commit. That can cause
+--   deadlocks because, in contrast to user tables, locks on catalog
+--   tables are routinely released before commit - therefore the lock
+--   held for reindexing doesn't guarantee that no running transaction
+--   performed modifications in the table underlying the index.
+--
+--   This is particularly problematic as such conflicts can be
+--   triggered even when run in isolation, as a previous session's
+--   temporary table cleanup might still be running (even when the
+--   session ended from a client perspective).
+
+
+-- Check reindexing of whole tables
+REINDEX TABLE pg_class
+;

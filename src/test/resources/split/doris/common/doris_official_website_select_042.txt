@@ -1,0 +1,733 @@
+select * from records_tbl order by user_id, name limit 100;
+select * from records_tbl order by user_id, name limit 100 offset 100;
+select user_id, name, address, city, nation, region, phone, mktsegment
+    from records_tbl2, (select unique_value as max_value from records_tbl2 order by unique_value limit 1 offset 9999) as previous_data
+    where records_tbl2.unique_value > previous_data.max_value
+    order by unique_value limit 100;
+-- Exact phrase search
+SELECT * FROM docs WHERE content MATCH_PHRASE 'inverted index';
+
+-- Prefix search
+SELECT * FROM docs WHERE content MATCH_PHRASE_PREFIX 'data ware';
+SELECT id, title, score() AS relevance
+FROM docs
+WHERE content MATCH_ANY 'real-time OLAP analytics'
+ORDER BY relevance DESC
+LIMIT 10;
+SELECT id, title, score() AS relevance
+FROM docs
+WHERE SEARCH('title:Machine AND tags:ANY(database sql)')
+ORDER BY relevance DESC
+LIMIT 20;
+-- Simple keyword search
+SELECT * FROM docs WHERE content MATCH_ANY 'apache doris';
+
+-- Phrase search
+SELECT * FROM docs WHERE content MATCH_PHRASE 'full-text search';
+
+-- Boolean query with SEARCH
+SELECT * FROM docs
+WHERE SEARCH('title:apache AND (category:database OR tags:ANY(sql nosql))');
+
+-- Relevance-based ranking
+SELECT id, title, score() AS relevance
+FROM docs
+WHERE content MATCH_ANY 'real-time analytics OLAP'
+ORDER BY relevance DESC
+LIMIT 10;
+SELECT *,
+       score() AS relevance
+FROM search_demo
+WHERE content MATCH_ANY 'text search test'
+ORDER BY relevance DESC
+LIMIT 10;
+SELECT * FROM docs
+WHERE SEARCH('apple banana',
+             '{"default_field":"title","default_operator":"and","mode":"lucene"}');
+SELECT id, title FROM search_test_basic WHERE SEARCH('title:Machine');
+SELECT id, title FROM search_test_basic WHERE SEARCH('title:Python');
+SELECT id, title FROM search_test_basic WHERE SEARCH('category:Technology');
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(python javascript)');
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(machine learning tutorial)');
+
+-- Edge case: a single-value ANY is equivalent to a term query
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(python)');
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(machine learning)');
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(programming tutorial)');
+
+-- Edge case: a single-value ALL is equivalent to a term query
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(python)');
+SELECT id, title FROM search_test_basic
+WHERE SEARCH('title:Machine AND category:Technology');
+
+SELECT id, title FROM search_test_basic
+WHERE SEARCH('title:Python OR title:Data');
+
+SELECT id, title FROM search_test_basic
+WHERE SEARCH('category:Technology AND NOT title:Machine');
+SELECT id, title FROM search_test_basic
+WHERE SEARCH('(title:Machine OR title:Python) AND category:Technology');
+
+SELECT id, title FROM search_test_basic
+WHERE SEARCH('tags:ANY(python javascript) AND (category:Technology OR category:Programming)');
+-- Basic Lucene mode
+SELECT * FROM docs
+WHERE SEARCH('apple AND banana',
+             '{"default_field":"title","mode":"lucene"}');
+
+-- Use minimum_should_match
+SELECT * FROM docs
+WHERE SEARCH('apple AND banana OR cherry',
+             '{"default_field":"title","mode":"lucene","minimum_should_match":1}');
+SELECT id, title FROM search_test_basic
+WHERE SEARCH('content:"machine learning"');
+SELECT id, title FROM search_test_basic
+WHERE SEARCH('title:Python OR tags:ANY(database mysql) OR author:Alice');
+
+SELECT id, title FROM search_test_basic
+WHERE SEARCH('tags:ALL(tutorial) AND category:Technology');
+SELECT id, title FROM search_test_basic
+WHERE SEARCH('firstname:Chris*');
+
+-- Combine with the default field parameter
+SELECT id, firstname FROM people
+WHERE SEARCH('Chris*', 'firstname');
+SELECT id, title FROM corpus
+WHERE SEARCH('title:/data.+science/');
+SELECT id
+FROM t
+WHERE SEARCH('content:EXACT(machine learning)');
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha');
+-- Strict equality match (uses the non-tokenized index)
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning)')
+ORDER BY id;
+
+-- EXACT does not match partial terms
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine)')
+ORDER BY id;
+
+-- ANY/ALL use the tokenized index
+SELECT id, content FROM t WHERE SEARCH('content:ANY(machine learning)') ORDER BY id;
+SELECT id, content FROM t WHERE SEARCH('content:ALL(machine learning)') ORDER BY id;
+
+-- Compare EXACT and ANY
+SELECT id, content FROM t WHERE SEARCH('content:EXACT(deep learning)') ORDER BY id;
+SELECT id, content FROM t WHERE SEARCH('content:ANY(deep learning)') ORDER BY id;
+-- Combined conditions
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning) OR content:ANY(intelligence)')
+ORDER BY id;
+
+-- Simplified form using a default field and default operator
+SELECT id, tags
+FROM tag_dataset
+WHERE SEARCH('deep learning', 'tags', 'and'); -- Automatically expands to tags:ALL(deep learning)
+
+-- Use a phrase and a wildcard together
+SELECT id, content FROM t
+WHERE SEARCH('content:"deep learning" OR content:AI*')
+ORDER BY id;
+-- Search for a value containing a space as a single term
+SELECT * FROM docs WHERE SEARCH('title:First\\ Value');
+
+-- Search for a value containing parentheses
+SELECT * FROM docs WHERE SEARCH('title:hello\\(world\\)');
+
+-- Search for a value containing a colon
+SELECT * FROM docs WHERE SEARCH('title:key\\:value');
+-- Filter by range using SQL
+SELECT * FROM t WHERE created_at >= '2024-01-01';
+SELECT * FROM table_name WHERE content MATCH_ANY 'keyword1 keyword2';
+SELECT * FROM table_name WHERE content MATCH_ALL 'keyword1 keyword2';
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2';
+-- Allow up to 3 words between keyword1 and keyword2
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3';
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3+';
+-- The last word matches by prefix
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1 key';
+
+-- A single word degenerates into a prefix match
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1';
+SELECT * FROM table_name WHERE content MATCH_PHRASE_EDGE 'search engine optim';
+SELECT * FROM table_name WHERE content MATCH_REGEXP '^key_word.*';
+-- Range query
+SELECT * FROM t WHERE price >= 100 AND price < 200;
+
+-- Set query
+SELECT * FROM t WHERE tags IN ('a', 'b', 'c');
+
+-- Array query
+SELECT * FROM t WHERE array_contains(attributes, 'color');
+SELECT count() FROM table1 WHERE message LIKE '%error%';
+SELECT
+    product_id,
+    any_value(product_title),
+    AVG(star_rating) AS rating,
+    COUNT() AS count
+FROM
+    amazon_reviews
+WHERE
+    review_body LIKE '%is super awesome%'
+GROUP BY
+    product_id
+ORDER BY
+    count DESC,
+    rating DESC,
+    product_id
+LIMIT 5;
+-- Query all columns
+SELECT * FROM tbl_point_query WHERE k = 100;
+
+-- Query a subset of columns
+SELECT k, v1, v3, v5, v7 FROM tbl_point_query WHERE k = 100;
+SELECT * FROM tbl_duplicate WHERE k < 10 ORDER BY k LIMIT 10;
+SELECT * FROM S3 (
+      "uri" = "s3://your_bucket/path/to/tvf_test/test.parquet",
+      "format" = "parquet",
+      "s3.endpoint" = "https://s3.us-east-1.amazonaws.com",
+      "s3.region" = "us-east-1",
+      "s3.role_arn" = "<your-bucket-role-arn>",
+      "s3.external_id" = "<your-external-id>"      -- 可选参数
+  )
+;
+-- 等价于 3.0.4 版本前的 SHOW CACHE HOTSPOT "/"
+WITH t1 AS (
+    SELECT
+        cluster_id,
+        cluster_name,
+        table_id,
+        table_name,
+        insert_day,
+        SUM(query_per_day) AS query_per_day_total,
+        SUM(query_per_week) AS query_per_week_total
+    FROM __internal_schema.cloud_cache_hotspot
+    GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+    cluster_id AS ComputeGroupId,
+    cluster_name AS ComputeGroupName,
+    table_id AS TableId,
+    table_name AS TableName
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (
+            PARTITION BY cluster_id
+            ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+        ) AS dr2,
+        *
+    FROM t1
+) t2
+WHERE dr2 = 1;
+-- 等价于 3.0.4 版本前的 SHOW CACHE HOTSPOT '/compute_group_name0'
+WITH t1 AS (
+    SELECT
+        cluster_id,
+        cluster_name,
+        table_id,
+        table_name,
+        insert_day,
+        SUM(query_per_day) AS query_per_day_total,
+        SUM(query_per_week) AS query_per_week_total
+    FROM __internal_schema.cloud_cache_hotspot
+    WHERE cluster_name = "compute_group_name0" -- 替换为实际的计算组名称，例如 "default_compute_group"
+    GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+    cluster_id AS ComputeGroupId,
+    cluster_name AS ComputeGroupName,
+    table_id AS TableId,
+    table_name AS TableName
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (
+            PARTITION BY cluster_id
+            ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+        ) AS dr2,
+        *
+    FROM t1
+) t2
+WHERE dr2 = 1;
+-- 1. 验证聚合是否生效（相同 dt+site_id 的指标是否合并）
+SELECT dt, site_id, pv, uv FROM site_metrics ORDER BY dt DESC LIMIT 10;
+
+-- 2. 验证分区裁剪是否生效
+EXPLAIN SELECT * FROM site_metrics WHERE dt = '2024-01-01';
+EXPLAIN SELECT * FROM your_table WHERE filter_column = 'xxx';
+-- 查看是否走 Sort Key 索引
+;
+-- 可通过 SHOW BACKENDS; 获取 backend_id
+SELECT * FROM local(
+    "file_path" = "data/my_dataset.lance/data/*.lance",
+    "backend_id" = "<backend_id>",
+    "format" = "lance"
+) ORDER BY id LIMIT 10;
+SELECT 'gauge' AS type, metric_name FROM otel.otel_metrics_gauge WHERE metric_name = '你的指标名' LIMIT 1
+UNION ALL
+SELECT 'sum', metric_name FROM otel.otel_metrics_sum WHERE metric_name = '你的指标名' LIMIT 1
+UNION ALL
+SELECT 'histogram', metric_name FROM otel.otel_metrics_histogram WHERE metric_name = '你的指标名' LIMIT 1;
+-- 统计各品类的订单量和销售额
+SELECT 
+    p.category_name,
+    p.brand_name,
+    COUNT(DISTINCT o.order_id) as order_count,
+    SUM(o.quantity) as total_quantity,
+    SUM(o.actual_price * o.quantity) as total_amount
+FROM orders o
+LEFT JOIN products p ON o.product_id = p.product_id
+WHERE o.order_time >= '2024-02-22 00:00:00'
+GROUP BY p.category_name, p.brand_name
+ORDER BY total_amount DESC;
+-- 命中 mv1
+    select 
+        abs(k1)+k2+1,
+        sum(abs(k2+2)+k3+3) 
+    from 
+        d_table 
+    group by 
+        abs(k1)+k2+1;
+        
+    -- 命中 mv1
+    select 
+        bin(abs(k1)+k2+1),
+        sum(abs(k2+2)+k3+3) 
+    from 
+        d_table 
+    group by 
+        bin(abs(k1)+k2+1);
+    
+    -- 命中 mv2
+    select 
+        year(k4) + month(k4) 
+    from 
+        d_table 
+    where 
+        year(k4) = 2020;
+    
+    -- 命中原始表 d_table，不会命中 mv2，因为 where 条件不匹配
+    select 
+        year(k4),
+        month(k4) 
+    from 
+        d_table;
+-- 查询 A
+SELECT region, SUM(revenue) FROM orders
+WHERE dt >= '2024-01-01' AND dt < '2024-01-03' GROUP BY region;
+
+-- 查询 B
+SELECT region, SUM(revenue) FROM orders
+WHERE dt >= '2024-01-02' AND dt < '2024-01-04' GROUP BY region;
+-- 第一次执行：缓存未命中，计算结果并写入缓存
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+
+-- 第二次执行：缓存命中，直接从缓存返回结果
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+-- 强制右表 Broadcast 分发
+SELECT COUNT(*) FROM t2 JOIN [broadcast] t1 ON t1.c1 = t2.c2;
+
+-- 强制右表 Shuffle 分发
+SELECT COUNT(*) FROM t2 JOIN [shuffle] t1 ON t1.c1 = t2.c2;
+------------------------------------------------------------------------------------------
+[SELECT] select * from records_tbl order by user_id, name limit 100;
+----------
+[SELECT] select * from records_tbl order by user_id, name limit 100 offset 100;
+----------
+[SELECT] select user_id, name, address, city, nation, region, phone, mktsegment
+    from records_tbl2, (select unique_value as max_value from records_tbl2 order by unique_value limit 1 offset 9999) as previous_data
+    where records_tbl2.unique_value > previous_data.max_value
+    order by unique_value limit 100;
+----------
+[SELECT] -- Exact phrase search
+SELECT * FROM docs WHERE content MATCH_PHRASE 'inverted index';
+----------
+[SELECT] -- Prefix search
+SELECT * FROM docs WHERE content MATCH_PHRASE_PREFIX 'data ware';
+----------
+[SELECT] SELECT id, title, score() AS relevance
+FROM docs
+WHERE content MATCH_ANY 'real-time OLAP analytics'
+ORDER BY relevance DESC
+LIMIT 10;
+----------
+[SELECT] SELECT id, title, score() AS relevance
+FROM docs
+WHERE SEARCH('title:Machine AND tags:ANY(database sql)')
+ORDER BY relevance DESC
+LIMIT 20;
+----------
+[SELECT] -- Simple keyword search
+SELECT * FROM docs WHERE content MATCH_ANY 'apache doris';
+----------
+[SELECT] -- Phrase search
+SELECT * FROM docs WHERE content MATCH_PHRASE 'full-text search';
+----------
+[SELECT] -- Boolean query with SEARCH
+SELECT * FROM docs
+WHERE SEARCH('title:apache AND (category:database OR tags:ANY(sql nosql))');
+----------
+[SELECT] -- Relevance-based ranking
+SELECT id, title, score() AS relevance
+FROM docs
+WHERE content MATCH_ANY 'real-time analytics OLAP'
+ORDER BY relevance DESC
+LIMIT 10;
+----------
+[SELECT] SELECT *,
+       score() AS relevance
+FROM search_demo
+WHERE content MATCH_ANY 'text search test'
+ORDER BY relevance DESC
+LIMIT 10;
+----------
+[SELECT] SELECT * FROM docs
+WHERE SEARCH('apple banana',
+             '{"default_field":"title","default_operator":"and","mode":"lucene"}');
+----------
+[SELECT] SELECT id, title FROM search_test_basic WHERE SEARCH('title:Machine');
+----------
+[SELECT] SELECT id, title FROM search_test_basic WHERE SEARCH('title:Python');
+----------
+[SELECT] SELECT id, title FROM search_test_basic WHERE SEARCH('category:Technology');
+----------
+[SELECT] SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(python javascript)');
+----------
+[SELECT] SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(machine learning tutorial)');
+----------
+[SELECT] -- Edge case: a single-value ANY is equivalent to a term query
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(python)');
+----------
+[SELECT] SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(machine learning)');
+----------
+[SELECT] SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(programming tutorial)');
+----------
+[SELECT] -- Edge case: a single-value ALL is equivalent to a term query
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(python)');
+----------
+[SELECT] SELECT id, title FROM search_test_basic
+WHERE SEARCH('title:Machine AND category:Technology');
+----------
+[SELECT] SELECT id, title FROM search_test_basic
+WHERE SEARCH('title:Python OR title:Data');
+----------
+[SELECT] SELECT id, title FROM search_test_basic
+WHERE SEARCH('category:Technology AND NOT title:Machine');
+----------
+[SELECT] SELECT id, title FROM search_test_basic
+WHERE SEARCH('(title:Machine OR title:Python) AND category:Technology');
+----------
+[SELECT] SELECT id, title FROM search_test_basic
+WHERE SEARCH('tags:ANY(python javascript) AND (category:Technology OR category:Programming)');
+----------
+[SELECT] -- Basic Lucene mode
+SELECT * FROM docs
+WHERE SEARCH('apple AND banana',
+             '{"default_field":"title","mode":"lucene"}');
+----------
+[SELECT] -- Use minimum_should_match
+SELECT * FROM docs
+WHERE SEARCH('apple AND banana OR cherry',
+             '{"default_field":"title","mode":"lucene","minimum_should_match":1}');
+----------
+[SELECT] SELECT id, title FROM search_test_basic
+WHERE SEARCH('content:"machine learning"');
+----------
+[SELECT] SELECT id, title FROM search_test_basic
+WHERE SEARCH('title:Python OR tags:ANY(database mysql) OR author:Alice');
+----------
+[SELECT] SELECT id, title FROM search_test_basic
+WHERE SEARCH('tags:ALL(tutorial) AND category:Technology');
+----------
+[SELECT] SELECT id, title FROM search_test_basic
+WHERE SEARCH('firstname:Chris*');
+----------
+[SELECT] -- Combine with the default field parameter
+SELECT id, firstname FROM people
+WHERE SEARCH('Chris*', 'firstname');
+----------
+[SELECT] SELECT id, title FROM corpus
+WHERE SEARCH('title:/data.+science/');
+----------
+[SELECT] SELECT id
+FROM t
+WHERE SEARCH('content:EXACT(machine learning)');
+----------
+[SELECT] SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha');
+----------
+[SELECT] -- Strict equality match (uses the non-tokenized index)
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning)')
+ORDER BY id;
+----------
+[SELECT] -- EXACT does not match partial terms
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine)')
+ORDER BY id;
+----------
+[SELECT] -- ANY/ALL use the tokenized index
+SELECT id, content FROM t WHERE SEARCH('content:ANY(machine learning)') ORDER BY id;
+----------
+[SELECT] SELECT id, content FROM t WHERE SEARCH('content:ALL(machine learning)') ORDER BY id;
+----------
+[SELECT] -- Compare EXACT and ANY
+SELECT id, content FROM t WHERE SEARCH('content:EXACT(deep learning)') ORDER BY id;
+----------
+[SELECT] SELECT id, content FROM t WHERE SEARCH('content:ANY(deep learning)') ORDER BY id;
+----------
+[SELECT] -- Combined conditions
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning) OR content:ANY(intelligence)')
+ORDER BY id;
+----------
+[SELECT] -- Simplified form using a default field and default operator
+SELECT id, tags
+FROM tag_dataset
+WHERE SEARCH('deep learning', 'tags', 'and');
+----------
+[SELECT] -- Use a phrase and a wildcard together
+SELECT id, content FROM t
+WHERE SEARCH('content:"deep learning" OR content:AI*')
+ORDER BY id;
+----------
+[SELECT] -- Search for a value containing a space as a single term
+SELECT * FROM docs WHERE SEARCH('title:First\\ Value');
+----------
+[SELECT] -- Search for a value containing parentheses
+SELECT * FROM docs WHERE SEARCH('title:hello\\(world\\)');
+----------
+[SELECT] -- Search for a value containing a colon
+SELECT * FROM docs WHERE SEARCH('title:key\\:value');
+----------
+[SELECT] -- Filter by range using SQL
+SELECT * FROM t WHERE created_at >= '2024-01-01';
+----------
+[SELECT] SELECT * FROM table_name WHERE content MATCH_ANY 'keyword1 keyword2';
+----------
+[SELECT] SELECT * FROM table_name WHERE content MATCH_ALL 'keyword1 keyword2';
+----------
+[SELECT] SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2';
+----------
+[SELECT] -- Allow up to 3 words between keyword1 and keyword2
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3';
+----------
+[SELECT] SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3+';
+----------
+[SELECT] -- The last word matches by prefix
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1 key';
+----------
+[SELECT] -- A single word degenerates into a prefix match
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1';
+----------
+[SELECT] SELECT * FROM table_name WHERE content MATCH_PHRASE_EDGE 'search engine optim';
+----------
+[SELECT] SELECT * FROM table_name WHERE content MATCH_REGEXP '^key_word.*';
+----------
+[SELECT] -- Range query
+SELECT * FROM t WHERE price >= 100 AND price < 200;
+----------
+[SELECT] -- Set query
+SELECT * FROM t WHERE tags IN ('a', 'b', 'c');
+----------
+[SELECT] -- Array query
+SELECT * FROM t WHERE array_contains(attributes, 'color');
+----------
+[SELECT] SELECT count() FROM table1 WHERE message LIKE '%error%';
+----------
+[SELECT] SELECT
+    product_id,
+    any_value(product_title),
+    AVG(star_rating) AS rating,
+    COUNT() AS count
+FROM
+    amazon_reviews
+WHERE
+    review_body LIKE '%is super awesome%'
+GROUP BY
+    product_id
+ORDER BY
+    count DESC,
+    rating DESC,
+    product_id
+LIMIT 5;
+----------
+[SELECT] -- Query all columns
+SELECT * FROM tbl_point_query WHERE k = 100;
+----------
+[SELECT] -- Query a subset of columns
+SELECT k, v1, v3, v5, v7 FROM tbl_point_query WHERE k = 100;
+----------
+[SELECT] SELECT * FROM tbl_duplicate WHERE k < 10 ORDER BY k LIMIT 10;
+----------
+[SELECT|DATA_IMPORT] SELECT * FROM S3 (
+      "uri" = "s3://your_bucket/path/to/tvf_test/test.parquet",
+      "format" = "parquet",
+      "s3.endpoint" = "https://s3.us-east-1.amazonaws.com",
+      "s3.region" = "us-east-1",
+      "s3.role_arn" = "<your-bucket-role-arn>",
+      "s3.external_id" = "<your-external-id>"      -- 可选参数
+  )
+----------
+[SELECT] -- 等价于 3.0.4 版本前的 SHOW CACHE HOTSPOT "/"
+WITH t1 AS (
+    SELECT
+        cluster_id,
+        cluster_name,
+        table_id,
+        table_name,
+        insert_day,
+        SUM(query_per_day) AS query_per_day_total,
+        SUM(query_per_week) AS query_per_week_total
+    FROM __internal_schema.cloud_cache_hotspot
+    GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+    cluster_id AS ComputeGroupId,
+    cluster_name AS ComputeGroupName,
+    table_id AS TableId,
+    table_name AS TableName
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (
+            PARTITION BY cluster_id
+            ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+        ) AS dr2,
+        *
+    FROM t1
+) t2
+WHERE dr2 = 1;
+----------
+[SELECT] -- 等价于 3.0.4 版本前的 SHOW CACHE HOTSPOT '/compute_group_name0'
+WITH t1 AS (
+    SELECT
+        cluster_id,
+        cluster_name,
+        table_id,
+        table_name,
+        insert_day,
+        SUM(query_per_day) AS query_per_day_total,
+        SUM(query_per_week) AS query_per_week_total
+    FROM __internal_schema.cloud_cache_hotspot
+    WHERE cluster_name = "compute_group_name0" -- 替换为实际的计算组名称，例如 "default_compute_group"
+    GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+    cluster_id AS ComputeGroupId,
+    cluster_name AS ComputeGroupName,
+    table_id AS TableId,
+    table_name AS TableName
+FROM (
+    SELECT
+        ROW_NUMBER() OVER (
+            PARTITION BY cluster_id
+            ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+        ) AS dr2,
+        *
+    FROM t1
+) t2
+WHERE dr2 = 1;
+----------
+[SELECT] -- 1. 验证聚合是否生效（相同 dt+site_id 的指标是否合并）
+SELECT dt, site_id, pv, uv FROM site_metrics ORDER BY dt DESC LIMIT 10;
+----------
+[SELECT] -- 2. 验证分区裁剪是否生效
+EXPLAIN SELECT * FROM site_metrics WHERE dt = '2024-01-01';
+----------
+[SELECT] EXPLAIN SELECT * FROM your_table WHERE filter_column = 'xxx';
+----------
+[SELECT|DATA_IMPORT] -- 可通过 SHOW BACKENDS; 获取 backend_id
+SELECT * FROM local(
+    "file_path" = "data/my_dataset.lance/data/*.lance",
+    "backend_id" = "<backend_id>",
+    "format" = "lance"
+) ORDER BY id LIMIT 10;
+----------
+[SELECT] SELECT 'gauge' AS type, metric_name FROM otel.otel_metrics_gauge WHERE metric_name = '你的指标名' LIMIT 1
+UNION ALL
+SELECT 'sum', metric_name FROM otel.otel_metrics_sum WHERE metric_name = '你的指标名' LIMIT 1
+UNION ALL
+SELECT 'histogram', metric_name FROM otel.otel_metrics_histogram WHERE metric_name = '你的指标名' LIMIT 1;
+----------
+[SELECT] -- 统计各品类的订单量和销售额
+SELECT 
+    p.category_name,
+    p.brand_name,
+    COUNT(DISTINCT o.order_id) as order_count,
+    SUM(o.quantity) as total_quantity,
+    SUM(o.actual_price * o.quantity) as total_amount
+FROM orders o
+LEFT JOIN products p ON o.product_id = p.product_id
+WHERE o.order_time >= '2024-02-22 00:00:00'
+GROUP BY p.category_name, p.brand_name
+ORDER BY total_amount DESC;
+----------
+[SELECT] select 
+        abs(k1)+k2+1,
+        sum(abs(k2+2)+k3+3) 
+    from 
+        d_table 
+    group by 
+        abs(k1)+k2+1;
+----------
+[SELECT] select 
+        bin(abs(k1)+k2+1),
+        sum(abs(k2+2)+k3+3) 
+    from 
+        d_table 
+    group by 
+        bin(abs(k1)+k2+1);
+----------
+[SELECT] select 
+        year(k4) + month(k4) 
+    from 
+        d_table 
+    where 
+        year(k4) = 2020;
+----------
+[SELECT] select 
+        year(k4),
+        month(k4) 
+    from 
+        d_table;
+----------
+[SELECT] -- 查询 A
+SELECT region, SUM(revenue) FROM orders
+WHERE dt >= '2024-01-01' AND dt < '2024-01-03' GROUP BY region;
+----------
+[SELECT] -- 查询 B
+SELECT region, SUM(revenue) FROM orders
+WHERE dt >= '2024-01-02' AND dt < '2024-01-04' GROUP BY region;
+----------
+[SELECT] -- 第一次执行：缓存未命中，计算结果并写入缓存
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+----------
+[SELECT] -- 第二次执行：缓存命中，直接从缓存返回结果
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+----------
+[SELECT] -- 强制右表 Broadcast 分发
+SELECT COUNT(*) FROM t2 JOIN [broadcast] t1 ON t1.c1 = t2.c2;
+----------
+[SELECT] -- 强制右表 Shuffle 分发
+SELECT COUNT(*) FROM t2 JOIN [shuffle] t1 ON t1.c1 = t2.c2;

@@ -1,0 +1,548 @@
+-- Schema publication that does not include the schema that has the parent table
+CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch2 WITH (PUBLISH_VIA_PARTITION_ROOT=1)
+;
+CREATE PUBLICATION tap_pub_toast FOR TABLE tab_rowfilter_toast WHERE (a = repeat('1234567890', 200) AND b < '10')
+;
+CREATE OR REPLACE FUNCTION numeric_pl_pg_lsn(numeric, pg_lsn)
+ RETURNS pg_lsn
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+create schema if not exists abc authorization current_role
+;
+-- ok - can use row filter for partition
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 WHERE (a > 99)
+;
+CREATE PUBLICATION testpub6 FOR TABLES IN SCHEMA testpub_rf_schema2
+;
+ALTER PUBLICATION testpub_fortable_insert ADD TABLE testpub_tbl5 (b, c)
+;
+CREATE OR REPLACE FUNCTION xpath(text, xml)
+ RETURNS xml[]
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN xpath($1, $2, '{}'::text[])
+;
+-- Switch type to use typanalyze function that always returns false.
+ALTER TYPE int_custom SET (ANALYZE = int_custom_typanalyze_false)
+;
+-- check that non-commutable hash clauses do not lead to error
+alter operator = (int8, int8alias1) set (hashes)
+;
+CREATE FUNCTION _pg_truetypid(pg_attribute, pg_type) RETURNS oid
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN CASE WHEN $2.typtype = 'd' THEN $2.typbasetype ELSE $1.atttypid END
+;
+CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(false_positive_rate = 0.00009)
+)
+;
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb
+;
+CREATE TABLE split_table_idx.base_inherit (
+    id integer NOT NULL,
+    code text UNIQUE NULLS NOT DISTINCT,
+    period tstzrange NOT NULL,
+    EXCLUDE USING gist (id WITH =, period WITH &&)
+)
+;
+-- Partitioned table with relam at 0
+ALTER TABLE am_partitioned SET ACCESS METHOD DEFAULT
+;
+CREATE OR REPLACE FUNCTION heap_page_item_attrs(IN page bytea, IN rel_oid regclass,
+    OUT lp smallint,
+    OUT lp_off smallint,
+    OUT lp_flags smallint,
+    OUT lp_len smallint,
+    OUT t_xmin xid,
+    OUT t_xmax xid,
+    OUT t_field3 int4,
+    OUT t_ctid tid,
+    OUT t_infomask2 integer,
+    OUT t_infomask integer,
+    OUT t_hoff smallint,
+    OUT t_bits text,
+    OUT t_oid oid,
+    OUT t_attrs bytea[]
+    )
+RETURNS SETOF record
+LANGUAGE SQL PARALLEL RESTRICTED
+BEGIN ATOMIC
+SELECT * FROM heap_page_item_attrs(page, rel_oid, false);
+END
+;
+-- test LIKE INCLUDING COMPRESSION
+CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION)
+;
+ALTER TYPE myvarchar SET (
+        send = myvarcharsend,
+        receive = myvarcharrecv
+    )
+;
+CREATE FUNCTION dump_test.ordering_func ()
+			RETURNS SETOF dump_test.ordering_table
+			LANGUAGE sql BEGIN ATOMIC
+			SELECT * FROM dump_test.ordering_table GROUP BY id; END
+;
+CREATE TABLE UNIQUE_TBL (i int UNIQUE NULLS NOT DISTINCT, t text)
+;
+CREATE OR REPLACE FUNCTION earth_box(earth, float8)
+RETURNS public.cube
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN public.cube_enlarge($1, gc_to_sec($2), 3)
+;
+CREATE OR REPLACE FUNCTION polygon(circle)
+ RETURNS polygon
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN polygon(12, $1)
+;
+-- alter publication drop schema
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test2
+;
+ALTER PUBLICATION testpub_tbl9 ADD TABLE public.testpub_tbl7(a)
+;
+CREATE OR REPLACE FUNCTION translate( citext, citext, text ) RETURNS TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.translate( pg_catalog.translate( $1::text, pg_catalog.lower($2::text), $3), pg_catalog.upper($2::text), $3)
+;
+ALTER PUBLICATION split_pub_cols ADD TABLE split_fdw_repl.accounts_extra WHERE (amount >= 10)
+;
+CREATE FUNCTION _pg_numeric_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE $1
+         WHEN 21 /*int2*/ THEN 16
+         WHEN 23 /*int4*/ THEN 32
+         WHEN 20 /*int8*/ THEN 64
+         WHEN 1700 /*numeric*/ THEN
+              CASE WHEN $2 = -1
+                   THEN null
+                   ELSE (($2 - 4) >> 16) & 0xFFFF
+                   END
+         WHEN 700 /*float4*/ THEN 24 /*FLT_MANT_DIG*/
+         WHEN 701 /*float8*/ THEN 53 /*DBL_MANT_DIG*/
+         ELSE null
+  END
+;
+ALTER TABLE range_parted2 DETACH PARTITION part_rp CONCURRENTLY
+;
+ALTER PUBLICATION pub8 ADD TABLE test_part_c_1 (a)
+;
+CREATE OR REPLACE FUNCTION
+  pg_freespace(rel regclass, blkno OUT bigint, avail OUT int2)
+RETURNS SETOF RECORD
+LANGUAGE SQL PARALLEL SAFE
+BEGIN ATOMIC
+  SELECT blkno, pg_freespace($1, blkno) AS avail
+  FROM generate_series('0'::bigint, pg_relation_size($1) / current_setting('block_size'::text)::bigint - '1'::bigint) AS blkno;
+END
+;
+ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    -- these are bogus, but it's safe as long as we don't use the type:
+    analyze = ts_typanalyze,
+    subscript = raw_array_subscript_handler
+)
+;
+ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl5 (a, a)
+;
+-- ok - conditional expressions are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl5 WHERE (a IS DOCUMENT)
+;
+CREATE OR REPLACE FUNCTION bit_length(bit)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN length($1)
+;
+/* Given an index's OID and an underlying-table column number, return the
+ * column's position in the index (NULL if not there) */
+CREATE FUNCTION _pg_index_position(oid, smallint) RETURNS int
+    LANGUAGE sql STRICT STABLE
+BEGIN ATOMIC
+SELECT (ss.a).n FROM
+  (SELECT information_schema._pg_expandarray(indkey) AS a
+   FROM pg_catalog.pg_index WHERE indexrelid = $1) ss
+  WHERE (ss.a).x = $2;
+END
+;
+CREATE FUNCTION functest_S_xx(x anyarray) RETURNS anyelement
+    LANGUAGE SQL
+    RETURN x[1]
+;
+DROP DATABASE IF EXISTS split_db_probe WITH (FORCE)
+;
+-- should be able to drop schema from 'FOR TABLE' publication
+ALTER PUBLICATION testpub_fortable DROP TABLES IN SCHEMA pub_test
+;
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA non_existent_schema
+;
+CREATE PUBLICATION testpub7 FOR TABLE testpub_rf_tbl6 WHERE (y > 100)
+;
+CREATE PUBLICATION pub1 for table t1(c1, c2, c3)
+;
+CREATE OR REPLACE VIEW jsonb_table_view7 AS
+SELECT sub.* FROM s,
+	(values(23)) x(x),
+	generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y
+	COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[2]' COLUMNS (NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$' WITHOUT WRAPPER OMIT QUOTES)),
+		NESTED PATH '$.a.za[1]' COLUMNS (d json PATH '$ ? (@.z21[*] == ($"x" -1))' WITH WRAPPER),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' as z1 COLUMNS (a int PATH '$' KEEP QUOTES)),
+		NESTED PATH '$.a.za[1]' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" +121))' as z21 COLUMNS (b int PATH '$ ? (@ > ($"x" +111))' DEFAULT 0 ON EMPTY))
+	)) sub
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (a)
+;
+CREATE PUBLICATION tap_pub_4a FOR TABLE tab_rowfilter_4 WHERE (c % 2 = 0)
+;
+CREATE PUBLICATION testpub2_forschema FOR TABLES IN SCHEMA pub_test1, pub_test2, pub_test3
+;
+ALTER PUBLICATION tap_pub_3 ADD TABLE tab_rowfilter_less_10k WHERE (a < 6000)
+;
+CREATE PUBLICATION pub3 FOR TABLE tab5 (a, b)
+;
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, e)
+;
+-- Firstly, test using the option publish='insert' because the row filter
+-- validation of referenced columns is less strict than for delete/update.
+CREATE PUBLICATION testpub5 FOR TABLE testpub_rf_tbl1, testpub_rf_tbl2 WHERE (c <> 'test' AND d < 5) WITH (publish = 'insert')
+;
+CREATE PUBLICATION tap_pub_viaroot_2 FOR TABLE tab_rowfilter_viaroot_part_1 WHERE (a < 15) WITH (publish_via_partition_root)
+;
+------------------------------------------------------------------------------------------
+[CREATE_PUB_SUB] -- Schema publication that does not include the schema that has the parent table
+CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch2 WITH (PUBLISH_VIA_PARTITION_ROOT=1)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_toast FOR TABLE tab_rowfilter_toast WHERE (a = repeat('1234567890', 200) AND b < '10')
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION numeric_pl_pg_lsn(numeric, pg_lsn)
+ RETURNS pg_lsn
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN $2 + $1
+;
+----------
+[CREATE_SCHEMA] create schema if not exists abc authorization current_role
+;
+----------
+[ALTER_PUB_SUB] -- ok - can use row filter for partition
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 WHERE (a > 99)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub6 FOR TABLES IN SCHEMA testpub_rf_schema2
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable_insert ADD TABLE testpub_tbl5 (b, c)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION xpath(text, xml)
+ RETURNS xml[]
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN xpath($1, $2, '{}'::text[])
+;
+----------
+[ALTER_TYPE] -- Switch type to use typanalyze function that always returns false.
+ALTER TYPE int_custom SET (ANALYZE = int_custom_typanalyze_false)
+;
+----------
+[ALTER_PROG_OBJ] -- check that non-commutable hash clauses do not lead to error
+alter operator = (int8, int8alias1) set (hashes)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_truetypid(pg_attribute, pg_type) RETURNS oid
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN CASE WHEN $2.typtype = 'd' THEN $2.typbasetype ELSE $1.atttypid END
+;
+----------
+[ADD_INDEX] CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(false_positive_rate = 0.00009)
+)
+;
+----------
+[CREATE_VIEW(SELECT)] create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb
+;
+----------
+[CREATE_TABLE] CREATE TABLE split_table_idx.base_inherit (
+    id integer NOT NULL,
+    code text UNIQUE NULLS NOT DISTINCT,
+    period tstzrange NOT NULL,
+    EXCLUDE USING gist (id WITH =, period WITH &&)
+)
+;
+----------
+[ALTER_TABLE] -- Partitioned table with relam at 0
+ALTER TABLE am_partitioned SET ACCESS METHOD DEFAULT
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION heap_page_item_attrs(IN page bytea, IN rel_oid regclass,
+    OUT lp smallint,
+    OUT lp_off smallint,
+    OUT lp_flags smallint,
+    OUT lp_len smallint,
+    OUT t_xmin xid,
+    OUT t_xmax xid,
+    OUT t_field3 int4,
+    OUT t_ctid tid,
+    OUT t_infomask2 integer,
+    OUT t_infomask integer,
+    OUT t_hoff smallint,
+    OUT t_bits text,
+    OUT t_oid oid,
+    OUT t_attrs bytea[]
+    )
+RETURNS SETOF record
+LANGUAGE SQL PARALLEL RESTRICTED
+BEGIN ATOMIC
+SELECT * FROM heap_page_item_attrs(page, rel_oid, false);
+END
+;
+----------
+[CREATE_TABLE] -- test LIKE INCLUDING COMPRESSION
+CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION)
+;
+----------
+[ALTER_TYPE] ALTER TYPE myvarchar SET (
+        send = myvarcharsend,
+        receive = myvarcharrecv
+    )
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION dump_test.ordering_func ()
+			RETURNS SETOF dump_test.ordering_table
+			LANGUAGE sql BEGIN ATOMIC
+			SELECT * FROM dump_test.ordering_table GROUP BY id; END
+;
+----------
+[CREATE_TABLE] CREATE TABLE UNIQUE_TBL (i int UNIQUE NULLS NOT DISTINCT, t text)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION earth_box(earth, float8)
+RETURNS public.cube
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN public.cube_enlarge($1, gc_to_sec($2), 3)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION polygon(circle)
+ RETURNS polygon
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN polygon(12, $1)
+;
+----------
+[ALTER_PUB_SUB] -- alter publication drop schema
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test2
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_tbl9 ADD TABLE public.testpub_tbl7(a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION translate( citext, citext, text ) RETURNS TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.translate( pg_catalog.translate( $1::text, pg_catalog.lower($2::text), $3), pg_catalog.upper($2::text), $3)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION split_pub_cols ADD TABLE split_fdw_repl.accounts_extra WHERE (amount >= 10)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_numeric_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE $1
+         WHEN 21 /*int2*/ THEN 16
+         WHEN 23 /*int4*/ THEN 32
+         WHEN 20 /*int8*/ THEN 64
+         WHEN 1700 /*numeric*/ THEN
+              CASE WHEN $2 = -1
+                   THEN null
+                   ELSE (($2 - 4) >> 16) & 0xFFFF
+                   END
+         WHEN 700 /*float4*/ THEN 24 /*FLT_MANT_DIG*/
+         WHEN 701 /*float8*/ THEN 53 /*DBL_MANT_DIG*/
+         ELSE null
+  END
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE range_parted2 DETACH PARTITION part_rp CONCURRENTLY
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub8 ADD TABLE test_part_c_1 (a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION
+  pg_freespace(rel regclass, blkno OUT bigint, avail OUT int2)
+RETURNS SETOF RECORD
+LANGUAGE SQL PARALLEL SAFE
+BEGIN ATOMIC
+  SELECT blkno, pg_freespace($1, blkno) AS avail
+  FROM generate_series('0'::bigint, pg_relation_size($1) / current_setting('block_size'::text)::bigint - '1'::bigint) AS blkno;
+END
+;
+----------
+[ALTER_TYPE] ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    -- these are bogus, but it's safe as long as we don't use the type:
+    analyze = ts_typanalyze,
+    subscript = raw_array_subscript_handler
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl5 (a, a)
+;
+----------
+[ALTER_PUB_SUB] -- ok - conditional expressions are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl5 WHERE (a IS DOCUMENT)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION bit_length(bit)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN length($1)
+;
+----------
+[CREATE_PROG_OBJ] /* Given an index's OID and an underlying-table column number, return the
+ * column's position in the index (NULL if not there) */
+CREATE FUNCTION _pg_index_position(oid, smallint) RETURNS int
+    LANGUAGE sql STRICT STABLE
+BEGIN ATOMIC
+SELECT (ss.a).n FROM
+  (SELECT information_schema._pg_expandarray(indkey) AS a
+   FROM pg_catalog.pg_index WHERE indexrelid = $1) ss
+  WHERE (ss.a).x = $2;
+END
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_xx(x anyarray) RETURNS anyelement
+    LANGUAGE SQL
+    RETURN x[1]
+;
+----------
+[DROP_CATALOG] DROP DATABASE IF EXISTS split_db_probe WITH (FORCE)
+;
+----------
+[ALTER_PUB_SUB] -- should be able to drop schema from 'FOR TABLE' publication
+ALTER PUBLICATION testpub_fortable DROP TABLES IN SCHEMA pub_test
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA non_existent_schema
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub7 FOR TABLE testpub_rf_tbl6 WHERE (y > 100)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub1 for table t1(c1, c2, c3)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE OR REPLACE VIEW jsonb_table_view7 AS
+SELECT sub.* FROM s,
+	(values(23)) x(x),
+	generate_series(13, 13) y,
+	JSON_TABLE(js, '$' AS c1 PASSING x AS x, y AS y
+	COLUMNS (
+		xx1 int PATH '$.c',
+		NESTED PATH '$.a.za[2]' COLUMNS (NESTED PATH '$.z22[*]' as z22 COLUMNS (c int PATH '$' WITHOUT WRAPPER OMIT QUOTES)),
+		NESTED PATH '$.a.za[1]' COLUMNS (d json PATH '$ ? (@.z21[*] == ($"x" -1))' WITH WRAPPER),
+		NESTED PATH '$.a.za[0]' COLUMNS (NESTED PATH '$.z1[*] ? (@ >= ($"x" -2))' as z1 COLUMNS (a int PATH '$' KEEP QUOTES)),
+		NESTED PATH '$.a.za[1]' COLUMNS
+			(NESTED PATH '$.z21[*] ? (@ >= ($"y" +121))' as z21 COLUMNS (b int PATH '$ ? (@ > ($"x" +111))' DEFAULT 0 ON EMPTY))
+	)) sub
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (a)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_4a FOR TABLE tab_rowfilter_4 WHERE (c % 2 = 0)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub2_forschema FOR TABLES IN SCHEMA pub_test1, pub_test2, pub_test3
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION tap_pub_3 ADD TABLE tab_rowfilter_less_10k WHERE (a < 6000)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub3 FOR TABLE tab5 (a, b)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, e)
+;
+----------
+[CREATE_PUB_SUB] -- Firstly, test using the option publish='insert' because the row filter
+-- validation of referenced columns is less strict than for delete/update.
+CREATE PUBLICATION testpub5 FOR TABLE testpub_rf_tbl1, testpub_rf_tbl2 WHERE (c <> 'test' AND d < 5) WITH (publish = 'insert')
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_viaroot_2 FOR TABLE tab_rowfilter_viaroot_part_1 WHERE (a < 15) WITH (publish_via_partition_root)
+;

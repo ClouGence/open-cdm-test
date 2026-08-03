@@ -1,0 +1,127 @@
+plugins {
+    id 'java-library'
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+def openCdmBackend = file(providers.gradleProperty('openCdmBackendDir')
+    .getOrElse('../open-cdm-copy-1/backend'))
+def openCdmProperties = new Properties()
+file("${openCdmBackend}/gradle.properties").withInputStream { input ->
+    openCdmProperties.load(input)
+}
+
+def openCdmVersion = System.getenv('CG_CLOUDDM_MAIN_VERSION') ?:
+    openCdmProperties.getProperty('cg.clouddm.main.version')
+def openCdm = { String moduleName ->
+    "com.cdmgr:${moduleName}:${openCdmVersion}"
+}
+
+ext {
+    JACKSON_VERSION = openCdmProperties.getProperty('cg.lib.jackson.version')
+    SLF4J_VERSION = openCdmProperties.getProperty('cg.lib.slf4j.version')
+}
+
+group = 'com.cdmgr'
+version = openCdmVersion
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 17
+    options.encoding = 'UTF-8'
+    if (!options.compilerArgs.contains('-parameters')) {
+        options.compilerArgs << '-parameters'
+    }
+}
+
+dependencies {
+    // Modules are resolved from the sibling open-cdm source tree by settings.gradle.
+    testImplementation openCdm('cgdm-plugin-sdk')
+    testImplementation openCdm('cgdm-console')
+    testImplementation openCdm('cgdm-share-libs')
+    testImplementation openCdm('cg-schema')
+    testImplementation openCdm('plus-sec-rules')
+    testImplementation openCdm('cg-detectrule')
+    testImplementation openCdm('cg-dslparser')
+
+    testImplementation openCdm('dsc-common')
+    testImplementation openCdm('dsc-common-mysql')
+    testImplementation openCdm('dsc-common-oracle')
+    testImplementation openCdm('dsc-common-postgres')
+    testImplementation openCdm('dsc-common-db2')
+    testImplementation openCdm('sql-mysql')
+    testImplementation openCdm('sql-oracle')
+    testImplementation openCdm('sql-postgres')
+    testImplementation openCdm('sql-sqlserver')
+    testImplementation openCdm('sql-doris')
+    testImplementation openCdm('sql-redis')
+    testImplementation openCdm('sql-mongodb')
+    testImplementation openCdm('sql-iso-sql92')
+    testImplementation openCdm('sql-iso-sql99')
+    testImplementation openCdm('sql-iso-sql2003')
+
+    testImplementation openCdm('ds-mysql')
+    testImplementation openCdm('ds-mariadb')
+    testImplementation openCdm('ds-adb')
+    testImplementation openCdm('ds-oceanbase')
+    testImplementation openCdm('ds-tidb')
+    testImplementation openCdm('ds-postgres')
+    testImplementation openCdm('ds-greenplum')
+    testImplementation openCdm('ds-polardb')
+    testImplementation openCdm('ds-oracle')
+    testImplementation openCdm('ds-dameng')
+    testImplementation openCdm('ds-db2')
+    testImplementation openCdm('ds-sqlserver')
+    testImplementation openCdm('ds-hana')
+    testImplementation openCdm('ds-gauss')
+    testImplementation openCdm('ds-doris')
+    testImplementation openCdm('ds-maxcompute')
+    testImplementation openCdm('ds-starrocks')
+    testImplementation openCdm('ds-clickhouse')
+    testImplementation openCdm('ds-redis')
+    testImplementation openCdm('ds-hologres')
+    testImplementation openCdm('ds-mongodb')
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.13.4'
+    testImplementation "com.fasterxml.jackson.core:jackson-databind:${JACKSON_VERSION}"
+    testRuntimeOnly "com.fasterxml.jackson.datatype:jackson-datatype-jsr310:${JACKSON_VERSION}"
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.13.4'
+    testRuntimeOnly "org.slf4j:slf4j-api:${SLF4J_VERSION}"
+    testRuntimeOnly 'com.mysql:mysql-connector-j:9.6.0'
+}
+
+test {
+    useJUnitPlatform()
+    testLogging {
+        showStandardStreams = true
+    }
+    filter {
+        includeTestsMatching 'com.clougence.test.UnifiedTest'
+    }
+    ['domain', 'datasource', 'version', 'resource', 'producers', 'workers', 'queueCapacity',
+     'antlrCacheSlots', 'antlrMaxSlotsPerKey', 'antlrMaxDfaStatesPerSlot'].each { name ->
+        def value = System.getProperty("test.${name}")
+        if (value != null) {
+            systemProperty "test.${name}", value
+        }
+    }
+}
+
+tasks.register('runTests', JavaExec) {
+    group = 'verification'
+    description = 'Runs the standalone SQL test framework without JUnit.'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.clougence.test.TestMain'
+    def configuredArgs = providers.gradleProperty('testArgs').getOrElse('').trim()
+    if (!configuredArgs.isEmpty()) {
+        args configuredArgs.split(/\s+/) as List
+    }
+}
+
+description = 'open-cdm-test'

@@ -1,0 +1,512 @@
+ALTER TEXT SEARCH DICTIONARY xsyn (RULES='xsyn_sample', KEEPORIG=false, MATCHORIG=false, KEEPSYNONYMS=false, MATCHSYNONYMS=false)
+;
+-- Add a trigger to catch and print the contents of the catalog view
+-- pg_stat_progress_copy during data insertion.  This allows to test
+-- the validation of some progress reports for COPY FROM where the trigger
+-- would fire.
+create function notice_after_tab_progress_reporting() returns trigger AS
+$$
+declare report record;
+begin
+  -- The fields ignored here are the ones that may not remain
+  -- consistent across multiple runs.  The sizes reported may differ
+  -- across platforms, so just check if these are strictly positive.
+  with progress_data as (
+    select
+       relid::regclass::text as relname,
+       command,
+       type,
+       bytes_processed > 0 as has_bytes_processed,
+       bytes_total > 0 as has_bytes_total,
+       tuples_processed,
+       tuples_excluded
+      from pg_stat_progress_copy
+      where pid = pg_backend_pid())
+  select into report (to_jsonb(r)) as value
+    from progress_data r;
+
+  raise info 'progress: %', report.value::text;
+  return new;
+end;
+$$ language plpgsql
+;
+-- but DETACH is allowed, and DROP afterwards works
+ALTER TABLE droppk2 DETACH PARTITION droppk21
+;
+vacuum gin_test_tbl
+;
+ALTER TABLE fktable ADD CONSTRAINT fk_1_3
+FOREIGN KEY (x1) REFERENCES pktable(id3)
+;
+CREATE DOMAIN "generated_stored_tests"."gtestdomainnn" AS integer
+	CONSTRAINT "gtestdomainnn_check" CHECK ((VALUE IS NOT NULL))
+;
+CREATE FUNCTION armor(bytea, text[], text[])
+RETURNS text
+AS '$libdir/pgcrypto', 'pg_armor'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+CREATE OPERATOR #># (
+       LEFTARG = hstore,
+       RIGHTARG = hstore,
+       PROCEDURE = hstore_gt,
+       COMMUTATOR = #<#,
+       NEGATOR = #<=#,
+       RESTRICT = scalargtsel,
+       JOIN = scalargtjoinsel
+)
+;
+CREATE PROCEDURE ptest7(a text, b text)
+LANGUAGE SQL
+AS $$
+SELECT a = b;
+$$
+;
+CREATE FUNCTION "public"."hobby_construct_named"("name" "text", "hobby" "text") RETURNS "public"."hobbies_r"
+    LANGUAGE "sql"
+    AS $$select name, hobby$$
+;
+CREATE TABLE B (
+	BID integer not null,
+	AID integer not null,
+	Col2 integer,
+	PRIMARY KEY (BID),
+	FOREIGN KEY (AID) REFERENCES A(AID)
+  )
+;
+-- cidr check
+
+CREATE TABLE cidrtmp AS
+  SELECT cidr(a) AS a FROM inettmp
+;
+CREATE TABLE t AS SELECT g, g + 1 FROM generate_series(1,10) g(g)
+;
+-- moving-aggregate options
+
+CREATE AGGREGATE sumdouble (float8)
+(
+    stype = float8,
+    sfunc = float8pl,
+    mstype = float8,
+    msfunc = float8pl,
+    minvfunc = float8mi
+)
+;
+-- test search template
+DROP TEXT SEARCH TEMPLATE test_tstemplate_exists
+;
+DROP FUNCTION fn_x_before()
+;
+-- fails
+DROP TABLE tid_part
+;
+CREATE TABLE mytable (key int PRIMARY KEY, value text)
+;
+CREATE FUNCTION split_typeconv.mytext_eq_text(
+    left_value split_typeconv.mytext,
+    right_value text
+)
+RETURNS boolean
+LANGUAGE SQL
+IMMUTABLE
+AS $$ SELECT false $$
+;
+-- Valid BEFORE statement VIEW triggers
+CREATE TRIGGER before_ins_stmt_trig BEFORE INSERT ON main_view
+FOR EACH STATEMENT EXECUTE PROCEDURE view_trigger('before_view_ins_stmt')
+;
+CREATE FUNCTION trig_row_before_insupdate() RETURNS TRIGGER AS $$
+  BEGIN
+    NEW.f2 := NEW.f2 || ' triggered !';
+    RETURN NEW;
+  END
+$$ language plpgsql
+;
+CREATE TABLE range_parted4_1 PARTITION OF range_parted4 FOR VALUES FROM (MINVALUE, MINVALUE, MINVALUE) TO (1, MAXVALUE, MAXVALUE)
+;
+ALTER TABLE T ADD COLUMN c_array TEXT[]
+                  DEFAULT '{"This", "is", "the", "real", "world"}',
+              ALTER COLUMN c_timestamp SET DEFAULT '1970-12-31 11:12:13',
+              ALTER COLUMN c_timestamp_null SET DEFAULT '2016-09-29 12:00:00'
+;
+VACUUM (SKIP_DATABASE_STATS, FREEZE) pg_catalog.pg_ts_dict
+;
+CREATE TABLE grantor_test2 ()
+;
+CREATE TABLE "public"."nummultirange_test" (
+    "nmr" "nummultirange"
+)
+;
+CREATE TRIGGER "tg_slotlink_a" AFTER INSERT OR DELETE OR UPDATE ON "public"."iface" FOR EACH ROW EXECUTE FUNCTION "public"."tg_slotlink_a"('IF')
+;
+ALTER TABLE ONLY "regress_indexing"."pk" ATTACH PARTITION "regress_indexing"."pk2" FOR VALUES FROM (1000) TO (2000)
+;
+create trigger tg_backlink_a after insert or update or delete
+    on PLine for each row execute procedure tg_backlink_a('PL')
+;
+ALTER TABLE ONLY "public"."dropcolumn" DROP COLUMN "........pg.dropped.3........"
+;
+CREATE TRIGGER merge_aru AFTER UPDATE ON target FOR EACH ROW EXECUTE PROCEDURE merge_trigfunc ()
+;
+--
+-- REINDEX CONCURRENTLY
+--
+CREATE TABLE concur_reindex_tab (c1 int)
+;
+DROP TABLE ctl_stats3_child
+;
+-- fail
+TRUNCATE TABLE trunc_c,trunc_d,trunc_e,truncate_a,trunc_b
+;
+CREATE UNLOGGED TABLE ts1_unlogged (id int) TABLESPACE ts1
+;
+DROP FUNCTION comp()
+;
+CREATE VIEW pg_stat_xact_all_tables AS
+    SELECT
+            C.oid AS relid,
+            N.nspname AS schemaname,
+            C.relname AS relname,
+            pg_stat_get_xact_numscans(C.oid) AS seq_scan,
+            pg_stat_get_xact_tuples_returned(C.oid) AS seq_tup_read,
+            sum(pg_stat_get_xact_numscans(I.indexrelid))::bigint AS idx_scan,
+            sum(pg_stat_get_xact_tuples_fetched(I.indexrelid))::bigint +
+            pg_stat_get_xact_tuples_fetched(C.oid) AS idx_tup_fetch,
+            pg_stat_get_xact_tuples_inserted(C.oid) AS n_tup_ins,
+            pg_stat_get_xact_tuples_updated(C.oid) AS n_tup_upd,
+            pg_stat_get_xact_tuples_deleted(C.oid) AS n_tup_del,
+            pg_stat_get_xact_tuples_hot_updated(C.oid) AS n_tup_hot_upd,
+            pg_stat_get_xact_tuples_newpage_updated(C.oid) AS n_tup_newpage_upd
+    FROM pg_class C LEFT JOIN
+         pg_index I ON C.oid = I.indrelid
+         LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+    WHERE C.relkind IN ('r', 't', 'm', 'p')
+    GROUP BY C.oid, N.nspname, C.relname
+;
+drop type testtype1, testtype2, testtype3, testtype4, testtype5, testtype6
+;
+CREATE MATERIALIZED VIEW dump_test.matview (col1) AS
+					   SELECT col1 FROM dump_test.test_table
+;
+CREATE TABLE src (id int PRIMARY KEY, val int)
+;
+-- Test that we don't try to return the value of a non-returnable
+-- column in an index-only scan.  (This isn't GIST-specific, but
+-- it only applies to index AMs that can return some columns and not
+-- others, so GIST with appropriate opclasses is a convenient test case.)
+create index gist_tbl_multi_index on gist_tbl using gist (circle(p,1), p)
+;
+CREATE TRIGGER trig_row_before_insert
+BEFORE INSERT ON rem1
+FOR EACH ROW EXECUTE PROCEDURE trigger_data(23,'skidoo')
+;
+CREATE TABLE "public"."rule_and_refint_t2" (
+    "id2a" integer NOT NULL,
+    "id2c" integer NOT NULL
+)
+;
+CREATE POLICY p3 ON rls_part USING (a < 0)
+;
+CREATE TABLE VARCHAR_TBL(f1 varchar(1))
+;
+COMMENT ON TEXT SEARCH DICTIONARY estonian_stem IS 'snowball stemmer for estonian language'
+;
+drop trigger rem2_trig_row_before on rem2
+;
+CREATE TABLE "public"."pagg_tab_m_p3" (
+    "a" integer,
+    "b" integer,
+    "c" integer
+)
+;
+DO $$
+						 DECLARE myoid oid;
+						 BEGIN
+							SELECT loid FROM pg_largeobject INTO myoid;
+							EXECUTE 'GRANT ALL ON LARGE OBJECT ' || myoid || ' TO regress_dump_test_role;';
+						 END;
+						 $$
+;
+ALTER TABLE hash_parted DETACH PARTITION not_a_part
+;
+------------------------------------------------------------------------------------------
+[ALTER_POLICY] ALTER TEXT SEARCH DICTIONARY xsyn (RULES='xsyn_sample', KEEPORIG=false, MATCHORIG=false, KEEPSYNONYMS=false, MATCHSYNONYMS=false)
+;
+----------
+[CREATE_PROG_OBJ] -- Add a trigger to catch and print the contents of the catalog view
+-- pg_stat_progress_copy during data insertion.  This allows to test
+-- the validation of some progress reports for COPY FROM where the trigger
+-- would fire.
+create function notice_after_tab_progress_reporting() returns trigger AS
+$$
+declare report record;
+begin
+  -- The fields ignored here are the ones that may not remain
+  -- consistent across multiple runs.  The sizes reported may differ
+  -- across platforms, so just check if these are strictly positive.
+  with progress_data as (
+    select
+       relid::regclass::text as relname,
+       command,
+       type,
+       bytes_processed > 0 as has_bytes_processed,
+       bytes_total > 0 as has_bytes_total,
+       tuples_processed,
+       tuples_excluded
+      from pg_stat_progress_copy
+      where pid = pg_backend_pid())
+  select into report (to_jsonb(r)) as value
+    from progress_data r;
+
+  raise info 'progress: %', report.value::text;
+  return new;
+end;
+$$ language plpgsql
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- but DETACH is allowed, and DROP afterwards works
+ALTER TABLE droppk2 DETACH PARTITION droppk21
+;
+----------
+[ADMIN_TABLE] vacuum gin_test_tbl
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE fktable ADD CONSTRAINT fk_1_3
+FOREIGN KEY (x1) REFERENCES pktable(id3)
+;
+----------
+[CREATE_TYPE] CREATE DOMAIN "generated_stored_tests"."gtestdomainnn" AS integer
+	CONSTRAINT "gtestdomainnn_check" CHECK ((VALUE IS NOT NULL))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION armor(bytea, text[], text[])
+RETURNS text
+AS '$libdir/pgcrypto', 'pg_armor'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR #># (
+       LEFTARG = hstore,
+       RIGHTARG = hstore,
+       PROCEDURE = hstore_gt,
+       COMMUTATOR = #<#,
+       NEGATOR = #<=#,
+       RESTRICT = scalargtsel,
+       JOIN = scalargtjoinsel
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE PROCEDURE ptest7(a text, b text)
+LANGUAGE SQL
+AS $$
+SELECT a = b;
+$$
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."hobby_construct_named"("name" "text", "hobby" "text") RETURNS "public"."hobbies_r"
+    LANGUAGE "sql"
+    AS $$select name, hobby$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE B (
+	BID integer not null,
+	AID integer not null,
+	Col2 integer,
+	PRIMARY KEY (BID),
+	FOREIGN KEY (AID) REFERENCES A(AID)
+  )
+;
+----------
+[CREATE_TABLE|SELECT] -- cidr check
+
+CREATE TABLE cidrtmp AS
+  SELECT cidr(a) AS a FROM inettmp
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE t AS SELECT g, g + 1 FROM generate_series(1,10) g(g)
+;
+----------
+[CREATE_PROG_OBJ] -- moving-aggregate options
+
+CREATE AGGREGATE sumdouble (float8)
+(
+    stype = float8,
+    sfunc = float8pl,
+    mstype = float8,
+    msfunc = float8pl,
+    minvfunc = float8mi
+)
+;
+----------
+[DROP_POLICY] -- test search template
+DROP TEXT SEARCH TEMPLATE test_tstemplate_exists
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION fn_x_before()
+;
+----------
+[DROP_TABLE] -- fails
+DROP TABLE tid_part
+;
+----------
+[CREATE_TABLE] CREATE TABLE mytable (key int PRIMARY KEY, value text)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION split_typeconv.mytext_eq_text(
+    left_value split_typeconv.mytext,
+    right_value text
+)
+RETURNS boolean
+LANGUAGE SQL
+IMMUTABLE
+AS $$ SELECT false $$
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] -- Valid BEFORE statement VIEW triggers
+CREATE TRIGGER before_ins_stmt_trig BEFORE INSERT ON main_view
+FOR EACH STATEMENT EXECUTE PROCEDURE view_trigger('before_view_ins_stmt')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION trig_row_before_insupdate() RETURNS TRIGGER AS $$
+  BEGIN
+    NEW.f2 := NEW.f2 || ' triggered !';
+    RETURN NEW;
+  END
+$$ language plpgsql
+;
+----------
+[CREATE_TABLE] CREATE TABLE range_parted4_1 PARTITION OF range_parted4 FOR VALUES FROM (MINVALUE, MINVALUE, MINVALUE) TO (1, MAXVALUE, MAXVALUE)
+;
+----------
+[ALTER_TABLE|ADD_COLUMN|ALTER_COLUMN] ALTER TABLE T ADD COLUMN c_array TEXT[]
+                  DEFAULT '{"This", "is", "the", "real", "world"}',
+              ALTER COLUMN c_timestamp SET DEFAULT '1970-12-31 11:12:13',
+              ALTER COLUMN c_timestamp_null SET DEFAULT '2016-09-29 12:00:00'
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, FREEZE) pg_catalog.pg_ts_dict
+;
+----------
+[CREATE_TABLE] CREATE TABLE grantor_test2 ()
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."nummultirange_test" (
+    "nmr" "nummultirange"
+)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER "tg_slotlink_a" AFTER INSERT OR DELETE OR UPDATE ON "public"."iface" FOR EACH ROW EXECUTE FUNCTION "public"."tg_slotlink_a"('IF')
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "regress_indexing"."pk" ATTACH PARTITION "regress_indexing"."pk2" FOR VALUES FROM (1000) TO (2000)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger tg_backlink_a after insert or update or delete
+    on PLine for each row execute procedure tg_backlink_a('PL')
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE ONLY "public"."dropcolumn" DROP COLUMN "........pg.dropped.3........"
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER merge_aru AFTER UPDATE ON target FOR EACH ROW EXECUTE PROCEDURE merge_trigfunc ()
+;
+----------
+[CREATE_TABLE] --
+-- REINDEX CONCURRENTLY
+--
+CREATE TABLE concur_reindex_tab (c1 int)
+;
+----------
+[DROP_TABLE] DROP TABLE ctl_stats3_child
+;
+----------
+[TRUNCATE_TABLE] -- fail
+TRUNCATE TABLE trunc_c,trunc_d,trunc_e,truncate_a,trunc_b
+;
+----------
+[CREATE_TABLE] CREATE UNLOGGED TABLE ts1_unlogged (id int) TABLESPACE ts1
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION comp()
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW pg_stat_xact_all_tables AS
+    SELECT
+            C.oid AS relid,
+            N.nspname AS schemaname,
+            C.relname AS relname,
+            pg_stat_get_xact_numscans(C.oid) AS seq_scan,
+            pg_stat_get_xact_tuples_returned(C.oid) AS seq_tup_read,
+            sum(pg_stat_get_xact_numscans(I.indexrelid))::bigint AS idx_scan,
+            sum(pg_stat_get_xact_tuples_fetched(I.indexrelid))::bigint +
+            pg_stat_get_xact_tuples_fetched(C.oid) AS idx_tup_fetch,
+            pg_stat_get_xact_tuples_inserted(C.oid) AS n_tup_ins,
+            pg_stat_get_xact_tuples_updated(C.oid) AS n_tup_upd,
+            pg_stat_get_xact_tuples_deleted(C.oid) AS n_tup_del,
+            pg_stat_get_xact_tuples_hot_updated(C.oid) AS n_tup_hot_upd,
+            pg_stat_get_xact_tuples_newpage_updated(C.oid) AS n_tup_newpage_upd
+    FROM pg_class C LEFT JOIN
+         pg_index I ON C.oid = I.indrelid
+         LEFT JOIN pg_namespace N ON (N.oid = C.relnamespace)
+    WHERE C.relkind IN ('r', 't', 'm', 'p')
+    GROUP BY C.oid, N.nspname, C.relname
+;
+----------
+[DROP_TYPE] drop type testtype1, testtype2, testtype3, testtype4, testtype5, testtype6
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW dump_test.matview (col1) AS
+					   SELECT col1 FROM dump_test.test_table
+;
+----------
+[CREATE_TABLE] CREATE TABLE src (id int PRIMARY KEY, val int)
+;
+----------
+[ADD_INDEX] -- Test that we don't try to return the value of a non-returnable
+-- column in an index-only scan.  (This isn't GIST-specific, but
+-- it only applies to index AMs that can return some columns and not
+-- others, so GIST with appropriate opclasses is a convenient test case.)
+create index gist_tbl_multi_index on gist_tbl using gist (circle(p,1), p)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER trig_row_before_insert
+BEFORE INSERT ON rem1
+FOR EACH ROW EXECUTE PROCEDURE trigger_data(23,'skidoo')
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."rule_and_refint_t2" (
+    "id2a" integer NOT NULL,
+    "id2c" integer NOT NULL
+)
+;
+----------
+[CREATE_POLICY] CREATE POLICY p3 ON rls_part USING (a < 0)
+;
+----------
+[CREATE_TABLE] CREATE TABLE VARCHAR_TBL(f1 varchar(1))
+;
+----------
+[ALTER_POLICY] COMMENT ON TEXT SEARCH DICTIONARY estonian_stem IS 'snowball stemmer for estonian language'
+;
+----------
+[DROP_TRIGGER] drop trigger rem2_trig_row_before on rem2
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."pagg_tab_m_p3" (
+    "a" integer,
+    "b" integer,
+    "c" integer
+)
+;
+----------
+[BLOCK] DO $$
+						 DECLARE myoid oid;
+						 BEGIN
+							SELECT loid FROM pg_largeobject INTO myoid;
+							EXECUTE 'GRANT ALL ON LARGE OBJECT ' || myoid || ' TO regress_dump_test_role;';
+						 END;
+						 $$
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE hash_parted DETACH PARTITION not_a_part
+;

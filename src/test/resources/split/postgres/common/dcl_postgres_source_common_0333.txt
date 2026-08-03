@@ -1,0 +1,66 @@
+-- Test cache invalidation FOR ALL TABLES publication
+SET client_min_messages = 'ERROR'
+;
+-- Test COPY FROM with the batch_size option enabled
+alter server loopback options (add batch_size '2')
+;
+REVOKE SELECT ON lock_table FROM regress_locktable_user
+;
+LOCK split_lock_next.parent IN ACCESS SHARE MODE
+;
+--  Leave this one in funny state for pg_upgrade testing
+
+-- test a HOT update that invalidates the conflicting tuple.
+-- the trigger should still fire and catch the violation
+
+BEGIN
+;
+-- grant delete privileges
+SET SESSION AUTHORIZATION regress_priv_user1
+;
+ALTER SYSTEM SET restart_after_crash = 1
+;
+EXECUTE dumpFunc('18324')
+;
+ALTER FUNCTION "public"."array_to_set"("anyarray") OWNER TO zyc
+;
+ALTER DEFAULT PRIVILEGES REVOKE USAGE ON SCHEMAS FROM regress_priv_user2
+;
+------------------------------------------------------------------------------------------
+[SESSION_SETTING_WRITE] -- Test cache invalidation FOR ALL TABLES publication
+SET client_min_messages = 'ERROR'
+;
+----------
+[SYSTEM_SETTING_WRITE] -- Test COPY FROM with the batch_size option enabled
+alter server loopback options (add batch_size '2')
+;
+----------
+[REVOKE] REVOKE SELECT ON lock_table FROM regress_locktable_user
+;
+----------
+[SESSION_LOCK] LOCK split_lock_next.parent IN ACCESS SHARE MODE
+;
+----------
+[TRANSACTION] --  Leave this one in funny state for pg_upgrade testing
+
+-- test a HOT update that invalidates the conflicting tuple.
+-- the trigger should still fire and catch the violation
+
+BEGIN
+;
+----------
+[SWITCH_USER] -- grant delete privileges
+SET SESSION AUTHORIZATION regress_priv_user1
+;
+----------
+[SYSTEM_SETTING_WRITE] ALTER SYSTEM SET restart_after_crash = 1
+;
+----------
+[UNSAFE] EXECUTE dumpFunc('18324')
+;
+----------
+[TRANSFER_PRIVILEGE] ALTER FUNCTION "public"."array_to_set"("anyarray") OWNER TO zyc
+;
+----------
+[REVOKE] ALTER DEFAULT PRIVILEGES REVOKE USAGE ON SCHEMAS FROM regress_priv_user2
+;

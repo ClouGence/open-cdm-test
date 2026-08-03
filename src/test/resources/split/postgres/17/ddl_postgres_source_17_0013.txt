@@ -1,0 +1,570 @@
+-- JSON_TABLE: Test backward parsing with nested paths
+
+CREATE VIEW jsonb_table_view_nested AS
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			NESTED PATH '$[1]' AS p1 COLUMNS (
+				a1 int,
+				NESTED PATH '$[*]' AS "p1 1" COLUMNS (
+					a11 text
+				),
+				b1 text
+			),
+			NESTED PATH '$[2]' AS p2 COLUMNS (
+				NESTED PATH '$[*]' AS "p2:1" COLUMNS (
+					a21 text
+				),
+				NESTED PATH '$[*]' AS p22 COLUMNS (
+					a22 text
+				)
+			)
+		)
+	)
+;
+CREATE TABLE cmdata2 (f1 TEXT COMPRESSION pglz, f2 TEXT COMPRESSION lz4)
+;
+CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA pub_test
+;
+ALTER PUBLICATION "dump_pub_qual_1ct" ADD TABLE ONLY "pubme"."t0" ("c", "d") WHERE (("c" > 0))
+;
+drop database if exists abc with (force)
+;
+-- Detach and re-attach once, to stress the concurrent detach case.
+ALTER TABLE parent_tbl DETACH PARTITION foreign_tbl CONCURRENTLY
+;
+-- alter publication set multiple schema
+ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA pub_test1, pub_test2
+;
+create or replace trigger my_trig
+  after insert on parted_trig
+  for each row execute procedure funcA()
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (ROW(a, 2) IS NULL)
+;
+CREATE FUNCTION btree_test_func() RETURNS int LANGUAGE sql IMMUTABLE RETURN 0
+;
+CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION)
+;
+ALTER OPERATOR =(ltree, ltree) SET (HASHES)
+;
+ALTER PUBLICATION pub2 SET TABLE gencols(a)
+;
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test1
+;
+CREATE PUBLICATION testpub6 FOR TABLE rf_bug WHERE (status = 'open') WITH (publish = 'insert')
+;
+CREATE OR REPLACE FUNCTION "substring"(text, text, text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN substring($1, similar_to_escape($2, $3))
+;
+CREATE TABLE ctl_table(a int PRIMARY KEY,
+  b varchar COMPRESSION pglz,
+  c int GENERATED ALWAYS AS (a * 2) STORED,
+  d bigint GENERATED ALWAYS AS IDENTITY,
+  e int DEFAULT 1)
+;
+create function psql_df_sql (x integer)
+  returns integer
+  security definer
+  begin atomic select x + 1; end
+;
+CREATE OR REPLACE FUNCTION bit_length(text)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN octet_length($1) * 8
+;
+CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(false_positive_rate = 0.26)
+)
+;
+CREATE PUBLICATION dump_pub_nsp_1ct FOR
+  TABLES IN SCHEMA pubme
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl5 WHERE (a IS DOCUMENT)
+;
+create index tstidx on ltreetest using gist (t gist_ltree_ops(siglen=0))
+;
+CREATE INDEX text_idx on test__int using gist (a gist__int_ops(numranges = 252))
+;
+ALTER TABLE gtestnn_parent ALTER COLUMN f3 SET EXPRESSION AS (nullif(f1, 2) + nullif(f2, 11))
+;
+CREATE PUBLICATION tap_pub_parent_sync FOR TABLE tab_rowfilter_parent_sync WHERE (a > 15) WITH (publish_via_partition_root)
+;
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, x)
+;
+CREATE FUNCTION _pg_datetime_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1082) /* date */
+           THEN 0
+       WHEN $1 IN (1083, 1114, 1184, 1266) /* time, timestamp, same + tz */
+           THEN CASE WHEN $2 < 0 THEN 6 ELSE $2 END
+       WHEN $1 IN (1186) /* interval */
+           THEN CASE WHEN $2 < 0 OR $2 & 65535 = 65535 THEN 6 ELSE $2 & 65535 END
+       ELSE null
+  END
+;
+CREATE VIEW timestamp_local_view AS
+  SELECT CAST('1978-07-07 19:38 America/New_York' AS TIMESTAMP WITH TIME ZONE) AT LOCAL AS ttz_at_local,
+         timezone(CAST('1978-07-07 19:38 America/New_York' AS TIMESTAMP WITH TIME ZONE)) AS ttz_func,
+         TIMESTAMP '1978-07-07 19:38' AT LOCAL AS t_at_local,
+         timezone(TIMESTAMP '1978-07-07 19:38') AS t_func
+;
+CREATE PUBLICATION testpub_forschema_fortable FOR TABLES IN SCHEMA pub_test1, TABLE pub_test2.tbl1
+;
+CREATE PUBLICATION pub2 FOR TABLE tab5 (a, b)
+;
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub1, testpub2 WITH (refresh = false)
+;
+-- Switching to heap should not have a dependency entry to the AM.
+ALTER TABLE heaptable SET ACCESS METHOD heap
+;
+ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    analyze = array_typanalyze  -- bogus, but it doesn't matter
+)
+;
+ALTER PUBLICATION pub6 ADD TABLE test_part_a_1 (a)
+;
+CREATE PUBLICATION testpub_col_list FOR TABLE testpub_tbl8 (a, b) WITH (publish_via_partition_root = 'true')
+;
+CREATE PUBLICATION testpub_tbl9 FOR TABLES IN SCHEMA public
+;
+CREATE TABLE cmmove2(f1 text COMPRESSION pglz)
+;
+/*
+ * PostgreSQL System Functions
+ *
+ * Copyright (c) 1996-2021, PostgreSQL Global Development Group
+ *
+ * src/backend/catalog/system_functions.sql
+ *
+ * This file redefines certain built-in functions that it's impractical
+ * to fully define in pg_proc.dat.  In most cases that's because they use
+ * SQL-standard function bodies and/or default expressions.  The node
+ * tree representations of those are too unreadable, platform-dependent,
+ * and changeable to want to deal with them manually.  Hence, we put stub
+ * definitions of such functions into pg_proc.dat and then replace them
+ * here.  The stub definitions would be unnecessary were it not that we'd
+ * like these functions to have stable OIDs, the same as other built-in
+ * functions.
+ *
+ * This file also takes care of adjusting privileges for those functions
+ * that should not have the default public-EXECUTE privileges.  (However,
+ * a small number of functions that exist mainly to underlie system views
+ * are dealt with in system_views.sql, instead.)
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+
+CREATE OR REPLACE FUNCTION lpad(text, integer)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN lpad($1, $2, ' ')
+;
+CREATE INDEX wowidx1 ON test_tsvector USING gist (a tsvector_ops(siglen=2048))
+;
+ALTER TYPE int_custom SET (ANALYZE = int_custom_typanalyze_invalid)
+;
+-- update using datum from different table
+CREATE TABLE cmmove2(f1 text COMPRESSION pglz)
+;
+CREATE PUBLICATION testpub5_forschema FOR TABLES IN SCHEMA CURRENT_SCHEMA, "CURRENT_SCHEMA"
+;
+ALTER TABLE split_alter_table.base_table ALTER COLUMN payload SET COMPRESSION pglz
+;
+/*
+ * PostgreSQL System Functions
+ *
+ * Copyright (c) 1996-2024, PostgreSQL Global Development Group
+ *
+ * src/backend/catalog/system_functions.sql
+ *
+ * This file redefines certain built-in functions that are impractical
+ * to fully define in pg_proc.dat.  In most cases that's because they use
+ * SQL-standard function bodies and/or default expressions.  The node
+ * tree representations of those are too unreadable, platform-dependent,
+ * and changeable to want to deal with them manually.  Hence, we put stub
+ * definitions of such functions into pg_proc.dat and then replace them
+ * here.  The stub definitions would be unnecessary were it not that we'd
+ * like these functions to have stable OIDs, the same as other built-in
+ * functions.
+ *
+ * This file also takes care of adjusting privileges for those functions
+ * that should not have the default public-EXECUTE privileges.  (However,
+ * a small number of functions that exist mainly to underlie system views
+ * are dealt with in system_views.sql, instead.)
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+
+CREATE OR REPLACE FUNCTION lpad(text, integer)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN lpad($1, $2, ' ')
+;
+ALTER OPERATOR === (boolean, real) SET (HASHES)
+;
+CREATE FUNCTION _pg_numeric_precision_radix(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (21, 23, 20, 700, 701) THEN 2
+       WHEN $1 IN (1700) THEN 10
+       ELSE null
+  END
+;
+CREATE OR REPLACE FUNCTION xpath_exists(text, xml)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN xpath_exists($1, $2, '{}'::text[])
+;
+CREATE OR REPLACE FUNCTION regexp_matches(string citext, pattern citext) RETURNS SETOF TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE ROWS 1
+RETURN pg_catalog.regexp_matches( $1::text, $2::text, 'i' )
+;
+-- Now change the root column list to use a column "b"
+-- (which is not in the replica identity)
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 (b)
+;
+------------------------------------------------------------------------------------------
+[CREATE_VIEW(SELECT)] -- JSON_TABLE: Test backward parsing with nested paths
+
+CREATE VIEW jsonb_table_view_nested AS
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			NESTED PATH '$[1]' AS p1 COLUMNS (
+				a1 int,
+				NESTED PATH '$[*]' AS "p1 1" COLUMNS (
+					a11 text
+				),
+				b1 text
+			),
+			NESTED PATH '$[2]' AS p2 COLUMNS (
+				NESTED PATH '$[*]' AS "p2:1" COLUMNS (
+					a21 text
+				),
+				NESTED PATH '$[*]' AS p22 COLUMNS (
+					a22 text
+				)
+			)
+		)
+	)
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmdata2 (f1 TEXT COMPRESSION pglz, f2 TEXT COMPRESSION lz4)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA pub_test
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_qual_1ct" ADD TABLE ONLY "pubme"."t0" ("c", "d") WHERE (("c" > 0))
+;
+----------
+[DROP_CATALOG] drop database if exists abc with (force)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- Detach and re-attach once, to stress the concurrent detach case.
+ALTER TABLE parent_tbl DETACH PARTITION foreign_tbl CONCURRENTLY
+;
+----------
+[ALTER_PUB_SUB] -- alter publication set multiple schema
+ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA pub_test1, pub_test2
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create or replace trigger my_trig
+  after insert on parted_trig
+  for each row execute procedure funcA()
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (ROW(a, 2) IS NULL)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION btree_test_func() RETURNS int LANGUAGE sql IMMUTABLE RETURN 0
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION)
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR =(ltree, ltree) SET (HASHES)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub2 SET TABLE gencols(a)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test1
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub6 FOR TABLE rf_bug WHERE (status = 'open') WITH (publish = 'insert')
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "substring"(text, text, text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN substring($1, similar_to_escape($2, $3))
+;
+----------
+[CREATE_TABLE] CREATE TABLE ctl_table(a int PRIMARY KEY,
+  b varchar COMPRESSION pglz,
+  c int GENERATED ALWAYS AS (a * 2) STORED,
+  d bigint GENERATED ALWAYS AS IDENTITY,
+  e int DEFAULT 1)
+;
+----------
+[CREATE_PROG_OBJ] create function psql_df_sql (x integer)
+  returns integer
+  security definer
+  begin atomic select x + 1; end
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION bit_length(text)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN octet_length($1) * 8
+;
+----------
+[ADD_INDEX] CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(false_positive_rate = 0.26)
+)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION dump_pub_nsp_1ct FOR
+  TABLES IN SCHEMA pubme
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl5 WHERE (a IS DOCUMENT)
+;
+----------
+[ADD_INDEX] create index tstidx on ltreetest using gist (t gist_ltree_ops(siglen=0))
+;
+----------
+[ADD_INDEX] CREATE INDEX text_idx on test__int using gist (a gist__int_ops(numranges = 252))
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtestnn_parent ALTER COLUMN f3 SET EXPRESSION AS (nullif(f1, 2) + nullif(f2, 11))
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_parent_sync FOR TABLE tab_rowfilter_parent_sync WHERE (a > 15) WITH (publish_via_partition_root)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, x)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_datetime_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1082) /* date */
+           THEN 0
+       WHEN $1 IN (1083, 1114, 1184, 1266) /* time, timestamp, same + tz */
+           THEN CASE WHEN $2 < 0 THEN 6 ELSE $2 END
+       WHEN $1 IN (1186) /* interval */
+           THEN CASE WHEN $2 < 0 OR $2 & 65535 = 65535 THEN 6 ELSE $2 & 65535 END
+       ELSE null
+  END
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW timestamp_local_view AS
+  SELECT CAST('1978-07-07 19:38 America/New_York' AS TIMESTAMP WITH TIME ZONE) AT LOCAL AS ttz_at_local,
+         timezone(CAST('1978-07-07 19:38 America/New_York' AS TIMESTAMP WITH TIME ZONE)) AS ttz_func,
+         TIMESTAMP '1978-07-07 19:38' AT LOCAL AS t_at_local,
+         timezone(TIMESTAMP '1978-07-07 19:38') AS t_func
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_forschema_fortable FOR TABLES IN SCHEMA pub_test1, TABLE pub_test2.tbl1
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub2 FOR TABLE tab5 (a, b)
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub1, testpub2 WITH (refresh = false)
+;
+----------
+[ALTER_TABLE] -- Switching to heap should not have a dependency entry to the AM.
+ALTER TABLE heaptable SET ACCESS METHOD heap
+;
+----------
+[ALTER_TYPE] ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    analyze = array_typanalyze  -- bogus, but it doesn't matter
+)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub6 ADD TABLE test_part_a_1 (a)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_col_list FOR TABLE testpub_tbl8 (a, b) WITH (publish_via_partition_root = 'true')
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_tbl9 FOR TABLES IN SCHEMA public
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmmove2(f1 text COMPRESSION pglz)
+;
+----------
+[CREATE_PROG_OBJ] /*
+ * PostgreSQL System Functions
+ *
+ * Copyright (c) 1996-2021, PostgreSQL Global Development Group
+ *
+ * src/backend/catalog/system_functions.sql
+ *
+ * This file redefines certain built-in functions that it's impractical
+ * to fully define in pg_proc.dat.  In most cases that's because they use
+ * SQL-standard function bodies and/or default expressions.  The node
+ * tree representations of those are too unreadable, platform-dependent,
+ * and changeable to want to deal with them manually.  Hence, we put stub
+ * definitions of such functions into pg_proc.dat and then replace them
+ * here.  The stub definitions would be unnecessary were it not that we'd
+ * like these functions to have stable OIDs, the same as other built-in
+ * functions.
+ *
+ * This file also takes care of adjusting privileges for those functions
+ * that should not have the default public-EXECUTE privileges.  (However,
+ * a small number of functions that exist mainly to underlie system views
+ * are dealt with in system_views.sql, instead.)
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+
+CREATE OR REPLACE FUNCTION lpad(text, integer)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN lpad($1, $2, ' ')
+;
+----------
+[ADD_INDEX] CREATE INDEX wowidx1 ON test_tsvector USING gist (a tsvector_ops(siglen=2048))
+;
+----------
+[ALTER_TYPE] ALTER TYPE int_custom SET (ANALYZE = int_custom_typanalyze_invalid)
+;
+----------
+[CREATE_TABLE] -- update using datum from different table
+CREATE TABLE cmmove2(f1 text COMPRESSION pglz)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub5_forschema FOR TABLES IN SCHEMA CURRENT_SCHEMA, "CURRENT_SCHEMA"
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE split_alter_table.base_table ALTER COLUMN payload SET COMPRESSION pglz
+;
+----------
+[CREATE_PROG_OBJ] /*
+ * PostgreSQL System Functions
+ *
+ * Copyright (c) 1996-2024, PostgreSQL Global Development Group
+ *
+ * src/backend/catalog/system_functions.sql
+ *
+ * This file redefines certain built-in functions that are impractical
+ * to fully define in pg_proc.dat.  In most cases that's because they use
+ * SQL-standard function bodies and/or default expressions.  The node
+ * tree representations of those are too unreadable, platform-dependent,
+ * and changeable to want to deal with them manually.  Hence, we put stub
+ * definitions of such functions into pg_proc.dat and then replace them
+ * here.  The stub definitions would be unnecessary were it not that we'd
+ * like these functions to have stable OIDs, the same as other built-in
+ * functions.
+ *
+ * This file also takes care of adjusting privileges for those functions
+ * that should not have the default public-EXECUTE privileges.  (However,
+ * a small number of functions that exist mainly to underlie system views
+ * are dealt with in system_views.sql, instead.)
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+
+CREATE OR REPLACE FUNCTION lpad(text, integer)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN lpad($1, $2, ' ')
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR === (boolean, real) SET (HASHES)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_numeric_precision_radix(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (21, 23, 20, 700, 701) THEN 2
+       WHEN $1 IN (1700) THEN 10
+       ELSE null
+  END
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION xpath_exists(text, xml)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN xpath_exists($1, $2, '{}'::text[])
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_matches(string citext, pattern citext) RETURNS SETOF TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE ROWS 1
+RETURN pg_catalog.regexp_matches( $1::text, $2::text, 'i' )
+;
+----------
+[ALTER_PUB_SUB] -- Now change the root column list to use a column "b"
+-- (which is not in the replica identity)
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 (b)
+;

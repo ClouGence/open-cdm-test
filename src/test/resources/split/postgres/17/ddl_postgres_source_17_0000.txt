@@ -1,0 +1,506 @@
+CREATE TABLE tab_settings_flags AS SELECT name, category,
+    'EXPLAIN'          = ANY(flags) AS explain,
+    'NO_RESET'         = ANY(flags) AS no_reset,
+    'NO_RESET_ALL'     = ANY(flags) AS no_reset_all,
+    'NOT_IN_SAMPLE'    = ANY(flags) AS not_in_sample,
+    'RUNTIME_COMPUTED' = ANY(flags) AS runtime_computed
+  FROM pg_show_all_settings() AS psas,
+    pg_settings_get_flags(psas.name) AS flags
+;
+CREATE TABLE tab_settings_flags AS SELECT name, category,
+    'EXPLAIN'          = ANY(flags) AS explain,
+    'NO_RESET_ALL'     = ANY(flags) AS no_reset_all,
+    'NOT_IN_SAMPLE'    = ANY(flags) AS not_in_sample,
+    'RUNTIME_COMPUTED' = ANY(flags) AS runtime_computed
+  FROM pg_show_all_settings() AS psas,
+    pg_settings_get_flags(psas.name) AS flags
+;
+CREATE PUBLICATION testpub4 FOR TABLES IN SCHEMA pub_test
+;
+CREATE UNIQUE INDEX unique_idx3 ON unique_tbl (i) NULLS DISTINCT
+;
+-- fail - can't add schema to 'FOR ALL TABLES' publication
+ALTER PUBLICATION testpub_foralltables ADD TABLES IN SCHEMA pub_test
+;
+-- error: column "x" does not exist
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, x)
+;
+CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch2 WITH (PUBLISH_VIA_PARTITION_ROOT=1)
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (a IS NULL)
+;
+ALTER TABLE cmdata ALTER COLUMN f1 SET COMPRESSION lz4
+;
+CREATE VIEW view_unnamed_ss AS
+SELECT * FROM (SELECT * FROM (SELECT abs(f1) AS a1 FROM int4_tbl)),
+              (SELECT * FROM int8_tbl)
+  WHERE a1 < 10 AND q1 > a1 ORDER BY q1, q2
+;
+CREATE PUBLICATION pub1 FOR table gencols(a, gen1) WITH (publish_generated_columns = none)
+;
+-- fails
+
+-- SET STORAGE may need to add a TOAST table
+create table test_storage (a text, c text storage plain)
+;
+CREATE OR REPLACE FUNCTION "overlaps"(timestamp, interval,
+  timestamp, interval)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, ($3 + $4))
+;
+ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA non_existent_schema
+;
+ALTER TABLE heaptable SET ACCESS METHOD heap, SET ACCESS METHOD heap2
+;
+CREATE UNIQUE INDEX unique_idx1 ON unique_tbl (i) NULLS DISTINCT
+;
+ALTER TABLE testpub_rf_tbl7 ALTER COLUMN y SET EXPRESSION AS (x * testpub_rf_func2())
+;
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub1, testpub1 WITH (refresh = false)
+;
+ALTER PUBLICATION testpub3_forschema SET TABLES IN SCHEMA pub_test1
+;
+-- ok - built-in type coercions between two binary compatible datatypes are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (b::varchar < '2')
+;
+CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime("HH:MI TZH") < $x' PASSING '12:34'::timetz AS x))
+;
+ALTER TABLE gtest23b ALTER COLUMN b SET EXPRESSION AS (a * 1)
+;
+CREATE OR REPLACE FUNCTION path_contain_pt(path, point)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN on_ppath($2, $1)
+;
+ALTER PUBLICATION pub4 ADD TABLE dump_test.test_second_table WHERE (col2 = 'test')
+;
+CREATE OR REPLACE FUNCTION ll_to_earth(float8, float8)
+RETURNS earth
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN public.cube(public.cube(public.cube(
+    earth() * cos(radians($1)) * cos(radians($2))),
+    earth() * cos(radians($1)) * sin(radians($2))),
+    earth() * sin(radians($1)))::earth
+;
+-- drop all schemas
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test1
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (a, b, c)
+;
+create index on btree_tall_tbl (id int4_ops(foo=1))
+;
+CREATE OR REPLACE FUNCTION pg_sleep_for(interval)
+ RETURNS void
+ LANGUAGE sql
+ PARALLEL SAFE STRICT COST 1
+RETURN pg_sleep(extract(epoch from clock_timestamp() + $1) -
+                extract(epoch from clock_timestamp()))
+;
+CREATE VIEW json_arrayagg_view AS
+SELECT JSON_ARRAYAGG(('111' || i)::bytea FORMAT JSON NULL ON NULL RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+-- Test setting merges and hashes
+ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 WHERE (b > 99)
+;
+CREATE TABLE cmdata1(f1 TEXT COMPRESSION lz4)
+;
+CREATE INDEX ON more__int using gist (a gist__int_ops(numranges = 252))
+;
+CREATE FUNCTION functest_S_xx(x date) RETURNS boolean
+    LANGUAGE SQL
+    RETURN x > 1
+;
+ALTER TABLE badcompresstbl ALTER a SET COMPRESSION I_Do_Not_Exist_Compression
+;
+CREATE OR REPLACE FUNCTION regexp_match(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_match( $1::text, $2::text, 'i' )
+;
+create or replace trigger my_trig
+  before insert on my_table
+  for each row execute procedure funcB()
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (CASE a WHEN 5 THEN true ELSE false END)
+;
+-- Test matching of locking clause to correct alias
+
+CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+ALTER TABLE fk_partitioned_fk ADD FOREIGN KEY (a, b)
+  REFERENCES fk_notpartitioned_pk
+  ON DELETE SET NULL (a)
+;
+-- reverse-listing of various special function syntaxes required by SQL
+
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb,
+  CURRENT_DATE as cd,
+  (select * from CURRENT_DATE) as cd2,
+  CURRENT_TIME as ct,
+  (select * from CURRENT_TIME) as ct2,
+  CURRENT_TIME (1) as ct3,
+  (select * from CURRENT_TIME (1)) as ct4,
+  CURRENT_TIMESTAMP as ct5,
+  (select * from CURRENT_TIMESTAMP) as ct6,
+  CURRENT_TIMESTAMP (1) as ct7,
+  (select * from CURRENT_TIMESTAMP (1)) as ct8,
+  LOCALTIME as lt1,
+  (select * from LOCALTIME) as lt2,
+  LOCALTIME (1) as lt3,
+  (select * from LOCALTIME (1)) as lt4,
+  LOCALTIMESTAMP as lt5,
+  (select * from LOCALTIMESTAMP) as lt6,
+  LOCALTIMESTAMP (1) as lt7,
+  (select * from LOCALTIMESTAMP (1)) as lt8,
+  CURRENT_CATALOG as ca,
+  (select * from CURRENT_CATALOG) as ca2,
+  CURRENT_ROLE as cr,
+  (select * from CURRENT_ROLE) as cr2,
+  CURRENT_SCHEMA as cs,
+  (select * from CURRENT_SCHEMA) as cs2,
+  CURRENT_USER as cu,
+  (select * from CURRENT_USER) as cu2,
+  USER as us,
+  (select * from USER) as us2,
+  SESSION_USER seu,
+  (select * from SESSION_USER) as seu2,
+  SYSTEM_USER as su,
+  (select * from SYSTEM_USER) as su2
+;
+CREATE OR REPLACE FUNCTION "overlaps"(timestamptz, interval,
+  timestamptz, timestamptz)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;
+CREATE OR REPLACE FUNCTION regexp_split_to_array(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_split_to_array( $1::text, $2::text, 'i' )
+;
+ALTER PUBLICATION testpub_fortable SET TABLES IN SCHEMA pub_test
+;
+CREATE PUBLICATION testpub_tbl9 FOR TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+-- Generated columns in column list, when 'publish_generated_columns'='stored'
+CREATE PUBLICATION pub2 FOR table gencols(a, gen1) WITH (publish_generated_columns = stored)
+;
+CREATE VIEW json_objectagg_view AS
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+ALTER TYPE hstore SET (
+  SUBSCRIPT = hstore_subscript_handler
+)
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE|SELECT] CREATE TABLE tab_settings_flags AS SELECT name, category,
+    'EXPLAIN'          = ANY(flags) AS explain,
+    'NO_RESET'         = ANY(flags) AS no_reset,
+    'NO_RESET_ALL'     = ANY(flags) AS no_reset_all,
+    'NOT_IN_SAMPLE'    = ANY(flags) AS not_in_sample,
+    'RUNTIME_COMPUTED' = ANY(flags) AS runtime_computed
+  FROM pg_show_all_settings() AS psas,
+    pg_settings_get_flags(psas.name) AS flags
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE tab_settings_flags AS SELECT name, category,
+    'EXPLAIN'          = ANY(flags) AS explain,
+    'NO_RESET_ALL'     = ANY(flags) AS no_reset_all,
+    'NOT_IN_SAMPLE'    = ANY(flags) AS not_in_sample,
+    'RUNTIME_COMPUTED' = ANY(flags) AS runtime_computed
+  FROM pg_show_all_settings() AS psas,
+    pg_settings_get_flags(psas.name) AS flags
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub4 FOR TABLES IN SCHEMA pub_test
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX unique_idx3 ON unique_tbl (i) NULLS DISTINCT
+;
+----------
+[ALTER_PUB_SUB] -- fail - can't add schema to 'FOR ALL TABLES' publication
+ALTER PUBLICATION testpub_foralltables ADD TABLES IN SCHEMA pub_test
+;
+----------
+[ALTER_PUB_SUB] -- error: column "x" does not exist
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, x)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub FOR TABLES IN SCHEMA sch2 WITH (PUBLISH_VIA_PARTITION_ROOT=1)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (a IS NULL)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE cmdata ALTER COLUMN f1 SET COMPRESSION lz4
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW view_unnamed_ss AS
+SELECT * FROM (SELECT * FROM (SELECT abs(f1) AS a1 FROM int4_tbl)),
+              (SELECT * FROM int8_tbl)
+  WHERE a1 < 10 AND q1 > a1 ORDER BY q1, q2
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub1 FOR table gencols(a, gen1) WITH (publish_generated_columns = none)
+;
+----------
+[CREATE_TABLE] -- fails
+
+-- SET STORAGE may need to add a TOAST table
+create table test_storage (a text, c text storage plain)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "overlaps"(timestamp, interval,
+  timestamp, interval)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, ($3 + $4))
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA non_existent_schema
+;
+----------
+[ALTER_TABLE] ALTER TABLE heaptable SET ACCESS METHOD heap, SET ACCESS METHOD heap2
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX unique_idx1 ON unique_tbl (i) NULLS DISTINCT
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE testpub_rf_tbl7 ALTER COLUMN y SET EXPRESSION AS (x * testpub_rf_func2())
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub1, testpub1 WITH (refresh = false)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub3_forschema SET TABLES IN SCHEMA pub_test1
+;
+----------
+[ALTER_PUB_SUB] -- ok - built-in type coercions between two binary compatible datatypes are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (b::varchar < '2')
+;
+----------
+[ADD_INDEX] CREATE INDEX ON test_jsonb_mutability (JSON_QUERY(js, '$.datetime("HH:MI TZH") < $x' PASSING '12:34'::timetz AS x))
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest23b ALTER COLUMN b SET EXPRESSION AS (a * 1)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION path_contain_pt(path, point)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN on_ppath($2, $1)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub4 ADD TABLE dump_test.test_second_table WHERE (col2 = 'test')
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION ll_to_earth(float8, float8)
+RETURNS earth
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN public.cube(public.cube(public.cube(
+    earth() * cos(radians($1)) * cos(radians($2))),
+    earth() * cos(radians($1)) * sin(radians($2))),
+    earth() * sin(radians($1)))::earth
+;
+----------
+[ALTER_PUB_SUB] -- drop all schemas
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test1
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (a, b, c)
+;
+----------
+[ADD_INDEX] create index on btree_tall_tbl (id int4_ops(foo=1))
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION pg_sleep_for(interval)
+ RETURNS void
+ LANGUAGE sql
+ PARALLEL SAFE STRICT COST 1
+RETURN pg_sleep(extract(epoch from clock_timestamp() + $1) -
+                extract(epoch from clock_timestamp()))
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_arrayagg_view AS
+SELECT JSON_ARRAYAGG(('111' || i)::bytea FORMAT JSON NULL ON NULL RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[ALTER_PROG_OBJ] -- Test setting merges and hashes
+ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk_1 WHERE (b > 99)
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmdata1(f1 TEXT COMPRESSION lz4)
+;
+----------
+[ADD_INDEX] CREATE INDEX ON more__int using gist (a gist__int_ops(numranges = 252))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_xx(x date) RETURNS boolean
+    LANGUAGE SQL
+    RETURN x > 1
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE badcompresstbl ALTER a SET COMPRESSION I_Do_Not_Exist_Compression
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_match(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_match( $1::text, $2::text, 'i' )
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create or replace trigger my_trig
+  before insert on my_table
+  for each row execute procedure funcB()
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (CASE a WHEN 5 THEN true ELSE false END)
+;
+----------
+[CREATE_VIEW(SELECT,QUERY_LOCK)] -- Test matching of locking clause to correct alias
+
+CREATE VIEW view_unnamed_ss_locking AS
+SELECT * FROM (SELECT * FROM int4_tbl), int8_tbl AS unnamed_subquery
+  WHERE f1 = q1
+  FOR UPDATE OF unnamed_subquery
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR === (boolean, real) SET (MERGES)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE fk_partitioned_fk ADD FOREIGN KEY (a, b)
+  REFERENCES fk_notpartitioned_pk
+  ON DELETE SET NULL (a)
+;
+----------
+[CREATE_VIEW(SELECT)] -- reverse-listing of various special function syntaxes required by SQL
+
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb,
+  CURRENT_DATE as cd,
+  (select * from CURRENT_DATE) as cd2,
+  CURRENT_TIME as ct,
+  (select * from CURRENT_TIME) as ct2,
+  CURRENT_TIME (1) as ct3,
+  (select * from CURRENT_TIME (1)) as ct4,
+  CURRENT_TIMESTAMP as ct5,
+  (select * from CURRENT_TIMESTAMP) as ct6,
+  CURRENT_TIMESTAMP (1) as ct7,
+  (select * from CURRENT_TIMESTAMP (1)) as ct8,
+  LOCALTIME as lt1,
+  (select * from LOCALTIME) as lt2,
+  LOCALTIME (1) as lt3,
+  (select * from LOCALTIME (1)) as lt4,
+  LOCALTIMESTAMP as lt5,
+  (select * from LOCALTIMESTAMP) as lt6,
+  LOCALTIMESTAMP (1) as lt7,
+  (select * from LOCALTIMESTAMP (1)) as lt8,
+  CURRENT_CATALOG as ca,
+  (select * from CURRENT_CATALOG) as ca2,
+  CURRENT_ROLE as cr,
+  (select * from CURRENT_ROLE) as cr2,
+  CURRENT_SCHEMA as cs,
+  (select * from CURRENT_SCHEMA) as cs2,
+  CURRENT_USER as cu,
+  (select * from CURRENT_USER) as cu2,
+  USER as us,
+  (select * from USER) as us2,
+  SESSION_USER seu,
+  (select * from SESSION_USER) as seu2,
+  SYSTEM_USER as su,
+  (select * from SYSTEM_USER) as su2
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "overlaps"(timestamptz, interval,
+  timestamptz, timestamptz)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_split_to_array(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_split_to_array( $1::text, $2::text, 'i' )
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable SET TABLES IN SCHEMA pub_test
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_tbl9 FOR TABLES IN SCHEMA public, TABLE public.testpub_tbl7(a)
+;
+----------
+[CREATE_PUB_SUB] -- Generated columns in column list, when 'publish_generated_columns'='stored'
+CREATE PUBLICATION pub2 FOR table gencols(a, gen1) WITH (publish_generated_columns = stored)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW json_objectagg_view AS
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[ALTER_TYPE] ALTER TYPE hstore SET (
+  SUBSCRIPT = hstore_subscript_handler
+)
+;

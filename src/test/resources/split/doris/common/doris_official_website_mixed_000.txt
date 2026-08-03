@@ -1,0 +1,1720 @@
+ALTER TABLE amazon_reviews ADD INDEX review_body_inverted_idx(`review_body`) 
+    USING INVERTED PROPERTIES("parser" = "english","support_phrase" = "true"); 
+BUILD INDEX review_body_inverted_idx ON amazon_reviews;
+ALTER TABLE amazon_reviews ADD INDEX product_id_inverted_idx(product_id) USING INVERTED ;
+ALTER TABLE amazon_reviews ADD INDEX customer_id_inverted_idx(customer_id) USING INVERTED ;
+BUILD INDEX product_id_inverted_idx ON amazon_reviews;
+BUILD INDEX customer_id_inverted_idx ON amazon_reviews;
+ALTER TABLE amazon_reviews ADD INDEX product_category_inverted_idx(`product_category`) USING INVERTED;
+BUILD INDEX product_category_inverted_idx ON amazon_reviews;
+-- Add inverted index. Doris will generate inverted index for all new data afterward.
+ALTER TABLE table_name ADD INDEX index_name(column_name) USING INVERTED;
+
+-- Build index for the specified historical data partitions.
+BUILD INDEX index_name ON table_name PARTITIONS(partition_name1, partition_name2);
+use tpch;
+
+CREATE TABLE IF NOT EXISTS orders  (
+    o_orderkey       integer not null,
+    o_custkey        integer not null,
+    o_orderstatus    char(1) not null,
+    o_totalprice     decimalv3(15,2) not null,
+    o_orderdate      date not null,
+    o_orderpriority  char(15) not null,
+    o_clerk          char(15) not null,
+    o_shippriority   integer not null,
+    o_comment        varchar(79) not null
+    )
+    DUPLICATE KEY(o_orderkey, o_custkey)
+    PARTITION BY RANGE(o_orderdate)(
+    FROM ('2023-10-17') TO ('2023-10-20') INTERVAL 1 DAY)
+    DISTRIBUTED BY HASH(o_orderkey) BUCKETS 3
+    PROPERTIES ("replication_num" = "1");
+
+insert into orders values
+   (1, 1, 'ok', 99.5, '2023-10-17', 'a', 'b', 1, 'yy'),
+   (2, 2, 'ok', 109.2, '2023-10-18', 'c','d',2, 'mm'),
+   (3, 3, 'ok', 99.5, '2023-10-19', 'a', 'b', 1, 'yy');
+
+CREATE TABLE IF NOT EXISTS lineitem (
+    l_orderkey    integer not null,
+    l_partkey     integer not null,
+    l_suppkey     integer not null,
+    l_linenumber  integer not null,
+    l_quantity    decimalv3(15,2) not null,
+    l_extendedprice  decimalv3(15,2) not null,
+    l_discount    decimalv3(15,2) not null,
+    l_tax         decimalv3(15,2) not null,
+    l_returnflag  char(1) not null,
+    l_linestatus  char(1) not null,
+    l_shipdate    date not null,
+    l_commitdate  date not null,
+    l_receiptdate date not null,
+    l_shipinstruct char(25) not null,
+    l_shipmode     char(10) not null,
+    l_comment      varchar(44) not null
+    )
+    DUPLICATE KEY(l_orderkey, l_partkey, l_suppkey, l_linenumber)
+    PARTITION BY RANGE(l_shipdate)
+    (FROM ('2023-10-17') TO ('2023-10-20') INTERVAL 1 DAY)
+    DISTRIBUTED BY HASH(l_orderkey) BUCKETS 3
+    PROPERTIES ("replication_num" = "1");
+
+insert into lineitem values
+ (1, 2, 3, 4, 5.5, 6.5, 7.5, 8.5, 'o', 'k', '2023-10-17', '2023-10-17', '2023-10-17', 'a', 'b', 'yyyyyyyyy'),
+ (2, 2, 3, 4, 5.5, 6.5, 7.5, 8.5, 'o', 'k', '2023-10-18', '2023-10-18', '2023-10-18', 'a', 'b', 'yyyyyyyyy'),
+ (3, 2, 3, 6, 7.5, 8.5, 9.5, 10.5, 'k', 'o', '2023-10-19', '2023-10-19', '2023-10-19', 'c', 'd', 'xxxxxxxxx');
+ 
+ 
+ CREATE TABLE IF NOT EXISTS partsupp (
+  ps_partkey     INTEGER NOT NULL,
+  ps_suppkey     INTEGER NOT NULL,
+  ps_availqty    INTEGER NOT NULL,
+  ps_supplycost  DECIMALV3(15,2)  NOT NULL,
+  ps_comment     VARCHAR(199) NOT NULL 
+)
+DUPLICATE KEY(ps_partkey, ps_suppkey)
+DISTRIBUTED BY HASH(ps_partkey) BUCKETS 3
+PROPERTIES (
+  "replication_num" = "1"
+)
+;
+CREATE TABLE `test_arithmetic_expressions_256` (
+      k1 decimal(76, 30),
+      k2 decimal(76, 30)
+    )
+    DISTRIBUTED BY HASH(k1)
+    PROPERTIES (
+    "replication_num" = "1"
+    );
+
+insert into test_arithmetic_expressions_256 values
+  (1.000000000000000000000000000001, 9999999999999999999999999999999999999999999998.999999999999999999999999999998),
+  (2.100000000000000000000000000001, 4999999999999999999999999999999999999999999999.899999999999999999999999999998),
+  (3.666666666666666666666666666666, 3333333333333333333333333333333333333333333333.333333333333333333333333333333);
+CREATE DATABASE test_variant;
+
+USE test_variant;
+
+CREATE TABLE IF NOT EXISTS github_events (
+    id BIGINT NOT NULL,
+    type VARCHAR(30) NULL,
+    actor VARIANT NULL,
+    repo VARIANT NULL,
+    payload VARIANT NULL,
+    public BOOLEAN NULL,
+    created_at DATETIME NULL,
+    INDEX idx_payload (`payload`) USING INVERTED PROPERTIES("parser" = "english") COMMENT 'inverted index for payload'
+)
+DUPLICATE KEY(`id`)
+DISTRIBUTED BY HASH(id) BUCKETS 10
+properties("replication_num" = "1");
+CREATE DATABASE IF NOT EXISTS lineage_demo;
+USE lineage_demo;
+
+CREATE TABLE lineage_source (
+    region VARCHAR(32),
+    amount DECIMAL(18, 2),
+    status VARCHAR(16)
+)
+DUPLICATE KEY(region)
+DISTRIBUTED BY HASH(region) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+CREATE TABLE lineage_target (
+    region VARCHAR(32),
+    total_amount DECIMAL(18, 2),
+    region_seq BIGINT,
+    region_group VARCHAR(16)
+)
+DUPLICATE KEY(region)
+DISTRIBUTED BY HASH(region) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+INSERT INTO lineage_source VALUES
+    ('east', 100.00, 'PAID'),
+    ('east', 30.00, 'CANCELLED'),
+    ('west', 80.00, 'PAID');
+
+INSERT INTO lineage_target
+SELECT
+    region,
+    SUM(amount) AS total_amount,
+    ROW_NUMBER() OVER (ORDER BY region) AS region_seq,
+    CASE
+        WHEN region = 'east' THEN 'CORE'
+        ELSE 'OTHER'
+    END AS region_group
+FROM lineage_source
+WHERE status = 'PAID'
+GROUP BY region
+ORDER BY SUM(amount) DESC;
+
+SELECT region, total_amount, region_seq, region_group
+FROM lineage_target
+ORDER BY region;
+CREATE CATALOG newdb_catalog PROPERTIES (
+    "type" = "jdbc",
+    "user" = "newdb_user",
+    "password" = "newdb_password",
+    "jdbc_url" = "jdbc:newdb://host:port/database",
+    "driver_url" = "newdb-jdbc-driver.jar",
+    "driver_class" = "com.newdb.jdbc.Driver"
+);
+
+-- Use the Catalog
+USE newdb_catalog.database_name;
+SELECT * FROM table_name LIMIT 10;
+switch kafka_tpch;
+show databases;
+select * from tpch.customer limit 10;
+CREATE ROLE ldap_readonly;
+CREATE ROLE ldap_query_user;
+
+GRANT SELECT_PRIV ON internal.example_db.* TO ROLE 'ldap_readonly';
+GRANT SELECT_PRIV ON internal.example_db.example_table TO ROLE 'ldap_query_user';
+USE `db_name`;
+SHOW ROUTINE LOAD FOR `job_name`;
+CREATE TABLE IF NOT EXISTS user.activity (
+    `user_id`        INT      NOT NULL,
+    `date`           DATE     NOT NULL,
+    `city`           VARCHAR(20),
+    `age`            SMALLINT,
+    `sex`            TINYINT,
+    `last_visit_date` DATETIME DEFAULT '1970-01-01 00:00:00',
+    `cost`           BIGINT   DEFAULT '0',
+    `max_dwell_time` INT      DEFAULT '0',
+    `min_dwell_time` INT      DEFAULT '99999'
+);
+
+INSERT INTO user.activity VALUES
+    (10000, '2017-10-01', 'Beijing',   20, 0, '2017-10-01 06:00:00', 20,  10, 10),
+    (10000, '2017-10-01', 'Beijing',   20, 0, '2017-10-01 07:00:00', 15,  2,  2),
+    (10001, '2017-10-01', 'Beijing',   30, 1, '2017-10-01 17:05:00', 2,   22, 22),
+    (10002, '2017-10-02', 'Shanghai',  20, 1, '2017-10-02 12:59:00', 200, 5,  5),
+    (10003, '2017-10-02', 'Guangzhou', 32, 0, '2017-10-02 11:20:00', 30,  11, 11),
+    (10004, '2017-10-01', 'Shenzhen',  35, 0, '2017-10-01 10:00:00', 100, 3,  3),
+    (10004, '2017-10-03', 'Shenzhen',  35, 0, '2017-10-03 10:20:00', 11,  6,  6);
+SET show_all_fe_connection = true;
+SHOW PROCESSLIST;
+SET dry_run_query = true;
+    SELECT * FROM hits.hits;
+-- Set to scan data only, do not return results
+    SET dry_run_query = true;
+
+    SELECT * FROM s3(
+        "URI" = "https://bucketname/1kw.tsv",
+        "s3.access_key" = "ak",
+        "s3.secret_key" = "sk",
+        "format" = "csv",
+        "use_path_style" = "true"
+    );
+SET dry_run_query = true;
+
+    SELECT * FROM s3(
+        "URI" = "https://bucketname/1kw.tsv",
+        "s3.access_key" = "ak",
+        "s3.secret_key" = "sk",
+        "format" = "csv",
+        "use_path_style" = "true"
+    );
+CREATE TABLE candidate_profiles (
+    candidate_id INT,
+    name         VARCHAR(50),
+    self_intro   VARCHAR(500)
+)
+DUPLICATE KEY(candidate_id)
+DISTRIBUTED BY HASH(candidate_id) BUCKETS 1
+PROPERTIES (
+    "replication_num" = "1"
+);
+
+CREATE TABLE job_requirements (
+    job_id   INT,
+    title    VARCHAR(100),
+    jd_text  VARCHAR(500)
+)
+DUPLICATE KEY(job_id)
+DISTRIBUTED BY HASH(job_id) BUCKETS 1
+PROPERTIES (
+    "replication_num" = "1"
+);
+
+INSERT INTO candidate_profiles VALUES
+(1, 'Alice', 'I am a senior backend engineer with 7 years of experience in Java, Spring Cloud and high-concurrency systems.'),
+(2, 'Bob',   'Frontend developer focusing on React, TypeScript and performance optimization for e-commerce sites.'),
+(3, 'Cathy', 'Data scientist specializing in NLP, large language models and recommendation systems.');
+
+INSERT INTO job_requirements VALUES
+(101, 'Backend Engineer', 'Looking for a senior backend engineer with deep Java expertise and experience designing distributed systems.'),
+(102, 'ML Engineer',      'Seeking a data scientist or ML engineer familiar with NLP and large language models.');
+-- Limit a single query to using at most 50% of the cache
+SET file_cache_query_limit_percent = 50;
+
+-- Execute the query
+SELECT * FROM large_table;
+CREATE DATABASE automq_db;
+USE automq_db;
+
+CREATE TABLE automq_db.users (
+    id BIGINT NOT NULL,
+    name STRING NOT NULL,
+    timestamp STRING NULL,
+    status STRING NULL
+) DISTRIBUTED BY HASH(id) PROPERTIES ("replication_num" = "1");
+CREATE DATABASE log_db;
+USE log_db;
+
+CREATE TABLE github_events
+(
+  `created_at` DATETIME,
+  `id` BIGINT,
+  `type` TEXT,
+  `public` BOOLEAN,
+  `actor` VARIANT,
+  `repo` VARIANT,
+  `payload` TEXT,
+  INDEX `idx_id` (`id`) USING INVERTED,
+  INDEX `idx_type` (`type`) USING INVERTED,
+  INDEX `idx_actor` (`actor`) USING INVERTED,
+  INDEX `idx_host` (`repo`) USING INVERTED,
+  INDEX `idx_payload` (`payload`) USING INVERTED PROPERTIES("parser" = "unicode", "support_phrase" = "true")
+)
+ENGINE = OLAP
+DUPLICATE KEY(`created_at`)
+PARTITION BY RANGE(`created_at`) ()
+DISTRIBUTED BY RANDOM BUCKETS 10
+PROPERTIES (
+"replication_num" = "1",
+"compaction_policy" = "time_series",
+"dynamic_partition.enable" = "true",
+"dynamic_partition.create_history_partition" = "true",
+"dynamic_partition.time_unit" = "DAY",
+"dynamic_partition.start" = "-30",
+"dynamic_partition.end" = "1",
+"dynamic_partition.prefix" = "p",
+"dynamic_partition.buckets" = "10",
+"dynamic_partition.replication_num" = "1"
+);
+CREATE DATABASE test;
+
+CREATE TABLE test.student (
+    `id` INT,
+    `name` VARCHAR(256),
+    `age` INT
+)
+UNIQUE KEY(`id`)
+DISTRIBUTED BY HASH(`id`) BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 3"
+);
+
+INSERT INTO test.student values(1, "James", 18);
+INSERT INTO test.student values(2, "Emily", 28);
+
+CREATE TABLE test.student_trans (
+    `id` INT,
+    `name` VARCHAR(256),
+    `age` INT
+)
+UNIQUE KEY(`id`)
+DISTRIBUTED BY HASH(`id`) BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 3"
+);
+use hive_test;
+
+-- Regular Hive table that stores raw data
+CREATE TABLE IF NOT EXISTS `hive_table`(
+    `k1`   int       COMMENT '',
+    `k2`   String    COMMENT '',
+    `k3`   String    COMMENT '',
+    `uuid` int       COMMENT ''
+) COMMENT 'source table';
+
+insert into hive_table select 1, 'a', 'b', 12345;
+insert into hive_table select 1, 'a', 'c', 12345;
+insert into hive_table select 2, 'b', 'c', 23456;
+insert into hive_table select 3, 'c', 'd', 34567;
+CREATE DATABASE log_db;
+USE log_db;
+
+CREATE TABLE github_events
+(
+    `created_at` DATETIME,
+    `id` BIGINT,
+    `type` TEXT,
+    `public` BOOLEAN,
+    `actor.id` BIGINT,
+    `actor.login` TEXT,
+    `actor.display_login` TEXT,
+    `actor.gravatar_id` TEXT,
+    `actor.url` TEXT,
+    `actor.avatar_url` TEXT,
+    `repo.id` BIGINT,
+    `repo.name` TEXT,
+    `repo.url` TEXT,
+    `payload` TEXT,
+    `host` TEXT,
+    `path` TEXT,
+    INDEX `idx_id` (`id`) USING INVERTED,
+    INDEX `idx_type` (`type`) USING INVERTED,
+    INDEX `idx_actor.id` (`actor.id`) USING INVERTED,
+    INDEX `idx_actor.login` (`actor.login`) USING INVERTED,
+    INDEX `idx_repo.id` (`repo.id`) USING INVERTED,
+    INDEX `idx_repo.name` (`repo.name`) USING INVERTED,
+    INDEX `idx_host` (`host`) USING INVERTED,
+    INDEX `idx_path` (`path`) USING INVERTED,
+    INDEX `idx_payload` (`payload`) USING INVERTED PROPERTIES("parser" = "unicode", "support_phrase" = "true")
+)
+ENGINE = OLAP
+DUPLICATE KEY(`created_at`)
+PARTITION BY RANGE(`created_at`) ()
+DISTRIBUTED BY RANDOM BUCKETS 10
+PROPERTIES (
+    "replication_num" = "1",
+    "compaction_policy" = "time_series",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.create_history_partition" = "true",
+    "dynamic_partition.time_unit" = "DAY",
+    "dynamic_partition.start" = "-30",
+    "dynamic_partition.end" = "1",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "10",
+    "dynamic_partition.replication_num" = "1"
+);
+CREATE DATABASE log_db;
+USE log_db;
+
+CREATE TABLE github_events
+(
+    `created_at` DATETIME,
+    `id` BIGINT,
+    `type` TEXT,
+    `public` BOOLEAN,
+    `actor` VARIANT,
+    `repo` VARIANT,
+    `payload` TEXT,
+    INDEX `idx_id` (`id`) USING INVERTED,
+    INDEX `idx_type` (`type`) USING INVERTED,
+    INDEX `idx_actor` (`actor`) USING INVERTED,
+    INDEX `idx_host` (`repo`) USING INVERTED,
+    INDEX `idx_payload` (`payload`) USING INVERTED PROPERTIES("parser" = "unicode", "support_phrase" = "true")
+)
+ENGINE = OLAP
+DUPLICATE KEY(`created_at`)
+PARTITION BY RANGE(`created_at`) ()
+DISTRIBUTED BY RANDOM BUCKETS 10
+PROPERTIES (
+    "replication_num" = "1",
+    "inverted_index_storage_format" = "v2",
+    "compaction_policy" = "time_series",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.create_history_partition" = "true",
+    "dynamic_partition.time_unit" = "DAY",
+    "dynamic_partition.start" = "-30",
+    "dynamic_partition.end" = "1",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "10",
+    "dynamic_partition.replication_num" = "1"
+);
+CREATE DATABASE log_db;
+USE log_db;
+
+CREATE TABLE github_events
+(
+    `created_at` DATETIME,
+    `id`         BIGINT,
+    `type`       TEXT,
+    `public`     BOOLEAN,
+    `actor`      VARIANT,
+    `repo`       VARIANT,
+    `payload`    TEXT,
+    INDEX `idx_id`      (`id`)      USING INVERTED,
+    INDEX `idx_type`    (`type`)    USING INVERTED,
+    INDEX `idx_actor`   (`actor`)   USING INVERTED,
+    INDEX `idx_host`    (`repo`)    USING INVERTED,
+    INDEX `idx_payload` (`payload`) USING INVERTED PROPERTIES("parser" = "unicode", "support_phrase" = "true")
+)
+ENGINE = OLAP
+DUPLICATE KEY(`created_at`)
+PARTITION BY RANGE(`created_at`) ()
+DISTRIBUTED BY RANDOM BUCKETS 10
+PROPERTIES (
+    "replication_num" = "1",
+    "inverted_index_storage_format" = "v2",
+    "compaction_policy" = "time_series",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.create_history_partition" = "true",
+    "dynamic_partition.time_unit" = "DAY",
+    "dynamic_partition.start" = "-30",
+    "dynamic_partition.end" = "1",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "10",
+    "dynamic_partition.replication_num" = "1"
+);
+CREATE DATABASE IF NOT EXISTS lineage_demo;
+USE lineage_demo;
+
+CREATE TABLE lineage_orders (
+    order_id BIGINT,
+    customer_id BIGINT,
+    region VARCHAR(16),
+    amount DECIMAL(18, 2),
+    status VARCHAR(16)
+)
+DUPLICATE KEY(order_id)
+DISTRIBUTED BY HASH(order_id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+CREATE TABLE lineage_customers (
+    customer_id BIGINT,
+    customer_name VARCHAR(64),
+    customer_level VARCHAR(16)
+)
+DUPLICATE KEY(customer_id)
+DISTRIBUTED BY HASH(customer_id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+CREATE TABLE lineage_customer_summary (
+    customer_id BIGINT,
+    region_label VARCHAR(16),
+    total_amount DECIMAL(18, 2),
+    customer_seq BIGINT,
+    region_group VARCHAR(16)
+)
+DUPLICATE KEY(customer_id)
+DISTRIBUTED BY HASH(customer_id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+
+INSERT INTO lineage_customers VALUES
+    (1, 'Alice', 'VIP'),
+    (2, 'Bob', 'VIP'),
+    (3, 'Carol', 'REGULAR');
+
+INSERT INTO lineage_orders VALUES
+    (101, 1, 'east', 100.00, 'PAID'),
+    (102, 1, 'east',  50.00, 'PAID'),
+    (103, 2, 'west',  80.00, 'PAID'),
+    (104, 2, 'west',  30.00, 'CANCELLED'),
+    (105, 3, 'north', 200.00, 'PAID');
+
+INSERT INTO lineage_customer_summary
+WITH customer_totals AS (
+    SELECT
+        o.customer_id,
+        UPPER(o.region) AS region_label,
+        SUM(o.amount) AS total_amount
+    FROM lineage_orders o
+    JOIN lineage_customers c
+        ON o.customer_id = c.customer_id
+    WHERE o.status = 'PAID'
+      AND c.customer_level = 'VIP'
+    GROUP BY o.customer_id, UPPER(o.region)
+    HAVING SUM(o.amount) >= 50
+)
+SELECT
+    customer_id,
+    region_label,
+    total_amount,
+    ROW_NUMBER() OVER (ORDER BY customer_id) AS customer_seq,
+    CASE
+        WHEN region_label = 'EAST' THEN 'CORE'
+        ELSE 'OTHER'
+    END AS region_group
+FROM customer_totals
+ORDER BY total_amount DESC;
+
+SELECT customer_id, region_label, total_amount, customer_seq, region_group
+FROM lineage_customer_summary
+ORDER BY customer_id;
+CREATE TABLE IF NOT EXISTS tbl (
+    `c1` int(11) NULL,
+    `c2` string NULL,
+    `c3` bigint NULL
+)
+DISTRIBUTED BY HASH(c1) BUCKETS 20
+PROPERTIES("replication_num" = "1");
+
+INSERT INTO tbl VALUES
+    (1, 'doris', 18),
+    (2, 'nereids', 20),
+    (3, 'pipelibe', 99999),
+    (4, 'Apache', 122123455),
+    (5, NULL, NULL);
+-- Create a Hive Catalog
+CREATE CATALOG hive_catalog PROPERTIES (
+    'type' = 'hms',
+    'hive.metastore.uris' = 'thrift://172.0.0.1:9083'
+);
+
+-- Export the Hive table
+EXPORT TABLE hive_catalog.sf1.lineitem TO "s3://bucket/export/export_"
+PROPERTIES(
+    "format" = "csv",
+    "max_file_size" = "1024MB"
+) WITH s3 (
+    "s3.endpoint" = "xxxxx",
+    "s3.region" = "xxxxx",
+    "s3.secret_key"="xxxx",
+    "s3.access_key" = "xxxxx"
+);
+CREATE TABLE IF NOT EXISTS tbl (
+    `c1` int(11) NULL,
+    `c2` string NULL,
+    `c3` bigint NULL
+)
+DISTRIBUTED BY HASH(c1) BUCKETS 20
+PROPERTIES("replication_num" = "1");
+
+insert into tbl values
+    (1, 'doris', 18),
+    (2, 'nereids', 20),
+    (3, 'pipelibe', 99999),
+    (4, 'Apache', 122123455),
+    (5, null, null);
+CREATE CATALOG mysql_catalog properties(
+    'type' = 'jdbc',
+    'user' = 'root',
+    'password' = '123456',
+    'jdbc_url' = 'jdbc:mysql://host:3306/mysql_db',
+    'driver_url' = 'mysql-connector-java-8.0.25.jar',
+    'driver_class' = 'com.mysql.cj.jdbc.Driver'
+);
+
+-- Load into an existing table with INSERT INTO
+INSERT INTO internal.doris_db.tbl1
+SELECT * FROM mysql_catalog.mysql_db.table1;
+
+-- Create the table and load data in one step with CTAS
+CREATE TABLE internal.doris_db.tbl1
+PROPERTIES('replication_num' = '1')
+AS
+SELECT * FROM mysql_catalog.mysql_db.table1;
+CREATE DATABASE IF NOT EXISTS doris_db;
+
+CREATE TABLE doris_db.students (
+    id     INT,
+    name   VARCHAR(64),
+    age    INT
+)
+UNIQUE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+SHOW TABLES FROM doris_db;
+SELECT * FROM doris_db.students;
+CREATE DATABASE IF NOT EXISTS doris_db;
+
+CREATE TABLE doris_db.students (
+    id    INT,
+    name  VARCHAR(64),
+    age   INT
+)
+UNIQUE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+SET enable_unique_key_partial_update=true;
+INSERT INTO order_tbl (order_id, order_status) VALUES (1, 'Pending shipment');
+SET enable_unique_key_partial_update=true;
+SET partial_update_new_key_behavior=ERROR;
+
+INSERT INTO user_profile (id, balance, last_access_time) VALUES
+    (1, 500, '2023-07-03 12:00:01'),
+    (3, 23, '2023-07-03 12:00:02'),
+    (18, 9999999, '2023-07-03 12:00:03');
+
+-- Error:
+-- (1105, "errCode = 2, detailMessage = (127.0.0.1)[INTERNAL_ERROR]tablet error:
+-- [E-7003]Can't append new rows in partial update when partial_update_new_key_behavior is ERROR.
+-- Row with key=[3] is not in table., host: 127.0.0.1")
+;
+-- 1. Verify primary key uniqueness (only one latest row per user_id)
+SELECT user_id, count(*) as cnt FROM user_profiles GROUP BY user_id HAVING cnt > 1;
+
+-- 2. Verify data distribution
+SHOW TABLETS FROM user_profiles;
+-- Check whether the index is used (look at output_id for Sort Key columns)
+EXPLAIN SELECT * FROM table_name WHERE key_col = 'xxx';
+
+-- Check tablet size (to detect data skew)
+SHOW TABLETS FROM table_name;
+-- create a test database
+   create database testdb;
+    
+   -- create a test table
+   CREATE TABLE testdb.table_hash
+   (
+       k1 TINYINT,
+       k2 DECIMAL(10, 2) DEFAULT "10.5",
+       k3 VARCHAR(10) COMMENT "string column",
+       k4 INT NOT NULL DEFAULT "1" COMMENT "int column"
+   )
+   COMMENT "my first table"
+   DISTRIBUTED BY HASH(k1) BUCKETS 32;
+-- Verify connection
+SHOW DATABASES FROM gravitino_vending;
+
+-- Switch to vended credentials catalog
+SWITCH gravitino_vending;
+
+-- Create database and table
+CREATE DATABASE demo;
+USE gravitino_vending.demo;
+
+CREATE TABLE gravitino_table (
+    id INT,
+    name STRING
+)
+PROPERTIES (
+    'write-format' = 'parquet'
+);
+
+-- Insert test data
+INSERT INTO gravitino_table VALUES (1, 'Doris'), (2, 'Gravitino');
+
+-- Query verification
+SELECT * FROM gravitino_table;
+-- Switch to the Catalog and Namespace configured in Lakekeeper
+USE lakekeeper_static.demo;
+
+-- Create an Iceberg table
+CREATE TABLE my_iceberg_table (
+  id INT,
+  name STRING
+)
+PROPERTIES (
+  'write-format'='parquet'
+);
+
+-- Insert data
+INSERT INTO my_iceberg_table VALUES (1, 'Doris'), (2, 'Lakekeeper');
+
+-- Query data
+SELECT * FROM my_iceberg_table;
+-- Expected result:
+-- +------+------------+
+-- | id   | name       |
+-- +------+------------+
+-- | 1    | Doris      |
+-- | 2    | Lakekeeper |
+-- +------+------------+
+;
+-- switch catalog
+SWITCH internal;
+-- create database
+CREATE DATABASE tpch_100g;
+-- ingest data
+CREATE TABLE tpch_100g.lineitem AS SELECT * FROM mc.selectdb_test.lineitem;
+CREATE TABLE tpch_100g.nation AS SELECT * FROM mc.selectdb_test.nation;
+CREATE TABLE tpch_100g.orders AS SELECT * FROM mc.selectdb_test.orders;
+CREATE TABLE tpch_100g.part AS SELECT * FROM mc.selectdb_test.part;
+CREATE TABLE tpch_100g.partsupp AS SELECT * FROM mc.selectdb_test.partsupp;
+CREATE TABLE tpch_100g.region AS SELECT * FROM mc.selectdb_test.region;
+CREATE TABLE tpch_100g.supplier AS SELECT * FROM mc.selectdb_test.supplier;
+-- switch catalog
+SWITCH internal;
+-- create database
+CREATE DATABASE github_events;
+-- ingest data
+CREATE TABLE github_events.dwd_github_events_odps
+AS SELECT * FROM mc.github_events.dwd_github_events_odps
+WHERE ds BETWEEN '2015-01-01' AND '2016-01-01';
+-- Switch to MaxCompute Catalog
+SWITCH mc;
+
+-- Create Schema
+CREATE DATABASE IF NOT EXISTS mc_schema;
+
+-- Create using fully qualified name
+CREATE DATABASE IF NOT EXISTS mc.mc_schema;
+
+-- Drop Schema (will also delete all tables within it)
+DROP DATABASE IF EXISTS mc.mc_schema;
+-- Create non-partitioned table
+CREATE TABLE mc_schema.mc_tbl1 (
+    id INT,
+    name STRING,
+    amount DECIMAL(18, 6),
+    create_time DATETIME
+);
+
+-- Create partitioned table
+CREATE TABLE mc_schema.mc_tbl2 (
+    id INT,
+    val STRING,
+    ds STRING,
+    region STRING
+)
+PARTITION BY (ds, region)();
+
+-- Drop table (will also delete data, including partition data)
+DROP TABLE IF EXISTS mc_schema.mc_tbl1;
+-- Switch to the Catalog
+USE nessie_vc;
+
+-- Create a namespace (database)
+CREATE DATABASE demo;
+USE demo;
+
+-- Create an Iceberg table
+CREATE TABLE my_iceberg_table (
+  id INT,
+  name STRING
+)
+PROPERTIES (
+  'write-format'='parquet'
+);
+
+-- Insert data
+INSERT INTO my_iceberg_table VALUES (1, 'alice'), (2, 'bob');
+
+-- Query data
+SELECT * FROM my_iceberg_table;
+-- Expected result:
+-- +------+-------+
+-- | id   | name  |
+-- +------+-------+
+-- | 1    | alice |
+-- | 2    | bob   |
+-- +------+-------+
+;
+-- Switch to the Catalog you created and the Namespace configured in Polaris
+USE polaris_vended.doris_demo;
+
+-- Create an Iceberg table
+CREATE TABLE my_iceberg_table (
+  id INT,
+  name STRING
+)
+PROPERTIES (
+  'write-format'='parquet'
+);
+
+-- Insert data
+INSERT INTO my_iceberg_table VALUES (1, 'Doris'), (2, 'Polaris');
+
+-- Query data
+SELECT * FROM my_iceberg_table;
+-- Expected result:
+-- +------+---------+
+-- | id   | name    |
+-- +------+---------+
+-- | 1    | Doris   |
+-- | 2    | Polaris |
+-- +------+---------+
+;
+USE seaweedfs;
+
+CREATE DATABASE IF NOT EXISTS demo;
+
+USE seaweedfs.demo;
+
+CREATE TABLE iceberg_smoke (
+  id BIGINT,
+  label STRING
+);
+
+INSERT INTO iceberg_smoke VALUES (1, 'one'), (2, 'two'), (3, 'three');
+
+SELECT id, label FROM iceberg_smoke ORDER BY id;
+INSERT INTO snowflake_open_catalog.public.doris_open_catalog_t
+VALUES (1, 'open_catalog_insert');
+
+SELECT *
+FROM snowflake_open_catalog.public.doris_open_catalog_t
+ORDER BY id;
+-- Refresh catalog
+REFRESH CATALOG catalog_name;
+
+-- Refresh specified database
+REFRESH DATABASE catalog_name.db_name;
+
+-- Refresh specified table
+REFRESH TABLE catalog_name.db_name.table_name;
+------------------------------------------------------------------------------------------
+[ALTER_TABLE|ADD_INDEX] ALTER TABLE amazon_reviews ADD INDEX review_body_inverted_idx(`review_body`) 
+    USING INVERTED PROPERTIES("parser" = "english","support_phrase" = "true");
+----------
+[ADMIN] BUILD INDEX review_body_inverted_idx ON amazon_reviews;
+----------
+[ALTER_TABLE|ADD_INDEX] ALTER TABLE amazon_reviews ADD INDEX product_id_inverted_idx(product_id) USING INVERTED
+----------
+[ALTER_TABLE|ADD_INDEX] ALTER TABLE amazon_reviews ADD INDEX customer_id_inverted_idx(customer_id) USING INVERTED
+----------
+[ADMIN] BUILD INDEX product_id_inverted_idx ON amazon_reviews;
+----------
+[ADMIN] BUILD INDEX customer_id_inverted_idx ON amazon_reviews;
+----------
+[ALTER_TABLE|ADD_INDEX] ALTER TABLE amazon_reviews ADD INDEX product_category_inverted_idx(`product_category`) USING INVERTED;
+----------
+[ADMIN] BUILD INDEX product_category_inverted_idx ON amazon_reviews;
+----------
+[ALTER_TABLE|ADD_INDEX] -- Add inverted index. Doris will generate inverted index for all new data afterward.
+ALTER TABLE table_name ADD INDEX index_name(column_name) USING INVERTED;
+----------
+[ADMIN] -- Build index for the specified historical data partitions.
+BUILD INDEX index_name ON table_name PARTITIONS(partition_name1, partition_name2);
+----------
+[SWITCH_SCHEMA] use tpch;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS orders  (
+    o_orderkey       integer not null,
+    o_custkey        integer not null,
+    o_orderstatus    char(1) not null,
+    o_totalprice     decimalv3(15,2) not null,
+    o_orderdate      date not null,
+    o_orderpriority  char(15) not null,
+    o_clerk          char(15) not null,
+    o_shippriority   integer not null,
+    o_comment        varchar(79) not null
+    )
+    DUPLICATE KEY(o_orderkey, o_custkey)
+    PARTITION BY RANGE(o_orderdate)(
+    FROM ('2023-10-17') TO ('2023-10-20') INTERVAL 1 DAY)
+    DISTRIBUTED BY HASH(o_orderkey) BUCKETS 3
+    PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] insert into orders values
+   (1, 1, 'ok', 99.5, '2023-10-17', 'a', 'b', 1, 'yy'),
+   (2, 2, 'ok', 109.2, '2023-10-18', 'c','d',2, 'mm'),
+   (3, 3, 'ok', 99.5, '2023-10-19', 'a', 'b', 1, 'yy');
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS lineitem (
+    l_orderkey    integer not null,
+    l_partkey     integer not null,
+    l_suppkey     integer not null,
+    l_linenumber  integer not null,
+    l_quantity    decimalv3(15,2) not null,
+    l_extendedprice  decimalv3(15,2) not null,
+    l_discount    decimalv3(15,2) not null,
+    l_tax         decimalv3(15,2) not null,
+    l_returnflag  char(1) not null,
+    l_linestatus  char(1) not null,
+    l_shipdate    date not null,
+    l_commitdate  date not null,
+    l_receiptdate date not null,
+    l_shipinstruct char(25) not null,
+    l_shipmode     char(10) not null,
+    l_comment      varchar(44) not null
+    )
+    DUPLICATE KEY(l_orderkey, l_partkey, l_suppkey, l_linenumber)
+    PARTITION BY RANGE(l_shipdate)
+    (FROM ('2023-10-17') TO ('2023-10-20') INTERVAL 1 DAY)
+    DISTRIBUTED BY HASH(l_orderkey) BUCKETS 3
+    PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] insert into lineitem values
+ (1, 2, 3, 4, 5.5, 6.5, 7.5, 8.5, 'o', 'k', '2023-10-17', '2023-10-17', '2023-10-17', 'a', 'b', 'yyyyyyyyy'),
+ (2, 2, 3, 4, 5.5, 6.5, 7.5, 8.5, 'o', 'k', '2023-10-18', '2023-10-18', '2023-10-18', 'a', 'b', 'yyyyyyyyy'),
+ (3, 2, 3, 6, 7.5, 8.5, 9.5, 10.5, 'k', 'o', '2023-10-19', '2023-10-19', '2023-10-19', 'c', 'd', 'xxxxxxxxx');
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS partsupp (
+  ps_partkey     INTEGER NOT NULL,
+  ps_suppkey     INTEGER NOT NULL,
+  ps_availqty    INTEGER NOT NULL,
+  ps_supplycost  DECIMALV3(15,2)  NOT NULL,
+  ps_comment     VARCHAR(199) NOT NULL 
+)
+DUPLICATE KEY(ps_partkey, ps_suppkey)
+DISTRIBUTED BY HASH(ps_partkey) BUCKETS 3
+PROPERTIES (
+  "replication_num" = "1"
+)
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE `test_arithmetic_expressions_256` (
+      k1 decimal(76, 30),
+      k2 decimal(76, 30)
+    )
+    DISTRIBUTED BY HASH(k1)
+    PROPERTIES (
+    "replication_num" = "1"
+    );
+----------
+[INSERT] insert into test_arithmetic_expressions_256 values
+  (1.000000000000000000000000000001, 9999999999999999999999999999999999999999999998.999999999999999999999999999998),
+  (2.100000000000000000000000000001, 4999999999999999999999999999999999999999999999.899999999999999999999999999998),
+  (3.666666666666666666666666666666, 3333333333333333333333333333333333333333333333.333333333333333333333333333333);
+----------
+[CREATE_SCHEMA] CREATE DATABASE test_variant;
+----------
+[SWITCH_SCHEMA] USE test_variant;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX|COMMENT_INDEX] CREATE TABLE IF NOT EXISTS github_events (
+    id BIGINT NOT NULL,
+    type VARCHAR(30) NULL,
+    actor VARIANT NULL,
+    repo VARIANT NULL,
+    payload VARIANT NULL,
+    public BOOLEAN NULL,
+    created_at DATETIME NULL,
+    INDEX idx_payload (`payload`) USING INVERTED PROPERTIES("parser" = "english") COMMENT 'inverted index for payload'
+)
+DUPLICATE KEY(`id`)
+DISTRIBUTED BY HASH(id) BUCKETS 10
+properties("replication_num" = "1");
+----------
+[CREATE_SCHEMA] CREATE DATABASE IF NOT EXISTS lineage_demo;
+----------
+[SWITCH_SCHEMA] USE lineage_demo;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE lineage_source (
+    region VARCHAR(32),
+    amount DECIMAL(18, 2),
+    status VARCHAR(16)
+)
+DUPLICATE KEY(region)
+DISTRIBUTED BY HASH(region) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE lineage_target (
+    region VARCHAR(32),
+    total_amount DECIMAL(18, 2),
+    region_seq BIGINT,
+    region_group VARCHAR(16)
+)
+DUPLICATE KEY(region)
+DISTRIBUTED BY HASH(region) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO lineage_source VALUES
+    ('east', 100.00, 'PAID'),
+    ('east', 30.00, 'CANCELLED'),
+    ('west', 80.00, 'PAID');
+----------
+[INSERT|SELECT] INSERT INTO lineage_target
+SELECT
+    region,
+    SUM(amount) AS total_amount,
+    ROW_NUMBER() OVER (ORDER BY region) AS region_seq,
+    CASE
+        WHEN region = 'east' THEN 'CORE'
+        ELSE 'OTHER'
+    END AS region_group
+FROM lineage_source
+WHERE status = 'PAID'
+GROUP BY region
+ORDER BY SUM(amount) DESC;
+----------
+[SELECT] SELECT region, total_amount, region_seq, region_group
+FROM lineage_target
+ORDER BY region;
+----------
+[CREATE_CATALOG] CREATE CATALOG newdb_catalog PROPERTIES (
+    "type" = "jdbc",
+    "user" = "newdb_user",
+    "password" = "newdb_password",
+    "jdbc_url" = "jdbc:newdb://host:port/database",
+    "driver_url" = "newdb-jdbc-driver.jar",
+    "driver_class" = "com.newdb.jdbc.Driver"
+);
+----------
+[SWITCH_SCHEMA] -- Use the Catalog
+USE newdb_catalog.database_name;
+----------
+[SELECT] SELECT * FROM table_name LIMIT 10;
+----------
+[SWITCH_CATALOG] switch kafka_tpch;
+----------
+[METADATA] show databases;
+----------
+[SELECT] select * from tpch.customer limit 10;
+----------
+[CREATE_ROLE] CREATE ROLE ldap_readonly;
+----------
+[CREATE_ROLE] CREATE ROLE ldap_query_user;
+----------
+[GRANT] GRANT SELECT_PRIV ON internal.example_db.* TO ROLE 'ldap_readonly';
+----------
+[GRANT] GRANT SELECT_PRIV ON internal.example_db.example_table TO ROLE 'ldap_query_user';
+----------
+[SWITCH_SCHEMA] USE `db_name`;
+----------
+[METADATA] SHOW ROUTINE LOAD FOR `job_name`;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS user.activity (
+    `user_id`        INT      NOT NULL,
+    `date`           DATE     NOT NULL,
+    `city`           VARCHAR(20),
+    `age`            SMALLINT,
+    `sex`            TINYINT,
+    `last_visit_date` DATETIME DEFAULT '1970-01-01 00:00:00',
+    `cost`           BIGINT   DEFAULT '0',
+    `max_dwell_time` INT      DEFAULT '0',
+    `min_dwell_time` INT      DEFAULT '99999'
+);
+----------
+[INSERT] INSERT INTO user.activity VALUES
+    (10000, '2017-10-01', 'Beijing',   20, 0, '2017-10-01 06:00:00', 20,  10, 10),
+    (10000, '2017-10-01', 'Beijing',   20, 0, '2017-10-01 07:00:00', 15,  2,  2),
+    (10001, '2017-10-01', 'Beijing',   30, 1, '2017-10-01 17:05:00', 2,   22, 22),
+    (10002, '2017-10-02', 'Shanghai',  20, 1, '2017-10-02 12:59:00', 200, 5,  5),
+    (10003, '2017-10-02', 'Guangzhou', 32, 0, '2017-10-02 11:20:00', 30,  11, 11),
+    (10004, '2017-10-01', 'Shenzhen',  35, 0, '2017-10-01 10:00:00', 100, 3,  3),
+    (10004, '2017-10-03', 'Shenzhen',  35, 0, '2017-10-03 10:20:00', 11,  6,  6);
+----------
+[SESSION_SETTING_WRITE] SET show_all_fe_connection = true;
+----------
+[PERFORMANCE] SHOW PROCESSLIST;
+----------
+[SESSION_SETTING_WRITE] SET dry_run_query = true;
+----------
+[SELECT] SELECT * FROM hits.hits;
+----------
+[SESSION_SETTING_WRITE] SET dry_run_query = true;
+----------
+[SELECT|DATA_IMPORT] SELECT * FROM s3(
+        "URI" = "https://bucketname/1kw.tsv",
+        "s3.access_key" = "ak",
+        "s3.secret_key" = "sk",
+        "format" = "csv",
+        "use_path_style" = "true"
+    );
+----------
+[SESSION_SETTING_WRITE] SET dry_run_query = true;
+----------
+[SELECT|DATA_IMPORT] SELECT * FROM s3(
+        "URI" = "https://bucketname/1kw.tsv",
+        "s3.access_key" = "ak",
+        "s3.secret_key" = "sk",
+        "format" = "csv",
+        "use_path_style" = "true"
+    );
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE candidate_profiles (
+    candidate_id INT,
+    name         VARCHAR(50),
+    self_intro   VARCHAR(500)
+)
+DUPLICATE KEY(candidate_id)
+DISTRIBUTED BY HASH(candidate_id) BUCKETS 1
+PROPERTIES (
+    "replication_num" = "1"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE job_requirements (
+    job_id   INT,
+    title    VARCHAR(100),
+    jd_text  VARCHAR(500)
+)
+DUPLICATE KEY(job_id)
+DISTRIBUTED BY HASH(job_id) BUCKETS 1
+PROPERTIES (
+    "replication_num" = "1"
+);
+----------
+[INSERT] INSERT INTO candidate_profiles VALUES
+(1, 'Alice', 'I am a senior backend engineer with 7 years of experience in Java, Spring Cloud and high-concurrency systems.'),
+(2, 'Bob',   'Frontend developer focusing on React, TypeScript and performance optimization for e-commerce sites.'),
+(3, 'Cathy', 'Data scientist specializing in NLP, large language models and recommendation systems.');
+----------
+[INSERT] INSERT INTO job_requirements VALUES
+(101, 'Backend Engineer', 'Looking for a senior backend engineer with deep Java expertise and experience designing distributed systems.'),
+(102, 'ML Engineer',      'Seeking a data scientist or ML engineer familiar with NLP and large language models.');
+----------
+[SESSION_SETTING_WRITE] -- Limit a single query to using at most 50% of the cache
+SET file_cache_query_limit_percent = 50;
+----------
+[SELECT] -- Execute the query
+SELECT * FROM large_table;
+----------
+[CREATE_SCHEMA] CREATE DATABASE automq_db;
+----------
+[SWITCH_SCHEMA] USE automq_db;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE automq_db.users (
+    id BIGINT NOT NULL,
+    name STRING NOT NULL,
+    timestamp STRING NULL,
+    status STRING NULL
+) DISTRIBUTED BY HASH(id) PROPERTIES ("replication_num" = "1");
+----------
+[CREATE_SCHEMA] CREATE DATABASE log_db;
+----------
+[SWITCH_SCHEMA] USE log_db;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE github_events
+(
+  `created_at` DATETIME,
+  `id` BIGINT,
+  `type` TEXT,
+  `public` BOOLEAN,
+  `actor` VARIANT,
+  `repo` VARIANT,
+  `payload` TEXT,
+  INDEX `idx_id` (`id`) USING INVERTED,
+  INDEX `idx_type` (`type`) USING INVERTED,
+  INDEX `idx_actor` (`actor`) USING INVERTED,
+  INDEX `idx_host` (`repo`) USING INVERTED,
+  INDEX `idx_payload` (`payload`) USING INVERTED PROPERTIES("parser" = "unicode", "support_phrase" = "true")
+)
+ENGINE = OLAP
+DUPLICATE KEY(`created_at`)
+PARTITION BY RANGE(`created_at`) ()
+DISTRIBUTED BY RANDOM BUCKETS 10
+PROPERTIES (
+"replication_num" = "1",
+"compaction_policy" = "time_series",
+"dynamic_partition.enable" = "true",
+"dynamic_partition.create_history_partition" = "true",
+"dynamic_partition.time_unit" = "DAY",
+"dynamic_partition.start" = "-30",
+"dynamic_partition.end" = "1",
+"dynamic_partition.prefix" = "p",
+"dynamic_partition.buckets" = "10",
+"dynamic_partition.replication_num" = "1"
+);
+----------
+[CREATE_SCHEMA] CREATE DATABASE test;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE test.student (
+    `id` INT,
+    `name` VARCHAR(256),
+    `age` INT
+)
+UNIQUE KEY(`id`)
+DISTRIBUTED BY HASH(`id`) BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 3"
+);
+----------
+[INSERT] INSERT INTO test.student values(1, "James", 18);
+----------
+[INSERT] INSERT INTO test.student values(2, "Emily", 28);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE test.student_trans (
+    `id` INT,
+    `name` VARCHAR(256),
+    `age` INT
+)
+UNIQUE KEY(`id`)
+DISTRIBUTED BY HASH(`id`) BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 3"
+);
+----------
+[SWITCH_SCHEMA] use hive_test;
+----------
+[CREATE_TABLE|ADD_COLUMN|COMMENT_COLUMN|COMMENT_TABLE] -- Regular Hive table that stores raw data
+CREATE TABLE IF NOT EXISTS `hive_table`(
+    `k1`   int       COMMENT '',
+    `k2`   String    COMMENT '',
+    `k3`   String    COMMENT '',
+    `uuid` int       COMMENT ''
+) COMMENT 'source table';
+----------
+[INSERT|SELECT] insert into hive_table select 1, 'a', 'b', 12345;
+----------
+[INSERT|SELECT] insert into hive_table select 1, 'a', 'c', 12345;
+----------
+[INSERT|SELECT] insert into hive_table select 2, 'b', 'c', 23456;
+----------
+[INSERT|SELECT] insert into hive_table select 3, 'c', 'd', 34567;
+----------
+[CREATE_SCHEMA] CREATE DATABASE log_db;
+----------
+[SWITCH_SCHEMA] USE log_db;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE github_events
+(
+    `created_at` DATETIME,
+    `id` BIGINT,
+    `type` TEXT,
+    `public` BOOLEAN,
+    `actor.id` BIGINT,
+    `actor.login` TEXT,
+    `actor.display_login` TEXT,
+    `actor.gravatar_id` TEXT,
+    `actor.url` TEXT,
+    `actor.avatar_url` TEXT,
+    `repo.id` BIGINT,
+    `repo.name` TEXT,
+    `repo.url` TEXT,
+    `payload` TEXT,
+    `host` TEXT,
+    `path` TEXT,
+    INDEX `idx_id` (`id`) USING INVERTED,
+    INDEX `idx_type` (`type`) USING INVERTED,
+    INDEX `idx_actor.id` (`actor.id`) USING INVERTED,
+    INDEX `idx_actor.login` (`actor.login`) USING INVERTED,
+    INDEX `idx_repo.id` (`repo.id`) USING INVERTED,
+    INDEX `idx_repo.name` (`repo.name`) USING INVERTED,
+    INDEX `idx_host` (`host`) USING INVERTED,
+    INDEX `idx_path` (`path`) USING INVERTED,
+    INDEX `idx_payload` (`payload`) USING INVERTED PROPERTIES("parser" = "unicode", "support_phrase" = "true")
+)
+ENGINE = OLAP
+DUPLICATE KEY(`created_at`)
+PARTITION BY RANGE(`created_at`) ()
+DISTRIBUTED BY RANDOM BUCKETS 10
+PROPERTIES (
+    "replication_num" = "1",
+    "compaction_policy" = "time_series",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.create_history_partition" = "true",
+    "dynamic_partition.time_unit" = "DAY",
+    "dynamic_partition.start" = "-30",
+    "dynamic_partition.end" = "1",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "10",
+    "dynamic_partition.replication_num" = "1"
+);
+----------
+[CREATE_SCHEMA] CREATE DATABASE log_db;
+----------
+[SWITCH_SCHEMA] USE log_db;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE github_events
+(
+    `created_at` DATETIME,
+    `id` BIGINT,
+    `type` TEXT,
+    `public` BOOLEAN,
+    `actor` VARIANT,
+    `repo` VARIANT,
+    `payload` TEXT,
+    INDEX `idx_id` (`id`) USING INVERTED,
+    INDEX `idx_type` (`type`) USING INVERTED,
+    INDEX `idx_actor` (`actor`) USING INVERTED,
+    INDEX `idx_host` (`repo`) USING INVERTED,
+    INDEX `idx_payload` (`payload`) USING INVERTED PROPERTIES("parser" = "unicode", "support_phrase" = "true")
+)
+ENGINE = OLAP
+DUPLICATE KEY(`created_at`)
+PARTITION BY RANGE(`created_at`) ()
+DISTRIBUTED BY RANDOM BUCKETS 10
+PROPERTIES (
+    "replication_num" = "1",
+    "inverted_index_storage_format" = "v2",
+    "compaction_policy" = "time_series",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.create_history_partition" = "true",
+    "dynamic_partition.time_unit" = "DAY",
+    "dynamic_partition.start" = "-30",
+    "dynamic_partition.end" = "1",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "10",
+    "dynamic_partition.replication_num" = "1"
+);
+----------
+[CREATE_SCHEMA] CREATE DATABASE log_db;
+----------
+[SWITCH_SCHEMA] USE log_db;
+----------
+[CREATE_TABLE|ADD_COLUMN|ADD_INDEX] CREATE TABLE github_events
+(
+    `created_at` DATETIME,
+    `id`         BIGINT,
+    `type`       TEXT,
+    `public`     BOOLEAN,
+    `actor`      VARIANT,
+    `repo`       VARIANT,
+    `payload`    TEXT,
+    INDEX `idx_id`      (`id`)      USING INVERTED,
+    INDEX `idx_type`    (`type`)    USING INVERTED,
+    INDEX `idx_actor`   (`actor`)   USING INVERTED,
+    INDEX `idx_host`    (`repo`)    USING INVERTED,
+    INDEX `idx_payload` (`payload`) USING INVERTED PROPERTIES("parser" = "unicode", "support_phrase" = "true")
+)
+ENGINE = OLAP
+DUPLICATE KEY(`created_at`)
+PARTITION BY RANGE(`created_at`) ()
+DISTRIBUTED BY RANDOM BUCKETS 10
+PROPERTIES (
+    "replication_num" = "1",
+    "inverted_index_storage_format" = "v2",
+    "compaction_policy" = "time_series",
+    "dynamic_partition.enable" = "true",
+    "dynamic_partition.create_history_partition" = "true",
+    "dynamic_partition.time_unit" = "DAY",
+    "dynamic_partition.start" = "-30",
+    "dynamic_partition.end" = "1",
+    "dynamic_partition.prefix" = "p",
+    "dynamic_partition.buckets" = "10",
+    "dynamic_partition.replication_num" = "1"
+);
+----------
+[CREATE_SCHEMA] CREATE DATABASE IF NOT EXISTS lineage_demo;
+----------
+[SWITCH_SCHEMA] USE lineage_demo;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE lineage_orders (
+    order_id BIGINT,
+    customer_id BIGINT,
+    region VARCHAR(16),
+    amount DECIMAL(18, 2),
+    status VARCHAR(16)
+)
+DUPLICATE KEY(order_id)
+DISTRIBUTED BY HASH(order_id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE lineage_customers (
+    customer_id BIGINT,
+    customer_name VARCHAR(64),
+    customer_level VARCHAR(16)
+)
+DUPLICATE KEY(customer_id)
+DISTRIBUTED BY HASH(customer_id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE lineage_customer_summary (
+    customer_id BIGINT,
+    region_label VARCHAR(16),
+    total_amount DECIMAL(18, 2),
+    customer_seq BIGINT,
+    region_group VARCHAR(16)
+)
+DUPLICATE KEY(customer_id)
+DISTRIBUTED BY HASH(customer_id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[INSERT] INSERT INTO lineage_customers VALUES
+    (1, 'Alice', 'VIP'),
+    (2, 'Bob', 'VIP'),
+    (3, 'Carol', 'REGULAR');
+----------
+[INSERT] INSERT INTO lineage_orders VALUES
+    (101, 1, 'east', 100.00, 'PAID'),
+    (102, 1, 'east',  50.00, 'PAID'),
+    (103, 2, 'west',  80.00, 'PAID'),
+    (104, 2, 'west',  30.00, 'CANCELLED'),
+    (105, 3, 'north', 200.00, 'PAID');
+----------
+[INSERT|SELECT] INSERT INTO lineage_customer_summary
+WITH customer_totals AS (
+    SELECT
+        o.customer_id,
+        UPPER(o.region) AS region_label,
+        SUM(o.amount) AS total_amount
+    FROM lineage_orders o
+    JOIN lineage_customers c
+        ON o.customer_id = c.customer_id
+    WHERE o.status = 'PAID'
+      AND c.customer_level = 'VIP'
+    GROUP BY o.customer_id, UPPER(o.region)
+    HAVING SUM(o.amount) >= 50
+)
+SELECT
+    customer_id,
+    region_label,
+    total_amount,
+    ROW_NUMBER() OVER (ORDER BY customer_id) AS customer_seq,
+    CASE
+        WHEN region_label = 'EAST' THEN 'CORE'
+        ELSE 'OTHER'
+    END AS region_group
+FROM customer_totals
+ORDER BY total_amount DESC;
+----------
+[SELECT] SELECT customer_id, region_label, total_amount, customer_seq, region_group
+FROM lineage_customer_summary
+ORDER BY customer_id;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS tbl (
+    `c1` int(11) NULL,
+    `c2` string NULL,
+    `c3` bigint NULL
+)
+DISTRIBUTED BY HASH(c1) BUCKETS 20
+PROPERTIES("replication_num" = "1");
+----------
+[INSERT] INSERT INTO tbl VALUES
+    (1, 'doris', 18),
+    (2, 'nereids', 20),
+    (3, 'pipelibe', 99999),
+    (4, 'Apache', 122123455),
+    (5, NULL, NULL);
+----------
+[CREATE_CATALOG] -- Create a Hive Catalog
+CREATE CATALOG hive_catalog PROPERTIES (
+    'type' = 'hms',
+    'hive.metastore.uris' = 'thrift://172.0.0.1:9083'
+);
+----------
+[DATA_EXPORT] -- Export the Hive table
+EXPORT TABLE hive_catalog.sf1.lineitem TO "s3://bucket/export/export_"
+PROPERTIES(
+    "format" = "csv",
+    "max_file_size" = "1024MB"
+) WITH s3 (
+    "s3.endpoint" = "xxxxx",
+    "s3.region" = "xxxxx",
+    "s3.secret_key"="xxxx",
+    "s3.access_key" = "xxxxx"
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE IF NOT EXISTS tbl (
+    `c1` int(11) NULL,
+    `c2` string NULL,
+    `c3` bigint NULL
+)
+DISTRIBUTED BY HASH(c1) BUCKETS 20
+PROPERTIES("replication_num" = "1");
+----------
+[INSERT] insert into tbl values
+    (1, 'doris', 18),
+    (2, 'nereids', 20),
+    (3, 'pipelibe', 99999),
+    (4, 'Apache', 122123455),
+    (5, null, null);
+----------
+[CREATE_CATALOG] CREATE CATALOG mysql_catalog properties(
+    'type' = 'jdbc',
+    'user' = 'root',
+    'password' = '123456',
+    'jdbc_url' = 'jdbc:mysql://host:3306/mysql_db',
+    'driver_url' = 'mysql-connector-java-8.0.25.jar',
+    'driver_class' = 'com.mysql.cj.jdbc.Driver'
+);
+----------
+[INSERT|SELECT] -- Load into an existing table with INSERT INTO
+INSERT INTO internal.doris_db.tbl1
+SELECT * FROM mysql_catalog.mysql_db.table1;
+----------
+[CREATE_TABLE] -- Create the table and load data in one step with CTAS
+CREATE TABLE internal.doris_db.tbl1
+PROPERTIES('replication_num' = '1')
+AS
+SELECT * FROM mysql_catalog.mysql_db.table1;
+----------
+[CREATE_SCHEMA] CREATE DATABASE IF NOT EXISTS doris_db;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE doris_db.students (
+    id     INT,
+    name   VARCHAR(64),
+    age    INT
+)
+UNIQUE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[METADATA] SHOW TABLES FROM doris_db;
+----------
+[SELECT] SELECT * FROM doris_db.students;
+----------
+[CREATE_SCHEMA] CREATE DATABASE IF NOT EXISTS doris_db;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE doris_db.students (
+    id    INT,
+    name  VARCHAR(64),
+    age   INT
+)
+UNIQUE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_num" = "1");
+----------
+[SESSION_SETTING_WRITE] SET enable_unique_key_partial_update=true;
+----------
+[INSERT] INSERT INTO order_tbl (order_id, order_status) VALUES (1, 'Pending shipment');
+----------
+[SESSION_SETTING_WRITE] SET enable_unique_key_partial_update=true;
+----------
+[SESSION_SETTING_WRITE] SET partial_update_new_key_behavior=ERROR;
+----------
+[INSERT] INSERT INTO user_profile (id, balance, last_access_time) VALUES
+    (1, 500, '2023-07-03 12:00:01'),
+    (3, 23, '2023-07-03 12:00:02'),
+    (18, 9999999, '2023-07-03 12:00:03');
+----------
+[SELECT] -- 1. Verify primary key uniqueness (only one latest row per user_id)
+SELECT user_id, count(*) as cnt FROM user_profiles GROUP BY user_id HAVING cnt > 1;
+----------
+[METADATA] -- 2. Verify data distribution
+SHOW TABLETS FROM user_profiles;
+----------
+[SELECT] -- Check whether the index is used (look at output_id for Sort Key columns)
+EXPLAIN SELECT * FROM table_name WHERE key_col = 'xxx';
+----------
+[METADATA] -- Check tablet size (to detect data skew)
+SHOW TABLETS FROM table_name;
+----------
+[CREATE_SCHEMA] create database testdb;
+----------
+[CREATE_TABLE|ADD_COLUMN|COMMENT_COLUMN|COMMENT_TABLE] CREATE TABLE testdb.table_hash
+   (
+       k1 TINYINT,
+       k2 DECIMAL(10, 2) DEFAULT "10.5",
+       k3 VARCHAR(10) COMMENT "string column",
+       k4 INT NOT NULL DEFAULT "1" COMMENT "int column"
+   )
+   COMMENT "my first table"
+   DISTRIBUTED BY HASH(k1) BUCKETS 32;
+----------
+[METADATA] -- Verify connection
+SHOW DATABASES FROM gravitino_vending;
+----------
+[SWITCH_CATALOG] -- Switch to vended credentials catalog
+SWITCH gravitino_vending;
+----------
+[CREATE_SCHEMA] -- Create database and table
+CREATE DATABASE demo;
+----------
+[SWITCH_SCHEMA] USE gravitino_vending.demo;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE gravitino_table (
+    id INT,
+    name STRING
+)
+PROPERTIES (
+    'write-format' = 'parquet'
+);
+----------
+[INSERT] -- Insert test data
+INSERT INTO gravitino_table VALUES (1, 'Doris'), (2, 'Gravitino');
+----------
+[SELECT] -- Query verification
+SELECT * FROM gravitino_table;
+----------
+[SWITCH_SCHEMA] -- Switch to the Catalog and Namespace configured in Lakekeeper
+USE lakekeeper_static.demo;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- Create an Iceberg table
+CREATE TABLE my_iceberg_table (
+  id INT,
+  name STRING
+)
+PROPERTIES (
+  'write-format'='parquet'
+);
+----------
+[INSERT] -- Insert data
+INSERT INTO my_iceberg_table VALUES (1, 'Doris'), (2, 'Lakekeeper');
+----------
+[SELECT] -- Query data
+SELECT * FROM my_iceberg_table;
+----------
+[SWITCH_CATALOG] -- switch catalog
+SWITCH internal;
+----------
+[CREATE_SCHEMA] -- create database
+CREATE DATABASE tpch_100g;
+----------
+[CREATE_TABLE] -- ingest data
+CREATE TABLE tpch_100g.lineitem AS SELECT * FROM mc.selectdb_test.lineitem;
+----------
+[CREATE_TABLE] CREATE TABLE tpch_100g.nation AS SELECT * FROM mc.selectdb_test.nation;
+----------
+[CREATE_TABLE] CREATE TABLE tpch_100g.orders AS SELECT * FROM mc.selectdb_test.orders;
+----------
+[CREATE_TABLE] CREATE TABLE tpch_100g.part AS SELECT * FROM mc.selectdb_test.part;
+----------
+[CREATE_TABLE] CREATE TABLE tpch_100g.partsupp AS SELECT * FROM mc.selectdb_test.partsupp;
+----------
+[CREATE_TABLE] CREATE TABLE tpch_100g.region AS SELECT * FROM mc.selectdb_test.region;
+----------
+[CREATE_TABLE] CREATE TABLE tpch_100g.supplier AS SELECT * FROM mc.selectdb_test.supplier;
+----------
+[SWITCH_CATALOG] -- switch catalog
+SWITCH internal;
+----------
+[CREATE_SCHEMA] -- create database
+CREATE DATABASE github_events;
+----------
+[CREATE_TABLE] -- ingest data
+CREATE TABLE github_events.dwd_github_events_odps
+AS SELECT * FROM mc.github_events.dwd_github_events_odps
+WHERE ds BETWEEN '2015-01-01' AND '2016-01-01';
+----------
+[SWITCH_CATALOG] -- Switch to MaxCompute Catalog
+SWITCH mc;
+----------
+[CREATE_SCHEMA] -- Create Schema
+CREATE DATABASE IF NOT EXISTS mc_schema;
+----------
+[CREATE_SCHEMA] -- Create using fully qualified name
+CREATE DATABASE IF NOT EXISTS mc.mc_schema;
+----------
+[DROP_SCHEMA] -- Drop Schema (will also delete all tables within it)
+DROP DATABASE IF EXISTS mc.mc_schema;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- Create non-partitioned table
+CREATE TABLE mc_schema.mc_tbl1 (
+    id INT,
+    name STRING,
+    amount DECIMAL(18, 6),
+    create_time DATETIME
+);
+----------
+[CREATE_TABLE|ADD_COLUMN] -- Create partitioned table
+CREATE TABLE mc_schema.mc_tbl2 (
+    id INT,
+    val STRING,
+    ds STRING,
+    region STRING
+)
+PARTITION BY (ds, region)();
+----------
+[DROP_TABLE] -- Drop table (will also delete data, including partition data)
+DROP TABLE IF EXISTS mc_schema.mc_tbl1;
+----------
+[SWITCH_SCHEMA] -- Switch to the Catalog
+USE nessie_vc;
+----------
+[CREATE_SCHEMA] -- Create a namespace (database)
+CREATE DATABASE demo;
+----------
+[SWITCH_SCHEMA] USE demo;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- Create an Iceberg table
+CREATE TABLE my_iceberg_table (
+  id INT,
+  name STRING
+)
+PROPERTIES (
+  'write-format'='parquet'
+);
+----------
+[INSERT] -- Insert data
+INSERT INTO my_iceberg_table VALUES (1, 'alice'), (2, 'bob');
+----------
+[SELECT] -- Query data
+SELECT * FROM my_iceberg_table;
+----------
+[SWITCH_SCHEMA] -- Switch to the Catalog you created and the Namespace configured in Polaris
+USE polaris_vended.doris_demo;
+----------
+[CREATE_TABLE|ADD_COLUMN] -- Create an Iceberg table
+CREATE TABLE my_iceberg_table (
+  id INT,
+  name STRING
+)
+PROPERTIES (
+  'write-format'='parquet'
+);
+----------
+[INSERT] -- Insert data
+INSERT INTO my_iceberg_table VALUES (1, 'Doris'), (2, 'Polaris');
+----------
+[SELECT] -- Query data
+SELECT * FROM my_iceberg_table;
+----------
+[SWITCH_SCHEMA] USE seaweedfs;
+----------
+[CREATE_SCHEMA] CREATE DATABASE IF NOT EXISTS demo;
+----------
+[SWITCH_SCHEMA] USE seaweedfs.demo;
+----------
+[CREATE_TABLE|ADD_COLUMN] CREATE TABLE iceberg_smoke (
+  id BIGINT,
+  label STRING
+);
+----------
+[INSERT] INSERT INTO iceberg_smoke VALUES (1, 'one'), (2, 'two'), (3, 'three');
+----------
+[SELECT] SELECT id, label FROM iceberg_smoke ORDER BY id;
+----------
+[INSERT] INSERT INTO snowflake_open_catalog.public.doris_open_catalog_t
+VALUES (1, 'open_catalog_insert');
+----------
+[SELECT] SELECT *
+FROM snowflake_open_catalog.public.doris_open_catalog_t
+ORDER BY id;
+----------
+[ADMIN] -- Refresh catalog
+REFRESH CATALOG catalog_name;
+----------
+[ADMIN] -- Refresh specified database
+REFRESH DATABASE catalog_name.db_name;
+----------
+[ADMIN_TABLE] -- Refresh specified table
+REFRESH TABLE catalog_name.db_name.table_name;

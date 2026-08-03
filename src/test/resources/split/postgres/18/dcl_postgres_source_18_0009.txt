@@ -1,0 +1,68 @@
+GRANT regress_du_role1 TO regress_du_role2 WITH ADMIN TRUE , INHERIT FALSE, SET TRUE  GRANTED BY regress_du_admin
+;
+REINDEX (TABLESPACE pg_global) INDEX regress_tblspace_test_tbl_idx
+;
+GRANT regress_du_role0 TO regress_du_role1 WITH ADMIN TRUE,  INHERIT TRUE,  SET TRUE  GRANTED BY regress_du_admin
+;
+-- And this should remove the entry altogether:
+REVOKE SET ON PARAMETER enable_material FROM PUBLIC
+;
+ALTER SUBSCRIPTION sub SKIP (lsn = '0/1800148')
+;
+-- Check the behavior of the hooks relative to unrecognized parameters
+GRANT ALL ON PARAMETER "none.such" TO PUBLIC
+;
+-- fail
+ALTER SUBSCRIPTION regress_testsub SKIP (lsn = '0/0')
+;
+-- move to global tablespace, fail
+REINDEX (TABLESPACE pg_global) INDEX regress_tblspace_test_tbl_idx
+;
+-- ditto
+REINDEX (CONCURRENTLY) SYSTEM
+;
+-- used in COPY
+COPY (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) TO stdout
+;
+------------------------------------------------------------------------------------------
+[GRANT] GRANT regress_du_role1 TO regress_du_role2 WITH ADMIN TRUE , INHERIT FALSE, SET TRUE  GRANTED BY regress_du_admin
+;
+----------
+[ADMIN] REINDEX (TABLESPACE pg_global) INDEX regress_tblspace_test_tbl_idx
+;
+----------
+[GRANT] GRANT regress_du_role0 TO regress_du_role1 WITH ADMIN TRUE,  INHERIT TRUE,  SET TRUE  GRANTED BY regress_du_admin
+;
+----------
+[REVOKE] -- And this should remove the entry altogether:
+REVOKE SET ON PARAMETER enable_material FROM PUBLIC
+;
+----------
+[ADMIN_PUB_SUB] ALTER SUBSCRIPTION sub SKIP (lsn = '0/1800148')
+;
+----------
+[GRANT] -- Check the behavior of the hooks relative to unrecognized parameters
+GRANT ALL ON PARAMETER "none.such" TO PUBLIC
+;
+----------
+[ADMIN_PUB_SUB] -- fail
+ALTER SUBSCRIPTION regress_testsub SKIP (lsn = '0/0')
+;
+----------
+[ADMIN] -- move to global tablespace, fail
+REINDEX (TABLESPACE pg_global) INDEX regress_tblspace_test_tbl_idx
+;
+----------
+[ADMIN] -- ditto
+REINDEX (CONCURRENTLY) SYSTEM
+;
+----------
+[DATA_EXPORT|MERGE] -- used in COPY
+COPY (
+  MERGE INTO target USING source ON (true)
+  WHEN MATCHED THEN DELETE
+) TO stdout
+;

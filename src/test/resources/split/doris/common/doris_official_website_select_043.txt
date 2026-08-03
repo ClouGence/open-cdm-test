@@ -1,0 +1,505 @@
+-- 等价于：ASOF LEFT JOIN ... MATCH_CONDITION(l.ts >= r.ts)
+SELECT id, rid, val FROM (
+    SELECT l.id, r.id AS rid, r.val,
+           ROW_NUMBER() OVER (PARTITION BY l.id ORDER BY r.ts DESC) AS rn
+    FROM left_table l
+    LEFT JOIN right_table r
+        ON l.grp = r.grp AND l.ts >= r.ts
+) t
+WHERE rn = 1;
+explain select *
+from 
+    (
+        -- t1 表按照 c1 做了 hash 分布，经过 group by 算子后，仍然保持按照 c1 做的 hash 分布
+        select c1 as c1, sum(c2) as c2
+        from t1
+        group by c1 
+    ) tx
+join 
+    (
+        -- t2 表按照 c1 做了 hash 分布，经过 group by 算子后，数据分布变成按照 c2 进行的 hash 分布
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c1 = ty.c2;
+explain select *
+from 
+    (
+        -- t1 表按照 c1 做了 hash 分布，经过 group by 算子后，数据分布变成按照 c2 进行的 hash 分布
+        select c2 as c2, sum(c1) as c1
+        from t1
+        group by c2 
+    ) tx
+join 
+    (
+        -- t2 表按照 c1 做了 hash 分布，经过 group by 算子后，数据分布变成按照 c2 进行的 hash 分布
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c2 = ty.c2;
+-- 标量子查询，当 t2 是空表时，子查询返回标量值 null
+select * from t1 where t1.c1 > (select sum(t2.c1) from t2);
+
+-- 非标量子查询，当 t2 是空表时，子查询返回 empty set (0 rows)
+select * from t1 where t1.c1 in (select t2.c1 from t2);
+-- 关联子查询，子查询内部使用了外部表的列 t1.c2
+select * from t1 where t1.c1 in (select t2.c1 from t2 where t2.c2 = t1.c2);
+
+-- 非关联子查询，子查询内部没有使用任何外部表 t1 的列
+select * from t1 where t1.c1 in (select t2.c1 from t2);
+-- 单个聚合函数，且无 group by，支持
+select * from t1 where t1.c1 < (select max(t2.c1) from t2 where t1.c2 = t2.c2);
+
+-- 等价改写的 SQL 如下：
+select t1.* from t1 inner join (select t2.c2 as c2, max(t2.c1) as c1 from t2 group by t2.c2) tx on t1.c1 < tx.c1 and t1.c2 = tx.c2;
+
+-- 非等值条件，不支持
+select * from t1 where t1.c1 = (select max(t2.c1) from t2 where t1.c2 > t2.c2);
+
+-- 没有聚合函数，不支持
+select * from t1 where t1.c1 = (select t2.c1 from t2 where t1.c2 = t2.c2);
+
+-- 有聚合函数，但包含 group by，不支持
+select * from t1 where t1.c1 = (select max(t2.c1) from t2 where t1.c2 = t2.c2 group by t2.c2);
+-- 带 limit 但无 offset，支持
+select * from t1 where exists (select t2.c1 from t2 where t1.c2 = t2.c2 limit 2);
+
+-- 等价改写 SQL 如下：
+select * from t1 left semi join t2 on t1.c2 = t2.c2;
+
+-- 带 offset 和 limit，不支持
+select * from t1 where exists (select t2.c1 from t2 where t1.c2 = t2.c2 limit 2, 3);
+SELECT py_add_three(10, 20, 30) AS sum_result; -- 结果: 60
+SELECT py_reverse('hello') AS reversed;        -- 结果: olleh
+SELECT py_is_prime(17) AS is_prime;            -- 结果: true
+;
+-- UDF: 每行都会调用
+SELECT id, py_upper(name) FROM users;
+
+-- UDAF: 每组调用一次
+SELECT category, py_sum(amount) FROM sales GROUP BY category;
+select cast('123' as int);
+explain select length(123);
+-- [1, 2, 3] T 是 INT
+    SELECT ARRAY(1, 2, 3);
+
+    --  ["1", "2", "abc"] , T 是 STRING
+    SELECT ARRAY(1, 2, 'abc');
+-- ["abc", "def", "efg"] T 是 STRING
+    SELECT ["abc", "def", "efg"];
+
+    --  ["1", "2", "abc"] , T 是 STRING
+    SELECT [1, 2, 'abc'];
+-- 表中有一个 STRUCT 列：s STRUCT<a: INT, b: DOUBLE>
+  SELECT s.a, s.b FROM struct_table;
+
+  -- 嵌套 STRUCT 列：s STRUCT<s: STRUCT<s: STRUCT<s: INT>>>
+  SELECT s.s.s.s FROM nested_struct_table;
+-- 字符串会保留为 VARIANT 字符串根值，即使内容看起来像 JSON。
+SELECT CAST(CAST('{"id": 1}' AS VARIANT) AS STRING) AS string_value,
+       VARIANT_TYPE(CAST('{"id": 1}' AS VARIANT)) AS root_type;
+-- string_value：{"id": 1}；root_type：string
+
+-- 需要结构化 VARIANT 值时，显式解析 JSON 文本。
+SELECT PARSE_TO_VARIANT('{"id": 1}') AS parsed_object;
+-- {"id":1}
+
+-- JSON/JSONB 输入按结构转换。
+SELECT CAST(CAST('{"id": 1}' AS JSON) AS VARIANT) AS parsed_object;
+-- {"id":1}
+;
+-- 1 和 1.0 只有一个 distinct logical value。
+SELECT COUNT(DISTINCT value) AS distinct_count
+FROM (
+    SELECT PARSE_TO_VARIANT('1') AS value
+    UNION ALL
+    SELECT PARSE_TO_VARIANT('1.0') AS value
+) AS numeric_values;
+-- distinct_count: 1
+
+-- 对象 key 顺序被忽略；数组顺序会保留。
+SELECT COUNT(DISTINCT value) AS distinct_count
+FROM (
+    SELECT PARSE_TO_VARIANT('{"a": 1, "b": 2}') AS value
+    UNION ALL
+    SELECT PARSE_TO_VARIANT('{"b": 2, "a": 1}') AS value
+) AS object_values;
+-- distinct_count: 1
+
+SELECT COUNT(DISTINCT value) AS distinct_count
+FROM (
+    SELECT PARSE_TO_VARIANT('[1, 2]') AS value
+    UNION ALL
+    SELECT PARSE_TO_VARIANT('[2, 1]') AS value
+) AS array_values;
+-- distinct_count: 2
+;
+-- JSON 成员带引号，因此类型为 STRING。这里使用 PARSE_TO_VARIANT，
+-- 因为 CAST(string AS VARIANT) 始终把整个输入保留为字符串。
+SELECT variant_type(PARSE_TO_VARIANT('{"a" : "12345"}')['a']);
+-- v['id'] 实际为 STRING，按 INT 进行等值会导致索引失效
+   SELECT * FROM tbl WHERE v['id'] = 123456;
+-- 显式 CAST
+SELECT CAST(v['arr'] AS ARRAY<TEXT>) FROM tbl;
+SELECT * FROM tbl WHERE CAST(v['decimal'] AS DECIMAL(27, 9)) = 1.111111111;
+SELECT * FROM tbl WHERE CAST(v['date'] AS DATE) = '2021-01-02';
+
+-- 隐式 CAST
+SELECT * FROM tbl WHERE v['bool'];
+SELECT * FROM tbl WHERE v['str'] MATCH 'Doris';
+SELECT BOOLAND_AGG(c1), BOOLAND_AGG(c2), BOOLAND_AGG(c3), BOOLAND_AGG(c4)
+FROM test_boolean_agg;
+SELECT
+    BOOL_OR(c_int) AS bool_or_int,
+    BOOL_OR(c_float) AS bool_or_float,
+    BOOL_OR(c_decimal) AS bool_or_decimal,
+    BOOL_OR(c_bool) AS bool_or_bool
+FROM test_numeric_and_null;
+select corr_welford(k1,k2) from test_corr where id=999;
+-- 该函数返回 DOUBLE，如需以整数形式展示可配合 ROUND/CAST
+SELECT CAST(ROUND(datasketches_hll_union_agg(sk)) AS BIGINT)
+FROM test_datasketches_hll_union_agg_tbl;
+-- 别名用法
+SELECT
+    CAST(ROUND(datasketches_hll_union_agg(sk)) AS BIGINT) AS v1,
+    CAST(ROUND(ds_hll_estimate(sk)) AS BIGINT)            AS v2,
+    CAST(ROUND(datasketches_hll_estimate(sk)) AS BIGINT)  AS v3
+FROM test_datasketches_hll_union_agg_tbl;
+-- 组内无合法数据返回 0
+SELECT datasketches_hll_union_agg(sk)
+FROM test_datasketches_hll_union_agg_tbl
+WHERE sk IS NULL;
+-- 非法 sketch 字节串将报错
+SELECT datasketches_hll_union_agg(from_base64('AA=='));
+-- 空字符串属于非法输入，将报错
+SELECT datasketches_hll_union_agg('');
+-- 使用相同数据，但 half_decay=1
+select exponential_moving_average(1.0, temp, ts) from temparature_data;
+-- 以下语句将报错：half_decay 必须为常量
+select exponential_moving_average(val, val, ts) from temparature_data;
+-- NULL 处理相关 case
+SELECT histogram(c_float) FROM histogram_test WHERE c_float IS NULL;
+select intersect_count(user_id,dt,20250801,20250802) from pv_bitmap;
+select datetime,median(scan_rows) from log_statis group by datetime;
+SELECT 
+    -- 计算不同压缩度下的 90 分位数
+    percentile_approx_weighted(score, weight, 0.9) as p90_default,          -- 默认压缩度
+    percentile_approx_weighted(score, weight, 0.9, 2048) as p90_fast,       -- 低压缩度，更快
+    percentile_approx_weighted(score, weight, 0.9, 10000) as p90_accurate   -- 高压缩度，更精确
+FROM weighted_scores;
+-- 使用不同压缩度计算 99 分位数
+SELECT 
+    percentile_approx(response_time, 0.99) as p99_default,          -- 默认压缩度
+    percentile_approx(response_time, 0.99, 2048) as p99_fast,       -- 低压缩度，更快
+    percentile_approx(response_time, 0.99, 10000) as p99_accurate   -- 高压缩度，更精确
+FROM response_times;
+SELECT 
+    percentile(sale_price, 0.5)  as median_price,     -- 中位数
+    percentile(sale_price, 0.75) as p75_price,        -- 75 分位数
+    percentile(sale_price, 0.90) as p90_price,        -- 90 分位数
+    percentile(sale_price, 0.95) as p95_price,        -- 95 分位数
+    percentile(null, 0.99)       as p99_null          -- null 的 99 分位数
+FROM sales_data;
+-- 每组仅包含一行，结果为 NULL。
+SELECT 
+  skew(val1), 
+  skew(val2) 
+FROM statistic_test
+GROUP BY tag;
+SELECT id, comment FROM user_comments
+WHERE  AI_FILTER('resource_name', CONCAT('This is a positive comment: ', comment));
+SELECT AI_GENERATE('resource_name', 'What is the fouding time of Apache Doris? Return only the date.') AS Result;
+SELECT AI_MASK('resource_name', 'My email is rarity@example.com and my phone is 123-456-7890',
+                ['email', 'phone_num']) AS RESULT
+;
+SELECT AI_SENTIMENT('resrouce_name', 'I hate sunny days.') AS Result;
+SELECT AI_Translate('resource_name', 'This is an example', 'Franch') AS Result;
+-- 两个向量完全相同，相似度为 1
+SELECT COSINE_SIMILARITY([1, 2, 3], [1, 2, 3]);
+-- 两个向量正交，相似度为 0
+SELECT COSINE_SIMILARITY([1, 0], [0, 1]);
+-- 任一向量为零向量时，返回 0
+SELECT COSINE_SIMILARITY([0, 0, 0], [1, 2, 3]);
+-- 空数组返回 0
+SELECT COSINE_SIMILARITY([], []);
+-- 输入数组中包含 NULL，会报错
+SELECT COSINE_SIMILARITY([1, NULL, 3], [1, 2, 3]);
+select ARRAY_SORT([[6, 2], [5, 6]]);
+-- [INVALID_ARGUMENT]execute failed, unsupported types for function arrays_overlap
+    SELECT ARRAYS_OVERLAP(ARRAY(ARRAY('hello', 'aloha'), ARRAY('hi', 'hey')), ARRAY(ARRAY('hello', 'hi', 'hey'), ARRAY('aloha', 'hi')));
+select bitmap_and_not_count(NULL, bitmap_from_string('1,2,3')) banc1, bitmap_and_not_count(bitmap_from_string('1,2,3') ,NULL) banc2;
+select bitmap_has_all(bitmap_from_string('0, 1, 2'), bitmap_from_string('1, 2')) res;
+------------------------------------------------------------------------------------------
+[SELECT] -- 等价于：ASOF LEFT JOIN ... MATCH_CONDITION(l.ts >= r.ts)
+SELECT id, rid, val FROM (
+    SELECT l.id, r.id AS rid, r.val,
+           ROW_NUMBER() OVER (PARTITION BY l.id ORDER BY r.ts DESC) AS rn
+    FROM left_table l
+    LEFT JOIN right_table r
+        ON l.grp = r.grp AND l.ts >= r.ts
+) t
+WHERE rn = 1;
+----------
+[SELECT] explain select *
+from 
+    (
+        -- t1 表按照 c1 做了 hash 分布，经过 group by 算子后，仍然保持按照 c1 做的 hash 分布
+        select c1 as c1, sum(c2) as c2
+        from t1
+        group by c1 
+    ) tx
+join 
+    (
+        -- t2 表按照 c1 做了 hash 分布，经过 group by 算子后，数据分布变成按照 c2 进行的 hash 分布
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c1 = ty.c2;
+----------
+[SELECT] explain select *
+from 
+    (
+        -- t1 表按照 c1 做了 hash 分布，经过 group by 算子后，数据分布变成按照 c2 进行的 hash 分布
+        select c2 as c2, sum(c1) as c1
+        from t1
+        group by c2 
+    ) tx
+join 
+    (
+        -- t2 表按照 c1 做了 hash 分布，经过 group by 算子后，数据分布变成按照 c2 进行的 hash 分布
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c2 = ty.c2;
+----------
+[SELECT] -- 标量子查询，当 t2 是空表时，子查询返回标量值 null
+select * from t1 where t1.c1 > (select sum(t2.c1) from t2);
+----------
+[SELECT] -- 非标量子查询，当 t2 是空表时，子查询返回 empty set (0 rows)
+select * from t1 where t1.c1 in (select t2.c1 from t2);
+----------
+[SELECT] -- 关联子查询，子查询内部使用了外部表的列 t1.c2
+select * from t1 where t1.c1 in (select t2.c1 from t2 where t2.c2 = t1.c2);
+----------
+[SELECT] -- 非关联子查询，子查询内部没有使用任何外部表 t1 的列
+select * from t1 where t1.c1 in (select t2.c1 from t2);
+----------
+[SELECT] -- 单个聚合函数，且无 group by，支持
+select * from t1 where t1.c1 < (select max(t2.c1) from t2 where t1.c2 = t2.c2);
+----------
+[SELECT] -- 等价改写的 SQL 如下：
+select t1.* from t1 inner join (select t2.c2 as c2, max(t2.c1) as c1 from t2 group by t2.c2) tx on t1.c1 < tx.c1 and t1.c2 = tx.c2;
+----------
+[SELECT] -- 非等值条件，不支持
+select * from t1 where t1.c1 = (select max(t2.c1) from t2 where t1.c2 > t2.c2);
+----------
+[SELECT] -- 没有聚合函数，不支持
+select * from t1 where t1.c1 = (select t2.c1 from t2 where t1.c2 = t2.c2);
+----------
+[SELECT] -- 有聚合函数，但包含 group by，不支持
+select * from t1 where t1.c1 = (select max(t2.c1) from t2 where t1.c2 = t2.c2 group by t2.c2);
+----------
+[SELECT] -- 带 limit 但无 offset，支持
+select * from t1 where exists (select t2.c1 from t2 where t1.c2 = t2.c2 limit 2);
+----------
+[SELECT] -- 等价改写 SQL 如下：
+select * from t1 left semi join t2 on t1.c2 = t2.c2;
+----------
+[SELECT] -- 带 offset 和 limit，不支持
+select * from t1 where exists (select t2.c1 from t2 where t1.c2 = t2.c2 limit 2, 3);
+----------
+[SELECT] SELECT py_add_three(10, 20, 30) AS sum_result;
+----------
+[SELECT] -- 结果: 60
+SELECT py_reverse('hello') AS reversed;
+----------
+[SELECT] -- 结果: olleh
+SELECT py_is_prime(17) AS is_prime;
+----------
+[SELECT] -- UDF: 每行都会调用
+SELECT id, py_upper(name) FROM users;
+----------
+[SELECT] -- UDAF: 每组调用一次
+SELECT category, py_sum(amount) FROM sales GROUP BY category;
+----------
+[SELECT] select cast('123' as int);
+----------
+[SELECT] explain select length(123);
+----------
+[SELECT] SELECT ARRAY(1, 2, 3);
+----------
+[SELECT] SELECT ARRAY(1, 2, 'abc');
+----------
+[SELECT] SELECT ["abc", "def", "efg"];
+----------
+[SELECT] SELECT [1, 2, 'abc'];
+----------
+[SELECT] SELECT s.a, s.b FROM struct_table;
+----------
+[SELECT] SELECT s.s.s.s FROM nested_struct_table;
+----------
+[SELECT] -- 字符串会保留为 VARIANT 字符串根值，即使内容看起来像 JSON。
+SELECT CAST(CAST('{"id": 1}' AS VARIANT) AS STRING) AS string_value,
+       VARIANT_TYPE(CAST('{"id": 1}' AS VARIANT)) AS root_type;
+----------
+[SELECT] -- 需要结构化 VARIANT 值时，显式解析 JSON 文本。
+SELECT PARSE_TO_VARIANT('{"id": 1}') AS parsed_object;
+----------
+[SELECT] -- JSON/JSONB 输入按结构转换。
+SELECT CAST(CAST('{"id": 1}' AS JSON) AS VARIANT) AS parsed_object;
+----------
+[SELECT] -- 1 和 1.0 只有一个 distinct logical value。
+SELECT COUNT(DISTINCT value) AS distinct_count
+FROM (
+    SELECT PARSE_TO_VARIANT('1') AS value
+    UNION ALL
+    SELECT PARSE_TO_VARIANT('1.0') AS value
+) AS numeric_values;
+----------
+[SELECT] -- 对象 key 顺序被忽略；数组顺序会保留。
+SELECT COUNT(DISTINCT value) AS distinct_count
+FROM (
+    SELECT PARSE_TO_VARIANT('{"a": 1, "b": 2}') AS value
+    UNION ALL
+    SELECT PARSE_TO_VARIANT('{"b": 2, "a": 1}') AS value
+) AS object_values;
+----------
+[SELECT] SELECT COUNT(DISTINCT value) AS distinct_count
+FROM (
+    SELECT PARSE_TO_VARIANT('[1, 2]') AS value
+    UNION ALL
+    SELECT PARSE_TO_VARIANT('[2, 1]') AS value
+) AS array_values;
+----------
+[SELECT] -- JSON 成员带引号，因此类型为 STRING。这里使用 PARSE_TO_VARIANT，
+-- 因为 CAST(string AS VARIANT) 始终把整个输入保留为字符串。
+SELECT variant_type(PARSE_TO_VARIANT('{"a" : "12345"}')['a']);
+----------
+[SELECT] SELECT * FROM tbl WHERE v['id'] = 123456;
+----------
+[SELECT] -- 显式 CAST
+SELECT CAST(v['arr'] AS ARRAY<TEXT>) FROM tbl;
+----------
+[SELECT] SELECT * FROM tbl WHERE CAST(v['decimal'] AS DECIMAL(27, 9)) = 1.111111111;
+----------
+[SELECT] SELECT * FROM tbl WHERE CAST(v['date'] AS DATE) = '2021-01-02';
+----------
+[SELECT] -- 隐式 CAST
+SELECT * FROM tbl WHERE v['bool'];
+----------
+[SELECT] SELECT * FROM tbl WHERE v['str'] MATCH 'Doris';
+----------
+[SELECT] SELECT BOOLAND_AGG(c1), BOOLAND_AGG(c2), BOOLAND_AGG(c3), BOOLAND_AGG(c4)
+FROM test_boolean_agg;
+----------
+[SELECT] SELECT
+    BOOL_OR(c_int) AS bool_or_int,
+    BOOL_OR(c_float) AS bool_or_float,
+    BOOL_OR(c_decimal) AS bool_or_decimal,
+    BOOL_OR(c_bool) AS bool_or_bool
+FROM test_numeric_and_null;
+----------
+[SELECT] select corr_welford(k1,k2) from test_corr where id=999;
+----------
+[SELECT] -- 该函数返回 DOUBLE，如需以整数形式展示可配合 ROUND/CAST
+SELECT CAST(ROUND(datasketches_hll_union_agg(sk)) AS BIGINT)
+FROM test_datasketches_hll_union_agg_tbl;
+----------
+[SELECT] -- 别名用法
+SELECT
+    CAST(ROUND(datasketches_hll_union_agg(sk)) AS BIGINT) AS v1,
+    CAST(ROUND(ds_hll_estimate(sk)) AS BIGINT)            AS v2,
+    CAST(ROUND(datasketches_hll_estimate(sk)) AS BIGINT)  AS v3
+FROM test_datasketches_hll_union_agg_tbl;
+----------
+[SELECT] -- 组内无合法数据返回 0
+SELECT datasketches_hll_union_agg(sk)
+FROM test_datasketches_hll_union_agg_tbl
+WHERE sk IS NULL;
+----------
+[SELECT] -- 非法 sketch 字节串将报错
+SELECT datasketches_hll_union_agg(from_base64('AA=='));
+----------
+[SELECT] -- 空字符串属于非法输入，将报错
+SELECT datasketches_hll_union_agg('');
+----------
+[SELECT] -- 使用相同数据，但 half_decay=1
+select exponential_moving_average(1.0, temp, ts) from temparature_data;
+----------
+[SELECT] -- 以下语句将报错：half_decay 必须为常量
+select exponential_moving_average(val, val, ts) from temparature_data;
+----------
+[SELECT] -- NULL 处理相关 case
+SELECT histogram(c_float) FROM histogram_test WHERE c_float IS NULL;
+----------
+[SELECT] select intersect_count(user_id,dt,20250801,20250802) from pv_bitmap;
+----------
+[SELECT] select datetime,median(scan_rows) from log_statis group by datetime;
+----------
+[SELECT] SELECT 
+    -- 计算不同压缩度下的 90 分位数
+    percentile_approx_weighted(score, weight, 0.9) as p90_default,          -- 默认压缩度
+    percentile_approx_weighted(score, weight, 0.9, 2048) as p90_fast,       -- 低压缩度，更快
+    percentile_approx_weighted(score, weight, 0.9, 10000) as p90_accurate   -- 高压缩度，更精确
+FROM weighted_scores;
+----------
+[SELECT] -- 使用不同压缩度计算 99 分位数
+SELECT 
+    percentile_approx(response_time, 0.99) as p99_default,          -- 默认压缩度
+    percentile_approx(response_time, 0.99, 2048) as p99_fast,       -- 低压缩度，更快
+    percentile_approx(response_time, 0.99, 10000) as p99_accurate   -- 高压缩度，更精确
+FROM response_times;
+----------
+[SELECT] SELECT 
+    percentile(sale_price, 0.5)  as median_price,     -- 中位数
+    percentile(sale_price, 0.75) as p75_price,        -- 75 分位数
+    percentile(sale_price, 0.90) as p90_price,        -- 90 分位数
+    percentile(sale_price, 0.95) as p95_price,        -- 95 分位数
+    percentile(null, 0.99)       as p99_null          -- null 的 99 分位数
+FROM sales_data;
+----------
+[SELECT] -- 每组仅包含一行，结果为 NULL。
+SELECT 
+  skew(val1), 
+  skew(val2) 
+FROM statistic_test
+GROUP BY tag;
+----------
+[SELECT] SELECT id, comment FROM user_comments
+WHERE  AI_FILTER('resource_name', CONCAT('This is a positive comment: ', comment));
+----------
+[SELECT] SELECT AI_GENERATE('resource_name', 'What is the fouding time of Apache Doris? Return only the date.') AS Result;
+----------
+[SELECT] SELECT AI_MASK('resource_name', 'My email is rarity@example.com and my phone is 123-456-7890',
+                ['email', 'phone_num']) AS RESULT
+----------
+[SELECT] SELECT AI_SENTIMENT('resrouce_name', 'I hate sunny days.') AS Result;
+----------
+[SELECT] SELECT AI_Translate('resource_name', 'This is an example', 'Franch') AS Result;
+----------
+[SELECT] -- 两个向量完全相同，相似度为 1
+SELECT COSINE_SIMILARITY([1, 2, 3], [1, 2, 3]);
+----------
+[SELECT] -- 两个向量正交，相似度为 0
+SELECT COSINE_SIMILARITY([1, 0], [0, 1]);
+----------
+[SELECT] -- 任一向量为零向量时，返回 0
+SELECT COSINE_SIMILARITY([0, 0, 0], [1, 2, 3]);
+----------
+[SELECT] -- 空数组返回 0
+SELECT COSINE_SIMILARITY([], []);
+----------
+[SELECT] -- 输入数组中包含 NULL，会报错
+SELECT COSINE_SIMILARITY([1, NULL, 3], [1, 2, 3]);
+----------
+[SELECT] select ARRAY_SORT([[6, 2], [5, 6]]);
+----------
+[SELECT] SELECT ARRAYS_OVERLAP(ARRAY(ARRAY('hello', 'aloha'), ARRAY('hi', 'hey')), ARRAY(ARRAY('hello', 'hi', 'hey'), ARRAY('aloha', 'hi')));
+----------
+[SELECT] select bitmap_and_not_count(NULL, bitmap_from_string('1,2,3')) banc1, bitmap_and_not_count(bitmap_from_string('1,2,3') ,NULL) banc2;
+----------
+[SELECT] select bitmap_has_all(bitmap_from_string('0, 1, 2'), bitmap_from_string('1, 2')) res;

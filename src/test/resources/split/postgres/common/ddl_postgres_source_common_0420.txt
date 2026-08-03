@@ -1,0 +1,544 @@
+ALTER TABLE ONLY public.tht_p2
+    ADD CONSTRAINT tht_p2_en_data_key UNIQUE (en, data)
+;
+ALTER TABLE ONLY "public"."atnnparted" ATTACH PARTITION "public"."atnnpart1" FOR VALUES IN (1)
+;
+ALTER TABLE temporal_pk REPLICA IDENTITY USING INDEX temporal_pk_pkey
+;
+create table dropColumnExists ()
+;
+ALTER TABLE "public"."itest2" ALTER COLUMN "a" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."itest2_a_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+)
+;
+-- fails
+CREATE TABLE badcompresstbl (a text)
+;
+CREATE TABLE "public"."notnull_tbl1_copy" (
+    "a" integer CONSTRAINT "nn" NOT NULL,
+    "b" integer
+)
+;
+ALTER FUNCTION gbt_int2_picksplit(internal, internal) PARALLEL SAFE
+;
+CREATE UNLOGGED TABLE testpub_unloggedtbl(a int)
+;
+CREATE TABLE "public"."past_parted" (
+    "i" integer
+)
+PARTITION BY LIST ("i")
+;
+/*
+ * 5.19
+ * COLUMN_PRIVILEGES
+ */
+
+CREATE VIEW column_privileges AS
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(x.relname AS sql_identifier) AS table_name,
+           CAST(x.attname AS sql_identifier) AS column_name,
+           CAST(x.prtype AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(x.grantee, x.relowner, 'USAGE')
+                  OR x.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+
+    FROM (
+           SELECT pr_c.grantor,
+                  pr_c.grantee,
+                  attname,
+                  relname,
+                  relnamespace,
+                  pr_c.prtype,
+                  pr_c.grantable,
+                  pr_c.relowner
+           FROM (SELECT oid, relname, relnamespace, relowner, (aclexplode(coalesce(relacl, acldefault('r', relowner)))).*
+                 FROM pg_class
+                 WHERE relkind IN ('r', 'v', 'f', 'p')
+                ) pr_c (oid, relname, relnamespace, relowner, grantor, grantee, prtype, grantable),
+                pg_attribute a
+           WHERE a.attrelid = pr_c.oid
+                 AND a.attnum > 0
+                 AND NOT a.attisdropped
+           UNION
+           SELECT pr_a.grantor,
+                  pr_a.grantee,
+                  attname,
+                  relname,
+                  relnamespace,
+                  pr_a.prtype,
+                  pr_a.grantable,
+                  c.relowner
+           FROM (SELECT attrelid, attname, (aclexplode(coalesce(attacl, acldefault('c', relowner)))).*
+                 FROM pg_attribute a JOIN pg_class cc ON (a.attrelid = cc.oid)
+                 WHERE attnum > 0
+                       AND NOT attisdropped
+                ) pr_a (attrelid, attname, grantor, grantee, prtype, grantable),
+                pg_class c
+           WHERE pr_a.attrelid = c.oid
+                 AND relkind IN ('r', 'v', 'f', 'p')
+         ) x,
+         pg_namespace nc,
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE x.relnamespace = nc.oid
+          AND x.grantee = grantee.oid
+          AND x.grantor = u_grantor.oid
+          AND x.prtype IN ('INSERT', 'SELECT', 'UPDATE', 'REFERENCES')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+;
+ALTER TABLE evttrig.id ALTER COLUMN col_d SET DATA TYPE bigint
+;
+VACUUM (SKIP_DATABASE_STATS, FULL) pg_catalog.pg_collation
+;
+CREATE FUNCTION gin_compare_prefix_timestamp(timestamp, timestamp, int2, internal)
+RETURNS int4
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+CREATE COLLATION test4 FROM nonsense
+;
+create table mlparted2 (b int not null, a int not null)
+;
+CREATE OPERATOR #*# (
+   leftarg = int8,
+   rightarg = int8,
+   procedure = fn_op6
+)
+;
+ANALYZE public.text_tbl
+;
+ALTER TABLE T ADD COLUMN c3 timestamptz DEFAULT foolme()
+;
+ANALYZE public.check_con_tbl
+;
+CREATE COLLATION split_collation_probe.c_locale (provider = libc, locale = 'C')
+;
+create trigger trig_row_before_insert before insert on loc2
+	for each row execute procedure trig_row_before_insupdate()
+;
+CREATE TABLE "public"."pagg_tab1_p3" (
+    "x" integer,
+    "y" integer
+)
+;
+CREATE TABLE plt2_adv_p1_null PARTITION OF plt2_adv FOR VALUES IN (NULL, '0001', '0003')
+;
+COMMENT ON OPERATOR CLASS split_operator_probe.int_hash_ops USING hash IS 'split hash opclass'
+;
+CREATE FUNCTION isnle(isbn, ean13)
+	RETURNS boolean
+	AS 'int8le'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+drop schema alter2 cascade
+;
+-- Add a second trigger, to check that the changes are propagated correctly
+-- from trigger to trigger
+CREATE TRIGGER trig_row_before_insupd2
+BEFORE INSERT OR UPDATE ON rem1
+FOR EACH ROW EXECUTE PROCEDURE trig_row_before_insupdate()
+;
+/*
+ * 24.9
+ * FOREIGN_TABLE_OPTIONS view
+ */
+CREATE VIEW foreign_table_options AS
+    SELECT foreign_table_catalog,
+           foreign_table_schema,
+           foreign_table_name,
+           CAST((pg_options_to_table(t.ftoptions)).option_name AS sql_identifier) AS option_name,
+           CAST((pg_options_to_table(t.ftoptions)).option_value AS character_data) AS option_value
+    FROM _pg_foreign_tables t
+;
+drop procedure ptest10(out int, int, int)
+;
+VACUUM (FULL) pg_catalog.pg_subscription
+;
+CREATE TABLE am_partitioned_5p1 PARTITION OF am_partitioned_5p
+  FOR VALUES WITH (MODULUS 10, REMAINDER 1)
+;
+-- Ownership of partitions is checked
+CREATE TABLE ptnowner(i int unique) PARTITION BY LIST (i)
+;
+CREATE SCHEMA test_maint_search_path
+;
+CREATE TABLE "public"."rtest_order2" (
+    "a" integer,
+    "b" integer,
+    "c" "text"
+)
+;
+--
+-- gist_page_items()
+--
+CREATE FUNCTION gist_page_items(IN page bytea,
+    IN index_oid regclass,
+    OUT itemoffset smallint,
+    OUT ctid tid,
+    OUT itemlen smallint,
+    OUT dead boolean,
+    OUT keys text)
+RETURNS SETOF record
+AS '$libdir/pageinspect', 'gist_page_items'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+create function polyf(x anycompatible) returns anycompatiblemultirange as $$
+  select array[x + 1, x + 2]
+$$ language sql
+;
+drop index t_f1_f2_f3_idx
+;
+CREATE VIEW v1 WITH (security_barrier = true) AS
+  SELECT * FROM t1
+;
+ALTER TABLE ONLY "generated_stored_tests"."gtest20a"
+    ADD CONSTRAINT "gtest20a_pkey" PRIMARY KEY ("a")
+;
+CREATE INDEX pg_description_test_index ON pg_description (description)
+;
+-- test expressions and partial-index predicate, too
+create index idxpart_2_idx on only idxpart ((b + a)) where a > 1
+;
+create table sj (a int unique, b int, c int unique)
+;
+CREATE INDEX textidx ON texttmp USING GIST ( a )
+;
+create type comptype as (cf1 int, cf2 int)
+;
+CREATE TABLE TEXT_TBL (f1 text)
+;
+CREATE TABLE plt2_adv_p2_ext PARTITION OF plt2_adv FOR VALUES IN ('0004', '0005', '0006')
+;
+ALTER INDEX pg_toast.pg_toast_30375_index RENAME TO reind_con_toast_idx
+;
+ALTER INDEX "public"."covidxpart_a_b_idx" ATTACH PARTITION "public"."covidxpart4_a_b_idx"
+;
+-- test hstore -> perl
+CREATE FUNCTION test1(val hstore) RETURNS int
+LANGUAGE plperlu
+TRANSFORM FOR TYPE hstore
+AS $$
+use Data::Dumper;
+$Data::Dumper::Sortkeys = 1;
+$Data::Dumper::Indent = 0;
+elog(INFO, Dumper($_[0]));
+return scalar(keys %{$_[0]});
+$$
+;
+------------------------------------------------------------------------------------------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY public.tht_p2
+    ADD CONSTRAINT tht_p2_en_data_key UNIQUE (en, data)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "public"."atnnparted" ATTACH PARTITION "public"."atnnpart1" FOR VALUES IN (1)
+;
+----------
+[ALTER_TABLE] ALTER TABLE temporal_pk REPLICA IDENTITY USING INDEX temporal_pk_pkey
+;
+----------
+[CREATE_TABLE] create table dropColumnExists ()
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE "public"."itest2" ALTER COLUMN "a" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."itest2_a_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+)
+;
+----------
+[CREATE_TABLE] -- fails
+CREATE TABLE badcompresstbl (a text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."notnull_tbl1_copy" (
+    "a" integer CONSTRAINT "nn" NOT NULL,
+    "b" integer
+)
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_int2_picksplit(internal, internal) PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] CREATE UNLOGGED TABLE testpub_unloggedtbl(a int)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."past_parted" (
+    "i" integer
+)
+PARTITION BY LIST ("i")
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 5.19
+ * COLUMN_PRIVILEGES
+ */
+
+CREATE VIEW column_privileges AS
+    SELECT CAST(u_grantor.rolname AS sql_identifier) AS grantor,
+           CAST(grantee.rolname AS sql_identifier) AS grantee,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nc.nspname AS sql_identifier) AS table_schema,
+           CAST(x.relname AS sql_identifier) AS table_name,
+           CAST(x.attname AS sql_identifier) AS column_name,
+           CAST(x.prtype AS character_data) AS privilege_type,
+           CAST(
+             CASE WHEN
+                  -- object owner always has grant options
+                  pg_has_role(x.grantee, x.relowner, 'USAGE')
+                  OR x.grantable
+                  THEN 'YES' ELSE 'NO' END AS yes_or_no) AS is_grantable
+
+    FROM (
+           SELECT pr_c.grantor,
+                  pr_c.grantee,
+                  attname,
+                  relname,
+                  relnamespace,
+                  pr_c.prtype,
+                  pr_c.grantable,
+                  pr_c.relowner
+           FROM (SELECT oid, relname, relnamespace, relowner, (aclexplode(coalesce(relacl, acldefault('r', relowner)))).*
+                 FROM pg_class
+                 WHERE relkind IN ('r', 'v', 'f', 'p')
+                ) pr_c (oid, relname, relnamespace, relowner, grantor, grantee, prtype, grantable),
+                pg_attribute a
+           WHERE a.attrelid = pr_c.oid
+                 AND a.attnum > 0
+                 AND NOT a.attisdropped
+           UNION
+           SELECT pr_a.grantor,
+                  pr_a.grantee,
+                  attname,
+                  relname,
+                  relnamespace,
+                  pr_a.prtype,
+                  pr_a.grantable,
+                  c.relowner
+           FROM (SELECT attrelid, attname, (aclexplode(coalesce(attacl, acldefault('c', relowner)))).*
+                 FROM pg_attribute a JOIN pg_class cc ON (a.attrelid = cc.oid)
+                 WHERE attnum > 0
+                       AND NOT attisdropped
+                ) pr_a (attrelid, attname, grantor, grantee, prtype, grantable),
+                pg_class c
+           WHERE pr_a.attrelid = c.oid
+                 AND relkind IN ('r', 'v', 'f', 'p')
+         ) x,
+         pg_namespace nc,
+         pg_authid u_grantor,
+         (
+           SELECT oid, rolname FROM pg_authid
+           UNION ALL
+           SELECT 0::oid, 'PUBLIC'
+         ) AS grantee (oid, rolname)
+
+    WHERE x.relnamespace = nc.oid
+          AND x.grantee = grantee.oid
+          AND x.grantor = u_grantor.oid
+          AND x.prtype IN ('INSERT', 'SELECT', 'UPDATE', 'REFERENCES')
+          AND (pg_has_role(u_grantor.oid, 'USAGE')
+               OR pg_has_role(grantee.oid, 'USAGE')
+               OR grantee.rolname = 'PUBLIC')
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE evttrig.id ALTER COLUMN col_d SET DATA TYPE bigint
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, FULL) pg_catalog.pg_collation
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gin_compare_prefix_timestamp(timestamp, timestamp, int2, internal)
+RETURNS int4
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+----------
+[CREATE_POLICY] CREATE COLLATION test4 FROM nonsense
+;
+----------
+[CREATE_TABLE] create table mlparted2 (b int not null, a int not null)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR #*# (
+   leftarg = int8,
+   rightarg = int8,
+   procedure = fn_op6
+)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.text_tbl
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE T ADD COLUMN c3 timestamptz DEFAULT foolme()
+;
+----------
+[ADMIN_TABLE] ANALYZE public.check_con_tbl
+;
+----------
+[CREATE_POLICY] CREATE COLLATION split_collation_probe.c_locale (provider = libc, locale = 'C')
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger trig_row_before_insert before insert on loc2
+	for each row execute procedure trig_row_before_insupdate()
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."pagg_tab1_p3" (
+    "x" integer,
+    "y" integer
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE plt2_adv_p1_null PARTITION OF plt2_adv FOR VALUES IN (NULL, '0001', '0003')
+;
+----------
+[COMMENT_PROG_OBJ] COMMENT ON OPERATOR CLASS split_operator_probe.int_hash_ops USING hash IS 'split hash opclass'
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isnle(isbn, ean13)
+	RETURNS boolean
+	AS 'int8le'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[DROP_SCHEMA] drop schema alter2 cascade
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] -- Add a second trigger, to check that the changes are propagated correctly
+-- from trigger to trigger
+CREATE TRIGGER trig_row_before_insupd2
+BEFORE INSERT OR UPDATE ON rem1
+FOR EACH ROW EXECUTE PROCEDURE trig_row_before_insupdate()
+;
+----------
+[CREATE_VIEW(SELECT)] /*
+ * 24.9
+ * FOREIGN_TABLE_OPTIONS view
+ */
+CREATE VIEW foreign_table_options AS
+    SELECT foreign_table_catalog,
+           foreign_table_schema,
+           foreign_table_name,
+           CAST((pg_options_to_table(t.ftoptions)).option_name AS sql_identifier) AS option_name,
+           CAST((pg_options_to_table(t.ftoptions)).option_value AS character_data) AS option_value
+    FROM _pg_foreign_tables t
+;
+----------
+[DROP_PROG_OBJ] drop procedure ptest10(out int, int, int)
+;
+----------
+[ADMIN_TABLE] VACUUM (FULL) pg_catalog.pg_subscription
+;
+----------
+[CREATE_TABLE] CREATE TABLE am_partitioned_5p1 PARTITION OF am_partitioned_5p
+  FOR VALUES WITH (MODULUS 10, REMAINDER 1)
+;
+----------
+[CREATE_TABLE] -- Ownership of partitions is checked
+CREATE TABLE ptnowner(i int unique) PARTITION BY LIST (i)
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA test_maint_search_path
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."rtest_order2" (
+    "a" integer,
+    "b" integer,
+    "c" "text"
+)
+;
+----------
+[CREATE_PROG_OBJ] --
+-- gist_page_items()
+--
+CREATE FUNCTION gist_page_items(IN page bytea,
+    IN index_oid regclass,
+    OUT itemoffset smallint,
+    OUT ctid tid,
+    OUT itemlen smallint,
+    OUT dead boolean,
+    OUT keys text)
+RETURNS SETOF record
+AS '$libdir/pageinspect', 'gist_page_items'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+----------
+[CREATE_PROG_OBJ] create function polyf(x anycompatible) returns anycompatiblemultirange as $$
+  select array[x + 1, x + 2]
+$$ language sql
+;
+----------
+[DROP_INDEX] drop index t_f1_f2_f3_idx
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW v1 WITH (security_barrier = true) AS
+  SELECT * FROM t1
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "generated_stored_tests"."gtest20a"
+    ADD CONSTRAINT "gtest20a_pkey" PRIMARY KEY ("a")
+;
+----------
+[ADD_INDEX] CREATE INDEX pg_description_test_index ON pg_description (description)
+;
+----------
+[ADD_INDEX] -- test expressions and partial-index predicate, too
+create index idxpart_2_idx on only idxpart ((b + a)) where a > 1
+;
+----------
+[CREATE_TABLE] create table sj (a int unique, b int, c int unique)
+;
+----------
+[ADD_INDEX] CREATE INDEX textidx ON texttmp USING GIST ( a )
+;
+----------
+[CREATE_TYPE] create type comptype as (cf1 int, cf2 int)
+;
+----------
+[CREATE_TABLE] CREATE TABLE TEXT_TBL (f1 text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE plt2_adv_p2_ext PARTITION OF plt2_adv FOR VALUES IN ('0004', '0005', '0006')
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_30375_index RENAME TO reind_con_toast_idx
+;
+----------
+[ALTER_INDEX] ALTER INDEX "public"."covidxpart_a_b_idx" ATTACH PARTITION "public"."covidxpart4_a_b_idx"
+;
+----------
+[CREATE_PROG_OBJ] -- test hstore -> perl
+CREATE FUNCTION test1(val hstore) RETURNS int
+LANGUAGE plperlu
+TRANSFORM FOR TYPE hstore
+AS $$
+use Data::Dumper;
+$Data::Dumper::Sortkeys = 1;
+$Data::Dumper::Indent = 0;
+elog(INFO, Dumper($_[0]));
+return scalar(keys %{$_[0]});
+$$
+;

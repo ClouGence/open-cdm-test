@@ -1,0 +1,474 @@
+-- check that we notice insertion of a volatile default argument
+CREATE FUNCTION foolme(timestamptz DEFAULT clock_timestamp())
+  RETURNS timestamptz
+  IMMUTABLE AS 'select $1' LANGUAGE sql
+;
+CREATE OPERATOR CLASS seg_ops
+    DEFAULT FOR TYPE seg USING btree AS
+        OPERATOR        1       < ,
+        OPERATOR        2       <= ,
+        OPERATOR        3       = ,
+        OPERATOR        4       >= ,
+        OPERATOR        5       > ,
+        FUNCTION        1       seg_cmp(seg, seg)
+;
+CREATE PUBLICATION alice
+  FOR TABLE alice.unpartitioned, alice.hashpart
+  WITH (publish_via_partition_root = true)
+;
+drop function polyf(anycompatiblemultirange)
+;
+/*
+ * 6.54
+ * ROUTINE_TABLE_USAGE view
+ */
+
+CREATE VIEW routine_table_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS specific_catalog,
+           CAST(np.nspname AS sql_identifier) AS specific_schema,
+           CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier) AS specific_name,
+           CAST(current_database() AS sql_identifier) AS routine_catalog,
+           CAST(np.nspname AS sql_identifier) AS routine_schema,
+           CAST(p.proname AS sql_identifier) AS routine_name,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nt.nspname AS sql_identifier) AS table_schema,
+           CAST(t.relname AS sql_identifier) AS table_name
+
+    FROM pg_namespace np, pg_proc p, pg_depend d,
+         pg_class t, pg_namespace nt
+
+    WHERE np.oid = p.pronamespace
+          AND p.oid = d.objid
+          AND d.classid = 'pg_catalog.pg_proc'::regclass
+          AND d.refobjid = t.oid
+          AND d.refclassid = 'pg_catalog.pg_class'::regclass
+          AND t.relnamespace = nt.oid
+          AND t.relkind IN ('r', 'v', 'f', 'p')
+          AND pg_has_role(t.relowner, 'USAGE')
+;
+CREATE TABLE bububu(a int)
+;
+ALTER INDEX pg_toast.pg_toast_30964_index RENAME TO reind_con_toast_idx
+;
+-- ERROR
+DROP FOREIGN TABLE foreign_part
+;
+VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_replication_origin
+;
+CREATE FUNCTION normal_rand(int4, float8, float8)
+RETURNS setof float8
+AS '$libdir/tablefunc','normal_rand'
+LANGUAGE C VOLATILE STRICT
+;
+ANALYZE (SKIP_LOCKED) pg_catalog.pg_foreign_data_wrapper
+;
+-- Try turning off all clustering
+ALTER TABLE clstr_tst SET WITHOUT CLUSTER
+;
+CREATE FUNCTION citext_smaller(citext, citext)
+RETURNS citext
+AS '$libdir/citext'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+-- Test implicit coercion to a domain over fixed-length type specified in
+-- RETURNING
+CREATE DOMAIN queryfuncs_char2 AS char(2)
+;
+VACUUM (PARALLEL 2) information_schema.sql_features
+;
+-- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."f_star" INHERIT "public"."e_star"
+;
+/* not all replica identities are good enough */
+CREATE UNIQUE INDEX testpub_tbl5_b_key ON testpub_tbl5 (b, c)
+;
+CREATE TABLE fkpart13_t2 (
+  part_id int PRIMARY KEY,
+  column_to_drop int,
+  FOREIGN KEY (part_id) REFERENCES fkpart13_t1 ON UPDATE CASCADE ON DELETE CASCADE
+) PARTITION BY LIST (part_id)
+;
+CREATE TABLE reindex_schema.tab_dropped (a int PRIMARY KEY)
+;
+-- DROP behavior for partitioned indexes
+create table idxpart (a int) partition by range (a)
+;
+CREATE TABLE d3_pid (pid int)
+;
+CREATE TABLE force_snapshot (a int)
+;
+ALTER OPERATOR FAMILY gist_uuid_ops USING gist ADD
+	FUNCTION	11  (uuid, uuid) gbt_uuid_sortsupport (internal)
+;
+ALTER TABLE ONLY "public"."renamecolumnanother" INHERIT "public"."renamecolumnchild"
+;
+ALTER TABLE ONLY "public"."mlparted4" DROP COLUMN "........pg.dropped.8........"
+;
+/* contrib/btree_gin/btree_gin--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION gin_btree_consistent(internal, int2, anyelement, int4, internal, internal)
+RETURNS bool
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+create table mcrparted6_common_ge_10 partition of mcrparted for values from ('common', 10) to ('common', maxvalue)
+;
+--
+-- FLOAT8
+--
+
+--
+-- Build a table for testing
+-- (This temporarily hides the table created in test_setup.sql)
+--
+
+CREATE TEMP TABLE FLOAT8_TBL(f1 float8)
+;
+create table mc3p1 partition of mc3p for values from (1, 1, 1) to (10, 5, 10)
+;
+CREATE FUNCTION btupccmp(upc, upc)
+	RETURNS int4
+	AS 'btint8cmp'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+create table part_default partition of list_parted default
+;
+ALTER TABLE temporal_no_key REPLICA IDENTITY NOTHING
+;
+-- modulus must be greater than zero
+CREATE TABLE fail_part PARTITION OF hash_parted2 FOR VALUES WITH (MODULUS 0, REMAINDER 1)
+;
+CREATE FUNCTION "public"."explain_filter"("text") RETURNS SETOF "text"
+    LANGUAGE "plpgsql"
+    AS $_$
+declare
+    ln text;
+begin
+    for ln in execute $1
+    loop
+        -- Replace any numeric word with just 'N'
+        ln := regexp_replace(ln, '-?\m\d+\M', 'N', 'g');
+        -- In sort output, the above won't match units-suffixed numbers
+        ln := regexp_replace(ln, '\m\d+kB', 'NkB', 'g');
+        -- Ignore text-mode buffers output because it varies depending
+        -- on the system state
+        CONTINUE WHEN (ln ~ ' +Buffers: .*');
+        -- Ignore text-mode "Planning:" line because whether it's output
+        -- varies depending on the system state
+        CONTINUE WHEN (ln = 'Planning:');
+        return next ln;
+    end loop;
+end;
+$_$
+;
+ALTER TABLE pg_sequence ADD PRIMARY KEY USING INDEX pg_sequence_seqrelid_index
+;
+CREATE TABLE macaddr8_data (a int, b macaddr8)
+;
+create table iboolpart (a bool) partition by list ((not a))
+;
+ALTER TABLE ONLY "public"."dropcolumnchild" INHERIT "public"."dropcolumn"
+;
+CREATE TEXT SEARCH CONFIGURATION catalan
+	(PARSER = default)
+;
+DROP TABLE error_tbl
+;
+-- Not this one either... Same as the last one except we didn't defined the columns being referenced.
+CREATE TABLE PKTABLE (ptest1 int, ptest2 inet, ptest3 int, ptest4 inet, PRIMARY KEY(ptest1, ptest2), FOREIGN KEY(ptest4,
+ptest3) REFERENCES pktable)
+;
+CREATE RULE rules_stats AS ON INSERT TO tab_rule_stats DO INSTEAD
+  INSERT INTO tab_rule_stats_2 VALUES(new.*, 1, 2)
+;
+CREATE TABLE quuux2 (a int, b text)
+;
+create event trigger regress_event_trigger2 on ddl_command_start
+   when tag in ('sandwich')
+   execute procedure test_event_trigger()
+;
+create function f1(x anyelement) returns anyrange as $$
+begin
+  return array[x + 1, x + 2];
+end$$ language plpgsql
+;
+DROP TABLE heaptable
+;
+ANALYZE public.tt3
+;
+DROP TABLE justthis
+;
+create table ddl_test (f1 int)
+;
+-- use it in regular and temporary tables and functions
+
+create table ext8_table1 (f1 posint)
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] -- check that we notice insertion of a volatile default argument
+CREATE FUNCTION foolme(timestamptz DEFAULT clock_timestamp())
+  RETURNS timestamptz
+  IMMUTABLE AS 'select $1' LANGUAGE sql
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR CLASS seg_ops
+    DEFAULT FOR TYPE seg USING btree AS
+        OPERATOR        1       < ,
+        OPERATOR        2       <= ,
+        OPERATOR        3       = ,
+        OPERATOR        4       >= ,
+        OPERATOR        5       > ,
+        FUNCTION        1       seg_cmp(seg, seg)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION alice
+  FOR TABLE alice.unpartitioned, alice.hashpart
+  WITH (publish_via_partition_root = true)
+;
+----------
+[DROP_PROG_OBJ] drop function polyf(anycompatiblemultirange)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 6.54
+ * ROUTINE_TABLE_USAGE view
+ */
+
+CREATE VIEW routine_table_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS specific_catalog,
+           CAST(np.nspname AS sql_identifier) AS specific_schema,
+           CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier) AS specific_name,
+           CAST(current_database() AS sql_identifier) AS routine_catalog,
+           CAST(np.nspname AS sql_identifier) AS routine_schema,
+           CAST(p.proname AS sql_identifier) AS routine_name,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nt.nspname AS sql_identifier) AS table_schema,
+           CAST(t.relname AS sql_identifier) AS table_name
+
+    FROM pg_namespace np, pg_proc p, pg_depend d,
+         pg_class t, pg_namespace nt
+
+    WHERE np.oid = p.pronamespace
+          AND p.oid = d.objid
+          AND d.classid = 'pg_catalog.pg_proc'::regclass
+          AND d.refobjid = t.oid
+          AND d.refclassid = 'pg_catalog.pg_class'::regclass
+          AND t.relnamespace = nt.oid
+          AND t.relkind IN ('r', 'v', 'f', 'p')
+          AND pg_has_role(t.relowner, 'USAGE')
+;
+----------
+[CREATE_TABLE] CREATE TABLE bububu(a int)
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_30964_index RENAME TO reind_con_toast_idx
+;
+----------
+[DROP_TABLE] -- ERROR
+DROP FOREIGN TABLE foreign_part
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_replication_origin
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION normal_rand(int4, float8, float8)
+RETURNS setof float8
+AS '$libdir/tablefunc','normal_rand'
+LANGUAGE C VOLATILE STRICT
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) pg_catalog.pg_foreign_data_wrapper
+;
+----------
+[ALTER_TABLE] -- Try turning off all clustering
+ALTER TABLE clstr_tst SET WITHOUT CLUSTER
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION citext_smaller(citext, citext)
+RETURNS citext
+AS '$libdir/citext'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[CREATE_TYPE] -- Test implicit coercion to a domain over fixed-length type specified in
+-- RETURNING
+CREATE DOMAIN queryfuncs_char2 AS char(2)
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 2) information_schema.sql_features
+;
+----------
+[ALTER_TABLE] -- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."f_star" INHERIT "public"."e_star"
+;
+----------
+[ADD_INDEX] /* not all replica identities are good enough */
+CREATE UNIQUE INDEX testpub_tbl5_b_key ON testpub_tbl5 (b, c)
+;
+----------
+[CREATE_TABLE] CREATE TABLE fkpart13_t2 (
+  part_id int PRIMARY KEY,
+  column_to_drop int,
+  FOREIGN KEY (part_id) REFERENCES fkpart13_t1 ON UPDATE CASCADE ON DELETE CASCADE
+) PARTITION BY LIST (part_id)
+;
+----------
+[CREATE_TABLE] CREATE TABLE reindex_schema.tab_dropped (a int PRIMARY KEY)
+;
+----------
+[CREATE_TABLE] -- DROP behavior for partitioned indexes
+create table idxpart (a int) partition by range (a)
+;
+----------
+[CREATE_TABLE] CREATE TABLE d3_pid (pid int)
+;
+----------
+[CREATE_TABLE] CREATE TABLE force_snapshot (a int)
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY gist_uuid_ops USING gist ADD
+	FUNCTION	11  (uuid, uuid) gbt_uuid_sortsupport (internal)
+;
+----------
+[ALTER_TABLE] ALTER TABLE ONLY "public"."renamecolumnanother" INHERIT "public"."renamecolumnchild"
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE ONLY "public"."mlparted4" DROP COLUMN "........pg.dropped.8........"
+;
+----------
+[CREATE_PROG_OBJ] /* contrib/btree_gin/btree_gin--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE FUNCTION gin_btree_consistent(internal, int2, anyelement, int4, internal, internal)
+RETURNS bool
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+----------
+[CREATE_TABLE] create table mcrparted6_common_ge_10 partition of mcrparted for values from ('common', 10) to ('common', maxvalue)
+;
+----------
+[CREATE_TABLE] --
+-- FLOAT8
+--
+
+--
+-- Build a table for testing
+-- (This temporarily hides the table created in test_setup.sql)
+--
+
+CREATE TEMP TABLE FLOAT8_TBL(f1 float8)
+;
+----------
+[CREATE_TABLE] create table mc3p1 partition of mc3p for values from (1, 1, 1) to (10, 5, 10)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION btupccmp(upc, upc)
+	RETURNS int4
+	AS 'btint8cmp'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] create table part_default partition of list_parted default
+;
+----------
+[ALTER_TABLE] ALTER TABLE temporal_no_key REPLICA IDENTITY NOTHING
+;
+----------
+[CREATE_TABLE] -- modulus must be greater than zero
+CREATE TABLE fail_part PARTITION OF hash_parted2 FOR VALUES WITH (MODULUS 0, REMAINDER 1)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."explain_filter"("text") RETURNS SETOF "text"
+    LANGUAGE "plpgsql"
+    AS $_$
+declare
+    ln text;
+begin
+    for ln in execute $1
+    loop
+        -- Replace any numeric word with just 'N'
+        ln := regexp_replace(ln, '-?\m\d+\M', 'N', 'g');
+        -- In sort output, the above won't match units-suffixed numbers
+        ln := regexp_replace(ln, '\m\d+kB', 'NkB', 'g');
+        -- Ignore text-mode buffers output because it varies depending
+        -- on the system state
+        CONTINUE WHEN (ln ~ ' +Buffers: .*');
+        -- Ignore text-mode "Planning:" line because whether it's output
+        -- varies depending on the system state
+        CONTINUE WHEN (ln = 'Planning:');
+        return next ln;
+    end loop;
+end;
+$_$
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE pg_sequence ADD PRIMARY KEY USING INDEX pg_sequence_seqrelid_index
+;
+----------
+[CREATE_TABLE] CREATE TABLE macaddr8_data (a int, b macaddr8)
+;
+----------
+[CREATE_TABLE] create table iboolpart (a bool) partition by list ((not a))
+;
+----------
+[ALTER_TABLE] ALTER TABLE ONLY "public"."dropcolumnchild" INHERIT "public"."dropcolumn"
+;
+----------
+[CREATE_POLICY] CREATE TEXT SEARCH CONFIGURATION catalan
+	(PARSER = default)
+;
+----------
+[DROP_TABLE] DROP TABLE error_tbl
+;
+----------
+[CREATE_TABLE] -- Not this one either... Same as the last one except we didn't defined the columns being referenced.
+CREATE TABLE PKTABLE (ptest1 int, ptest2 inet, ptest3 int, ptest4 inet, PRIMARY KEY(ptest1, ptest2), FOREIGN KEY(ptest4,
+ptest3) REFERENCES pktable)
+;
+----------
+[CREATE_POLICY] CREATE RULE rules_stats AS ON INSERT TO tab_rule_stats DO INSTEAD
+  INSERT INTO tab_rule_stats_2 VALUES(new.*, 1, 2)
+;
+----------
+[CREATE_TABLE] CREATE TABLE quuux2 (a int, b text)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create event trigger regress_event_trigger2 on ddl_command_start
+   when tag in ('sandwich')
+   execute procedure test_event_trigger()
+;
+----------
+[CREATE_PROG_OBJ] create function f1(x anyelement) returns anyrange as $$
+begin
+  return array[x + 1, x + 2];
+end$$ language plpgsql
+;
+----------
+[DROP_TABLE] DROP TABLE heaptable
+;
+----------
+[ADMIN_TABLE] ANALYZE public.tt3
+;
+----------
+[DROP_TABLE] DROP TABLE justthis
+;
+----------
+[CREATE_TABLE] create table ddl_test (f1 int)
+;
+----------
+[CREATE_TABLE] -- use it in regular and temporary tables and functions
+
+create table ext8_table1 (f1 posint)
+;

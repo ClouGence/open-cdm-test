@@ -1,0 +1,73 @@
+[metadata__common_tidb_upstream_tikv_in_memory_engine_md_0_000]
+sql:
+SELECT
+    Time,
+    DB,
+    Index_names,
+    Process_keys,
+    Total_keys,
+    CONCAT(
+        LEFT(REGEXP_REPLACE(Query, '\\s+', ' '), 20),
+        '...',
+        RIGHT(REGEXP_REPLACE(Query, '\\s+', ' '), 10)
+    ) as Query,
+    Query_time,
+    Cop_time,
+    Process_time
+FROM
+    INFORMATION_SCHEMA.SLOW_QUERY
+WHERE
+    Is_internal = 0
+    AND Cop_time > 1
+    AND Process_keys > 0
+    AND Total_keys / Process_keys >= 10
+    AND Time >= NOW() - INTERVAL 10 MINUTE
+ORDER BY Total_keys DESC
+LIMIT 5;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Function(7:4~7:10) /test/1/catalog1/schema1/CONCAT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:8~8:12) /test/1/catalog1/schema1/LEFT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:13~8:27) /test/1/catalog1/schema1/REGEXP_REPLACE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:8~10:13) /test/1/catalog1/schema1/RIGHT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(16:4~16:33) /test/1/catalog1/INFORMATION_SCHEMA/SLOW_QUERY/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(22:16~22:19) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[metadata__common_tidb_upstream_tikv_in_memory_engine_md_0_001]
+sql:
+SHOW CONFIG WHERE Type='tikv' AND Name LIKE 'in-memory-engine\.%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Instance(1:0~1:65) /test/1/",
+      "action" : "READ"
+    }
+  ]
+}

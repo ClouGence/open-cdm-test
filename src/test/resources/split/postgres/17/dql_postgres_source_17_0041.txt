@@ -1,0 +1,490 @@
+SELECT a, a::bool FROM JSON_TABLE(jsonb '{"a":1}', '$' COLUMNS (a dint4_0 EXISTS PATH '$.b' FALSE ON ERROR))
+;
+SELECT 0o273
+;
+--
+-- NUMEROLOGY
+-- Test various combinations of numeric types and functions.
+--
+
+
+--
+-- numeric literals
+--
+
+SELECT 0b100101
+;
+SELECT
+	x, y,
+	JSON_QUERY(
+		jsonb '[1,2,3,4,5,null]',
+		'$[*] ? (@ >= $x && @ <= $y)'
+		PASSING x AS x, y AS y
+		WITH CONDITIONAL WRAPPER
+		EMPTY ARRAY ON EMPTY
+	) list
+FROM
+	generate_series(0, 4) x,
+	generate_series(0, 4) y
+;
+SELECT * FROM JSON_TABLE(
+  jsonb '{"favorites":[{"kind":"horror","films":[{"title":"Psycho","director":"Alfred Hitchcock"}]},{"kind":"thriller","films":[{"title":"Vertigo","director":"Alfred Hitchcock"}]}]}',
+  '$.favorites[*] ? (@.films[*].director == $filter)'
+  PASSING 'Alfred Hitchcock' AS filter
+  COLUMNS (
+    id FOR ORDINALITY,
+    kind text PATH '$.kind',
+    title text FORMAT JSON PATH '$.films[*].title' OMIT QUOTES,
+    director text PATH '$.films[*].director' KEEP QUOTES
+  )
+) AS jt
+;
+SELECT JSON_OBJECTAGG(k: v ABSENT ON NULL WITH UNIQUE KEYS RETURNING jsonb)
+FROM (VALUES (1, 1), (0, NULL),(4, null), (5, null),(6, null),(2, 2)) foo(k, v)
+;
+SELECT * FROM unnest((JSON_QUERY(jsonb '{"reca": [{"a": 1, "t": ["foo", []]}, {"a": 2, "jb": [{}, true]}]}', '$' RETURNING sqljsonb_reca)).reca)
+;
+EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON('123' WITH UNIQUE KEYS)
+;
+SELECT
+	js,
+	js IS JSON "IS JSON",
+	js IS NOT JSON "IS NOT JSON",
+	js IS JSON VALUE "IS VALUE",
+	js IS JSON OBJECT "IS OBJECT",
+	js IS JSON ARRAY "IS ARRAY",
+	js IS JSON SCALAR "IS SCALAR",
+	js IS JSON WITHOUT UNIQUE KEYS "WITHOUT UNIQUE",
+	js IS JSON WITH UNIQUE KEYS "WITH UNIQUE"
+FROM
+	(SELECT js::jsonb FROM test_is_json WHERE js IS JSON) foo(js)
+;
+SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') EMPTY ON ERROR)
+;
+explain (verbose, costs off)
+select * from generate_series(1,10) t1(id) left join
+    lateral (select t1.id as t1id, t2.id from emp1 t2 join emp1 t3 on t2.id = t3.id)
+on true
+;
+SELECT k, GROUPING(k, bucket) AS grp_id, bucket, count(*) AS n
+FROM (VALUES ('a', 1), ('a', 2), ('b', 1)) AS t(k, bucket)
+GROUP BY DISTINCT GROUPING SETS ((k), (k, bucket), (k))
+ORDER BY k NULLS LAST, bucket NULLS LAST, grp_id
+;
+-- Reading page in buffer for read and write
+SELECT test_slru_page_read(0x1234500000020, true)
+;
+SELECT JSON_VALUE(jsonb 'null', '$' RETURNING sqljsonb_int_not_null)
+;
+WITH RECURSIVE t(action, a) AS (
+	MERGE INTO y USING (VALUES (11)) v(a) ON y.a = v.a
+		WHEN NOT MATCHED THEN INSERT VALUES (v.a)
+		RETURNING merge_action(), (SELECT a FROM t)
+)
+SELECT * FROM t
+;
+SELECT 0b100101
+;
+EXPLAIN (COSTS OFF, VERBOSE)
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$'
+	)) json_table_func
+;
+-- Test implicit coercion to a fixed-length type specified in RETURNING
+SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING varchar(2))
+;
+SELECT x.* FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+select foo from json_table ( jsonb '[{"foo":1}]' , '$[*]' as p0 columns ( foo int ) ) jt ( foo )
+;
+-- indent empty string
+SELECT xmlserialize(DOCUMENT '' AS text INDENT)
+;
+SELECT xmlserialize(CONTENT  'text node<foo>    <bar></bar>   </foo>' AS text INDENT)
+;
+SELECT SUBSTRING('abcdefg' SIMILAR 'a*#"%#"g*#"x' ESCAPE '#') AS "error"
+;
+-- Ensure consecutive NULLs are properly treated as distinct from each other
+select array_agg(distinct val)
+from (select null as val from generate_series(1, 2))
+;
+SELECT * FROM JSON_TABLE(
+  jsonb '{"a":1}',
+  '$'
+  COLUMNS (
+    id FOR ORDINALITY,
+    has_a boolean EXISTS PATH '$.a',
+    has_b int EXISTS PATH 'strict $.b' UNKNOWN ON ERROR,
+    missing int PATH '$.b' DEFAULT 42 ON EMPTY DEFAULT 7 ON ERROR
+  )
+) AS jt
+;
+SELECT JSON_ARRAY('a',  NULL, 'b' NULL   ON NULL RETURNING jsonb)
+;
+SELECT JSON_VALUE(jsonb '{"d1": "H"}', '$.a2' RETURNING queryfuncs_test_domain DEFAULT 'foo'::queryfuncs_test_domain ON EMPTY)
+;
+-- NULL ON EMPTY
+
+SELECT JSON_QUERY(jsonb '[1,2]', '$[*]' ERROR ON ERROR)
+;
+SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (id FOR ORDINALITY, a int PATH '$' ERROR ON EMPTY)) jt
+;
+SELECT JSON_QUERY(jsonb '{"a": 123}', ('$' || '.' || 'a' || NULL)::date WITH WRAPPER)
+;
+SELECT JSON_OBJECTAGG(k: v RETURNING jsonb) FROM (VALUES ('a', 1), ('b', 2)) AS t(k,v)
+;
+SELECT xmlserialize(CONTENT  '<?xml version="1.0" encoding="UTF-8"?><foo><bar><val>73</val></bar></foo>' AS text INDENT)
+;
+SELECT -0x8000000000000001
+;
+SELECT -0b1000000000000000000000000000000000000000000000000000000000000000
+;
+-- star expansion
+with recursive a as (
+	select 1 as b
+	union all
+	select * from a
+) cycle b set c using p
+select * from a
+;
+-- IS JSON predicate
+SELECT NULL IS JSON
+;
+SELECT * FROM JSON_TABLE (NULL::jsonb, '$' COLUMNS (v1 timestamp)) AS f (v1, v2)
+;
+SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING float8 error on error)
+;
+-- JSON_TABLE: nested paths
+
+-- Duplicate path names
+SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$' AS a
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS a
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+SELECT JSON_OBJECT('a': '1', 'b': NULL, 'c': 2 ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+SELECT * FROM JSON_TABLE(
+  jsonb '{"favorites":[{"kind":"comedy","films":[{"title":"Bananas","director":"Woody Allen"},{"title":"The Dinner Game","director":"Francis Veber"}]},{"kind":"horror","films":[{"title":"Psycho","director":"Alfred Hitchcock"}]}]}',
+  '$.favorites[*]'
+  COLUMNS (
+    id FOR ORDINALITY,
+    kind text PATH '$.kind',
+    NESTED PATH '$.films[*]' COLUMNS (
+      film_id FOR ORDINALITY,
+      title text FORMAT JSON PATH '$.title' OMIT QUOTES,
+      director text PATH '$.director' KEEP QUOTES
+    )
+  )
+) AS jt
+;
+SELECT JSON_QUERY(jsonb '[{"a": "a", "b": "foo", "t": "aaa", "js": [1, "2", {}], "jb": {"x": [1, "2", {}]}},  {"a": 2}]', '$[0]' RETURNING sqljsonb_rec ERROR ON ERROR)
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set label to true default false using path
+select * from search_graph
+;
+EXPLAIN (COSTS OFF)
+SELECT * FROM onek t1, lateral (SELECT * FROM onek t2 WHERE t2.ten IN (values (t1.ten), (1)))
+;
+explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() + 2 as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+SELECT substring('Thomas'::citext similar '%#"o_a#"_' escape '#') = 'oma' AS t
+;
+SELECT JSON_SERIALIZE('123' RETURNING sqljson_char2)
+;
+SELECT JSON_QUERY(jsonb '"1"', '$' RETURNING qf_char_domain OMIT QUOTES ERROR ON ERROR)
+;
+SELECT JSON_OBJECT(RETURNING text FORMAT JSON ENCODING UTF8)
+;
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i))
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT a, a::bool FROM JSON_TABLE(jsonb '{"a":1}', '$' COLUMNS (a dint4_0 EXISTS PATH '$.b' FALSE ON ERROR))
+;
+----------
+[SELECT] SELECT 0o273
+;
+----------
+[SELECT] --
+-- NUMEROLOGY
+-- Test various combinations of numeric types and functions.
+--
+
+
+--
+-- numeric literals
+--
+
+SELECT 0b100101
+;
+----------
+[SELECT] SELECT
+	x, y,
+	JSON_QUERY(
+		jsonb '[1,2,3,4,5,null]',
+		'$[*] ? (@ >= $x && @ <= $y)'
+		PASSING x AS x, y AS y
+		WITH CONDITIONAL WRAPPER
+		EMPTY ARRAY ON EMPTY
+	) list
+FROM
+	generate_series(0, 4) x,
+	generate_series(0, 4) y
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+  jsonb '{"favorites":[{"kind":"horror","films":[{"title":"Psycho","director":"Alfred Hitchcock"}]},{"kind":"thriller","films":[{"title":"Vertigo","director":"Alfred Hitchcock"}]}]}',
+  '$.favorites[*] ? (@.films[*].director == $filter)'
+  PASSING 'Alfred Hitchcock' AS filter
+  COLUMNS (
+    id FOR ORDINALITY,
+    kind text PATH '$.kind',
+    title text FORMAT JSON PATH '$.films[*].title' OMIT QUOTES,
+    director text PATH '$.films[*].director' KEEP QUOTES
+  )
+) AS jt
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v ABSENT ON NULL WITH UNIQUE KEYS RETURNING jsonb)
+FROM (VALUES (1, 1), (0, NULL),(4, null), (5, null),(6, null),(2, 2)) foo(k, v)
+;
+----------
+[SELECT] SELECT * FROM unnest((JSON_QUERY(jsonb '{"reca": [{"a": 1, "t": ["foo", []]}, {"a": 2, "jb": [{}, true]}]}', '$' RETURNING sqljsonb_reca)).reca)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF) SELECT JSON('123' WITH UNIQUE KEYS)
+;
+----------
+[SELECT] SELECT
+	js,
+	js IS JSON "IS JSON",
+	js IS NOT JSON "IS NOT JSON",
+	js IS JSON VALUE "IS VALUE",
+	js IS JSON OBJECT "IS OBJECT",
+	js IS JSON ARRAY "IS ARRAY",
+	js IS JSON SCALAR "IS SCALAR",
+	js IS JSON WITHOUT UNIQUE KEYS "WITHOUT UNIQUE",
+	js IS JSON WITH UNIQUE KEYS "WITH UNIQUE"
+FROM
+	(SELECT js::jsonb FROM test_is_json WHERE js IS JSON) foo(js)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE('[]', 'strict $.a' COLUMNS (js2 int PATH '$') EMPTY ON ERROR)
+;
+----------
+[PERFORMANCE] explain (verbose, costs off)
+select * from generate_series(1,10) t1(id) left join
+    lateral (select t1.id as t1id, t2.id from emp1 t2 join emp1 t3 on t2.id = t3.id)
+on true
+;
+----------
+[SELECT] SELECT k, GROUPING(k, bucket) AS grp_id, bucket, count(*) AS n
+FROM (VALUES ('a', 1), ('a', 2), ('b', 1)) AS t(k, bucket)
+GROUP BY DISTINCT GROUPING SETS ((k), (k, bucket), (k))
+ORDER BY k NULLS LAST, bucket NULLS LAST, grp_id
+;
+----------
+[SELECT] -- Reading page in buffer for read and write
+SELECT test_slru_page_read(0x1234500000020, true)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb 'null', '$' RETURNING sqljsonb_int_not_null)
+;
+----------
+[SELECT|MERGE] WITH RECURSIVE t(action, a) AS (
+	MERGE INTO y USING (VALUES (11)) v(a) ON y.a = v.a
+		WHEN NOT MATCHED THEN INSERT VALUES (v.a)
+		RETURNING merge_action(), (SELECT a FROM t)
+)
+SELECT * FROM t
+;
+----------
+[SELECT] SELECT 0b100101
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF, VERBOSE)
+SELECT * FROM
+	JSON_TABLE(
+		jsonb 'null', 'lax $[*]' PASSING 1 + 2 AS a, json '"foo"' AS "b c"
+		COLUMNS (
+			id FOR ORDINALITY,
+			"int" int PATH '$',
+			"text" text PATH '$'
+	)) json_table_func
+;
+----------
+[SELECT] -- Test implicit coercion to a fixed-length type specified in RETURNING
+SELECT JSON_SERIALIZE('{ "a" : 1 } ' RETURNING varchar(2))
+;
+----------
+[SELECT] SELECT x.* FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+----------
+[SELECT] select foo from json_table ( jsonb '[{"foo":1}]' , '$[*]' as p0 columns ( foo int ) ) jt ( foo )
+;
+----------
+[SELECT] -- indent empty string
+SELECT xmlserialize(DOCUMENT '' AS text INDENT)
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  'text node<foo>    <bar></bar>   </foo>' AS text INDENT)
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR 'a*#"%#"g*#"x' ESCAPE '#') AS "error"
+;
+----------
+[SELECT] -- Ensure consecutive NULLs are properly treated as distinct from each other
+select array_agg(distinct val)
+from (select null as val from generate_series(1, 2))
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+  jsonb '{"a":1}',
+  '$'
+  COLUMNS (
+    id FOR ORDINALITY,
+    has_a boolean EXISTS PATH '$.a',
+    has_b int EXISTS PATH 'strict $.b' UNKNOWN ON ERROR,
+    missing int PATH '$.b' DEFAULT 42 ON EMPTY DEFAULT 7 ON ERROR
+  )
+) AS jt
+;
+----------
+[SELECT] SELECT JSON_ARRAY('a',  NULL, 'b' NULL   ON NULL RETURNING jsonb)
+;
+----------
+[SELECT] SELECT JSON_VALUE(jsonb '{"d1": "H"}', '$.a2' RETURNING queryfuncs_test_domain DEFAULT 'foo'::queryfuncs_test_domain ON EMPTY)
+;
+----------
+[SELECT] -- NULL ON EMPTY
+
+SELECT JSON_QUERY(jsonb '[1,2]', '$[*]' ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(jsonb '1', '$' COLUMNS (id FOR ORDINALITY, a int PATH '$' ERROR ON EMPTY)) jt
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '{"a": 123}', ('$' || '.' || 'a' || NULL)::date WITH WRAPPER)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v RETURNING jsonb) FROM (VALUES ('a', 1), ('b', 2)) AS t(k,v)
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '<?xml version="1.0" encoding="UTF-8"?><foo><bar><val>73</val></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] SELECT -0x8000000000000001
+;
+----------
+[SELECT] SELECT -0b1000000000000000000000000000000000000000000000000000000000000000
+;
+----------
+[SELECT] -- star expansion
+with recursive a as (
+	select 1 as b
+	union all
+	select * from a
+) cycle b set c using p
+select * from a
+;
+----------
+[SELECT] -- IS JSON predicate
+SELECT NULL IS JSON
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE (NULL::jsonb, '$' COLUMNS (v1 timestamp)) AS f (v1, v2)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"123.1"', '$' RETURNING float8 error on error)
+;
+----------
+[SELECT] -- JSON_TABLE: nested paths
+
+-- Duplicate path names
+SELECT * FROM JSON_TABLE(
+	jsonb '[]', '$' AS a
+	COLUMNS (
+		b int,
+		NESTED PATH '$' AS a
+		COLUMNS (
+			c int
+		)
+	)
+) jt
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': '1', 'b': NULL, 'c': 2 ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+----------
+[SELECT] SELECT * FROM JSON_TABLE(
+  jsonb '{"favorites":[{"kind":"comedy","films":[{"title":"Bananas","director":"Woody Allen"},{"title":"The Dinner Game","director":"Francis Veber"}]},{"kind":"horror","films":[{"title":"Psycho","director":"Alfred Hitchcock"}]}]}',
+  '$.favorites[*]'
+  COLUMNS (
+    id FOR ORDINALITY,
+    kind text PATH '$.kind',
+    NESTED PATH '$.films[*]' COLUMNS (
+      film_id FOR ORDINALITY,
+      title text FORMAT JSON PATH '$.title' OMIT QUOTES,
+      director text PATH '$.director' KEEP QUOTES
+    )
+  )
+) AS jt
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '[{"a": "a", "b": "foo", "t": "aaa", "js": [1, "2", {}], "jb": {"x": [1, "2", {}]}},  {"a": 2}]', '$[0]' RETURNING sqljsonb_rec ERROR ON ERROR)
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set label to true default false using path
+select * from search_graph
+;
+----------
+[PERFORMANCE] EXPLAIN (COSTS OFF)
+SELECT * FROM onek t1, lateral (SELECT * FROM onek t2 WHERE t2.ten IN (values (t1.ten), (1)))
+;
+----------
+[PERFORMANCE] explain (costs off)
+merge into part_abc_view pt
+using (select stable_one() + 2 as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+----------
+[SELECT] SELECT substring('Thomas'::citext similar '%#"o_a#"_' escape '#') = 'oma' AS t
+;
+----------
+[SELECT] SELECT JSON_SERIALIZE('123' RETURNING sqljson_char2)
+;
+----------
+[SELECT] SELECT JSON_QUERY(jsonb '"1"', '$' RETURNING qf_char_domain OMIT QUOTES ERROR ON ERROR)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING text FORMAT JSON ENCODING UTF8)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(SELECT i FROM (VALUES (NULL::int[]), ('{1,2}'), (NULL), (NULL), ('{3,4}'), (NULL)) foo(i))
+;

@@ -1,0 +1,612 @@
+CREATE PUBLICATION dump_pub_all FOR TABLE ONLY pubme.t0, pubme.t1
+  WITH (publish_via_partition_root = true)
+;
+--
+-- Polymorphic aggregate tests
+--
+-- Legend:
+-----------
+-- A = type is ANY
+-- P = type is polymorphic
+-- N = type is non-polymorphic
+-- B = aggregate base type
+-- S = aggregate state type
+-- R = aggregate return type
+-- 1 = arg1 of a function
+-- 2 = arg2 of a function
+-- ag = aggregate
+-- tf = trans (state) function
+-- ff = final function
+-- rt = return type of a function
+-- -> = implies
+-- => = allowed
+-- !> = not allowed
+-- E  = exists
+-- NE = not-exists
+--
+-- Possible states:
+-- ----------------
+-- B = (A || P || N)
+--   when (B = A) -> (tf2 = NE)
+-- S = (P || N)
+-- ff = (E || NE)
+-- tf1 = (P || N)
+-- tf2 = (NE || P || N)
+-- R = (P || N)
+
+-- create functions for use as tf and ff with the needed combinations of
+-- argument polymorphism, but within the constraints of valid aggregate
+-- functions, i.e. tf arg1 and tf return type must match
+
+-- polymorphic single arg transfn
+CREATE FUNCTION stfp(anyarray) RETURNS anyarray AS
+'select $1' LANGUAGE SQL
+;
+ALTER FOREIGN TABLE foreign_schema.foreign_table_1
+	DISABLE TRIGGER trigtest_before_stmt
+;
+VACUUM (PARALLEL 2) pg_catalog.pg_publication_rel
+;
+COMMENT ON CONSTRAINT id_notnull_constraint ON comment_test IS 'NOT NULL constraint of comment_test'
+;
+-- ok
+ALTER TABLE IF EXISTS constraint_rename_test ADD CONSTRAINT con4 UNIQUE (a)
+;
+ALTER TABLE pg_toast.pg_toast_30321 RENAME TO reind_con_toast
+;
+alter function simpletarget(int) immutable
+;
+-- ok
+CREATE TABLE gtestxx_4 (b int GENERATED ALWAYS AS (a * 2) STORED, a int NOT NULL)
+;
+create index numrange_test_btree on numrange_test(nr)
+;
+drop table defaulttest cascade
+;
+/*
+ * 6.62
+ * TABLE_CONSTRAINTS view
+ */
+
+CREATE VIEW table_constraints AS
+    SELECT CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(nc.nspname AS sql_identifier) AS constraint_schema,
+           CAST(c.conname AS sql_identifier) AS constraint_name,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nr.nspname AS sql_identifier) AS table_schema,
+           CAST(r.relname AS sql_identifier) AS table_name,
+           CAST(
+             CASE c.contype WHEN 'c' THEN 'CHECK'
+                            WHEN 'f' THEN 'FOREIGN KEY'
+                            WHEN 'p' THEN 'PRIMARY KEY'
+                            WHEN 'u' THEN 'UNIQUE' END
+             AS character_data) AS constraint_type,
+           CAST(CASE WHEN c.condeferrable THEN 'YES' ELSE 'NO' END AS yes_or_no)
+             AS is_deferrable,
+           CAST(CASE WHEN c.condeferred THEN 'YES' ELSE 'NO' END AS yes_or_no)
+             AS initially_deferred,
+           CAST('YES' AS yes_or_no) AS enforced,
+           CAST(CASE WHEN c.contype = 'u'
+                     THEN CASE WHEN (SELECT NOT indnullsnotdistinct FROM pg_index WHERE indexrelid = conindid) THEN 'YES' ELSE 'NO' END
+                     END
+                AS yes_or_no) AS nulls_distinct
+
+    FROM pg_namespace nc,
+         pg_namespace nr,
+         pg_constraint c,
+         pg_class r
+
+    WHERE nc.oid = c.connamespace AND nr.oid = r.relnamespace
+          AND c.conrelid = r.oid
+          AND c.contype NOT IN ('t', 'x')  -- ignore nonstandard constraints
+          AND r.relkind IN ('r', 'p')
+          AND (NOT pg_is_other_temp_schema(nr.oid))
+          AND (pg_has_role(r.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(r.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(r.oid, 'INSERT, UPDATE, REFERENCES') )
+
+    UNION ALL
+
+    -- not-null constraints
+
+    SELECT CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(nr.nspname AS sql_identifier) AS constraint_schema,
+           CAST(CAST(nr.oid AS text) || '_' || CAST(r.oid AS text) || '_' || CAST(a.attnum AS text) || '_not_null' AS sql_identifier) AS constraint_name, -- XXX
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nr.nspname AS sql_identifier) AS table_schema,
+           CAST(r.relname AS sql_identifier) AS table_name,
+           CAST('CHECK' AS character_data) AS constraint_type,
+           CAST('NO' AS yes_or_no) AS is_deferrable,
+           CAST('NO' AS yes_or_no) AS initially_deferred,
+           CAST('YES' AS yes_or_no) AS enforced,
+           CAST(NULL AS yes_or_no) AS nulls_distinct
+
+    FROM pg_namespace nr,
+         pg_class r,
+         pg_attribute a
+
+    WHERE nr.oid = r.relnamespace
+          AND r.oid = a.attrelid
+          AND a.attnotnull
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+          AND r.relkind IN ('r', 'p')
+          AND (NOT pg_is_other_temp_schema(nr.oid))
+          AND (pg_has_role(r.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(r.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(r.oid, 'INSERT, UPDATE, REFERENCES') )
+;
+CREATE OPERATOR = (
+	LEFTARG = seg,
+	RIGHTARG = seg,
+	PROCEDURE = seg_same,
+	COMMUTATOR = '=',
+	NEGATOR = '<>',
+	RESTRICT = eqsel,
+	JOIN = eqjoinsel,
+	MERGES
+)
+;
+ALTER TABLE ONLY "public"."pagg_tab2" ATTACH PARTITION "public"."pagg_tab2_p3" FOR VALUES FROM (20) TO (30)
+;
+ANALYZE public.tbl_include_box
+;
+create table inh_p1(f1 int not null)
+;
+create temp table onerow()
+;
+CREATE SEQUENCE test_seq1 CACHE 10
+;
+CREATE FUNCTION gtrgm_compress(internal)
+RETURNS internal
+AS '$libdir/pg_trgm'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+CREATE TABLE "fkpart6"."pk1" (
+    "a" integer NOT NULL
+)
+PARTITION BY RANGE ("a")
+;
+CREATE FUNCTION heap_tuple_infomask_flags(
+       t_infomask integer,
+       t_infomask2 integer,
+       raw_flags OUT text[],
+       combined_flags OUT text[])
+RETURNS record
+AS '$libdir/pageinspect', 'heap_tuple_infomask_flags'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+VACUUM pg_catalog.pg_type
+;
+CREATE FUNCTION btean13cmp(ean13, ismn13)
+	RETURNS int4
+	AS 'btint8cmp'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+alter table alterlock alter column f2 set storage extended
+;
+CREATE SEQUENCE sequence_test10 AS integer MINVALUE -100000 START 1
+;
+create foreign table tab_batch_sharded_p1 partition of tab_batch_sharded
+  for values with (modulus 2, remainder 1)
+  server loopback options (table_name 'tab_batch_sharded_p1_remote')
+;
+-- wrong typmod
+CREATE TABLE tt3 (y numeric(8,2), x int)
+;
+ALTER DATABASE "contrib_regression" SET lc_messages TO 'C'
+;
+-- case that causes change of typmod knowledge during inlining
+CREATE OR REPLACE FUNCTION rngfunc()
+RETURNS TABLE(a varchar(5))
+AS $$ SELECT 'hello'::varchar(5) $$ LANGUAGE sql STABLE
+;
+CREATE PUBLICATION tap_pub_1 FOR TABLE tab_1
+;
+-- check validation when attaching hash partitions
+
+-- Use hand-rolled hash functions and operator class to get predictable result
+-- on different machines. part_test_int4_ops is defined in insert.sql.
+
+-- check that the new partition won't overlap with an existing partition
+CREATE TABLE hash_parted (
+	a int,
+	b int
+) PARTITION BY HASH (a part_test_int4_ops)
+;
+CREATE TABLE t (c) AS VALUES ('bar'::text)
+;
+-- Test correct deparsing of ORDER BY when there is an output name conflict
+
+create view aliased_order_by as
+select x1 as x2, x2 as x1, x3 from tt1
+  order by x2
+;
+CREATE TABLE amcheck_schema.pg_namespace (junk text)
+;
+CREATE OPERATOR - (
+	LEFTARG = _int4,
+	RIGHTARG = int4,
+	PROCEDURE = intarray_del_elem
+)
+;
+CREATE OR REPLACE FUNCTION large_val() RETURNS TEXT LANGUAGE SQL AS
+'select array_agg(fipshash(g::text))::text from generate_series(1, 256) g'
+;
+CREATE OPERATOR ~ (
+        LEFTARG = lquery,
+	RIGHTARG = ltree,
+	PROCEDURE = ltq_rregex,
+	COMMUTATOR = '~',
+	RESTRICT = contsel,
+	JOIN = contjoinsel
+)
+;
+drop table if exists ppln_uniqviol
+;
+-- should be created in temp object schema
+CREATE TEMP VIEW v2_temp AS SELECT * FROM base_table
+;
+CREATE FOREIGN TABLE insert_tbl (a int, b int, c text)
+  SERVER loopback OPTIONS (table_name 'base_tbl4')
+;
+CREATE FUNCTION gbt_uuid_picksplit(internal, internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+ANALYZE public.rtest_nothn3
+;
+ANALYZE pg_catalog.pg_description
+;
+-- set PUBLISH_VIA_PARTITION_ROOT to true
+-- can use column list for partitioned table
+ALTER PUBLICATION testpub6 SET (PUBLISH_VIA_PARTITION_ROOT=1)
+;
+CREATE UNIQUE INDEX "num_exp_log10_idx" ON "public"."num_exp_log10" USING "btree" ("id")
+;
+drop trigger check_after_tab_progress_reporting on tab_progress_reporting
+;
+DROP VIEW jsonb_table_view_nested
+;
+drop schema alter1
+;
+create cast (xfloat8 as float8) without function
+;
+CREATE INDEX "hash_f8_index" ON "public"."hash_f8_heap" USING "hash" ("random") WITH ("fillfactor"='60')
+;
+------------------------------------------------------------------------------------------
+[CREATE_PUB_SUB] CREATE PUBLICATION dump_pub_all FOR TABLE ONLY pubme.t0, pubme.t1
+  WITH (publish_via_partition_root = true)
+;
+----------
+[CREATE_PROG_OBJ] --
+-- Polymorphic aggregate tests
+--
+-- Legend:
+-----------
+-- A = type is ANY
+-- P = type is polymorphic
+-- N = type is non-polymorphic
+-- B = aggregate base type
+-- S = aggregate state type
+-- R = aggregate return type
+-- 1 = arg1 of a function
+-- 2 = arg2 of a function
+-- ag = aggregate
+-- tf = trans (state) function
+-- ff = final function
+-- rt = return type of a function
+-- -> = implies
+-- => = allowed
+-- !> = not allowed
+-- E  = exists
+-- NE = not-exists
+--
+-- Possible states:
+-- ----------------
+-- B = (A || P || N)
+--   when (B = A) -> (tf2 = NE)
+-- S = (P || N)
+-- ff = (E || NE)
+-- tf1 = (P || N)
+-- tf2 = (NE || P || N)
+-- R = (P || N)
+
+-- create functions for use as tf and ff with the needed combinations of
+-- argument polymorphism, but within the constraints of valid aggregate
+-- functions, i.e. tf arg1 and tf return type must match
+
+-- polymorphic single arg transfn
+CREATE FUNCTION stfp(anyarray) RETURNS anyarray AS
+'select $1' LANGUAGE SQL
+;
+----------
+[ALTER_TABLE] ALTER FOREIGN TABLE foreign_schema.foreign_table_1
+	DISABLE TRIGGER trigtest_before_stmt
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 2) pg_catalog.pg_publication_rel
+;
+----------
+[COMMENT_CONSTRAINT] COMMENT ON CONSTRAINT id_notnull_constraint ON comment_test IS 'NOT NULL constraint of comment_test'
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] -- ok
+ALTER TABLE IF EXISTS constraint_rename_test ADD CONSTRAINT con4 UNIQUE (a)
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_30321 RENAME TO reind_con_toast
+;
+----------
+[ALTER_PROG_OBJ] alter function simpletarget(int) immutable
+;
+----------
+[CREATE_TABLE] -- ok
+CREATE TABLE gtestxx_4 (b int GENERATED ALWAYS AS (a * 2) STORED, a int NOT NULL)
+;
+----------
+[ADD_INDEX] create index numrange_test_btree on numrange_test(nr)
+;
+----------
+[DROP_TABLE] drop table defaulttest cascade
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 6.62
+ * TABLE_CONSTRAINTS view
+ */
+
+CREATE VIEW table_constraints AS
+    SELECT CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(nc.nspname AS sql_identifier) AS constraint_schema,
+           CAST(c.conname AS sql_identifier) AS constraint_name,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nr.nspname AS sql_identifier) AS table_schema,
+           CAST(r.relname AS sql_identifier) AS table_name,
+           CAST(
+             CASE c.contype WHEN 'c' THEN 'CHECK'
+                            WHEN 'f' THEN 'FOREIGN KEY'
+                            WHEN 'p' THEN 'PRIMARY KEY'
+                            WHEN 'u' THEN 'UNIQUE' END
+             AS character_data) AS constraint_type,
+           CAST(CASE WHEN c.condeferrable THEN 'YES' ELSE 'NO' END AS yes_or_no)
+             AS is_deferrable,
+           CAST(CASE WHEN c.condeferred THEN 'YES' ELSE 'NO' END AS yes_or_no)
+             AS initially_deferred,
+           CAST('YES' AS yes_or_no) AS enforced,
+           CAST(CASE WHEN c.contype = 'u'
+                     THEN CASE WHEN (SELECT NOT indnullsnotdistinct FROM pg_index WHERE indexrelid = conindid) THEN 'YES' ELSE 'NO' END
+                     END
+                AS yes_or_no) AS nulls_distinct
+
+    FROM pg_namespace nc,
+         pg_namespace nr,
+         pg_constraint c,
+         pg_class r
+
+    WHERE nc.oid = c.connamespace AND nr.oid = r.relnamespace
+          AND c.conrelid = r.oid
+          AND c.contype NOT IN ('t', 'x')  -- ignore nonstandard constraints
+          AND r.relkind IN ('r', 'p')
+          AND (NOT pg_is_other_temp_schema(nr.oid))
+          AND (pg_has_role(r.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(r.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(r.oid, 'INSERT, UPDATE, REFERENCES') )
+
+    UNION ALL
+
+    -- not-null constraints
+
+    SELECT CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(nr.nspname AS sql_identifier) AS constraint_schema,
+           CAST(CAST(nr.oid AS text) || '_' || CAST(r.oid AS text) || '_' || CAST(a.attnum AS text) || '_not_null' AS sql_identifier) AS constraint_name, -- XXX
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nr.nspname AS sql_identifier) AS table_schema,
+           CAST(r.relname AS sql_identifier) AS table_name,
+           CAST('CHECK' AS character_data) AS constraint_type,
+           CAST('NO' AS yes_or_no) AS is_deferrable,
+           CAST('NO' AS yes_or_no) AS initially_deferred,
+           CAST('YES' AS yes_or_no) AS enforced,
+           CAST(NULL AS yes_or_no) AS nulls_distinct
+
+    FROM pg_namespace nr,
+         pg_class r,
+         pg_attribute a
+
+    WHERE nr.oid = r.relnamespace
+          AND r.oid = a.attrelid
+          AND a.attnotnull
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+          AND r.relkind IN ('r', 'p')
+          AND (NOT pg_is_other_temp_schema(nr.oid))
+          AND (pg_has_role(r.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(r.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(r.oid, 'INSERT, UPDATE, REFERENCES') )
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR = (
+	LEFTARG = seg,
+	RIGHTARG = seg,
+	PROCEDURE = seg_same,
+	COMMUTATOR = '=',
+	NEGATOR = '<>',
+	RESTRICT = eqsel,
+	JOIN = eqjoinsel,
+	MERGES
+)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "public"."pagg_tab2" ATTACH PARTITION "public"."pagg_tab2_p3" FOR VALUES FROM (20) TO (30)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.tbl_include_box
+;
+----------
+[CREATE_TABLE] create table inh_p1(f1 int not null)
+;
+----------
+[CREATE_TABLE] create temp table onerow()
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE test_seq1 CACHE 10
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gtrgm_compress(internal)
+RETURNS internal
+AS '$libdir/pg_trgm'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] CREATE TABLE "fkpart6"."pk1" (
+    "a" integer NOT NULL
+)
+PARTITION BY RANGE ("a")
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION heap_tuple_infomask_flags(
+       t_infomask integer,
+       t_infomask2 integer,
+       raw_flags OUT text[],
+       combined_flags OUT text[])
+RETURNS record
+AS '$libdir/pageinspect', 'heap_tuple_infomask_flags'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+----------
+[ADMIN_TABLE] VACUUM pg_catalog.pg_type
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION btean13cmp(ean13, ismn13)
+	RETURNS int4
+	AS 'btint8cmp'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table alterlock alter column f2 set storage extended
+;
+----------
+[CREATE_SEQUENCE] CREATE SEQUENCE sequence_test10 AS integer MINVALUE -100000 START 1
+;
+----------
+[CREATE_TABLE] create foreign table tab_batch_sharded_p1 partition of tab_batch_sharded
+  for values with (modulus 2, remainder 1)
+  server loopback options (table_name 'tab_batch_sharded_p1_remote')
+;
+----------
+[CREATE_TABLE] -- wrong typmod
+CREATE TABLE tt3 (y numeric(8,2), x int)
+;
+----------
+[ALTER_CATALOG] ALTER DATABASE "contrib_regression" SET lc_messages TO 'C'
+;
+----------
+[CREATE_PROG_OBJ] -- case that causes change of typmod knowledge during inlining
+CREATE OR REPLACE FUNCTION rngfunc()
+RETURNS TABLE(a varchar(5))
+AS $$ SELECT 'hello'::varchar(5) $$ LANGUAGE sql STABLE
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_1 FOR TABLE tab_1
+;
+----------
+[CREATE_TABLE] -- check validation when attaching hash partitions
+
+-- Use hand-rolled hash functions and operator class to get predictable result
+-- on different machines. part_test_int4_ops is defined in insert.sql.
+
+-- check that the new partition won't overlap with an existing partition
+CREATE TABLE hash_parted (
+	a int,
+	b int
+) PARTITION BY HASH (a part_test_int4_ops)
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE t (c) AS VALUES ('bar'::text)
+;
+----------
+[CREATE_VIEW(SELECT)] -- Test correct deparsing of ORDER BY when there is an output name conflict
+
+create view aliased_order_by as
+select x1 as x2, x2 as x1, x3 from tt1
+  order by x2
+;
+----------
+[CREATE_TABLE] CREATE TABLE amcheck_schema.pg_namespace (junk text)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR - (
+	LEFTARG = _int4,
+	RIGHTARG = int4,
+	PROCEDURE = intarray_del_elem
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION large_val() RETURNS TEXT LANGUAGE SQL AS
+'select array_agg(fipshash(g::text))::text from generate_series(1, 256) g'
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR ~ (
+        LEFTARG = lquery,
+	RIGHTARG = ltree,
+	PROCEDURE = ltq_rregex,
+	COMMUTATOR = '~',
+	RESTRICT = contsel,
+	JOIN = contjoinsel
+)
+;
+----------
+[DROP_TABLE] drop table if exists ppln_uniqviol
+;
+----------
+[CREATE_VIEW(SELECT)] -- should be created in temp object schema
+CREATE TEMP VIEW v2_temp AS SELECT * FROM base_table
+;
+----------
+[CREATE_TABLE] CREATE FOREIGN TABLE insert_tbl (a int, b int, c text)
+  SERVER loopback OPTIONS (table_name 'base_tbl4')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_uuid_picksplit(internal, internal)
+RETURNS internal
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[ADMIN_TABLE] ANALYZE public.rtest_nothn3
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_catalog.pg_description
+;
+----------
+[ALTER_PUB_SUB] -- set PUBLISH_VIA_PARTITION_ROOT to true
+-- can use column list for partitioned table
+ALTER PUBLICATION testpub6 SET (PUBLISH_VIA_PARTITION_ROOT=1)
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX "num_exp_log10_idx" ON "public"."num_exp_log10" USING "btree" ("id")
+;
+----------
+[DROP_TRIGGER] drop trigger check_after_tab_progress_reporting on tab_progress_reporting
+;
+----------
+[DROP_VIEW] DROP VIEW jsonb_table_view_nested
+;
+----------
+[DROP_SCHEMA] drop schema alter1
+;
+----------
+[CREATE_PROG_OBJ] create cast (xfloat8 as float8) without function
+;
+----------
+[ADD_INDEX] CREATE INDEX "hash_f8_index" ON "public"."hash_f8_heap" USING "hash" ("random") WITH ("fillfactor"='60')
+;

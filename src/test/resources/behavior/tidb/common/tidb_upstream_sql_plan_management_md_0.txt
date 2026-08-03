@@ -1,0 +1,871 @@
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_000]
+sql:
+-- Rewrite of type two statements: Remove the `USING` keyword from the `DELETE` statement.
+CREATE GLOBAL BINDING for
+    DELETE users FROM users JOIN orders ON users.id = orders.user_id
+USING
+    DELETE users FROM users JOIN orders ON users.id = orders.user_id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(2:0~5:68) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(4:11~4:16) /test/1/catalog1/schema1/users/",
+      "action" : "DELETE",
+      "target" : [
+        "Table(4:22~4:27) /test/1/catalog1/schema1/users/",
+        "Table(4:33~4:39) /test/1/catalog1/schema1/orders/"
+      ]
+    },
+    {
+      "subject": "Table(2:11~2:16) /test/1/catalog1/schema1/users/",
+      "action" : "DELETE",
+      "target" : [
+        "Table(2:22~2:27) /test/1/catalog1/schema1/users/",
+        "Table(2:33~2:39) /test/1/catalog1/schema1/orders/"
+      ]
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_sql_plan_management_md_0_001]
+sql:
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('table', 'db_*.table_*');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:50) /test/1/catalog1/mysql/capture_plan_baselines_blacklist/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[metadata__common_tidb_upstream_sql_plan_management_md_0_002]
+sql:
+-- Create a GLOBAL scope cross-database binding.
+SHOW GLOBAL BINDINGS;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Instance(2:0~2:20) /test/1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[metadata__common_tidb_upstream_sql_plan_management_md_0_003]
+sql:
+WITH stmts AS (                                                -- Gets all information
+  SELECT * FROM INFORMATION_SCHEMA.CLUSTER_STATEMENTS_SUMMARY
+  UNION ALL
+  SELECT * FROM INFORMATION_SCHEMA.CLUSTER_STATEMENTS_SUMMARY_HISTORY
+),
+best_plans AS (
+  SELECT plan_digest, `digest`, avg_latency,
+  CONCAT('create global binding from history using plan digest "', plan_digest, '"') as binding_stmt
+  FROM stmts t1
+  WHERE avg_latency = (SELECT min(avg_latency) FROM stmts t2   -- The plan with the lowest query latency
+                       WHERE t2.`digest` = t1.`digest`)
+)
+SELECT any_value(digest_text) as query,
+       SUM(exec_count) as exec_count,
+       plan_hint, binding_stmt
+FROM stmts, best_plans
+WHERE stmts.`digest` = best_plans.`digest`
+  AND summary_begin_time > DATE_SUB(NOW(), interval 14 day)    -- Executed in the past 2 weeks
+  AND stmt_type = 'Select'                                     -- Only consider select statements
+  AND schema_name NOT IN ('INFORMATION_SCHEMA', 'mysql')       -- Not an internal query
+  AND plan_in_binding = 0                                      -- No binding yet
+GROUP BY stmts.`digest`
+  HAVING COUNT(DISTINCT(stmts.plan_digest)) > 1                -- This query is unstable. It has more than 1 plan.
+         AND SUM(exec_count) > 10                              -- High-frequency, and has been executed more than 10 times.
+ORDER BY SUM(exec_count) DESC LIMIT 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Table(2:16~2:61) /test/1/catalog1/INFORMATION_SCHEMA/CLUSTER_STATEMENTS_SUMMARY/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:16~4:69) /test/1/catalog1/INFORMATION_SCHEMA/CLUSTER_STATEMENTS_SUMMARY_HISTORY/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(8:2~8:8) /test/1/catalog1/schema1/CONCAT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:30~10:33) /test/1/catalog1/schema1/min/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(13:7~13:16) /test/1/catalog1/schema1/any_value/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(14:7~14:10) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(18:27~18:35) /test/1/catalog1/schema1/DATE_SUB/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(18:36~18:39) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(23:9~23:14) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[session_variable_rw__common_tidb_upstream_sql_plan_management_md_0_004]
+sql:
+-- If `tidb_evolve_plan_baselines` is still enabled, disable it.
+    SET GLOBAL tidb_evolve_plan_baselines = OFF;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(2:4~2:47) /test/1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[session_variable_rw__common_tidb_upstream_sql_plan_management_md_0_005]
+sql:
+SET tidb_opt_enable_fuzzy_binding=1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:0~1:35) /test/1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_schema__common_tidb_upstream_sql_plan_management_md_0_006]
+sql:
+CREATE DATABASE db2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_SCHEMA": [
+    {
+      "subject": "Schema(1:16~1:19) /test/1/catalog1/db2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_007]
+sql:
+CREATE GLOBAL BINDING FOR SELECT * FROM orders USING SELECT /*+ use_index(orders, orders_book_id_idx) */ * FROM orders;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(1:0~1:118) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(1:112~1:118) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:40~1:46) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_sql_plan_management_md_0_008]
+sql:
+-- The execution plan of this SQL statement uses the `sort merge join` specified in the GLOBAL binding.
+explain SELECT * FROM t1, t2 WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(2:22~2:24) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:26~2:28) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_sql_plan_management_md_0_009]
+sql:
+-- Views the SQL execution plan again.
+explain SELECT * FROM t1,t2 WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(2:22~2:24) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:25~2:27) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_sql_plan_management_md_0_010]
+sql:
+CREATE TABLE db2.t1 (a INT, KEY(a));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:28~1:34) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:19) /test/1/catalog1/db2/t1/"
+    },
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/db2/t1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_011]
+sql:
+CREATE BINDING FOR SELECT * FROM t WHERE a > 1 USING SELECT * FROM t use index  (idx) WHERE a > 2
+;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(1:0~1:97) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(1:67~1:68) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:33~1:34) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_012]
+sql:
+-- Creates another SESSION binding and specifies using `hash join` in this binding.
+CREATE BINDING for
+    SELECT * FROM t1, t2 WHERE t1.id = t2.id
+USING
+    SELECT /*+ hash_join(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(2:0~5:69) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(4:43~4:45) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:47~4:49) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:18~2:20) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:22~2:24) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_013]
+sql:
+-- Drops the binding created in the SESSION scope.
+drop session binding for SELECT * FROM t1, t2 WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(2:0~2:65) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(1:39~1:41) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:43~1:45) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[session_variable_rw__common_tidb_upstream_sql_plan_management_md_0_014]
+sql:
+SET GLOBAL tidb_evolve_plan_baselines = ON;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:0~1:42) /test/1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_015]
+sql:
+--  Creates a GLOBAL binding and specifies using `sort merge join` in this binding.
+CREATE GLOBAL BINDING for
+    SELECT * FROM t1, t2 WHERE t1.id = t2.id
+USING
+    SELECT /*+ merge_join(t1, t2) */ * FROM t1, t2 WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(2:0~5:70) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(4:44~4:46) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:48~4:50) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:18~2:20) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:22~2:24) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_sql_plan_management_md_0_016]
+sql:
+-- Run `show warnings` to view the binding used in the query.
+    show warnings;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Instance(2:4~2:17) /test/1/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_sql_plan_management_md_0_017]
+sql:
+-- Filter by user name
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('user', 'user1');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:50) /test/1/catalog1/mysql/capture_plan_baselines_blacklist/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_018]
+sql:
+-- Create a global binding
+    CREATE GLOBAL BINDING for
+        SELECT * FROM t
+    USING
+        SELECT /*+ USE_INDEX(t, idx_a) */ * FROM t;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(2:4~5:50) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(4:49~4:50) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:22~2:23) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_sql_plan_management_md_0_019]
+sql:
+-- In the execution plan of this statement, `hash join` specified in the SESSION binding is used, instead of `sort merge join` specified in the GLOBAL binding.
+explain SELECT * FROM t1, t2 WHERE t1.id = t2.id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(2:22~2:24) /test/1/catalog1/schema1/t1/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:26~2:28) /test/1/catalog1/schema1/t2/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_020]
+sql:
+-- Rewrite of type one statements: Delete the `JOIN` keyword. Replace it with a comma.
+CREATE GLOBAL BINDING for
+    SELECT * FROM orders o1, orders o2
+USING
+    SELECT * FROM orders o1, orders o2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(2:0~5:38) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(4:18~4:24) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(2:18~2:24) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_021]
+sql:
+CREATE GLOBAL BINDING for SELECT * FROM t WHERE a < 100 AND b < 100 USING SELECT * FROM t use index(a) WHERE a < 100 AND b < 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(1:0~1:128) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(1:88~1:89) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:40~1:41) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_sql_plan_management_md_0_022]
+sql:
+SELECT * FROM t WHERE a < 100 AND b < 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:15) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_sql_plan_management_md_0_023]
+sql:
+-- Filter by frequency
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('frequency', '2');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:50) /test/1/catalog1/mysql/capture_plan_baselines_blacklist/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[performance__common_tidb_upstream_sql_plan_management_md_0_024]
+sql:
+-- Use explain format = 'verbose' to view the execution plan of a SQL statement
+    explain format = 'verbose' SELECT * FROM t;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "PERFORMANCE": [
+    {
+      "subject": "Table(2:45~2:46) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_schema__common_tidb_upstream_sql_plan_management_md_0_025]
+sql:
+CREATE DATABASE db1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_SCHEMA": [
+    {
+      "subject": "Schema(1:16~1:19) /test/1/catalog1/db1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_sql_plan_management_md_0_026]
+sql:
+SELECT * FROM t WHERE a = 1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:15) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_027]
+sql:
+-- The hint takes effect in the following statement.
+CREATE GLOBAL BINDING for
+    INSERT INTO orders SELECT * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR)
+USING
+    INSERT INTO orders SELECT /*+ use_index(@sel_1 pre_orders, idx_created) */ * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(2:0~5:160) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(4:16~4:22) /test/1/catalog1/schema1/orders/",
+      "action" : "INSERT",
+      "target" : "Table(4:86~4:96) /test/1/catalog1/schema1/pre_orders/"
+    },
+    {
+      "subject": "Function(4:136~4:139) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:16~2:22) /test/1/catalog1/schema1/orders/",
+      "action" : "INSERT",
+      "target" : "Table(2:37~2:47) /test/1/catalog1/schema1/pre_orders/"
+    },
+    {
+      "subject": "Function(2:87~2:90) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_028]
+sql:
+CREATE BINDING FOR SELECT * FROM t WHERE a > 1 USING SELECT * FROM t use index(idx) WHERE b > 2
+;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(1:0~1:95) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(1:67~1:68) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(1:33~1:34) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_sql_plan_management_md_0_029]
+sql:
+CREATE TABLE db1.t2 (a INT, KEY(a));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:28~1:34) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:19) /test/1/catalog1/db1/t2/"
+    },
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/db1/t2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_sql_plan_management_md_0_030]
+sql:
+CREATE TABLE t(a INT, b INT, KEY(a), KEY(b));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:29~1:35) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:14) /test/1/catalog1/schema1/t/"
+    },
+    {
+      "subject": "Index(1:37~1:43) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:14) /test/1/catalog1/schema1/t/"
+    },
+    {
+      "subject": "Table(1:13~1:14) /test/1/catalog1/schema1/t/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[select__common_tidb_upstream_sql_plan_management_md_0_031]
+sql:
+-- Check whether `tidb_evolve_plan_baselines` is disabled in the earlier version.
+    SELECT @@global.tidb_evolve_plan_baselines;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "ConfigKey(2:11~2:46) /test/1/tidb_evolve_plan_baselines/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[admin_performance__common_tidb_upstream_sql_plan_management_md_0_032]
+sql:
+-- The hint cannot take effect in the following statement.
+CREATE GLOBAL BINDING for
+    INSERT INTO orders SELECT * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR)
+USING
+    INSERT /*+ use_index(@sel_1 pre_orders, idx_created) */ INTO orders SELECT * FROM pre_orders WHERE status = 'VALID' AND created <= (NOW() - INTERVAL 1 HOUR);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_PERFORMANCE": [
+    {
+      "subject": "Instance(2:0~5:160) /test/1/",
+      "action" : "UNKNOWN"
+    },
+    {
+      "subject": "Table(4:65~4:71) /test/1/catalog1/schema1/orders/",
+      "action" : "INSERT",
+      "target" : "Table(4:86~4:96) /test/1/catalog1/schema1/pre_orders/"
+    },
+    {
+      "subject": "Function(4:136~4:139) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:16~2:22) /test/1/catalog1/schema1/orders/",
+      "action" : "INSERT",
+      "target" : "Table(2:37~2:47) /test/1/catalog1/schema1/pre_orders/"
+    },
+    {
+      "subject": "Function(2:87~2:90) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_sql_plan_management_md_0_033]
+sql:
+-- Filter by database name and table name through wildcards
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('table', 'test.table_*');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:50) /test/1/catalog1/mysql/capture_plan_baselines_blacklist/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_sql_plan_management_md_0_034]
+sql:
+CREATE TABLE db1.t1 (a INT, KEY(a));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:28~1:34) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:19) /test/1/catalog1/db1/t1/"
+    },
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/db1/t1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[create_table__common_tidb_upstream_sql_plan_management_md_0_035]
+sql:
+CREATE TABLE db2.t2 (a INT, KEY(a));
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Index(1:28~1:34) /test/1/catalog1/schema1/",
+      "action" : "CREATE",
+      "target" : "Table(1:13~1:19) /test/1/catalog1/db2/t2/"
+    },
+    {
+      "subject": "Table(1:13~1:19) /test/1/catalog1/db2/t2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[insert__common_tidb_upstream_sql_plan_management_md_0_036]
+sql:
+-- Filter by table name
+INSERT INTO mysql.capture_plan_baselines_blacklist(filter_type, filter_value) VALUES('table', 'test.t');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:50) /test/1/catalog1/mysql/capture_plan_baselines_blacklist/",
+      "action" : "INSERT"
+    }
+  ]
+}

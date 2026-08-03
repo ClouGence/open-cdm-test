@@ -1,0 +1,426 @@
+-- Test JSON_ARRAY(subquery) deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+explain (verbose, costs off)
+select * from
+     (select k from
+         (select i, coalesce(i, j) as k from
+             (select i from t union all select 0)
+             join (select 1 as j limit 1) on i = j)
+         right join (select 2 as x) on true
+         join (select 3 as y) on i is not null
+     ),
+     lateral (select k as kl limit 1)
+;
+SELECT JSON_OBJECT('foo': NULL::json FORMAT JSON)
+;
+-- indent containing DOCTYPE declaration
+SELECT xmlserialize(DOCUMENT '<!DOCTYPE a><a/>' AS text INDENT)
+;
+-- Segment deletion
+SELECT test_slru_page_delete(0x1234500000030)
+;
+-- 48 extra pages
+SELECT count(test_slru_page_write(a, 'Test SLRU 64-bit'))
+  FROM generate_series(0x1234500000001, 0x1234500000030, 1) as a
+;
+EXPLAIN (verbose, costs off)
+MERGE INTO tgt t
+USING (SELECT *, (SELECT count(*) FROM ref r
+                   WHERE r.ab = s.a + s.b
+                     AND r.cd = s.c - s.d) cnt
+         FROM src s) s
+ON t.a = s.a AND t.b < s.cnt
+WHEN MATCHED AND t.c > s.cnt THEN
+  UPDATE SET (b, c) = (SELECT s.b, s.cnt)
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+WITH cte_init AS MATERIALIZED (SELECT 1 a, 'cte_init val' b)
+MERGE INTO m USING (select 1 k, 'merge source InitPlan' v offset 0) o ON m.k=o.k
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || ' merge update' FROM cte_init WHERE a = 1 LIMIT 1)
+WHEN NOT MATCHED THEN INSERT VALUES(o.k, o.v)
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+WITH cte_basic AS MATERIALIZED (SELECT 1 a, 'cte_basic val' b)
+MERGE INTO m USING (select 0 k, 'merge source SubPlan' v offset 0) o ON m.k=o.k
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || ' merge update' FROM cte_basic WHERE cte_basic.a = m.k LIMIT 1)
+WHEN NOT MATCHED THEN INSERT VALUES(o.k, o.v)
+;
+SELECT JSON_OBJECT(1: 1, '1': NULL WITH UNIQUE)
+;
+-- error
+
+--
+-- conversions between bytea and integer types
+--
+SELECT 0x1234::int2::bytea AS "\x1234", (-0x1234)::int2::bytea AS "\xedcc"
+;
+SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) OVER (ORDER BY i DESC) FROM (VALUES (1), (2), (3)) AS t(i)
+;
+SELECT JSON_OBJECTAGG(k: v NULL ON NULL RETURNING text) FROM (VALUES ('a', 1), ('b', NULL)) AS t(k,v)
+;
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+SELECT JSON_OBJECT(1: 1, '1': NULL ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+with recursive test as (
+  select 0 as x
+  union all
+  select (x + 1) % 10
+  from test
+) cycle x set is_cycle using path
+select * from test
+;
+SELECT xmlserialize(CONTENT  '<foo><bar><val x="y">42</val></bar></foo>' AS text INDENT)
+;
+SELECT JSON_OBJECT('a': '123', 'b': JSON_OBJECT('a': 111, 'b': 'aaa'))
+;
+-- ok
+SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE x.t = 'one'
+;
+SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%#"g' ESCAPE '#') AS "bcdef"
+;
+SELECT test_slru_page_delete(0x1234500000030)
+;
+SELECT t1.c2 FROM ft1 t1 WHERE t1.c1 > 960 ORDER BY t1.c2 FETCH FIRST 2 ROWS WITH TIES
+;
+SELECT test_slru_page_exists(0x1234500000030)
+;
+SELECT ROW(x.*) FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+SELECT JSON_OBJECT('a' VALUE 2 + 3)
+;
+-- all partitions pruned
+explain (costs off) select * from rparted_by_int2 where a > 100_000_000_000_000
+;
+SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST 1 ROW WITH TIES
+;
+SELECT 0o1000000000000000000000
+;
+SELECT JSON_OBJECT('foo': NULL::int FORMAT JSON)
+;
+-- indent xml strings containing blank nodes
+SELECT xmlserialize(DOCUMENT '<foo>   <bar></bar>    </foo>' AS text INDENT)
+;
+SELECT k, bucket, count(*) AS n
+FROM (VALUES ('a', 1), ('a', 2), ('b', 1)) AS t(k, bucket)
+GROUP BY ALL ROLLUP (k, bucket)
+ORDER BY k NULLS LAST, bucket NULLS LAST
+;
+-- indent
+SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text INDENT)
+;
+SELECT 0x80000000
+;
+SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' RETURNING varchar(2)))
+;
+select json_array ( returning jsonb )
+;
+-- indent xml with empty element
+SELECT xmlserialize(DOCUMENT '<foo><bar></bar></foo>' AS text INDENT)
+;
+SELECT JSON_OBJECT(RETURNING json)
+;
+SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': volatile_one() RETURNING text) FORMAT JSON)
+;
+explain (verbose, costs off)
+select t3.a from sj t1
+	join sj t2 on t1.a = t2.a
+	join lateral (select * from (select t1.a offset 0) offset 0) t3 on true
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union distinct
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search breadth first by f, t set seq
+select * from search_graph order by seq
+;
+SELECT JSON_OBJECTAGG(k: v WITH UNIQUE KEYS)
+FROM (VALUES (1, 1), (1, NULL), (2, 2)) foo(k, v)
+;
+-- Test IS JSON deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT '1' IS JSON AS "any", ('1' || i) IS JSON SCALAR AS "scalar", '[]' IS NOT JSON ARRAY AS "array", '{}' IS JSON OBJECT WITH UNIQUE AS "object" FROM generate_series(1, 3) i
+;
+SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST 2 ROW WITH TIES
+;
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	(select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t)
+) search depth first by f, t set seq
+select * from search_graph order by seq
+;
+-- window functions returning pass-by-ref values from different rows
+select x, lag(x, 1) over (order by x), lead(x, 3) over (order by x)
+from (select x::numeric as x from generate_series(1,10) x)
+;
+SELECT JSON_ARRAY(RETURNING bytea FORMAT JSON ENCODING UTF16)
+;
+EXPLAIN (costs off)
+MERGE INTO rw_view1 t
+  USING (SELECT * FROM generate_series(1,5)) AS s(a) ON t.a = s.a
+  WHEN MATCHED THEN UPDATE SET b = 'Updated'
+;
+SELECT 0x8000000000000000
+;
+--
+-- Test 64-bit pages
+--
+SELECT test_slru_page_exists(0x1234500000000)
+;
+SELECT	JSON_ARRAYAGG(NULL NULL ON NULL),
+		JSON_ARRAYAGG(NULL NULL ON NULL RETURNING jsonb)
+FROM generate_series(1, 5)
+;
+------------------------------------------------------------------------------------------
+[PERFORMANCE] -- Test JSON_ARRAY(subquery) deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_ARRAY(SELECT i FROM (VALUES (1), (2), (NULL), (4)) foo(i) RETURNING jsonb)
+;
+----------
+[PERFORMANCE] explain (verbose, costs off)
+select * from
+     (select k from
+         (select i, coalesce(i, j) as k from
+             (select i from t union all select 0)
+             join (select 1 as j limit 1) on i = j)
+         right join (select 2 as x) on true
+         join (select 3 as y) on i is not null
+     ),
+     lateral (select k as kl limit 1)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('foo': NULL::json FORMAT JSON)
+;
+----------
+[SELECT] -- indent containing DOCTYPE declaration
+SELECT xmlserialize(DOCUMENT '<!DOCTYPE a><a/>' AS text INDENT)
+;
+----------
+[SELECT] -- Segment deletion
+SELECT test_slru_page_delete(0x1234500000030)
+;
+----------
+[SELECT] -- 48 extra pages
+SELECT count(test_slru_page_write(a, 'Test SLRU 64-bit'))
+  FROM generate_series(0x1234500000001, 0x1234500000030, 1) as a
+;
+----------
+[PERFORMANCE] EXPLAIN (verbose, costs off)
+MERGE INTO tgt t
+USING (SELECT *, (SELECT count(*) FROM ref r
+                   WHERE r.ab = s.a + s.b
+                     AND r.cd = s.c - s.d) cnt
+         FROM src s) s
+ON t.a = s.a AND t.b < s.cnt
+WHEN MATCHED AND t.c > s.cnt THEN
+  UPDATE SET (b, c) = (SELECT s.b, s.cnt)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+WITH cte_init AS MATERIALIZED (SELECT 1 a, 'cte_init val' b)
+MERGE INTO m USING (select 1 k, 'merge source InitPlan' v offset 0) o ON m.k=o.k
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || ' merge update' FROM cte_init WHERE a = 1 LIMIT 1)
+WHEN NOT MATCHED THEN INSERT VALUES(o.k, o.v)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+WITH cte_basic AS MATERIALIZED (SELECT 1 a, 'cte_basic val' b)
+MERGE INTO m USING (select 0 k, 'merge source SubPlan' v offset 0) o ON m.k=o.k
+WHEN MATCHED THEN UPDATE SET v = (SELECT b || ' merge update' FROM cte_basic WHERE cte_basic.a = m.k LIMIT 1)
+WHEN NOT MATCHED THEN INSERT VALUES(o.k, o.v)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1: 1, '1': NULL WITH UNIQUE)
+;
+----------
+[SELECT] -- error
+
+--
+-- conversions between bytea and integer types
+--
+SELECT 0x1234::int2::bytea AS "\x1234", (-0x1234)::int2::bytea AS "\xedcc"
+;
+----------
+[SELECT] SELECT JSON_ARRAYAGG(i NULL ON NULL RETURNING jsonb) OVER (ORDER BY i DESC) FROM (VALUES (1), (2), (3)) AS t(i)
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v NULL ON NULL RETURNING text) FROM (VALUES ('a', 1), ('b', NULL)) AS t(k,v)
+;
+----------
+[PERFORMANCE] EXPLAIN (VERBOSE, COSTS OFF)
+SELECT JSON_OBJECTAGG(i: ('111' || i)::bytea FORMAT JSON WITH UNIQUE RETURNING text) FILTER (WHERE i > 3)
+FROM generate_series(1,5) i
+;
+----------
+[SELECT] SELECT JSON_OBJECT(1: 1, '1': NULL ABSENT ON NULL WITH UNIQUE RETURNING jsonb)
+;
+----------
+[SELECT] with recursive test as (
+  select 0 as x
+  union all
+  select (x + 1) % 10
+  from test
+) cycle x set is_cycle using path
+select * from test
+;
+----------
+[SELECT] SELECT xmlserialize(CONTENT  '<foo><bar><val x="y">42</val></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': '123', 'b': JSON_OBJECT('a': 111, 'b': 'aaa'))
+;
+----------
+[SELECT] -- ok
+SELECT * FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE x.t = 'one'
+;
+----------
+[SELECT] SELECT SUBSTRING('abcdefg' SIMILAR 'a#"%#"g' ESCAPE '#') AS "bcdef"
+;
+----------
+[SELECT] SELECT test_slru_page_delete(0x1234500000030)
+;
+----------
+[SELECT] SELECT t1.c2 FROM ft1 t1 WHERE t1.c1 > 960 ORDER BY t1.c2 FETCH FIRST 2 ROWS WITH TIES
+;
+----------
+[SELECT] SELECT test_slru_page_exists(0x1234500000030)
+;
+----------
+[SELECT] SELECT ROW(x.*) FROM J1_TBL JOIN J2_TBL USING (i) AS x WHERE J1_TBL.t = 'one'
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a' VALUE 2 + 3)
+;
+----------
+[PERFORMANCE] -- all partitions pruned
+explain (costs off) select * from rparted_by_int2 where a > 100_000_000_000_000
+;
+----------
+[SELECT] SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST 1 ROW WITH TIES
+;
+----------
+[SELECT] SELECT 0o1000000000000000000000
+;
+----------
+[SELECT] SELECT JSON_OBJECT('foo': NULL::int FORMAT JSON)
+;
+----------
+[SELECT] -- indent xml strings containing blank nodes
+SELECT xmlserialize(DOCUMENT '<foo>   <bar></bar>    </foo>' AS text INDENT)
+;
+----------
+[SELECT] SELECT k, bucket, count(*) AS n
+FROM (VALUES ('a', 1), ('a', 2), ('b', 1)) AS t(k, bucket)
+GROUP BY ALL ROLLUP (k, bucket)
+ORDER BY k NULLS LAST, bucket NULLS LAST
+;
+----------
+[SELECT] -- indent
+SELECT xmlserialize(DOCUMENT '<foo><bar><val x="y">42</val></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] SELECT 0x80000000
+;
+----------
+[SELECT] SELECT JSON_ARRAY(JSON_ARRAY('{ "a" : 123 }' RETURNING varchar(2)))
+;
+----------
+[SELECT] select json_array ( returning jsonb )
+;
+----------
+[SELECT] -- indent xml with empty element
+SELECT xmlserialize(DOCUMENT '<foo><bar></bar></foo>' AS text INDENT)
+;
+----------
+[SELECT] SELECT JSON_OBJECT(RETURNING json)
+;
+----------
+[SELECT] SELECT JSON_OBJECT('a': JSON_OBJECTAGG('b': volatile_one() RETURNING text) FORMAT JSON)
+;
+----------
+[PERFORMANCE] explain (verbose, costs off)
+select t3.a from sj t1
+	join sj t2 on t1.a = t2.a
+	join lateral (select * from (select t1.a offset 0) offset 0) t3 on true
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union distinct
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search breadth first by f, t set seq
+select * from search_graph order by seq
+;
+----------
+[SELECT] SELECT JSON_OBJECTAGG(k: v WITH UNIQUE KEYS)
+FROM (VALUES (1, 1), (1, NULL), (2, 2)) foo(k, v)
+;
+----------
+[PERFORMANCE] -- Test IS JSON deparsing
+EXPLAIN (VERBOSE, COSTS OFF)
+SELECT '1' IS JSON AS "any", ('1' || i) IS JSON SCALAR AS "scalar", '[]' IS NOT JSON ARRAY AS "array", '{}' IS JSON OBJECT WITH UNIQUE AS "object" FROM generate_series(1, 3) i
+;
+----------
+[SELECT] SELECT  thousand
+		FROM onek WHERE thousand < 5
+		ORDER BY thousand FETCH FIRST 2 ROW WITH TIES
+;
+----------
+[SELECT] with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	(select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t)
+) search depth first by f, t set seq
+select * from search_graph order by seq
+;
+----------
+[SELECT] -- window functions returning pass-by-ref values from different rows
+select x, lag(x, 1) over (order by x), lead(x, 3) over (order by x)
+from (select x::numeric as x from generate_series(1,10) x)
+;
+----------
+[SELECT] SELECT JSON_ARRAY(RETURNING bytea FORMAT JSON ENCODING UTF16)
+;
+----------
+[PERFORMANCE] EXPLAIN (costs off)
+MERGE INTO rw_view1 t
+  USING (SELECT * FROM generate_series(1,5)) AS s(a) ON t.a = s.a
+  WHEN MATCHED THEN UPDATE SET b = 'Updated'
+;
+----------
+[SELECT] SELECT 0x8000000000000000
+;
+----------
+[SELECT] --
+-- Test 64-bit pages
+--
+SELECT test_slru_page_exists(0x1234500000000)
+;
+----------
+[SELECT] SELECT	JSON_ARRAYAGG(NULL NULL ON NULL),
+		JSON_ARRAYAGG(NULL NULL ON NULL RETURNING jsonb)
+FROM generate_series(1, 5)
+;

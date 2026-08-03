@@ -1,0 +1,43 @@
+[metadata__common_tidb_upstream_index_advisor_md_0_000]
+sql:
+-- Find indexes that are consistently scanned with over 50% of total records.
+SELECT table_schema, table_name, index_name,
+       query_total, rows_access_total,
+       percentage_access_0 as full_table_scans
+FROM information_schema.cluster_tidb_index_usage
+WHERE last_access_time IS NOT NULL AND percentage_access_0 + percentage_access_0_1 + percentage_access_1_10 + percentage_access_10_20 + percentage_access_20_50 = 0;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Table(5:5~5:48) /test/1/catalog1/information_schema/cluster_tidb_index_usage/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[metadata__common_tidb_upstream_index_advisor_md_0_001]
+sql:
+-- Find indexes that have not been accessed in the last 30 days.
+SELECT table_schema, table_name, index_name, last_access_time
+FROM information_schema.cluster_tidb_index_usage
+WHERE last_access_time IS NULL
+  OR last_access_time < NOW() - INTERVAL 30 DAY;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": [
+    {
+      "subject": "Table(3:5~3:48) /test/1/catalog1/information_schema/cluster_tidb_index_usage/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(5:24~5:27) /test/1/catalog1/schema1/NOW/",
+      "action" : "CALL"
+    }
+  ]
+}

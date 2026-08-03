@@ -1,0 +1,704 @@
+CREATE FUNCTION isnne(ean13, issn13)
+	RETURNS boolean
+	AS 'int8ne'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+ALTER TABLE list_parted2 add constraint check_b2 check (b <> 'zz') NO INHERIT
+;
+CREATE OPERATOR < (
+	PROCEDURE = isnlt,
+	LEFTARG = ean13,
+	RIGHTARG = issn13,
+	COMMUTATOR = >,
+	NEGATOR = >=,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+create table tht (en digit, data int, unique(en, data)) partition by hash(en)
+;
+-- PROCESS_TOAST option
+CREATE TABLE vac_option_tab (a INT, t TEXT)
+;
+CALL test_proc8a(10, 20)
+;
+ALTER TABLE list_parted ATTACH PARTITION fail_def_part DEFAULT
+;
+create table rule_and_refint_t1 (
+	id1a integer,
+	id1b integer,
+	primary key (id1a, id1b)
+)
+;
+create trigger check_fkeys2_pkey_exist
+	before insert or update on fkeys2
+	for each row
+	execute procedure
+	check_primary_key ('fkey21', 'fkey22', 'pkeys', 'pkey1', 'pkey2')
+;
+-- check that columns match in type, collation and NOT NULL status
+CREATE TABLE fail_part (
+	b char(3),
+	a int NOT NULL
+)
+;
+ALTER TABLE "public"."itest7d" ALTER COLUMN "a" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."itest7d_a_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+)
+;
+CREATE TABLE split_alter_table.part_us (region text NOT NULL, amount integer)
+;
+CREATE TEMP TABLE tab_stats (a int, b char(20))
+;
+ALTER FUNCTION gbt_oid_fetch(internal) PARALLEL SAFE
+;
+CREATE VIEW pg_buffercache AS
+	SELECT P.* FROM pg_buffercache_pages() AS P
+	(bufferid integer, relfilenode oid, reltablespace oid, reldatabase oid,
+	 relforknumber int2, relblocknumber int8, isdirty bool, usagecount int2,
+	 pinning_backends int4)
+;
+create function tg_backlink_set(myname bpchar, blname bpchar)
+returns integer as '
+declare
+    mytype	char(2);
+    link	char(4);
+    rec		record;
+begin
+    mytype := substr(myname, 1, 2);
+    link := mytype || substr(blname, 1, 2);
+    if link = ''PLPL'' then
+        raise exception
+		''backlink between two phone lines does not make sense'';
+    end if;
+    if link in (''PLWS'', ''WSPL'') then
+        raise exception
+		''direct link of phone line to wall slot not permitted'';
+    end if;
+    if mytype = ''PS'' then
+        select into rec * from PSlot where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.backlink != blname then
+	    update PSlot set backlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''WS'' then
+        select into rec * from WSlot where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.backlink != blname then
+	    update WSlot set backlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''PL'' then
+        select into rec * from PLine where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.backlink != blname then
+	    update PLine set backlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    raise exception ''illegal backlink beginning with %'', mytype;
+end;
+' language plpgsql
+;
+CREATE TEMP TABLE pktable (
+        id1     INT4 PRIMARY KEY,
+        id2     VARCHAR(4) UNIQUE,
+        id3     REAL UNIQUE,
+        UNIQUE(id1, id2, id3)
+)
+;
+CREATE TABLE vchartmp (a varchar(32))
+;
+CREATE UNIQUE INDEX "sj_t3_a_id_idx" ON "public"."sj_t3" USING "btree" ("a", "id")
+;
+CREATE TABLE COPY_TBL (x INT, y TEXT, z INT,
+	CONSTRAINT COPY_CON
+	CHECK (x > 3 AND y <> 'check failed' AND x < 7 ))
+;
+CREATE TABLE "public"."rtest_nothn2" (
+    "a" integer,
+    "b" "text"
+)
+;
+ANALYZE public.gtest25
+;
+-- more tests for certain multi-level partitioning scenarios
+create table mlparted (a int, b int) partition by range (a, b)
+;
+create rule insert_tt_rule as on insert to tt do also
+  insert into tt_log values(new.*)
+;
+ALTER TABLE hash_parted ATTACH PARTITION fail_part FOR VALUES WITH (MODULUS 0, REMAINDER 1)
+;
+VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_foreign_data_wrapper
+;
+/*
+ * 5.61
+ * TABLE_CONSTRAINTS view
+ */
+
+CREATE VIEW table_constraints AS
+    SELECT CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(nc.nspname AS sql_identifier) AS constraint_schema,
+           CAST(c.conname AS sql_identifier) AS constraint_name,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nr.nspname AS sql_identifier) AS table_schema,
+           CAST(r.relname AS sql_identifier) AS table_name,
+           CAST(
+             CASE c.contype WHEN 'c' THEN 'CHECK'
+                            WHEN 'f' THEN 'FOREIGN KEY'
+                            WHEN 'p' THEN 'PRIMARY KEY'
+                            WHEN 'u' THEN 'UNIQUE' END
+             AS character_data) AS constraint_type,
+           CAST(CASE WHEN c.condeferrable THEN 'YES' ELSE 'NO' END AS yes_or_no)
+             AS is_deferrable,
+           CAST(CASE WHEN c.condeferred THEN 'YES' ELSE 'NO' END AS yes_or_no)
+             AS initially_deferred,
+           CAST('YES' AS yes_or_no) AS enforced
+
+    FROM pg_namespace nc,
+         pg_namespace nr,
+         pg_constraint c,
+         pg_class r
+
+    WHERE nc.oid = c.connamespace AND nr.oid = r.relnamespace
+          AND c.conrelid = r.oid
+          AND c.contype NOT IN ('t', 'x')  -- ignore nonstandard constraints
+          AND r.relkind IN ('r', 'p')
+          AND (NOT pg_is_other_temp_schema(nr.oid))
+          AND (pg_has_role(r.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(r.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(r.oid, 'INSERT, UPDATE, REFERENCES') )
+
+    UNION ALL
+
+    -- not-null constraints
+
+    SELECT CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(nr.nspname AS sql_identifier) AS constraint_schema,
+           CAST(CAST(nr.oid AS text) || '_' || CAST(r.oid AS text) || '_' || CAST(a.attnum AS text) || '_not_null' AS sql_identifier) AS constraint_name, -- XXX
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nr.nspname AS sql_identifier) AS table_schema,
+           CAST(r.relname AS sql_identifier) AS table_name,
+           CAST('CHECK' AS character_data) AS constraint_type,
+           CAST('NO' AS yes_or_no) AS is_deferrable,
+           CAST('NO' AS yes_or_no) AS initially_deferred,
+           CAST('YES' AS yes_or_no) AS enforced
+
+    FROM pg_namespace nr,
+         pg_class r,
+         pg_attribute a
+
+    WHERE nr.oid = r.relnamespace
+          AND r.oid = a.attrelid
+          AND a.attnotnull
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+          AND r.relkind IN ('r', 'p')
+          AND (NOT pg_is_other_temp_schema(nr.oid))
+          AND (pg_has_role(r.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(r.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(r.oid, 'INSERT, UPDATE, REFERENCES') )
+;
+ALTER PUBLICATION pub_empty RENAME TO pub_for_tab
+;
+create table spgist_domain_tbl (f1 spgist_text)
+;
+CREATE TABLE primary_promotion_tab (a int)
+;
+CREATE FUNCTION gin_extract_value_int2(int2, internal)
+RETURNS internal
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+CREATE FUNCTION uuid_node(uuid) RETURNS text AS
+$$ SELECT substr($1::text, 25) $$
+LANGUAGE SQL STRICT IMMUTABLE
+;
+CREATE FUNCTION foo3(a double precision, b int) RETURNS double precision AS $$ select $1 + $2 $$ LANGUAGE sql
+;
+CREATE FUNCTION "public"."nth_value_def"("val" "anyelement", "n" integer DEFAULT 1) RETURNS "anyelement"
+    LANGUAGE "internal" WINDOW IMMUTABLE STRICT
+    AS $$window_nth_value$$
+;
+CREATE SUBSCRIPTION admin_sub CONNECTION 'port=32571 host=/tmp/0jj507HGD9 dbname=postgres' PUBLICATION alice
+WITH (run_as_owner = false, password_required = false, copy_data = true, enabled = false)
+;
+create table part_1_10_cd partition of part_1_10 for values in ('cd')
+;
+/*
+ * check whether we decode subtransactions correctly in relation with each
+ * other
+ */
+CREATE TABLE tr_sub (id serial primary key, path text)
+;
+VACUUM (TRUNCATE FALSE) pg_catalog.pg_ts_config
+;
+drop type xfloat4 cascade
+;
+create table empl ( idnum integer , name char ( 20 ) , accs smallint , byte bytea )
+;
+TRUNCATE tab3, tab4
+;
+CREATE TEMP TABLE mytab (foo widget(42,13))
+;
+-- Numeric type, implicit cast is squashed
+CREATE TABLE test_squash_numeric (id int, data numeric(5, 2))
+;
+CREATE OR REPLACE FUNCTION test_slru_page_sync(bigint) RETURNS VOID
+  AS 'MODULE_PATHNAME', 'test_slru_page_sync' LANGUAGE C
+;
+alter table atacc1 drop b
+;
+CREATE FUNCTION pg_stat_statements(IN showtext boolean,
+    OUT userid oid,
+    OUT dbid oid,
+    OUT toplevel bool,
+    OUT queryid bigint,
+    OUT query text,
+    OUT plans int8,
+    OUT total_plan_time float8,
+    OUT min_plan_time float8,
+    OUT max_plan_time float8,
+    OUT mean_plan_time float8,
+    OUT stddev_plan_time float8,
+    OUT calls int8,
+    OUT total_exec_time float8,
+    OUT min_exec_time float8,
+    OUT max_exec_time float8,
+    OUT mean_exec_time float8,
+    OUT stddev_exec_time float8,
+    OUT rows int8,
+    OUT shared_blks_hit int8,
+    OUT shared_blks_read int8,
+    OUT shared_blks_dirtied int8,
+    OUT shared_blks_written int8,
+    OUT local_blks_hit int8,
+    OUT local_blks_read int8,
+    OUT local_blks_dirtied int8,
+    OUT local_blks_written int8,
+    OUT temp_blks_read int8,
+    OUT temp_blks_written int8,
+    OUT blk_read_time float8,
+    OUT blk_write_time float8,
+    OUT temp_blk_read_time float8,
+    OUT temp_blk_write_time float8,
+    OUT wal_records int8,
+    OUT wal_fpi int8,
+    OUT wal_bytes numeric,
+    OUT jit_functions int8,
+    OUT jit_generation_time float8,
+    OUT jit_inlining_count int8,
+    OUT jit_inlining_time float8,
+    OUT jit_optimization_count int8,
+    OUT jit_optimization_time float8,
+    OUT jit_emission_count int8,
+    OUT jit_emission_time float8
+)
+RETURNS SETOF record
+AS '$libdir/pg_stat_statements', 'pg_stat_statements_1_10'
+LANGUAGE C STRICT VOLATILE PARALLEL SAFE
+;
+CREATE TABLE test_ex_constraints_inh () INHERITS (test_ex_constraints)
+;
+-- error
+CREATE SCHEMA IF NOT EXISTS newschema6 AUTHORIZATION nonexistent
+;
+drop trigger trig_stmt_before on rem2
+;
+DROP INDEX unique_idx1, unique_idx2
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] CREATE FUNCTION isnne(ean13, issn13)
+	RETURNS boolean
+	AS 'int8ne'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE list_parted2 add constraint check_b2 check (b <> 'zz') NO INHERIT
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR < (
+	PROCEDURE = isnlt,
+	LEFTARG = ean13,
+	RIGHTARG = issn13,
+	COMMUTATOR = >,
+	NEGATOR = >=,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+----------
+[CREATE_TABLE] create table tht (en digit, data int, unique(en, data)) partition by hash(en)
+;
+----------
+[CREATE_TABLE] -- PROCESS_TOAST option
+CREATE TABLE vac_option_tab (a INT, t TEXT)
+;
+----------
+[CALL_PROG_OBJ] CALL test_proc8a(10, 20)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE list_parted ATTACH PARTITION fail_def_part DEFAULT
+;
+----------
+[CREATE_TABLE] create table rule_and_refint_t1 (
+	id1a integer,
+	id1b integer,
+	primary key (id1a, id1b)
+)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger check_fkeys2_pkey_exist
+	before insert or update on fkeys2
+	for each row
+	execute procedure
+	check_primary_key ('fkey21', 'fkey22', 'pkeys', 'pkey1', 'pkey2')
+;
+----------
+[CREATE_TABLE] -- check that columns match in type, collation and NOT NULL status
+CREATE TABLE fail_part (
+	b char(3),
+	a int NOT NULL
+)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE "public"."itest7d" ALTER COLUMN "a" ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME "public"."itest7d_a_seq"
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE split_alter_table.part_us (region text NOT NULL, amount integer)
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE tab_stats (a int, b char(20))
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_oid_fetch(internal) PARALLEL SAFE
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW pg_buffercache AS
+	SELECT P.* FROM pg_buffercache_pages() AS P
+	(bufferid integer, relfilenode oid, reltablespace oid, reldatabase oid,
+	 relforknumber int2, relblocknumber int8, isdirty bool, usagecount int2,
+	 pinning_backends int4)
+;
+----------
+[CREATE_PROG_OBJ] create function tg_backlink_set(myname bpchar, blname bpchar)
+returns integer as '
+declare
+    mytype	char(2);
+    link	char(4);
+    rec		record;
+begin
+    mytype := substr(myname, 1, 2);
+    link := mytype || substr(blname, 1, 2);
+    if link = ''PLPL'' then
+        raise exception
+		''backlink between two phone lines does not make sense'';
+    end if;
+    if link in (''PLWS'', ''WSPL'') then
+        raise exception
+		''direct link of phone line to wall slot not permitted'';
+    end if;
+    if mytype = ''PS'' then
+        select into rec * from PSlot where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.backlink != blname then
+	    update PSlot set backlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''WS'' then
+        select into rec * from WSlot where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.backlink != blname then
+	    update WSlot set backlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    if mytype = ''PL'' then
+        select into rec * from PLine where slotname = myname;
+	if not found then
+	    raise exception ''% does not exist'', myname;
+	end if;
+	if rec.backlink != blname then
+	    update PLine set backlink = blname where slotname = myname;
+	end if;
+	return 0;
+    end if;
+    raise exception ''illegal backlink beginning with %'', mytype;
+end;
+' language plpgsql
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE pktable (
+        id1     INT4 PRIMARY KEY,
+        id2     VARCHAR(4) UNIQUE,
+        id3     REAL UNIQUE,
+        UNIQUE(id1, id2, id3)
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE vchartmp (a varchar(32))
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX "sj_t3_a_id_idx" ON "public"."sj_t3" USING "btree" ("a", "id")
+;
+----------
+[CREATE_TABLE] CREATE TABLE COPY_TBL (x INT, y TEXT, z INT,
+	CONSTRAINT COPY_CON
+	CHECK (x > 3 AND y <> 'check failed' AND x < 7 ))
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."rtest_nothn2" (
+    "a" integer,
+    "b" "text"
+)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.gtest25
+;
+----------
+[CREATE_TABLE] -- more tests for certain multi-level partitioning scenarios
+create table mlparted (a int, b int) partition by range (a, b)
+;
+----------
+[CREATE_POLICY] create rule insert_tt_rule as on insert to tt do also
+  insert into tt_log values(new.*)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE hash_parted ATTACH PARTITION fail_part FOR VALUES WITH (MODULUS 0, REMAINDER 1)
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_foreign_data_wrapper
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 5.61
+ * TABLE_CONSTRAINTS view
+ */
+
+CREATE VIEW table_constraints AS
+    SELECT CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(nc.nspname AS sql_identifier) AS constraint_schema,
+           CAST(c.conname AS sql_identifier) AS constraint_name,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nr.nspname AS sql_identifier) AS table_schema,
+           CAST(r.relname AS sql_identifier) AS table_name,
+           CAST(
+             CASE c.contype WHEN 'c' THEN 'CHECK'
+                            WHEN 'f' THEN 'FOREIGN KEY'
+                            WHEN 'p' THEN 'PRIMARY KEY'
+                            WHEN 'u' THEN 'UNIQUE' END
+             AS character_data) AS constraint_type,
+           CAST(CASE WHEN c.condeferrable THEN 'YES' ELSE 'NO' END AS yes_or_no)
+             AS is_deferrable,
+           CAST(CASE WHEN c.condeferred THEN 'YES' ELSE 'NO' END AS yes_or_no)
+             AS initially_deferred,
+           CAST('YES' AS yes_or_no) AS enforced
+
+    FROM pg_namespace nc,
+         pg_namespace nr,
+         pg_constraint c,
+         pg_class r
+
+    WHERE nc.oid = c.connamespace AND nr.oid = r.relnamespace
+          AND c.conrelid = r.oid
+          AND c.contype NOT IN ('t', 'x')  -- ignore nonstandard constraints
+          AND r.relkind IN ('r', 'p')
+          AND (NOT pg_is_other_temp_schema(nr.oid))
+          AND (pg_has_role(r.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(r.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(r.oid, 'INSERT, UPDATE, REFERENCES') )
+
+    UNION ALL
+
+    -- not-null constraints
+
+    SELECT CAST(current_database() AS sql_identifier) AS constraint_catalog,
+           CAST(nr.nspname AS sql_identifier) AS constraint_schema,
+           CAST(CAST(nr.oid AS text) || '_' || CAST(r.oid AS text) || '_' || CAST(a.attnum AS text) || '_not_null' AS sql_identifier) AS constraint_name, -- XXX
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nr.nspname AS sql_identifier) AS table_schema,
+           CAST(r.relname AS sql_identifier) AS table_name,
+           CAST('CHECK' AS character_data) AS constraint_type,
+           CAST('NO' AS yes_or_no) AS is_deferrable,
+           CAST('NO' AS yes_or_no) AS initially_deferred,
+           CAST('YES' AS yes_or_no) AS enforced
+
+    FROM pg_namespace nr,
+         pg_class r,
+         pg_attribute a
+
+    WHERE nr.oid = r.relnamespace
+          AND r.oid = a.attrelid
+          AND a.attnotnull
+          AND a.attnum > 0
+          AND NOT a.attisdropped
+          AND r.relkind IN ('r', 'p')
+          AND (NOT pg_is_other_temp_schema(nr.oid))
+          AND (pg_has_role(r.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(r.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(r.oid, 'INSERT, UPDATE, REFERENCES') )
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub_empty RENAME TO pub_for_tab
+;
+----------
+[CREATE_TABLE] create table spgist_domain_tbl (f1 spgist_text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE primary_promotion_tab (a int)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gin_extract_value_int2(int2, internal)
+RETURNS internal
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION uuid_node(uuid) RETURNS text AS
+$$ SELECT substr($1::text, 25) $$
+LANGUAGE SQL STRICT IMMUTABLE
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION foo3(a double precision, b int) RETURNS double precision AS $$ select $1 + $2 $$ LANGUAGE sql
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."nth_value_def"("val" "anyelement", "n" integer DEFAULT 1) RETURNS "anyelement"
+    LANGUAGE "internal" WINDOW IMMUTABLE STRICT
+    AS $$window_nth_value$$
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION admin_sub CONNECTION 'port=32571 host=/tmp/0jj507HGD9 dbname=postgres' PUBLICATION alice
+WITH (run_as_owner = false, password_required = false, copy_data = true, enabled = false)
+;
+----------
+[CREATE_TABLE] create table part_1_10_cd partition of part_1_10 for values in ('cd')
+;
+----------
+[CREATE_TABLE] /*
+ * check whether we decode subtransactions correctly in relation with each
+ * other
+ */
+CREATE TABLE tr_sub (id serial primary key, path text)
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) pg_catalog.pg_ts_config
+;
+----------
+[DROP_TYPE] drop type xfloat4 cascade
+;
+----------
+[CREATE_TABLE] create table empl ( idnum integer , name char ( 20 ) , accs smallint , byte bytea )
+;
+----------
+[TRUNCATE_TABLE] TRUNCATE tab3, tab4
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE mytab (foo widget(42,13))
+;
+----------
+[CREATE_TABLE] -- Numeric type, implicit cast is squashed
+CREATE TABLE test_squash_numeric (id int, data numeric(5, 2))
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION test_slru_page_sync(bigint) RETURNS VOID
+  AS 'MODULE_PATHNAME', 'test_slru_page_sync' LANGUAGE C
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] alter table atacc1 drop b
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION pg_stat_statements(IN showtext boolean,
+    OUT userid oid,
+    OUT dbid oid,
+    OUT toplevel bool,
+    OUT queryid bigint,
+    OUT query text,
+    OUT plans int8,
+    OUT total_plan_time float8,
+    OUT min_plan_time float8,
+    OUT max_plan_time float8,
+    OUT mean_plan_time float8,
+    OUT stddev_plan_time float8,
+    OUT calls int8,
+    OUT total_exec_time float8,
+    OUT min_exec_time float8,
+    OUT max_exec_time float8,
+    OUT mean_exec_time float8,
+    OUT stddev_exec_time float8,
+    OUT rows int8,
+    OUT shared_blks_hit int8,
+    OUT shared_blks_read int8,
+    OUT shared_blks_dirtied int8,
+    OUT shared_blks_written int8,
+    OUT local_blks_hit int8,
+    OUT local_blks_read int8,
+    OUT local_blks_dirtied int8,
+    OUT local_blks_written int8,
+    OUT temp_blks_read int8,
+    OUT temp_blks_written int8,
+    OUT blk_read_time float8,
+    OUT blk_write_time float8,
+    OUT temp_blk_read_time float8,
+    OUT temp_blk_write_time float8,
+    OUT wal_records int8,
+    OUT wal_fpi int8,
+    OUT wal_bytes numeric,
+    OUT jit_functions int8,
+    OUT jit_generation_time float8,
+    OUT jit_inlining_count int8,
+    OUT jit_inlining_time float8,
+    OUT jit_optimization_count int8,
+    OUT jit_optimization_time float8,
+    OUT jit_emission_count int8,
+    OUT jit_emission_time float8
+)
+RETURNS SETOF record
+AS '$libdir/pg_stat_statements', 'pg_stat_statements_1_10'
+LANGUAGE C STRICT VOLATILE PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_ex_constraints_inh () INHERITS (test_ex_constraints)
+;
+----------
+[CREATE_SCHEMA] -- error
+CREATE SCHEMA IF NOT EXISTS newschema6 AUTHORIZATION nonexistent
+;
+----------
+[DROP_TRIGGER] drop trigger trig_stmt_before on rem2
+;
+----------
+[DROP_INDEX] DROP INDEX unique_idx1, unique_idx2
+;

@@ -1,0 +1,414 @@
+CREATE PUBLICATION split_pub_schema FOR TABLES IN SCHEMA split_fdw_repl WITH (publish = 'insert, update')
+;
+ALTER TABLE parent_tbl DETACH PARTITION foreign_tbl CONCURRENTLY
+;
+CREATE FUNCTION _pg_char_max_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $2 = -1 /* default typmod */
+       THEN null
+       WHEN $1 IN (1042, 1043) /* char, varchar */
+       THEN $2 - 4
+       WHEN $1 IN (1560, 1562) /* bit, varbit */
+       THEN $2
+       ELSE null
+  END
+;
+CREATE PUBLICATION pub1 FOR table tab2(gen1) WITH (publish_generated_columns=none)
+;
+ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl7 (a, c)
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk WHERE (b > 99)
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE ((a > 5) IS FALSE)
+;
+-- test ruleutils and view expansion
+create temp view v_cycle1 as
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select f, t, label from search_graph
+;
+CREATE FUNCTION _pg_char_octet_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (25, 1042, 1043) /* text, char, varchar */
+       THEN CASE WHEN $2 = -1 /* default typmod */
+                 THEN CAST(2^30 AS integer)
+                 ELSE information_schema._pg_char_max_length($1, $2) *
+                      pg_catalog.pg_encoding_max_length((SELECT encoding FROM pg_catalog.pg_database WHERE datname = pg_catalog.current_database()))
+            END
+       ELSE null
+  END
+;
+CREATE PUBLICATION pub7 FOR TABLE test_part_b (a, b) WITH (publish_via_partition_root = true)
+;
+CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA non_existent_schema
+;
+ALTER PUBLICATION tap_pub_1 ADD TABLE tab_rowfilter_2 WHERE (c % 7 = 0)
+;
+alter table d4_primary detach partition d4_primary1 concurrently
+;
+CREATE PUBLICATION pub_root_true FOR TABLE test_root (a) WITH (publish_via_partition_root = true)
+;
+-- remove testpub_rf_tbl1 and add testpub_rf_tbl3 again (another WHERE expression)
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (e > 300 AND e < 500)
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (a, b, c, d)
+;
+CREATE PUBLICATION testpub6_forschema FOR TABLES IN SCHEMA "CURRENT_SCHEMA", CURRENT_SCHEMA
+;
+CREATE OR REPLACE FUNCTION timestamptz(date, time)
+ RETURNS timestamptz
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN cast(($1 + $2) as timestamptz)
+;
+CREATE OR REPLACE FUNCTION age(timestamp)
+ RETURNS interval
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN age(cast(current_date as timestamp), $1)
+;
+ALTER PUBLICATION testpub2_forschema DROP TABLES IN SCHEMA pub_test1
+;
+-- ok: the column list is the same, we should skip this table (or at least not fail)
+ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl7 (a, b)
+;
+ALTER PUBLICATION split_pub18_schema SET TABLES IN SCHEMA split_pub18_a, split_pub18_b
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk (b)
+;
+ALTER PUBLICATION pub8 ADD TABLE test_part_c_2 (a,b)
+;
+ALTER PUBLICATION pub6 ADD TABLE test_part_a_2 (b)
+;
+CREATE VIEW "public"."limit_thousand_v_3" AS
+ SELECT "onek"."thousand"
+   FROM "public"."onek"
+  WHERE ("onek"."thousand" < 995)
+  ORDER BY "onek"."thousand"
+ FETCH FIRST ((NULL::integer + 1)) ROWS WITH TIES
+;
+-- fail - publication used more than once
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub1, testpub1 WITH (refresh = false)
+;
+-- fail - all publications are deleted
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub, testpub1, testpub2 WITH (refresh = false)
+;
+ALTER TABLE d3_listp DETACH PARTITION d3_listp1 FINALIZE
+;
+ALTER DATABASE split_db_probe REFRESH COLLATION VERSION
+;
+-- try setting compression for incompressible data type
+CREATE TABLE cmdata2 (f1 int COMPRESSION pglz)
+;
+CREATE OR REPLACE FUNCTION regexp_matches(string citext, pattern citext, flags text) RETURNS SETOF TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE ROWS 10
+RETURN pg_catalog.regexp_matches( $1::text, $2::text, CASE WHEN pg_catalog.strpos($3, 'c') = 0 THEN  $3 || 'i' ELSE $3 END )
+;
+alter table "catalog1".schema1."test" alter column "a1" drop expression if exists
+;
+-- No support for multiple subcommands
+ALTER TABLE heaptable SET ACCESS METHOD heap, SET ACCESS METHOD heap2
+;
+-- fail - publication does not exist in subscription
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub3 WITH (refresh = false)
+;
+CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA pg_catalog
+;
+CREATE VIEW "public"."limit_thousand_v_1" AS
+ SELECT "thousand"
+   FROM "public"."onek"
+  WHERE ("thousand" < 995)
+  ORDER BY "thousand"
+ OFFSET 10
+ FETCH FIRST (5) ROWS WITH TIES
+;
+-- check create publication on CURRENT_SCHEMA
+CREATE PUBLICATION testpub3_forschema FOR TABLES IN SCHEMA CURRENT_SCHEMA
+;
+ALTER PUBLICATION "dump_pub_nsp_1ct" ADD TABLES IN SCHEMA "pubme"
+;
+-- test that trigger can be replaced by another one
+-- at the same level of partition table
+create or replace trigger my_trig
+  after insert on parted_trig
+  for each row execute procedure funcA()
+;
+ALTER SUBSCRIPTION tap_sub DROP PUBLICATION tap_pub_1
+;
+CREATE OR REPLACE FUNCTION trunc(numeric)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN trunc($1, 0)
+;
+-- Partitioned table with relam set.
+ALTER TABLE am_partitioned SET ACCESS METHOD heap2
+;
+-- fails
+CREATE VIEW limit_thousand_v_3 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST (NULL+1) ROWS WITH TIES
+;
+CREATE VIEW "public"."limit_thousand_v_4" AS
+ SELECT "thousand"
+   FROM "public"."onek"
+  WHERE ("thousand" < 995)
+  ORDER BY "thousand"
+ FETCH FIRST ((5)::bigint) ROWS WITH TIES
+;
+-- test alter compression method
+ALTER TABLE cmdata ALTER COLUMN f1 SET COMPRESSION lz4
+;
+CREATE PUBLICATION pub_mix_2 FOR TABLE test_mix_1 (a, c)
+;
+-- check create publication on a system schema
+CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA pg_catalog
+;
+ALTER TYPE myvarchar SET (storage = extended)
+;
+ALTER TRIGGER c ON a NO DEPENDS ON EXTENSION test_ext5
+;
+------------------------------------------------------------------------------------------
+[CREATE_PUB_SUB] CREATE PUBLICATION split_pub_schema FOR TABLES IN SCHEMA split_fdw_repl WITH (publish = 'insert, update')
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE parent_tbl DETACH PARTITION foreign_tbl CONCURRENTLY
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_char_max_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $2 = -1 /* default typmod */
+       THEN null
+       WHEN $1 IN (1042, 1043) /* char, varchar */
+       THEN $2 - 4
+       WHEN $1 IN (1560, 1562) /* bit, varbit */
+       THEN $2
+       ELSE null
+  END
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub1 FOR table tab2(gen1) WITH (publish_generated_columns=none)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl7 (a, c)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk WHERE (b > 99)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE ((a > 5) IS FALSE)
+;
+----------
+[CREATE_VIEW(SELECT)] -- test ruleutils and view expansion
+create temp view v_cycle1 as
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select f, t, label from search_graph
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_char_octet_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (25, 1042, 1043) /* text, char, varchar */
+       THEN CASE WHEN $2 = -1 /* default typmod */
+                 THEN CAST(2^30 AS integer)
+                 ELSE information_schema._pg_char_max_length($1, $2) *
+                      pg_catalog.pg_encoding_max_length((SELECT encoding FROM pg_catalog.pg_database WHERE datname = pg_catalog.current_database()))
+            END
+       ELSE null
+  END
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub7 FOR TABLE test_part_b (a, b) WITH (publish_via_partition_root = true)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA non_existent_schema
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION tap_pub_1 ADD TABLE tab_rowfilter_2 WHERE (c % 7 = 0)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] alter table d4_primary detach partition d4_primary1 concurrently
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_root_true FOR TABLE test_root (a) WITH (publish_via_partition_root = true)
+;
+----------
+[ALTER_PUB_SUB] -- remove testpub_rf_tbl1 and add testpub_rf_tbl3 again (another WHERE expression)
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (e > 300 AND e < 500)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_pk (a, b, c, d)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub6_forschema FOR TABLES IN SCHEMA "CURRENT_SCHEMA", CURRENT_SCHEMA
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION timestamptz(date, time)
+ RETURNS timestamptz
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN cast(($1 + $2) as timestamptz)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION age(timestamp)
+ RETURNS interval
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN age(cast(current_date as timestamp), $1)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub2_forschema DROP TABLES IN SCHEMA pub_test1
+;
+----------
+[ALTER_PUB_SUB] -- ok: the column list is the same, we should skip this table (or at least not fail)
+ALTER PUBLICATION testpub_fortable SET TABLE testpub_tbl7 (a, b)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION split_pub18_schema SET TABLES IN SCHEMA split_pub18_a, split_pub18_b
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk (b)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub8 ADD TABLE test_part_c_2 (a,b)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub6 ADD TABLE test_part_a_2 (b)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."limit_thousand_v_3" AS
+ SELECT "onek"."thousand"
+   FROM "public"."onek"
+  WHERE ("onek"."thousand" < 995)
+  ORDER BY "onek"."thousand"
+ FETCH FIRST ((NULL::integer + 1)) ROWS WITH TIES
+;
+----------
+[ALTER_PUB_SUB] -- fail - publication used more than once
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub1, testpub1 WITH (refresh = false)
+;
+----------
+[ALTER_PUB_SUB] -- fail - all publications are deleted
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub, testpub1, testpub2 WITH (refresh = false)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE d3_listp DETACH PARTITION d3_listp1 FINALIZE
+;
+----------
+[ALTER_CATALOG] ALTER DATABASE split_db_probe REFRESH COLLATION VERSION
+;
+----------
+[CREATE_TABLE] -- try setting compression for incompressible data type
+CREATE TABLE cmdata2 (f1 int COMPRESSION pglz)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_matches(string citext, pattern citext, flags text) RETURNS SETOF TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE ROWS 10
+RETURN pg_catalog.regexp_matches( $1::text, $2::text, CASE WHEN pg_catalog.strpos($3, 'c') = 0 THEN  $3 || 'i' ELSE $3 END )
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table "catalog1".schema1."test" alter column "a1" drop expression if exists
+;
+----------
+[ALTER_TABLE] -- No support for multiple subcommands
+ALTER TABLE heaptable SET ACCESS METHOD heap, SET ACCESS METHOD heap2
+;
+----------
+[ALTER_PUB_SUB] -- fail - publication does not exist in subscription
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub3 WITH (refresh = false)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA pg_catalog
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."limit_thousand_v_1" AS
+ SELECT "thousand"
+   FROM "public"."onek"
+  WHERE ("thousand" < 995)
+  ORDER BY "thousand"
+ OFFSET 10
+ FETCH FIRST (5) ROWS WITH TIES
+;
+----------
+[CREATE_PUB_SUB] -- check create publication on CURRENT_SCHEMA
+CREATE PUBLICATION testpub3_forschema FOR TABLES IN SCHEMA CURRENT_SCHEMA
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_nsp_1ct" ADD TABLES IN SCHEMA "pubme"
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] -- test that trigger can be replaced by another one
+-- at the same level of partition table
+create or replace trigger my_trig
+  after insert on parted_trig
+  for each row execute procedure funcA()
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION tap_sub DROP PUBLICATION tap_pub_1
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION trunc(numeric)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN trunc($1, 0)
+;
+----------
+[ALTER_TABLE] -- Partitioned table with relam set.
+ALTER TABLE am_partitioned SET ACCESS METHOD heap2
+;
+----------
+[CREATE_VIEW(SELECT)] -- fails
+CREATE VIEW limit_thousand_v_3 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST (NULL+1) ROWS WITH TIES
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."limit_thousand_v_4" AS
+ SELECT "thousand"
+   FROM "public"."onek"
+  WHERE ("thousand" < 995)
+  ORDER BY "thousand"
+ FETCH FIRST ((5)::bigint) ROWS WITH TIES
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] -- test alter compression method
+ALTER TABLE cmdata ALTER COLUMN f1 SET COMPRESSION lz4
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION pub_mix_2 FOR TABLE test_mix_1 (a, c)
+;
+----------
+[CREATE_PUB_SUB] -- check create publication on a system schema
+CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA pg_catalog
+;
+----------
+[ALTER_TYPE] ALTER TYPE myvarchar SET (storage = extended)
+;
+----------
+[ALTER_TRIGGER] ALTER TRIGGER c ON a NO DEPENDS ON EXTENSION test_ext5
+;

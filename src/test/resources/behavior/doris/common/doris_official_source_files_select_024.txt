@@ -1,0 +1,6140 @@
+[doris_official_source_files_select_024__select__0001]
+sql:
+select  a.ca_state state, count(*) cnt
+ from customer_address a
+     ,customer c
+     ,store_sales s
+     ,date_dim d
+     ,item i
+ where       a.ca_address_sk = c.c_current_addr_sk
+ 	and c.c_customer_sk = s.ss_customer_sk
+ 	and s.ss_sold_date_sk = d.d_date_sk
+ 	and s.ss_item_sk = i.i_item_sk
+ 	and d.d_month_seq = 
+ 	     (select distinct (d_month_seq)
+ 	      from date_dim
+               where d_year = 2002
+ 	        and d_moy = 3 )
+ 	and i.i_current_price > 1.2 * 
+             (select avg(j.i_current_price) 
+ 	     from item j 
+ 	     where j.i_category = i.i_category)
+ group by a.ca_state
+ having count(*) >= 10
+ order by cnt, a.ca_state 
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:26~1:31) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:6~2:22) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:6~3:14) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:6~4:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:6~5:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:6~6:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:13~13:21) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(17:21~17:24) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(18:12~18:16) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(21:8~21:13) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0002]
+sql:
+with ss as (
+ select
+          i_item_id,sum(ss_ext_sales_price) total_sales
+ from
+ 	store_sales,
+ 	date_dim,
+         customer_address,
+         item
+ where
+         i_item_id in (select
+  i_item_id
+from
+ item
+where i_category in ('Jewelry'))
+ and     ss_item_sk              = i_item_sk
+ and     ss_sold_date_sk         = d_date_sk
+ and     d_year                  = 2000
+ and     d_moy                   = 10
+ and     ss_addr_sk              = ca_address_sk
+ and     ca_gmt_offset           = -5 
+ group by i_item_id),
+ cs as (
+ select
+          i_item_id,sum(cs_ext_sales_price) total_sales
+ from
+ 	catalog_sales,
+ 	date_dim,
+         customer_address,
+         item
+ where
+         i_item_id               in (select
+  i_item_id
+from
+ item
+where i_category in ('Jewelry'))
+ and     cs_item_sk              = i_item_sk
+ and     cs_sold_date_sk         = d_date_sk
+ and     d_year                  = 2000
+ and     d_moy                   = 10
+ and     cs_bill_addr_sk         = ca_address_sk
+ and     ca_gmt_offset           = -5 
+ group by i_item_id),
+ ws as (
+ select
+          i_item_id,sum(ws_ext_sales_price) total_sales
+ from
+ 	web_sales,
+ 	date_dim,
+         customer_address,
+         item
+ where
+         i_item_id               in (select
+  i_item_id
+from
+ item
+where i_category in ('Jewelry'))
+ and     ws_item_sk              = i_item_sk
+ and     ws_sold_date_sk         = d_date_sk
+ and     d_year                  = 2000
+ and     d_moy                   = 10
+ and     ws_bill_addr_sk         = ca_address_sk
+ and     ca_gmt_offset           = -5
+ group by i_item_id)
+  select   
+  i_item_id
+,sum(total_sales) total_sales
+ from  (select * from ss 
+        union all
+        select * from cs 
+        union all
+        select * from ws) tmp1
+ group by i_item_id
+ order by i_item_id
+      ,total_sales
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:20~3:23) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:2~5:13) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:2~6:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:9~7:25) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:9~8:13) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:1~13:5) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(24:20~24:23) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(26:2~26:15) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(27:2~27:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(28:9~28:25) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:9~29:13) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(34:1~34:5) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(45:20~45:23) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(47:2~47:11) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(48:2~48:10) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(49:9~49:25) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(50:9~50:13) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(55:1~55:5) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(66:1~66:4) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(67:22~67:24) /test/1/catalog1/schema1/ss/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(69:22~69:24) /test/1/catalog1/schema1/cs/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(71:22~71:24) /test/1/catalog1/schema1/ws/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0003]
+sql:
+select  promotions,total,cast(promotions as decimal(15,4))/cast(total as decimal(15,4))*100
+from
+  (select sum(ss_ext_sales_price) promotions
+   from  store_sales
+        ,store
+        ,promotion
+        ,date_dim
+        ,customer
+        ,customer_address 
+        ,item
+   where ss_sold_date_sk = d_date_sk
+   and   ss_store_sk = s_store_sk
+   and   ss_promo_sk = p_promo_sk
+   and   ss_customer_sk= c_customer_sk
+   and   ca_address_sk = c_current_addr_sk
+   and   ss_item_sk = i_item_sk 
+   and   ca_gmt_offset = -7
+   and   i_category = 'Home'
+   and   (p_channel_dmail = 'Y' or p_channel_email = 'Y' or p_channel_tv = 'Y')
+   and   s_gmt_offset = -7
+   and   d_year = 2000
+   and   d_moy  = 12) promotional_sales,
+  (select sum(ss_ext_sales_price) total
+   from  store_sales
+        ,store
+        ,date_dim
+        ,customer
+        ,customer_address
+        ,item
+   where ss_sold_date_sk = d_date_sk
+   and   ss_store_sk = s_store_sk
+   and   ss_customer_sk= c_customer_sk
+   and   ca_address_sk = c_current_addr_sk
+   and   ss_item_sk = i_item_sk
+   and   ca_gmt_offset = -7
+   and   i_category = 'Home'
+   and   s_gmt_offset = -7
+   and   d_year = 2000
+   and   d_moy  = 12) all_sales
+order by promotions, total
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:10~3:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:9~4:20) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:9~5:14) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:9~6:18) /test/1/catalog1/schema1/promotion/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:9~7:17) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:9~8:17) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:9~9:25) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:9~10:13) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(23:10~23:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(24:9~24:20) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(25:9~25:14) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(26:9~26:17) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(27:9~27:17) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(28:9~28:25) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:9~29:13) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0004]
+sql:
+select  
+   substr(w_warehouse_name,1,20)
+  ,sm_type
+  ,web_name
+  ,sum(case when (ws_ship_date_sk - ws_sold_date_sk <= 30 ) then 1 else 0 end)  as "30 days" 
+  ,sum(case when (ws_ship_date_sk - ws_sold_date_sk > 30) and 
+                 (ws_ship_date_sk - ws_sold_date_sk <= 60) then 1 else 0 end )  as "31-60 days" 
+  ,sum(case when (ws_ship_date_sk - ws_sold_date_sk > 60) and 
+                 (ws_ship_date_sk - ws_sold_date_sk <= 90) then 1 else 0 end)  as "61-90 days" 
+  ,sum(case when (ws_ship_date_sk - ws_sold_date_sk > 90) and
+                 (ws_ship_date_sk - ws_sold_date_sk <= 120) then 1 else 0 end)  as "91-120 days" 
+  ,sum(case when (ws_ship_date_sk - ws_sold_date_sk  > 120) then 1 else 0 end)  as ">120 days" 
+from
+   web_sales
+  ,warehouse
+  ,ship_mode
+  ,web_site
+  ,date_dim
+where
+    d_month_seq between 1223 and 1223 + 11
+and ws_ship_date_sk   = d_date_sk
+and ws_warehouse_sk   = w_warehouse_sk
+and ws_ship_mode_sk   = sm_ship_mode_sk
+and ws_web_site_sk    = web_site_sk
+group by
+   substr(w_warehouse_name,1,20)
+  ,sm_type
+  ,web_name
+order by substr(w_warehouse_name,1,20)
+        ,sm_type
+       ,web_name
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:3~2:9) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:3~5:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:3~6:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:3~8:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:3~10:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:3~12:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(14:3~14:12) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:3~15:12) /test/1/catalog1/schema1/warehouse/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:3~16:12) /test/1/catalog1/schema1/ship_mode/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:3~17:11) /test/1/catalog1/schema1/web_site/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:3~18:11) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(26:3~26:9) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(29:9~29:15) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0005]
+sql:
+select  * 
+from (select i_manager_id
+             ,sum(ss_sales_price) sum_sales
+             ,avg(sum(ss_sales_price)) over (partition by i_manager_id) avg_monthly_sales
+      from item
+          ,store_sales
+          ,date_dim
+          ,store
+      where ss_item_sk = i_item_sk
+        and ss_sold_date_sk = d_date_sk
+        and ss_store_sk = s_store_sk
+        and d_month_seq in (1222,1222+1,1222+2,1222+3,1222+4,1222+5,1222+6,1222+7,1222+8,1222+9,1222+10,1222+11)
+        and ((    i_category in ('Books','Children','Electronics')
+              and i_class in ('personal','portable','reference','self-help')
+              and i_brand in ('scholaramalgamalg #14','scholaramalgamalg #7',
+		                  'exportiunivamalg #9','scholaramalgamalg #9'))
+           or(    i_category in ('Women','Music','Men')
+              and i_class in ('accessories','classical','fragrances','pants')
+              and i_brand in ('amalgimporto #1','edu packscholar #1','exportiimporto #1',
+		                 'importoamalg #1')))
+group by i_manager_id, d_moy) tmp1
+where case when avg_monthly_sales > 0 then abs (sum_sales - avg_monthly_sales) / avg_monthly_sales else null end > 0.1
+order by i_manager_id
+        ,avg_monthly_sales
+        ,sum_sales
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:14~3:17) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:14~4:17) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:18~4:21) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:11~5:15) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:11~6:22) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:11~7:19) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:11~8:16) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(22:43~22:46) /test/1/catalog1/schema1/abs/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0006]
+sql:
+with cs_ui as
+ (select cs_item_sk
+        ,sum(cs_ext_list_price) as sale,sum(cr_refunded_cash+cr_reversed_charge+cr_store_credit) as refund
+  from catalog_sales
+      ,catalog_returns
+  where cs_item_sk = cr_item_sk
+    and cs_order_number = cr_order_number
+  group by cs_item_sk
+  having sum(cs_ext_list_price)>2*sum(cr_refunded_cash+cr_reversed_charge+cr_store_credit)),
+cross_sales as
+ (select i_product_name product_name
+     ,i_item_sk item_sk
+     ,s_store_name store_name
+     ,s_zip store_zip
+     ,ad1.ca_street_number b_street_number
+     ,ad1.ca_street_name b_street_name
+     ,ad1.ca_city b_city
+     ,ad1.ca_zip b_zip
+     ,ad2.ca_street_number c_street_number
+     ,ad2.ca_street_name c_street_name
+     ,ad2.ca_city c_city
+     ,ad2.ca_zip c_zip
+     ,d1.d_year as syear
+     ,d2.d_year as fsyear
+     ,d3.d_year s2year
+     ,count(*) cnt
+     ,sum(ss_wholesale_cost) s1
+     ,sum(ss_list_price) s2
+     ,sum(ss_coupon_amt) s3
+  FROM   store_sales
+        ,store_returns
+        ,cs_ui
+        ,date_dim d1
+        ,date_dim d2
+        ,date_dim d3
+        ,store
+        ,customer
+        ,customer_demographics cd1
+        ,customer_demographics cd2
+        ,promotion
+        ,household_demographics hd1
+        ,household_demographics hd2
+        ,customer_address ad1
+        ,customer_address ad2
+        ,income_band ib1
+        ,income_band ib2
+        ,item
+  WHERE  ss_store_sk = s_store_sk AND
+         ss_sold_date_sk = d1.d_date_sk AND
+         ss_customer_sk = c_customer_sk AND
+         ss_cdemo_sk= cd1.cd_demo_sk AND
+         ss_hdemo_sk = hd1.hd_demo_sk AND
+         ss_addr_sk = ad1.ca_address_sk and
+         ss_item_sk = i_item_sk and
+         ss_item_sk = sr_item_sk and
+         ss_ticket_number = sr_ticket_number and
+         ss_item_sk = cs_ui.cs_item_sk and
+         c_current_cdemo_sk = cd2.cd_demo_sk AND
+         c_current_hdemo_sk = hd2.hd_demo_sk AND
+         c_current_addr_sk = ad2.ca_address_sk and
+         c_first_sales_date_sk = d2.d_date_sk and
+         c_first_shipto_date_sk = d3.d_date_sk and
+         ss_promo_sk = p_promo_sk and
+         hd1.hd_income_band_sk = ib1.ib_income_band_sk and
+         hd2.hd_income_band_sk = ib2.ib_income_band_sk and
+         cd1.cd_marital_status <> cd2.cd_marital_status and
+         i_color in ('orange','lace','lawn','misty','blush','pink') and
+         i_current_price between 48 and 48 + 10 and
+         i_current_price between 48 + 1 and 48 + 15
+group by i_product_name
+       ,i_item_sk
+       ,s_store_name
+       ,s_zip
+       ,ad1.ca_street_number
+       ,ad1.ca_street_name
+       ,ad1.ca_city
+       ,ad1.ca_zip
+       ,ad2.ca_street_number
+       ,ad2.ca_street_name
+       ,ad2.ca_city
+       ,ad2.ca_zip
+       ,d1.d_year
+       ,d2.d_year
+       ,d3.d_year
+)
+select cs1.product_name
+     ,cs1.store_name
+     ,cs1.store_zip
+     ,cs1.b_street_number
+     ,cs1.b_street_name
+     ,cs1.b_city
+     ,cs1.b_zip
+     ,cs1.c_street_number
+     ,cs1.c_street_name
+     ,cs1.c_city
+     ,cs1.c_zip
+     ,cs1.syear
+     ,cs1.cnt
+     ,cs1.s1 as s11
+     ,cs1.s2 as s21
+     ,cs1.s3 as s31
+     ,cs2.s1 as s12
+     ,cs2.s2 as s22
+     ,cs2.s3 as s32
+     ,cs2.syear
+     ,cs2.cnt
+from cross_sales cs1,cross_sales cs2
+where cs1.item_sk=cs2.item_sk and
+     cs1.syear = 1999 and
+     cs2.syear = 1999 + 1 and
+     cs2.cnt <= cs1.cnt and
+     cs1.store_name = cs2.store_name and
+     cs1.store_zip = cs2.store_zip
+order by cs1.product_name
+       ,cs1.store_name
+       ,cs2.cnt
+       ,cs1.s1
+       ,cs2.s1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:9~3:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:40~3:43) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:7~4:20) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:7~5:22) /test/1/catalog1/schema1/catalog_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(9:9~9:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:34~9:37) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(26:6~26:11) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(27:6~27:9) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(28:6~28:9) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(29:6~29:9) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(30:9~30:20) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(31:9~31:22) /test/1/catalog1/schema1/store_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(32:9~32:14) /test/1/catalog1/schema1/cs_ui/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(33:9~33:17) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(34:9~34:17) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(35:9~35:17) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(36:9~36:14) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(37:9~37:17) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(38:9~38:30) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(39:9~39:30) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(40:9~40:18) /test/1/catalog1/schema1/promotion/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(41:9~41:31) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(42:9~42:31) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(43:9~43:25) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(44:9~44:25) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(45:9~45:20) /test/1/catalog1/schema1/income_band/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(46:9~46:20) /test/1/catalog1/schema1/income_band/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(47:9~47:13) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(107:5~107:16) /test/1/catalog1/schema1/cross_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(107:21~107:32) /test/1/catalog1/schema1/cross_sales/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0007]
+sql:
+select 
+	s_store_name,
+	i_item_desc,
+	sc.revenue,
+	i_current_price,
+	i_wholesale_cost,
+	i_brand
+ from store, item,
+     (select ss_store_sk, avg(revenue) as ave
+ 	from
+ 	    (select  ss_store_sk, ss_item_sk, 
+ 		     sum(ss_sales_price) as revenue
+ 		from store_sales, date_dim
+ 		where ss_sold_date_sk = d_date_sk and d_month_seq between 1176 and 1176+11
+ 		group by ss_store_sk, ss_item_sk) sa
+ 	group by ss_store_sk) sb,
+     (select  ss_store_sk, ss_item_sk, sum(ss_sales_price) as revenue
+ 	from store_sales, date_dim
+ 	where ss_sold_date_sk = d_date_sk and d_month_seq between 1176 and 1176+11
+ 	group by ss_store_sk, ss_item_sk) sc
+ where sb.ss_store_sk = sc.ss_store_sk and 
+       sc.revenue <= 0.1 * sb.ave and
+       s_store_sk = sc.ss_store_sk and
+       i_item_sk = sc.ss_item_sk
+ order by s_store_name, i_item_desc
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(8:6~8:11) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:13~8:17) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(9:26~9:29) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:8~12:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(13:8~13:19) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:21~13:29) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(17:39~17:42) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(18:7~18:18) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:20~18:28) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0008]
+sql:
+select   
+         w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+        ,ship_carriers
+        ,year
+ 	,sum(jan_sales) as jan_sales
+ 	,sum(feb_sales) as feb_sales
+ 	,sum(mar_sales) as mar_sales
+ 	,sum(apr_sales) as apr_sales
+ 	,sum(may_sales) as may_sales
+ 	,sum(jun_sales) as jun_sales
+ 	,sum(jul_sales) as jul_sales
+ 	,sum(aug_sales) as aug_sales
+ 	,sum(sep_sales) as sep_sales
+ 	,sum(oct_sales) as oct_sales
+ 	,sum(nov_sales) as nov_sales
+ 	,sum(dec_sales) as dec_sales
+ 	,sum(jan_sales/w_warehouse_sq_ft) as jan_sales_per_sq_foot
+ 	,sum(feb_sales/w_warehouse_sq_ft) as feb_sales_per_sq_foot
+ 	,sum(mar_sales/w_warehouse_sq_ft) as mar_sales_per_sq_foot
+ 	,sum(apr_sales/w_warehouse_sq_ft) as apr_sales_per_sq_foot
+ 	,sum(may_sales/w_warehouse_sq_ft) as may_sales_per_sq_foot
+ 	,sum(jun_sales/w_warehouse_sq_ft) as jun_sales_per_sq_foot
+ 	,sum(jul_sales/w_warehouse_sq_ft) as jul_sales_per_sq_foot
+ 	,sum(aug_sales/w_warehouse_sq_ft) as aug_sales_per_sq_foot
+ 	,sum(sep_sales/w_warehouse_sq_ft) as sep_sales_per_sq_foot
+ 	,sum(oct_sales/w_warehouse_sq_ft) as oct_sales_per_sq_foot
+ 	,sum(nov_sales/w_warehouse_sq_ft) as nov_sales_per_sq_foot
+ 	,sum(dec_sales/w_warehouse_sq_ft) as dec_sales_per_sq_foot
+ 	,sum(jan_net) as jan_net
+ 	,sum(feb_net) as feb_net
+ 	,sum(mar_net) as mar_net
+ 	,sum(apr_net) as apr_net
+ 	,sum(may_net) as may_net
+ 	,sum(jun_net) as jun_net
+ 	,sum(jul_net) as jul_net
+ 	,sum(aug_net) as aug_net
+ 	,sum(sep_net) as sep_net
+ 	,sum(oct_net) as oct_net
+ 	,sum(nov_net) as nov_net
+ 	,sum(dec_net) as dec_net
+ from (
+     select 
+ 	w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+ 	,concat(concat('ORIENTAL ', ','), ' BOXBUNDLES') as ship_carriers
+       ,d_year as year
+ 	,sum(case when d_moy = 1 
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as jan_sales
+ 	,sum(case when d_moy = 2 
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as feb_sales
+ 	,sum(case when d_moy = 3 
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as mar_sales
+ 	,sum(case when d_moy = 4 
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as apr_sales
+ 	,sum(case when d_moy = 5 
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as may_sales
+ 	,sum(case when d_moy = 6 
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as jun_sales
+ 	,sum(case when d_moy = 7 
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as jul_sales
+ 	,sum(case when d_moy = 8 
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as aug_sales
+ 	,sum(case when d_moy = 9 
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as sep_sales
+ 	,sum(case when d_moy = 10 
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as oct_sales
+ 	,sum(case when d_moy = 11
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as nov_sales
+ 	,sum(case when d_moy = 12
+ 		then ws_ext_sales_price* ws_quantity else 0 end) as dec_sales
+ 	,sum(case when d_moy = 1 
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as jan_net
+ 	,sum(case when d_moy = 2
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as feb_net
+ 	,sum(case when d_moy = 3 
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as mar_net
+ 	,sum(case when d_moy = 4 
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as apr_net
+ 	,sum(case when d_moy = 5 
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as may_net
+ 	,sum(case when d_moy = 6 
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as jun_net
+ 	,sum(case when d_moy = 7 
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as jul_net
+ 	,sum(case when d_moy = 8 
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as aug_net
+ 	,sum(case when d_moy = 9 
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as sep_net
+ 	,sum(case when d_moy = 10 
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as oct_net
+ 	,sum(case when d_moy = 11
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as nov_net
+ 	,sum(case when d_moy = 12
+ 		then ws_net_paid_inc_ship * ws_quantity else 0 end) as dec_net
+     from
+          web_sales
+         ,warehouse
+         ,date_dim
+         ,time_dim
+ 	  ,ship_mode
+     where
+            ws_warehouse_sk =  w_warehouse_sk
+        and ws_sold_date_sk = d_date_sk
+        and ws_sold_time_sk = t_time_sk
+ 	and ws_ship_mode_sk = sm_ship_mode_sk
+        and d_year = 2001
+ 	and t_time between 42970 and 42970+28800 
+ 	and sm_carrier in ('ORIENTAL','BOXBUNDLES')
+     group by 
+        w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+       ,d_year
+ union all
+     select 
+ 	w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+ 	,concat(concat('ORIENTAL ', ','), ' BOXBUNDLES') as ship_carriers
+       ,d_year as year
+ 	,sum(case when d_moy = 1 
+ 		then cs_ext_list_price* cs_quantity else 0 end) as jan_sales
+ 	,sum(case when d_moy = 2 
+ 		then cs_ext_list_price* cs_quantity else 0 end) as feb_sales
+ 	,sum(case when d_moy = 3 
+ 		then cs_ext_list_price* cs_quantity else 0 end) as mar_sales
+ 	,sum(case when d_moy = 4 
+ 		then cs_ext_list_price* cs_quantity else 0 end) as apr_sales
+ 	,sum(case when d_moy = 5 
+ 		then cs_ext_list_price* cs_quantity else 0 end) as may_sales
+ 	,sum(case when d_moy = 6 
+ 		then cs_ext_list_price* cs_quantity else 0 end) as jun_sales
+ 	,sum(case when d_moy = 7 
+ 		then cs_ext_list_price* cs_quantity else 0 end) as jul_sales
+ 	,sum(case when d_moy = 8 
+ 		then cs_ext_list_price* cs_quantity else 0 end) as aug_sales
+ 	,sum(case when d_moy = 9 
+ 		then cs_ext_list_price* cs_quantity else 0 end) as sep_sales
+ 	,sum(case when d_moy = 10 
+ 		then cs_ext_list_price* cs_quantity else 0 end) as oct_sales
+ 	,sum(case when d_moy = 11
+ 		then cs_ext_list_price* cs_quantity else 0 end) as nov_sales
+ 	,sum(case when d_moy = 12
+ 		then cs_ext_list_price* cs_quantity else 0 end) as dec_sales
+ 	,sum(case when d_moy = 1 
+ 		then cs_net_paid * cs_quantity else 0 end) as jan_net
+ 	,sum(case when d_moy = 2 
+ 		then cs_net_paid * cs_quantity else 0 end) as feb_net
+ 	,sum(case when d_moy = 3 
+ 		then cs_net_paid * cs_quantity else 0 end) as mar_net
+ 	,sum(case when d_moy = 4 
+ 		then cs_net_paid * cs_quantity else 0 end) as apr_net
+ 	,sum(case when d_moy = 5 
+ 		then cs_net_paid * cs_quantity else 0 end) as may_net
+ 	,sum(case when d_moy = 6 
+ 		then cs_net_paid * cs_quantity else 0 end) as jun_net
+ 	,sum(case when d_moy = 7 
+ 		then cs_net_paid * cs_quantity else 0 end) as jul_net
+ 	,sum(case when d_moy = 8 
+ 		then cs_net_paid * cs_quantity else 0 end) as aug_net
+ 	,sum(case when d_moy = 9 
+ 		then cs_net_paid * cs_quantity else 0 end) as sep_net
+ 	,sum(case when d_moy = 10 
+ 		then cs_net_paid * cs_quantity else 0 end) as oct_net
+ 	,sum(case when d_moy = 11
+ 		then cs_net_paid * cs_quantity else 0 end) as nov_net
+ 	,sum(case when d_moy = 12
+ 		then cs_net_paid * cs_quantity else 0 end) as dec_net
+     from
+          catalog_sales
+         ,warehouse
+         ,date_dim
+         ,time_dim
+ 	 ,ship_mode
+     where
+            cs_warehouse_sk =  w_warehouse_sk
+        and cs_sold_date_sk = d_date_sk
+        and cs_sold_time_sk = t_time_sk
+ 	and cs_ship_mode_sk = sm_ship_mode_sk
+        and d_year = 2001
+ 	and t_time between 42970 AND 42970+28800 
+ 	and sm_carrier in ('ORIENTAL','BOXBUNDLES')
+     group by 
+        w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+       ,d_year
+ ) x
+ group by 
+        w_warehouse_name
+ 	,w_warehouse_sq_ft
+ 	,w_city
+ 	,w_county
+ 	,w_state
+ 	,w_country
+ 	,ship_carriers
+       ,year
+ order by w_warehouse_name
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(10:3~10:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:3~11:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:3~12:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(13:3~13:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(14:3~14:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(15:3~15:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(16:3~16:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(17:3~17:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(18:3~18:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(19:3~19:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(20:3~20:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(21:3~21:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(22:3~22:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(23:3~23:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(24:3~24:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(25:3~25:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(26:3~26:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(27:3~27:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(28:3~28:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(29:3~29:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(30:3~30:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(31:3~31:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(32:3~32:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(33:3~33:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(34:3~34:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(35:3~35:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(36:3~36:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(37:3~37:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(38:3~38:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(39:3~39:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(40:3~40:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(41:3~41:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(42:3~42:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(43:3~43:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(44:3~44:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(45:3~45:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(54:3~54:9) /test/1/catalog1/schema1/concat/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(54:10~54:16) /test/1/catalog1/schema1/concat/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(56:3~56:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(58:3~58:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(60:3~60:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(62:3~62:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(64:3~64:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(66:3~66:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(68:3~68:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(70:3~70:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(72:3~72:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(74:3~74:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(76:3~76:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(78:3~78:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(80:3~80:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(82:3~82:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(84:3~84:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(86:3~86:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(88:3~88:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(90:3~90:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(92:3~92:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(94:3~94:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(96:3~96:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(98:3~98:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(100:3~100:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(102:3~102:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(105:10~105:19) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(106:10~106:19) /test/1/catalog1/schema1/warehouse/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(107:10~107:18) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(108:10~108:18) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(109:5~109:14) /test/1/catalog1/schema1/ship_mode/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(134:3~134:9) /test/1/catalog1/schema1/concat/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(134:10~134:16) /test/1/catalog1/schema1/concat/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(136:3~136:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(138:3~138:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(140:3~140:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(142:3~142:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(144:3~144:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(146:3~146:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(148:3~148:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(150:3~150:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(152:3~152:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(154:3~154:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(156:3~156:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(158:3~158:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(160:3~160:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(162:3~162:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(164:3~164:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(166:3~166:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(168:3~168:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(170:3~170:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(172:3~172:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(174:3~174:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(176:3~176:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(178:3~178:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(180:3~180:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(182:3~182:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(185:10~185:23) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(186:10~186:19) /test/1/catalog1/schema1/warehouse/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(187:10~187:18) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(188:10~188:18) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(189:4~189:13) /test/1/catalog1/schema1/ship_mode/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0009]
+sql:
+select  *
+from (select i_category
+            ,i_class
+            ,i_brand
+            ,i_product_name
+            ,d_year
+            ,d_qoy
+            ,d_moy
+            ,s_store_id
+            ,sumsales
+            ,rank() over (partition by i_category order by sumsales desc) rk
+      from (select i_category
+                  ,i_class
+                  ,i_brand
+                  ,i_product_name
+                  ,d_year
+                  ,d_qoy
+                  ,d_moy
+                  ,s_store_id
+                  ,sum(coalesce(ss_sales_price*ss_quantity,0)) sumsales
+            from store_sales
+                ,date_dim
+                ,store
+                ,item
+       where  ss_sold_date_sk=d_date_sk
+          and ss_item_sk=i_item_sk
+          and ss_store_sk = s_store_sk
+          and d_month_seq between 1217 and 1217+11
+       group by  rollup(i_category, i_class, i_brand, i_product_name, d_year, d_qoy, d_moy,s_store_id))dw1) dw2
+where rk <= 100
+order by i_category
+        ,i_class
+        ,i_brand
+        ,i_product_name
+        ,d_year
+        ,d_qoy
+        ,d_moy
+        ,s_store_id
+        ,sumsales
+        ,rk
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(11:13~11:17) /test/1/catalog1/schema1/rank/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(20:19~20:22) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(20:23~20:31) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(21:17~21:28) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(22:17~22:25) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(23:17~23:22) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(24:17~24:21) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0010]
+sql:
+select  c_last_name
+       ,c_first_name
+       ,ca_city
+       ,bought_city
+       ,ss_ticket_number
+       ,extended_price
+       ,extended_tax
+       ,list_price
+ from (select ss_ticket_number
+             ,ss_customer_sk
+             ,ca_city bought_city
+             ,sum(ss_ext_sales_price) extended_price 
+             ,sum(ss_ext_list_price) list_price
+             ,sum(ss_ext_tax) extended_tax 
+       from store_sales
+           ,date_dim
+           ,store
+           ,household_demographics
+           ,customer_address 
+       where store_sales.ss_sold_date_sk = date_dim.d_date_sk
+         and store_sales.ss_store_sk = store.s_store_sk  
+        and store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+        and store_sales.ss_addr_sk = customer_address.ca_address_sk
+        and date_dim.d_dom between 1 and 2 
+        and (household_demographics.hd_dep_count = 3 or
+             household_demographics.hd_vehicle_count= 4)
+        and date_dim.d_year in (1998,1998+1,1998+2)
+        and store.s_city in ('Fairview','Midway')
+       group by ss_ticket_number
+               ,ss_customer_sk
+               ,ss_addr_sk,ca_city) dn
+      ,customer
+      ,customer_address current_addr
+ where ss_customer_sk = c_customer_sk
+   and customer.c_current_addr_sk = current_addr.ca_address_sk
+   and current_addr.ca_city <> bought_city
+ order by c_last_name
+         ,ss_ticket_number
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(12:14~12:17) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(13:14~13:17) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(14:14~14:17) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(15:12~15:23) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:12~16:20) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:12~17:17) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:12~18:34) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(19:12~19:28) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(32:7~32:15) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(33:7~33:23) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0011]
+sql:
+select  
+  cd_gender,
+  cd_marital_status,
+  cd_education_status,
+  count(*) cnt1,
+  cd_purchase_estimate,
+  count(*) cnt2,
+  cd_credit_rating,
+  count(*) cnt3
+ from
+  customer c,customer_address ca,customer_demographics
+ where
+  c.c_current_addr_sk = ca.ca_address_sk and
+  ca_state in ('IL','TX','ME') and
+  cd_demo_sk = c.c_current_cdemo_sk and 
+  exists (select *
+          from store_sales,date_dim
+          where c.c_customer_sk = ss_customer_sk and
+                ss_sold_date_sk = d_date_sk and
+                d_year = 2002 and
+                d_moy between 1 and 1+2) and
+   (not exists (select *
+            from web_sales,date_dim
+            where c.c_customer_sk = ws_bill_customer_sk and
+                  ws_sold_date_sk = d_date_sk and
+                  d_year = 2002 and
+                  d_moy between 1 and 1+2) and
+    not exists (select * 
+            from catalog_sales,date_dim
+            where c.c_customer_sk = cs_ship_customer_sk and
+                  cs_sold_date_sk = d_date_sk and
+                  d_year = 2002 and
+                  d_moy between 1 and 1+2))
+ group by cd_gender,
+          cd_marital_status,
+          cd_education_status,
+          cd_purchase_estimate,
+          cd_credit_rating
+ order by cd_gender,
+          cd_marital_status,
+          cd_education_status,
+          cd_purchase_estimate,
+          cd_credit_rating
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:2~5:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:2~7:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:2~9:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(11:2~11:10) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:13~11:29) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:33~11:54) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:15~17:26) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:27~17:35) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(23:17~23:26) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(23:27~23:35) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:17~29:30) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:31~29:39) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0012]
+sql:
+select  i_item_id, 
+        avg(ss_quantity) agg1,
+        avg(ss_list_price) agg2,
+        avg(ss_coupon_amt) agg3,
+        avg(ss_sales_price) agg4 
+ from store_sales, customer_demographics, date_dim, item, promotion
+ where ss_sold_date_sk = d_date_sk and
+       ss_item_sk = i_item_sk and
+       ss_cdemo_sk = cd_demo_sk and
+       ss_promo_sk = p_promo_sk and
+       cd_gender = 'F' and 
+       cd_marital_status = 'W' and
+       cd_education_status = 'College' and
+       (p_channel_email = 'N' or p_channel_event = 'N') and
+       d_year = 2001 
+ group by i_item_id
+ order by i_item_id
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:8~2:11) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:8~3:11) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:8~4:11) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:8~5:11) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:6~6:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:19~6:40) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:42~6:50) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:52~6:56) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:58~6:67) /test/1/catalog1/schema1/promotion/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0013]
+sql:
+select  
+    sum(ss_net_profit) as total_sum
+   ,s_state
+   ,s_county
+   ,grouping(s_state)+grouping(s_county) as lochierarchy
+   ,rank() over (
+ 	partition by grouping(s_state)+grouping(s_county),
+ 	case when grouping(s_county) = 0 then s_state end 
+ 	order by sum(ss_net_profit) desc) as rank_within_parent
+ from
+    store_sales
+   ,date_dim       d1
+   ,store
+ where
+    d1.d_month_seq between 1220 and 1220+11
+ and d1.d_date_sk = ss_sold_date_sk
+ and s_store_sk  = ss_store_sk
+ and s_state in
+             ( select s_state
+               from  (select s_state as s_state,
+ 			    rank() over ( partition by s_state order by sum(ss_net_profit) desc) as ranking
+                      from   store_sales, store, date_dim
+                      where  d_month_seq between 1220 and 1220+11
+ 			    and d_date_sk = ss_sold_date_sk
+ 			    and s_store_sk  = ss_store_sk
+                      group by s_state
+                     ) tmp1 
+               where ranking <= 5
+             )
+ group by rollup(s_state,s_county)
+ order by
+   lochierarchy desc
+  ,case when lochierarchy = 0 then s_state end
+  ,rank_within_parent
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:4~2:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:12) /test/1/catalog1/schema1/grouping/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:22~5:30) /test/1/catalog1/schema1/grouping/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:8) /test/1/catalog1/schema1/rank/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:15~7:23) /test/1/catalog1/schema1/grouping/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:33~7:41) /test/1/catalog1/schema1/grouping/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:12~8:20) /test/1/catalog1/schema1/grouping/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:11~9:14) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(11:4~11:15) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:4~12:12) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:4~13:9) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(21:8~21:12) /test/1/catalog1/schema1/rank/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(21:52~21:55) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(22:29~22:40) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(22:42~22:47) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(22:49~22:57) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0014]
+sql:
+select i_brand_id brand_id, i_brand brand,t_hour,t_minute,
+ 	sum(ext_price) ext_price
+ from item, (select ws_ext_sales_price as ext_price, 
+                        ws_sold_date_sk as sold_date_sk,
+                        ws_item_sk as sold_item_sk,
+                        ws_sold_time_sk as time_sk  
+                 from web_sales,date_dim
+                 where d_date_sk = ws_sold_date_sk
+                   and d_moy=12
+                   and d_year=2002
+                 union all
+                 select cs_ext_sales_price as ext_price,
+                        cs_sold_date_sk as sold_date_sk,
+                        cs_item_sk as sold_item_sk,
+                        cs_sold_time_sk as time_sk
+                 from catalog_sales,date_dim
+                 where d_date_sk = cs_sold_date_sk
+                   and d_moy=12
+                   and d_year=2002
+                 union all
+                 select ss_ext_sales_price as ext_price,
+                        ss_sold_date_sk as sold_date_sk,
+                        ss_item_sk as sold_item_sk,
+                        ss_sold_time_sk as time_sk
+                 from store_sales,date_dim
+                 where d_date_sk = ss_sold_date_sk
+                   and d_moy=12
+                   and d_year=2002
+                 ) tmp,time_dim
+ where
+   sold_item_sk = i_item_sk
+   and i_manager_id=1
+   and time_sk = t_time_sk
+   and (t_meal_time = 'breakfast' or t_meal_time = 'dinner')
+ group by i_brand, i_brand_id,t_hour,t_minute
+ order by ext_price desc, i_brand_id
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:2~2:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:6~3:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:22~7:31) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:32~7:40) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:22~16:35) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:36~16:44) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(25:22~25:33) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(25:34~25:42) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:23~29:31) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0015]
+sql:
+select  i_item_desc
+      ,w_warehouse_name
+      ,d1.d_week_seq
+      ,sum(case when p_promo_sk is null then 1 else 0 end) no_promo
+      ,sum(case when p_promo_sk is not null then 1 else 0 end) promo
+      ,count(*) total_cnt
+from catalog_sales
+join inventory on (cs_item_sk = inv_item_sk)
+join warehouse on (w_warehouse_sk=inv_warehouse_sk)
+join item on (i_item_sk = cs_item_sk)
+join customer_demographics on (cs_bill_cdemo_sk = cd_demo_sk)
+join household_demographics on (cs_bill_hdemo_sk = hd_demo_sk)
+join date_dim d1 on (cs_sold_date_sk = d1.d_date_sk)
+join date_dim d2 on (inv_date_sk = d2.d_date_sk)
+join date_dim d3 on (cs_ship_date_sk = d3.d_date_sk)
+left outer join promotion on (cs_promo_sk=p_promo_sk)
+left outer join catalog_returns on (cr_item_sk = cs_item_sk and cr_order_number = cs_order_number)
+where d1.d_week_seq = d2.d_week_seq
+  and inv_quantity_on_hand < cs_quantity 
+  and (d3.d_date > (d1.d_date + INTERVAL  '5' DAY))
+  and hd_buy_potential = '1001-5000'
+  and d1.d_year = 1998
+  and cd_marital_status = 'S'
+group by i_item_desc,w_warehouse_name,d1.d_week_seq
+order by total_cnt desc, i_item_desc, w_warehouse_name, d_week_seq
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:7~4:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:7~5:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:7~6:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:5~7:18) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:5~8:14) /test/1/catalog1/schema1/inventory/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:5~9:14) /test/1/catalog1/schema1/warehouse/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:5~10:9) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:5~11:26) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:5~12:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:5~13:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(14:5~14:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:5~15:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:16~16:25) /test/1/catalog1/schema1/promotion/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:16~17:31) /test/1/catalog1/schema1/catalog_returns/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0016]
+sql:
+select c_last_name
+       ,c_first_name
+       ,c_salutation
+       ,c_preferred_cust_flag 
+       ,ss_ticket_number
+       ,cnt from
+   (select ss_ticket_number
+          ,ss_customer_sk
+          ,count(*) cnt
+    from store_sales,date_dim,store,household_demographics
+    where store_sales.ss_sold_date_sk = date_dim.d_date_sk
+    and store_sales.ss_store_sk = store.s_store_sk  
+    and store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+    and date_dim.d_dom between 1 and 2 
+    and (household_demographics.hd_buy_potential = '1001-5000' or
+         household_demographics.hd_buy_potential = '5001-10000')
+    and household_demographics.hd_vehicle_count > 0
+    and case when household_demographics.hd_vehicle_count > 0 then 
+             household_demographics.hd_dep_count/ household_demographics.hd_vehicle_count else null end > 1
+    and date_dim.d_year in (2000,2000+1,2000+2)
+    and store.s_county in ('Williamson County','Williamson County','Williamson County','Williamson County')
+    group by ss_ticket_number,ss_customer_sk) dj,customer
+    where ss_customer_sk = c_customer_sk
+      and cnt between 1 and 5
+    order by cnt desc, c_last_name asc;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(9:11~9:16) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(10:9~10:20) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:21~10:29) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:30~10:35) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:36~10:58) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(22:49~22:57) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0017]
+sql:
+with year_total as (
+ select c_customer_id customer_id
+       ,c_first_name customer_first_name
+       ,c_last_name customer_last_name
+       ,d_year as year
+       ,max(ss_net_paid) year_total
+       ,'s' sale_type
+ from customer
+     ,store_sales
+     ,date_dim
+ where c_customer_sk = ss_customer_sk
+   and ss_sold_date_sk = d_date_sk
+   and d_year in (1999,1999+1)
+ group by c_customer_id
+         ,c_first_name
+         ,c_last_name
+         ,d_year
+ union all
+ select c_customer_id customer_id
+       ,c_first_name customer_first_name
+       ,c_last_name customer_last_name
+       ,d_year as year
+       ,max(ws_net_paid) year_total
+       ,'w' sale_type
+ from customer
+     ,web_sales
+     ,date_dim
+ where c_customer_sk = ws_bill_customer_sk
+   and ws_sold_date_sk = d_date_sk
+   and d_year in (1999,1999+1)
+ group by c_customer_id
+         ,c_first_name
+         ,c_last_name
+         ,d_year
+         )
+  select 
+        t_s_secyear.customer_id, t_s_secyear.customer_first_name, t_s_secyear.customer_last_name
+ from year_total t_s_firstyear
+     ,year_total t_s_secyear
+     ,year_total t_w_firstyear
+     ,year_total t_w_secyear
+ where t_s_secyear.customer_id = t_s_firstyear.customer_id
+         and t_s_firstyear.customer_id = t_w_secyear.customer_id
+         and t_s_firstyear.customer_id = t_w_firstyear.customer_id
+         and t_s_firstyear.sale_type = 's'
+         and t_w_firstyear.sale_type = 'w'
+         and t_s_secyear.sale_type = 's'
+         and t_w_secyear.sale_type = 'w'
+         and t_s_firstyear.year = 1999
+         and t_s_secyear.year = 1999+1
+         and t_w_firstyear.year = 1999
+         and t_w_secyear.year = 1999+1
+         and t_s_firstyear.year_total > 0
+         and t_w_firstyear.year_total > 0
+         and case when t_w_firstyear.year_total > 0 then t_w_secyear.year_total / t_w_firstyear.year_total else null end
+           > case when t_s_firstyear.year_total > 0 then t_s_secyear.year_total / t_s_firstyear.year_total else null end
+ order by 1,3,2
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(6:8~6:11) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:6~8:14) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:6~9:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:6~10:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(23:8~23:11) /test/1/catalog1/schema1/max/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(25:6~25:14) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(26:6~26:15) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(27:6~27:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(38:6~38:16) /test/1/catalog1/schema1/year_total/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(39:6~39:16) /test/1/catalog1/schema1/year_total/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(40:6~40:16) /test/1/catalog1/schema1/year_total/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(41:6~41:16) /test/1/catalog1/schema1/year_total/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0018]
+sql:
+WITH all_sales AS (
+ SELECT d_year
+       ,i_brand_id
+       ,i_class_id
+       ,i_category_id
+       ,i_manufact_id
+       ,SUM(sales_cnt) AS sales_cnt
+       ,SUM(sales_amt) AS sales_amt
+ FROM (SELECT d_year
+             ,i_brand_id
+             ,i_class_id
+             ,i_category_id
+             ,i_manufact_id
+             ,cs_quantity - COALESCE(cr_return_quantity,0) AS sales_cnt
+             ,cs_ext_sales_price - COALESCE(cr_return_amount,0.0) AS sales_amt
+       FROM catalog_sales JOIN item ON i_item_sk=cs_item_sk
+                          JOIN date_dim ON d_date_sk=cs_sold_date_sk
+                          LEFT JOIN catalog_returns ON (cs_order_number=cr_order_number 
+                                                    AND cs_item_sk=cr_item_sk)
+       WHERE i_category='Sports'
+       UNION
+       SELECT d_year
+             ,i_brand_id
+             ,i_class_id
+             ,i_category_id
+             ,i_manufact_id
+             ,ss_quantity - COALESCE(sr_return_quantity,0) AS sales_cnt
+             ,ss_ext_sales_price - COALESCE(sr_return_amt,0.0) AS sales_amt
+       FROM store_sales JOIN item ON i_item_sk=ss_item_sk
+                        JOIN date_dim ON d_date_sk=ss_sold_date_sk
+                        LEFT JOIN store_returns ON (ss_ticket_number=sr_ticket_number 
+                                                AND ss_item_sk=sr_item_sk)
+       WHERE i_category='Sports'
+       UNION
+       SELECT d_year
+             ,i_brand_id
+             ,i_class_id
+             ,i_category_id
+             ,i_manufact_id
+             ,ws_quantity - COALESCE(wr_return_quantity,0) AS sales_cnt
+             ,ws_ext_sales_price - COALESCE(wr_return_amt,0.0) AS sales_amt
+       FROM web_sales JOIN item ON i_item_sk=ws_item_sk
+                      JOIN date_dim ON d_date_sk=ws_sold_date_sk
+                      LEFT JOIN web_returns ON (ws_order_number=wr_order_number 
+                                            AND ws_item_sk=wr_item_sk)
+       WHERE i_category='Sports') sales_detail
+ GROUP BY d_year, i_brand_id, i_class_id, i_category_id, i_manufact_id)
+ SELECT  prev_yr.d_year AS prev_year
+                          ,curr_yr.d_year AS year
+                          ,curr_yr.i_brand_id
+                          ,curr_yr.i_class_id
+                          ,curr_yr.i_category_id
+                          ,curr_yr.i_manufact_id
+                          ,prev_yr.sales_cnt AS prev_yr_cnt
+                          ,curr_yr.sales_cnt AS curr_yr_cnt
+                          ,curr_yr.sales_cnt-prev_yr.sales_cnt AS sales_cnt_diff
+                          ,curr_yr.sales_amt-prev_yr.sales_amt AS sales_amt_diff
+ FROM all_sales curr_yr, all_sales prev_yr
+ WHERE curr_yr.i_brand_id=prev_yr.i_brand_id
+   AND curr_yr.i_class_id=prev_yr.i_class_id
+   AND curr_yr.i_category_id=prev_yr.i_category_id
+   AND curr_yr.i_manufact_id=prev_yr.i_manufact_id
+   AND curr_yr.d_year=2002
+   AND prev_yr.d_year=2002-1
+   AND CAST(curr_yr.sales_cnt AS DECIMAL(17,2))/CAST(prev_yr.sales_cnt AS DECIMAL(17,2))<0.9
+ ORDER BY sales_cnt_diff,sales_amt_diff
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(7:8~7:11) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:8~8:11) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(14:28~14:36) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(15:35~15:43) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(16:12~16:25) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:31~16:35) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:31~17:39) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:36~18:51) /test/1/catalog1/schema1/catalog_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(27:28~27:36) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(28:35~28:43) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(29:12~29:23) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:29~29:33) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(30:29~30:37) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(31:34~31:47) /test/1/catalog1/schema1/store_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(40:28~40:36) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(41:35~41:43) /test/1/catalog1/schema1/COALESCE/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(42:12~42:21) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(42:27~42:31) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(43:27~43:35) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(44:32~44:43) /test/1/catalog1/schema1/web_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(58:6~58:15) /test/1/catalog1/schema1/all_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(58:25~58:34) /test/1/catalog1/schema1/all_sales/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0019]
+sql:
+select  channel, col_name, d_year, d_qoy, i_category, COUNT(*) sales_cnt, SUM(ext_sales_price) sales_amt FROM (
+        SELECT 'store' as channel, 'ss_customer_sk' col_name, d_year, d_qoy, i_category, ss_ext_sales_price ext_sales_price
+         FROM store_sales, item, date_dim
+         WHERE ss_customer_sk IS NULL
+           AND ss_sold_date_sk=d_date_sk
+           AND ss_item_sk=i_item_sk
+        UNION ALL
+        SELECT 'web' as channel, 'ws_promo_sk' col_name, d_year, d_qoy, i_category, ws_ext_sales_price ext_sales_price
+         FROM web_sales, item, date_dim
+         WHERE ws_promo_sk IS NULL
+           AND ws_sold_date_sk=d_date_sk
+           AND ws_item_sk=i_item_sk
+        UNION ALL
+        SELECT 'catalog' as channel, 'cs_bill_customer_sk' col_name, d_year, d_qoy, i_category, cs_ext_sales_price ext_sales_price
+         FROM catalog_sales, item, date_dim
+         WHERE cs_bill_customer_sk IS NULL
+           AND cs_sold_date_sk=d_date_sk
+           AND cs_item_sk=i_item_sk) foo
+GROUP BY channel, col_name, d_year, d_qoy, i_category
+ORDER BY channel, col_name, d_year, d_qoy, i_category
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:54~1:59) /test/1/catalog1/schema1/COUNT/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:74~1:77) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:14~3:25) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:27~3:31) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:33~3:41) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:14~9:23) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:25~9:29) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:31~9:39) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:14~15:27) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:29~15:33) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:35~15:43) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0020]
+sql:
+with ss as
+ (select s_store_sk,
+         sum(ss_ext_sales_price) as sales,
+         sum(ss_net_profit) as profit
+ from store_sales,
+      date_dim,
+      store
+ where ss_sold_date_sk = d_date_sk
+       and d_date between cast('2000-08-10' as date) 
+                  and (cast('2000-08-10' as date) +  interval 30 day) 
+       and ss_store_sk = s_store_sk
+ group by s_store_sk)
+ ,
+ sr as
+ (select s_store_sk,
+         sum(sr_return_amt) as returns,
+         sum(sr_net_loss) as profit_loss
+ from store_returns,
+      date_dim,
+      store
+ where sr_returned_date_sk = d_date_sk
+       and d_date between cast('2000-08-10' as date)
+                  and (cast('2000-08-10' as date) +  interval 30 day)
+       and sr_store_sk = s_store_sk
+ group by s_store_sk), 
+ cs as
+ (select cs_call_center_sk,
+        sum(cs_ext_sales_price) as sales,
+        sum(cs_net_profit) as profit
+ from catalog_sales,
+      date_dim
+ where cs_sold_date_sk = d_date_sk
+       and d_date between cast('2000-08-10' as date)
+                  and (cast('2000-08-10' as date) +  interval 30 day)
+ group by cs_call_center_sk 
+ ), 
+ cr as
+ (select cr_call_center_sk,
+         sum(cr_return_amount) as returns,
+         sum(cr_net_loss) as profit_loss
+ from catalog_returns,
+      date_dim
+ where cr_returned_date_sk = d_date_sk
+       and d_date between cast('2000-08-10' as date)
+                  and (cast('2000-08-10' as date) +  interval 30 day)
+ group by cr_call_center_sk
+ ), 
+ ws as
+ ( select wp_web_page_sk,
+        sum(ws_ext_sales_price) as sales,
+        sum(ws_net_profit) as profit
+ from web_sales,
+      date_dim,
+      web_page
+ where ws_sold_date_sk = d_date_sk
+       and d_date between cast('2000-08-10' as date)
+                  and (cast('2000-08-10' as date) +  interval 30 day)
+       and ws_web_page_sk = wp_web_page_sk
+ group by wp_web_page_sk), 
+ wr as
+ (select wp_web_page_sk,
+        sum(wr_return_amt) as returns,
+        sum(wr_net_loss) as profit_loss
+ from web_returns,
+      date_dim,
+      web_page
+ where wr_returned_date_sk = d_date_sk
+       and d_date between cast('2000-08-10' as date)
+                  and (cast('2000-08-10' as date) +  interval 30 day)
+       and wr_web_page_sk = wp_web_page_sk
+ group by wp_web_page_sk)
+  select  channel
+        , id
+        , sum(sales) as sales
+        , sum(returns) as returns
+        , sum(profit) as profit
+ from 
+ (select 'store channel' as channel
+        , ss.s_store_sk as id
+        , sales
+        , coalesce(returns, 0) as returns
+        , (profit - coalesce(profit_loss,0)) as profit
+ from   ss left join sr
+        on  ss.s_store_sk = sr.s_store_sk
+ union all
+ select 'catalog channel' as channel
+        , cs_call_center_sk as id
+        , sales
+        , returns
+        , (profit - profit_loss) as profit
+ from  cs
+       , cr
+ union all
+ select 'web channel' as channel
+        , ws.wp_web_page_sk as id
+        , sales
+        , coalesce(returns, 0) returns
+        , (profit - coalesce(profit_loss,0)) as profit
+ from   ws left join wr
+        on  ws.wp_web_page_sk = wr.wp_web_page_sk
+ ) x
+ group by rollup (channel, id)
+ order by channel
+         ,id
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:9~3:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:9~4:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:6~5:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:6~6:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:6~7:11) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(16:9~16:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(17:9~17:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(18:6~18:19) /test/1/catalog1/schema1/store_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(19:6~19:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(20:6~20:11) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(28:8~28:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(29:8~29:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(30:6~30:19) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(31:6~31:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(39:9~39:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(40:9~40:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(41:6~41:21) /test/1/catalog1/schema1/catalog_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(42:6~42:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(50:8~50:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(51:8~51:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(52:6~52:15) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(53:6~53:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(54:6~54:14) /test/1/catalog1/schema1/web_page/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(62:8~62:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(63:8~63:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(64:6~64:17) /test/1/catalog1/schema1/web_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(65:6~65:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(66:6~66:14) /test/1/catalog1/schema1/web_page/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(74:10~74:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(75:10~75:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(76:10~76:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(81:10~81:18) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(82:20~82:28) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(83:8~83:10) /test/1/catalog1/schema1/ss/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(83:21~83:23) /test/1/catalog1/schema1/sr/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(91:7~91:9) /test/1/catalog1/schema1/cs/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(92:9~92:11) /test/1/catalog1/schema1/cr/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(97:10~97:18) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(98:20~98:28) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(99:8~99:10) /test/1/catalog1/schema1/ws/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(99:21~99:23) /test/1/catalog1/schema1/wr/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0021]
+sql:
+with ws as
+  (select d_year AS ws_sold_year, ws_item_sk,
+    ws_bill_customer_sk ws_customer_sk,
+    sum(ws_quantity) ws_qty,
+    sum(ws_wholesale_cost) ws_wc,
+    sum(ws_sales_price) ws_sp
+   from web_sales
+   left join web_returns on wr_order_number=ws_order_number and ws_item_sk=wr_item_sk
+   join date_dim on ws_sold_date_sk = d_date_sk
+   where wr_order_number is null
+   group by d_year, ws_item_sk, ws_bill_customer_sk
+   ),
+cs as
+  (select d_year AS cs_sold_year, cs_item_sk,
+    cs_bill_customer_sk cs_customer_sk,
+    sum(cs_quantity) cs_qty,
+    sum(cs_wholesale_cost) cs_wc,
+    sum(cs_sales_price) cs_sp
+   from catalog_sales
+   left join catalog_returns on cr_order_number=cs_order_number and cs_item_sk=cr_item_sk
+   join date_dim on cs_sold_date_sk = d_date_sk
+   where cr_order_number is null
+   group by d_year, cs_item_sk, cs_bill_customer_sk
+   ),
+ss as
+  (select d_year AS ss_sold_year, ss_item_sk,
+    ss_customer_sk,
+    sum(ss_quantity) ss_qty,
+    sum(ss_wholesale_cost) ss_wc,
+    sum(ss_sales_price) ss_sp
+   from store_sales
+   left join store_returns on sr_ticket_number=ss_ticket_number and ss_item_sk=sr_item_sk
+   join date_dim on ss_sold_date_sk = d_date_sk
+   where sr_ticket_number is null
+   group by d_year, ss_item_sk, ss_customer_sk
+   )
+select 
+ss_customer_sk,
+round(ss_qty/(coalesce(ws_qty,0)+coalesce(cs_qty,0)),2) ratio,
+ss_qty store_qty, ss_wc store_wholesale_cost, ss_sp store_sales_price,
+coalesce(ws_qty,0)+coalesce(cs_qty,0) other_chan_qty,
+coalesce(ws_wc,0)+coalesce(cs_wc,0) other_chan_wholesale_cost,
+coalesce(ws_sp,0)+coalesce(cs_sp,0) other_chan_sales_price
+from ss
+left join ws on (ws_sold_year=ss_sold_year and ws_item_sk=ss_item_sk and ws_customer_sk=ss_customer_sk)
+left join cs on (cs_sold_year=ss_sold_year and cs_item_sk=ss_item_sk and cs_customer_sk=ss_customer_sk)
+where (coalesce(ws_qty,0)>0 or coalesce(cs_qty, 0)>0) and ss_sold_year=1998
+order by 
+  ss_customer_sk,
+  ss_qty desc, ss_wc desc, ss_sp desc,
+  other_chan_qty,
+  other_chan_wholesale_cost,
+  other_chan_sales_price,
+  ratio
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:4~4:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:8~7:17) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:13~8:24) /test/1/catalog1/schema1/web_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:8~9:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(16:4~16:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(17:4~17:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(18:4~18:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(19:8~19:21) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(20:13~20:28) /test/1/catalog1/schema1/catalog_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(21:8~21:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(28:4~28:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(29:4~29:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(30:4~30:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(31:8~31:19) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(32:13~32:26) /test/1/catalog1/schema1/store_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(33:8~33:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(39:0~39:5) /test/1/catalog1/schema1/round/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(39:14~39:22) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(39:33~39:41) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(41:0~41:8) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(41:19~41:27) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(42:0~42:8) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(42:18~42:26) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(43:0~43:8) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(43:18~43:26) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(44:5~44:7) /test/1/catalog1/schema1/ss/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(45:10~45:12) /test/1/catalog1/schema1/ws/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(46:10~46:12) /test/1/catalog1/schema1/cs/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(47:7~47:15) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(47:31~47:39) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0022]
+sql:
+select 
+  c_last_name,c_first_name,substr(s_city,1,30),ss_ticket_number,amt,profit
+  from
+   (select ss_ticket_number
+          ,ss_customer_sk
+          ,store.s_city
+          ,sum(ss_coupon_amt) amt
+          ,sum(ss_net_profit) profit
+    from store_sales,date_dim,store,household_demographics
+    where store_sales.ss_sold_date_sk = date_dim.d_date_sk
+    and store_sales.ss_store_sk = store.s_store_sk  
+    and store_sales.ss_hdemo_sk = household_demographics.hd_demo_sk
+    and (household_demographics.hd_dep_count = 7 or household_demographics.hd_vehicle_count > -1)
+    and date_dim.d_dow = 1
+    and date_dim.d_year in (2000,2000+1,2000+2) 
+    and store.s_number_employees between 200 and 295
+    group by ss_ticket_number,ss_customer_sk,ss_addr_sk,store.s_city) ms,customer
+    where ss_customer_sk = c_customer_sk
+ order by c_last_name,c_first_name,substr(s_city,1,30), profit
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:27~2:33) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:11~7:14) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:11~8:14) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(9:9~9:20) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:21~9:29) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:30~9:35) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:36~9:58) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:73~17:81) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(19:35~19:41) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0023]
+sql:
+select  s_store_name
+      ,sum(ss_net_profit)
+ from store_sales
+     ,date_dim
+     ,store,
+     (select ca_zip
+     from (
+      SELECT substr(ca_zip,1,5) ca_zip
+      FROM customer_address
+      WHERE substr(ca_zip,1,5) IN (
+                          '47602','16704','35863','28577','83910','36201',
+                          '58412','48162','28055','41419','80332',
+                          '38607','77817','24891','16226','18410',
+                          '21231','59345','13918','51089','20317',
+                          '17167','54585','67881','78366','47770',
+                          '18360','51717','73108','14440','21800',
+                          '89338','45859','65501','34948','25973',
+                          '73219','25333','17291','10374','18829',
+                          '60736','82620','41351','52094','19326',
+                          '25214','54207','40936','21814','79077',
+                          '25178','75742','77454','30621','89193',
+                          '27369','41232','48567','83041','71948',
+                          '37119','68341','14073','16891','62878',
+                          '49130','19833','24286','27700','40979',
+                          '50412','81504','94835','84844','71954',
+                          '39503','57649','18434','24987','12350',
+                          '86379','27413','44529','98569','16515',
+                          '27287','24255','21094','16005','56436',
+                          '91110','68293','56455','54558','10298',
+                          '83647','32754','27052','51766','19444',
+                          '13869','45645','94791','57631','20712',
+                          '37788','41807','46507','21727','71836',
+                          '81070','50632','88086','63991','20244',
+                          '31655','51782','29818','63792','68605',
+                          '94898','36430','57025','20601','82080',
+                          '33869','22728','35834','29086','92645',
+                          '98584','98072','11652','78093','57553',
+                          '43830','71144','53565','18700','90209',
+                          '71256','38353','54364','28571','96560',
+                          '57839','56355','50679','45266','84680',
+                          '34306','34972','48530','30106','15371',
+                          '92380','84247','92292','68852','13338',
+                          '34594','82602','70073','98069','85066',
+                          '47289','11686','98862','26217','47529',
+                          '63294','51793','35926','24227','14196',
+                          '24594','32489','99060','49472','43432',
+                          '49211','14312','88137','47369','56877',
+                          '20534','81755','15794','12318','21060',
+                          '73134','41255','63073','81003','73873',
+                          '66057','51184','51195','45676','92696',
+                          '70450','90669','98338','25264','38919',
+                          '59226','58581','60298','17895','19489',
+                          '52301','80846','95464','68770','51634',
+                          '19988','18367','18421','11618','67975',
+                          '25494','41352','95430','15734','62585',
+                          '97173','33773','10425','75675','53535',
+                          '17879','41967','12197','67998','79658',
+                          '59130','72592','14851','43933','68101',
+                          '50636','25717','71286','24660','58058',
+                          '72991','95042','15543','33122','69280',
+                          '11912','59386','27642','65177','17672',
+                          '33467','64592','36335','54010','18767',
+                          '63193','42361','49254','33113','33159',
+                          '36479','59080','11855','81963','31016',
+                          '49140','29392','41836','32958','53163',
+                          '13844','73146','23952','65148','93498',
+                          '14530','46131','58454','13376','13378',
+                          '83986','12320','17193','59852','46081',
+                          '98533','52389','13086','68843','31013',
+                          '13261','60560','13443','45533','83583',
+                          '11489','58218','19753','22911','25115',
+                          '86709','27156','32669','13123','51933',
+                          '39214','41331','66943','14155','69998',
+                          '49101','70070','35076','14242','73021',
+                          '59494','15782','29752','37914','74686',
+                          '83086','34473','15751','81084','49230',
+                          '91894','60624','17819','28810','63180',
+                          '56224','39459','55233','75752','43639',
+                          '55349','86057','62361','50788','31830',
+                          '58062','18218','85761','60083','45484',
+                          '21204','90229','70041','41162','35390',
+                          '16364','39500','68908','26689','52868',
+                          '81335','40146','11340','61527','61794',
+                          '71997','30415','59004','29450','58117',
+                          '69952','33562','83833','27385','61860',
+                          '96435','48333','23065','32961','84919',
+                          '61997','99132','22815','56600','68730',
+                          '48017','95694','32919','88217','27116',
+                          '28239','58032','18884','16791','21343',
+                          '97462','18569','75660','15475')
+     intersect
+      select ca_zip
+      from (SELECT substr(ca_zip,1,5) ca_zip,count(*) cnt
+            FROM customer_address, customer
+            WHERE ca_address_sk = c_current_addr_sk and
+                  c_preferred_cust_flag='Y'
+            group by ca_zip
+            having count(*) > 10)A1)A2) V1
+ where ss_store_sk = s_store_sk
+  and ss_sold_date_sk = d_date_sk
+  and d_qoy = 2 and d_year = 1998
+  and (substr(s_zip,1,2) = substr(V1.ca_zip,1,2))
+ group by s_store_name
+ order by s_store_name
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:7~2:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:6~3:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:6~4:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:6~5:11) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(8:13~8:19) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(9:11~9:27) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(10:12~10:18) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(93:19~93:25) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(93:45~93:50) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(94:17~94:33) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(94:35~94:43) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(98:19~98:24) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(102:7~102:13) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(102:27~102:33) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0024]
+sql:
+with ssr as
+ (select  s_store_id as store_id,
+          sum(ss_ext_sales_price) as sales,
+          sum(coalesce(sr_return_amt, 0)) as returns,
+          sum(ss_net_profit - coalesce(sr_net_loss, 0)) as profit
+  from store_sales left outer join store_returns on
+         (ss_item_sk = sr_item_sk and ss_ticket_number = sr_ticket_number),
+     date_dim,
+     store,
+     item,
+     promotion
+ where ss_sold_date_sk = d_date_sk
+       and d_date between cast('2002-08-14' as date) 
+                  and (cast('2002-08-14' as date) +  interval 30 day)
+       and ss_store_sk = s_store_sk
+       and ss_item_sk = i_item_sk
+       and i_current_price > 50
+       and ss_promo_sk = p_promo_sk
+       and p_channel_tv = 'N'
+ group by s_store_id)
+ ,
+ csr as
+ (select  cp_catalog_page_id as catalog_page_id,
+          sum(cs_ext_sales_price) as sales,
+          sum(coalesce(cr_return_amount, 0)) as returns,
+          sum(cs_net_profit - coalesce(cr_net_loss, 0)) as profit
+  from catalog_sales left outer join catalog_returns on
+         (cs_item_sk = cr_item_sk and cs_order_number = cr_order_number),
+     date_dim,
+     catalog_page,
+     item,
+     promotion
+ where cs_sold_date_sk = d_date_sk
+       and d_date between cast('2002-08-14' as date)
+                  and (cast('2002-08-14' as date) +  interval 30 day)
+        and cs_catalog_page_sk = cp_catalog_page_sk
+       and cs_item_sk = i_item_sk
+       and i_current_price > 50
+       and cs_promo_sk = p_promo_sk
+       and p_channel_tv = 'N'
+group by cp_catalog_page_id)
+ ,
+ wsr as
+ (select  web_site_id,
+          sum(ws_ext_sales_price) as sales,
+          sum(coalesce(wr_return_amt, 0)) as returns,
+          sum(ws_net_profit - coalesce(wr_net_loss, 0)) as profit
+  from web_sales left outer join web_returns on
+         (ws_item_sk = wr_item_sk and ws_order_number = wr_order_number),
+     date_dim,
+     web_site,
+     item,
+     promotion
+ where ws_sold_date_sk = d_date_sk
+       and d_date between cast('2002-08-14' as date)
+                  and (cast('2002-08-14' as date) +  interval 30 day)
+        and ws_web_site_sk = web_site_sk
+       and ws_item_sk = i_item_sk
+       and i_current_price > 50
+       and ws_promo_sk = p_promo_sk
+       and p_channel_tv = 'N'
+group by web_site_id)
+  select  channel
+        , id
+        , sum(sales) as sales
+        , sum(returns) as returns
+        , sum(profit) as profit
+ from 
+ (select 'store channel' as channel
+        , concat('store', store_id) as id
+        , sales
+        , returns
+        , profit
+ from   ssr
+ union all
+ select 'catalog channel' as channel
+        , concat('catalog_page', catalog_page_id) as id
+        , sales
+        , returns
+        , profit
+ from  csr
+ union all
+ select 'web channel' as channel
+        , concat('web_site', web_site_id) as id
+        , sales
+        , returns
+        , profit
+ from   wsr
+ ) x
+ group by rollup (channel, id)
+ order by channel
+         ,id
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:10~3:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:10~4:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:14~4:22) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:10~5:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:30~5:38) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:7~6:18) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:35~6:48) /test/1/catalog1/schema1/store_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:5~8:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:5~9:10) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:5~10:9) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:5~11:14) /test/1/catalog1/schema1/promotion/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(24:10~24:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(25:10~25:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(25:14~25:22) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(26:10~26:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(26:30~26:38) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(27:7~27:20) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(27:37~27:52) /test/1/catalog1/schema1/catalog_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:5~29:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(30:5~30:17) /test/1/catalog1/schema1/catalog_page/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(31:5~31:9) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(32:5~32:14) /test/1/catalog1/schema1/promotion/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(45:10~45:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(46:10~46:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(46:14~46:22) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(47:10~47:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(47:30~47:38) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(48:7~48:16) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(48:33~48:44) /test/1/catalog1/schema1/web_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(50:5~50:13) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(51:5~51:13) /test/1/catalog1/schema1/web_site/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(52:5~52:9) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(53:5~53:14) /test/1/catalog1/schema1/promotion/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(65:10~65:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(66:10~66:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(67:10~67:13) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(70:10~70:16) /test/1/catalog1/schema1/concat/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(74:8~74:11) /test/1/catalog1/schema1/ssr/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(77:10~77:16) /test/1/catalog1/schema1/concat/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(81:7~81:10) /test/1/catalog1/schema1/csr/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(84:10~84:16) /test/1/catalog1/schema1/concat/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(88:8~88:11) /test/1/catalog1/schema1/wsr/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0025]
+sql:
+with customer_total_return as
+ (select cr_returning_customer_sk as ctr_customer_sk
+        ,ca_state as ctr_state, 
+ 	sum(cr_return_amt_inc_tax) as ctr_total_return
+ from catalog_returns
+     ,date_dim
+     ,customer_address
+ where cr_returned_date_sk = d_date_sk 
+   and d_year =2001
+   and cr_returning_addr_sk = ca_address_sk 
+ group by cr_returning_customer_sk
+         ,ca_state )
+  select  c_customer_id,c_salutation,c_first_name,c_last_name,ca_street_number,ca_street_name
+                   ,ca_street_type,ca_suite_number,ca_city,ca_county,ca_state,ca_zip,ca_country,ca_gmt_offset
+                  ,ca_location_type,ctr_total_return
+ from customer_total_return ctr1
+     ,customer_address
+     ,customer
+ where ctr1.ctr_total_return > (select avg(ctr_total_return)*1.2
+ 			  from customer_total_return ctr2 
+                  	  where ctr1.ctr_state = ctr2.ctr_state)
+       and ca_address_sk = c_current_addr_sk
+       and ca_state = 'TN'
+       and ctr1.ctr_customer_sk = c_customer_sk
+ order by c_customer_id,c_salutation,c_first_name,c_last_name,ca_street_number,ca_street_name
+                   ,ca_street_type,ca_suite_number,ca_city,ca_county,ca_state,ca_zip,ca_country,ca_gmt_offset
+                  ,ca_location_type,ctr_total_return
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:2~4:5) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:6~5:21) /test/1/catalog1/schema1/catalog_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:6~6:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:6~7:22) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:6~16:27) /test/1/catalog1/schema1/customer_total_return/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:6~17:22) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:6~18:14) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(19:39~19:42) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(20:11~20:32) /test/1/catalog1/schema1/customer_total_return/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0026]
+sql:
+select  i_item_id
+       ,i_item_desc
+       ,i_current_price
+ from item, inventory, date_dim, store_sales
+ where i_current_price between 58 and 58+30
+ and inv_item_sk = i_item_sk
+ and d_date_sk=inv_date_sk
+ and d_date between cast('2001-01-13' as date) and (cast('2001-01-13' as date) +  interval 60 day)
+ and i_manufact_id in (259,559,580,485)
+ and inv_quantity_on_hand between 100 and 500
+ and ss_item_sk = i_item_sk
+ group by i_item_id,i_item_desc,i_current_price
+ order by i_item_id
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(4:6~4:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:12~4:21) /test/1/catalog1/schema1/inventory/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:23~4:31) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:33~4:44) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0027]
+sql:
+with sr_items as
+ (select i_item_id item_id,
+        sum(sr_return_quantity) sr_item_qty
+ from store_returns,
+      item,
+      date_dim
+ where sr_item_sk = i_item_sk
+ and   d_date    in 
+	(select d_date
+	from date_dim
+	where d_week_seq in 
+		(select d_week_seq
+		from date_dim
+	  where d_date in ('2001-07-13','2001-09-10','2001-11-16')))
+ and   sr_returned_date_sk   = d_date_sk
+ group by i_item_id),
+ cr_items as
+ (select i_item_id item_id,
+        sum(cr_return_quantity) cr_item_qty
+ from catalog_returns,
+      item,
+      date_dim
+ where cr_item_sk = i_item_sk
+ and   d_date    in 
+	(select d_date
+	from date_dim
+	where d_week_seq in 
+		(select d_week_seq
+		from date_dim
+	  where d_date in ('2001-07-13','2001-09-10','2001-11-16')))
+ and   cr_returned_date_sk   = d_date_sk
+ group by i_item_id),
+ wr_items as
+ (select i_item_id item_id,
+        sum(wr_return_quantity) wr_item_qty
+ from web_returns,
+      item,
+      date_dim
+ where wr_item_sk = i_item_sk
+ and   d_date    in 
+	(select d_date
+	from date_dim
+	where d_week_seq in 
+		(select d_week_seq
+		from date_dim
+		where d_date in ('2001-07-13','2001-09-10','2001-11-16')))
+ and   wr_returned_date_sk   = d_date_sk
+ group by i_item_id)
+  select  sr_items.item_id
+       ,sr_item_qty
+       ,sr_item_qty/(sr_item_qty+cr_item_qty+wr_item_qty)/3.0 * 100 sr_dev
+       ,cr_item_qty
+       ,cr_item_qty/(sr_item_qty+cr_item_qty+wr_item_qty)/3.0 * 100 cr_dev
+       ,wr_item_qty
+       ,wr_item_qty/(sr_item_qty+cr_item_qty+wr_item_qty)/3.0 * 100 wr_dev
+       ,(sr_item_qty+cr_item_qty+wr_item_qty)/3.0 average
+ from sr_items
+     ,cr_items
+     ,wr_items
+ where sr_items.item_id=cr_items.item_id
+   and sr_items.item_id=wr_items.item_id 
+ order by sr_items.item_id
+         ,sr_item_qty
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:8~3:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:6~4:19) /test/1/catalog1/schema1/store_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:6~5:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:6~6:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:6~10:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:7~13:15) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(19:8~19:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(20:6~20:21) /test/1/catalog1/schema1/catalog_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(21:6~21:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(22:6~22:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(26:6~26:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:7~29:15) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(35:8~35:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(36:6~36:17) /test/1/catalog1/schema1/web_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(37:6~37:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(38:6~38:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(42:6~42:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(45:7~45:15) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(57:6~57:14) /test/1/catalog1/schema1/sr_items/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(58:6~58:14) /test/1/catalog1/schema1/cr_items/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(59:6~59:14) /test/1/catalog1/schema1/wr_items/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0028]
+sql:
+select  c_customer_id as customer_id
+       , concat(concat(coalesce(c_last_name,''), ','), coalesce(c_first_name,'')) as customername
+ from customer
+     ,customer_address
+     ,customer_demographics
+     ,household_demographics
+     ,income_band
+     ,store_returns
+ where ca_city	        =  'Woodland'
+   and c_current_addr_sk = ca_address_sk
+   and ib_lower_bound   >=  60306
+   and ib_upper_bound   <=  60306 + 50000
+   and ib_income_band_sk = hd_income_band_sk
+   and cd_demo_sk = c_current_cdemo_sk
+   and hd_demo_sk = c_current_hdemo_sk
+   and sr_cdemo_sk = cd_demo_sk
+ order by c_customer_id
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:9~2:15) /test/1/catalog1/schema1/concat/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:16~2:22) /test/1/catalog1/schema1/concat/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:23~2:31) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:55~2:63) /test/1/catalog1/schema1/coalesce/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:6~3:14) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:6~4:22) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:6~5:27) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:6~6:28) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:6~7:17) /test/1/catalog1/schema1/income_band/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:6~8:19) /test/1/catalog1/schema1/store_returns/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0029]
+sql:
+select  substr(r_reason_desc,1,20)
+       ,avg(ws_quantity)
+       ,avg(wr_refunded_cash)
+       ,avg(wr_fee)
+ from web_sales, web_returns, web_page, customer_demographics cd1,
+      customer_demographics cd2, customer_address, date_dim, reason 
+ where ws_web_page_sk = wp_web_page_sk
+   and ws_item_sk = wr_item_sk
+   and ws_order_number = wr_order_number
+   and ws_sold_date_sk = d_date_sk and d_year = 1998
+   and cd1.cd_demo_sk = wr_refunded_cdemo_sk 
+   and cd2.cd_demo_sk = wr_returning_cdemo_sk
+   and ca_address_sk = wr_refunded_addr_sk
+   and r_reason_sk = wr_reason_sk
+   and
+   (
+    (
+     cd1.cd_marital_status = 'D'
+     and
+     cd1.cd_marital_status = cd2.cd_marital_status
+     and
+     cd1.cd_education_status = 'Primary'
+     and 
+     cd1.cd_education_status = cd2.cd_education_status
+     and
+     ws_sales_price between 100.00 and 150.00
+    )
+   or
+    (
+     cd1.cd_marital_status = 'S'
+     and
+     cd1.cd_marital_status = cd2.cd_marital_status
+     and
+     cd1.cd_education_status = 'College' 
+     and
+     cd1.cd_education_status = cd2.cd_education_status
+     and
+     ws_sales_price between 50.00 and 100.00
+    )
+   or
+    (
+     cd1.cd_marital_status = 'U'
+     and
+     cd1.cd_marital_status = cd2.cd_marital_status
+     and
+     cd1.cd_education_status = 'Advanced Degree'
+     and
+     cd1.cd_education_status = cd2.cd_education_status
+     and
+     ws_sales_price between 150.00 and 200.00
+    )
+   )
+   and
+   (
+    (
+     ca_country = 'United States'
+     and
+     ca_state in ('NC', 'TX', 'IA')
+     and ws_net_profit between 100 and 200  
+    )
+    or
+    (
+     ca_country = 'United States'
+     and
+     ca_state in ('WI', 'WV', 'GA')
+     and ws_net_profit between 150 and 300  
+    )
+    or
+    (
+     ca_country = 'United States'
+     and
+     ca_state in ('OK', 'VA', 'KY')
+     and ws_net_profit between 50 and 250  
+    )
+   )
+group by r_reason_desc
+order by substr(r_reason_desc,1,20)
+        ,avg(ws_quantity)
+        ,avg(wr_refunded_cash)
+        ,avg(wr_fee)
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:8~1:14) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:8~2:11) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:8~3:11) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:8~4:11) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:6~5:15) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:17~5:28) /test/1/catalog1/schema1/web_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:30~5:38) /test/1/catalog1/schema1/web_page/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:40~5:61) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:6~6:27) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:33~6:49) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:51~6:59) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:61~6:67) /test/1/catalog1/schema1/reason/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(77:9~77:15) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(78:9~78:12) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(79:9~79:12) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(80:9~80:12) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0030]
+sql:
+select   
+    sum(ws_net_paid) as total_sum
+   ,i_category
+   ,i_class
+   ,grouping(i_category)+grouping(i_class) as lochierarchy
+   ,rank() over (
+ 	partition by grouping(i_category)+grouping(i_class),
+ 	case when grouping(i_class) = 0 then i_category end 
+ 	order by sum(ws_net_paid) desc) as rank_within_parent
+ from
+    web_sales
+   ,date_dim       d1
+   ,item
+ where
+    d1.d_month_seq between 1186 and 1186+11
+ and d1.d_date_sk = ws_sold_date_sk
+ and i_item_sk  = ws_item_sk
+ group by rollup(i_category,i_class)
+ order by
+   lochierarchy desc,
+   case when lochierarchy = 0 then i_category end,
+   rank_within_parent
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:4~2:7) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:4~5:12) /test/1/catalog1/schema1/grouping/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:25~5:33) /test/1/catalog1/schema1/grouping/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:4~6:8) /test/1/catalog1/schema1/rank/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:15~7:23) /test/1/catalog1/schema1/grouping/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:36~7:44) /test/1/catalog1/schema1/grouping/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:12~8:20) /test/1/catalog1/schema1/grouping/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:11~9:14) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(11:4~11:13) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:4~12:12) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:4~13:8) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0031]
+sql:
+select count(*) 
+from ((select distinct c_last_name, c_first_name, d_date
+       from store_sales, date_dim, customer
+       where store_sales.ss_sold_date_sk = date_dim.d_date_sk
+         and store_sales.ss_customer_sk = customer.c_customer_sk
+         and d_month_seq between 1202 and 1202+11)
+       except
+      (select distinct c_last_name, c_first_name, d_date
+       from catalog_sales, date_dim, customer
+       where catalog_sales.cs_sold_date_sk = date_dim.d_date_sk
+         and catalog_sales.cs_bill_customer_sk = customer.c_customer_sk
+         and d_month_seq between 1202 and 1202+11)
+       except
+      (select distinct c_last_name, c_first_name, d_date
+       from web_sales, date_dim, customer
+       where web_sales.ws_sold_date_sk = date_dim.d_date_sk
+         and web_sales.ws_bill_customer_sk = customer.c_customer_sk
+         and d_month_seq between 1202 and 1202+11)
+) cool_cust
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:12) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:12~3:23) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:25~3:33) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:35~3:43) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:12~9:25) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:27~9:35) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:37~9:45) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:12~15:21) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:23~15:31) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:33~15:41) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0032]
+sql:
+select  *
+from
+ (select count(*) h8_30_to_9
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk   
+     and ss_hdemo_sk = household_demographics.hd_demo_sk 
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 8
+     and time_dim.t_minute >= 30
+     and ((household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2)) 
+     and store.s_store_name = 'ese') s1,
+ (select count(*) h9_to_9_30 
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk 
+     and time_dim.t_hour = 9 
+     and time_dim.t_minute < 30
+     and ((household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
+     and store.s_store_name = 'ese') s2,
+ (select count(*) h9_30_to_10 
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 9
+     and time_dim.t_minute >= 30
+     and ((household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
+     and store.s_store_name = 'ese') s3,
+ (select count(*) h10_to_10_30
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 10 
+     and time_dim.t_minute < 30
+     and ((household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
+     and store.s_store_name = 'ese') s4,
+ (select count(*) h10_30_to_11
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 10 
+     and time_dim.t_minute >= 30
+     and ((household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
+     and store.s_store_name = 'ese') s5,
+ (select count(*) h11_to_11_30
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk 
+     and time_dim.t_hour = 11
+     and time_dim.t_minute < 30
+     and ((household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
+     and store.s_store_name = 'ese') s6,
+ (select count(*) h11_30_to_12
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 11
+     and time_dim.t_minute >= 30
+     and ((household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
+     and store.s_store_name = 'ese') s7,
+ (select count(*) h12_to_12_30
+ from store_sales, household_demographics , time_dim, store
+ where ss_sold_time_sk = time_dim.t_time_sk
+     and ss_hdemo_sk = household_demographics.hd_demo_sk
+     and ss_store_sk = s_store_sk
+     and time_dim.t_hour = 12
+     and time_dim.t_minute < 30
+     and ((household_demographics.hd_dep_count = 0 and household_demographics.hd_vehicle_count<=0+2) or
+          (household_demographics.hd_dep_count = -1 and household_demographics.hd_vehicle_count<=-1+2) or
+          (household_demographics.hd_dep_count = 3 and household_demographics.hd_vehicle_count<=3+2))
+     and store.s_store_name = 'ese') s8
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(3:9~3:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:6~4:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:19~4:41) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:44~4:52) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:54~4:59) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(14:9~14:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(15:6~15:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:19~15:41) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:44~15:52) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:54~15:59) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(25:9~25:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(26:6~26:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(26:19~26:41) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(26:44~26:52) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(26:54~26:59) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(36:9~36:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(37:6~37:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(37:19~37:41) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(37:44~37:52) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(37:54~37:59) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(47:9~47:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(48:6~48:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(48:19~48:41) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(48:44~48:52) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(48:54~48:59) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(58:9~58:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(59:6~59:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(59:19~59:41) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(59:44~59:52) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(59:54~59:59) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(69:9~69:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(70:6~70:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(70:19~70:41) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(70:44~70:52) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(70:54~70:59) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(80:9~80:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(81:6~81:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(81:19~81:41) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(81:44~81:52) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(81:54~81:59) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0033]
+sql:
+select  *
+from(
+select i_category, i_class, i_brand,
+       s_store_name, s_company_name,
+       d_moy,
+       sum(ss_sales_price) sum_sales,
+       avg(sum(ss_sales_price)) over
+         (partition by i_category, i_brand, s_store_name, s_company_name)
+         avg_monthly_sales
+from item, store_sales, date_dim, store
+where ss_item_sk = i_item_sk and
+      ss_sold_date_sk = d_date_sk and
+      ss_store_sk = s_store_sk and
+      d_year in (2001) and
+        ((i_category in ('Books','Children','Electronics') and
+          i_class in ('history','school-uniforms','audio')
+         )
+      or (i_category in ('Men','Sports','Shoes') and
+          i_class in ('pants','tennis','womens') 
+        ))
+group by i_category, i_class, i_brand,
+         s_store_name, s_company_name, d_moy) tmp1
+where case when (avg_monthly_sales <> 0) then (abs(sum_sales - avg_monthly_sales) / avg_monthly_sales) else null end > 0.1
+order by sum_sales - avg_monthly_sales, s_store_name
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(6:7~6:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:7~7:10) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:11~7:14) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(10:5~10:9) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:11~10:22) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:24~10:32) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:34~10:39) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(23:47~23:50) /test/1/catalog1/schema1/abs/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0034]
+sql:
+select case when (select count(*) 
+                  from store_sales 
+                  where ss_quantity between 1 and 20) > 1071
+            then (select avg(ss_ext_tax) 
+                  from store_sales 
+                  where ss_quantity between 1 and 20) 
+            else (select avg(ss_net_paid_inc_tax)
+                  from store_sales
+                  where ss_quantity between 1 and 20) end bucket1 ,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 21 and 40) > 39161
+            then (select avg(ss_ext_tax)
+                  from store_sales
+                  where ss_quantity between 21 and 40) 
+            else (select avg(ss_net_paid_inc_tax)
+                  from store_sales
+                  where ss_quantity between 21 and 40) end bucket2,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 41 and 60) > 29434
+            then (select avg(ss_ext_tax)
+                  from store_sales
+                  where ss_quantity between 41 and 60)
+            else (select avg(ss_net_paid_inc_tax)
+                  from store_sales
+                  where ss_quantity between 41 and 60) end bucket3,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 61 and 80) > 6568
+            then (select avg(ss_ext_tax)
+                  from store_sales
+                  where ss_quantity between 61 and 80)
+            else (select avg(ss_net_paid_inc_tax)
+                  from store_sales
+                  where ss_quantity between 61 and 80) end bucket4,
+       case when (select count(*)
+                  from store_sales
+                  where ss_quantity between 81 and 100) > 21216
+            then (select avg(ss_ext_tax)
+                  from store_sales
+                  where ss_quantity between 81 and 100)
+            else (select avg(ss_net_paid_inc_tax)
+                  from store_sales
+                  where ss_quantity between 81 and 100) end bucket5
+from reason
+where r_reason_sk = 1
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:25~1:30) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:23~2:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:25~4:28) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:23~5:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(7:25~7:28) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:23~8:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(10:25~10:30) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(11:23~11:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(13:25~13:28) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(14:23~14:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(16:25~16:28) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(17:23~17:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(19:25~19:30) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(20:23~20:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(22:25~22:28) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(23:23~23:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(25:25~25:28) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(26:23~26:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(28:25~28:30) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(29:23~29:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(31:25~31:28) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(32:23~32:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(34:25~34:28) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(35:23~35:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(37:25~37:30) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(38:23~38:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(40:25~40:28) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(41:23~41:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(43:25~43:28) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(44:23~44:34) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(46:5~46:11) /test/1/catalog1/schema1/reason/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0035]
+sql:
+select  cast(amc as decimal(15,4))/cast(pmc as decimal(15,4)) am_pm_ratio
+ from ( select count(*) amc
+       from web_sales, household_demographics , time_dim, web_page
+       where ws_sold_time_sk = time_dim.t_time_sk
+         and ws_ship_hdemo_sk = household_demographics.hd_demo_sk
+         and ws_web_page_sk = web_page.wp_web_page_sk
+         and time_dim.t_hour between 12 and 12+1
+         and household_demographics.hd_dep_count = 6
+         and web_page.wp_char_count between 5000 and 5200) at,
+      ( select count(*) pmc
+       from web_sales, household_demographics , time_dim, web_page
+       where ws_sold_time_sk = time_dim.t_time_sk
+         and ws_ship_hdemo_sk = household_demographics.hd_demo_sk
+         and ws_web_page_sk = web_page.wp_web_page_sk
+         and time_dim.t_hour between 14 and 14+1
+         and household_demographics.hd_dep_count = 6
+         and web_page.wp_char_count between 5000 and 5200) pt
+ order by am_pm_ratio
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:15~2:20) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(3:12~3:21) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:23~3:45) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:48~3:56) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:58~3:66) /test/1/catalog1/schema1/web_page/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(10:15~10:20) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(11:12~11:21) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:23~11:45) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:48~11:56) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:58~11:66) /test/1/catalog1/schema1/web_page/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0036]
+sql:
+select  
+        cc_call_center_id Call_Center,
+        cc_name Call_Center_Name,
+        cc_manager Manager,
+        sum(cr_net_loss) Returns_Loss
+from
+        call_center,
+        catalog_returns,
+        date_dim,
+        customer,
+        customer_address,
+        customer_demographics,
+        household_demographics
+where
+        cr_call_center_sk       = cc_call_center_sk
+and     cr_returned_date_sk     = d_date_sk
+and     cr_returning_customer_sk= c_customer_sk
+and     cd_demo_sk              = c_current_cdemo_sk
+and     hd_demo_sk              = c_current_hdemo_sk
+and     ca_address_sk           = c_current_addr_sk
+and     d_year                  = 2000 
+and     d_moy                   = 12
+and     ( (cd_marital_status       = 'M' and cd_education_status     = 'Unknown')
+        or(cd_marital_status       = 'W' and cd_education_status     = 'Advanced Degree'))
+and     hd_buy_potential like 'Unknown%'
+and     ca_gmt_offset           = -7
+group by cc_call_center_id,cc_name,cc_manager,cd_marital_status,cd_education_status
+order by sum(cr_net_loss) desc;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:8~5:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(7:8~7:19) /test/1/catalog1/schema1/call_center/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:8~8:23) /test/1/catalog1/schema1/catalog_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:8~9:16) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:8~10:16) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:8~11:24) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:8~12:29) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:8~13:30) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(28:9~28:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0037]
+sql:
+select  
+   sum(ws_ext_discount_amt)  as "Excess Discount Amount" 
+from 
+    web_sales 
+   ,item 
+   ,date_dim
+where
+i_manufact_id = 714
+and i_item_sk = ws_item_sk 
+and d_date between '2000-02-01' and 
+        (cast('2000-02-01' as date) + interval 90 day)
+and d_date_sk = ws_sold_date_sk 
+and ws_ext_discount_amt  
+     > ( 
+         SELECT 
+            1.3 * avg(ws_ext_discount_amt) 
+         FROM 
+            web_sales 
+           ,date_dim
+         WHERE 
+              ws_item_sk = i_item_sk 
+          and d_date between '2000-02-01' and
+                             (cast('2000-02-01' as date) + interval 90 day)
+          and d_date_sk = ws_sold_date_sk 
+      ) 
+order by sum(ws_ext_discount_amt)
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:3~2:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(4:4~4:13) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(5:4~5:8) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:4~6:12) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(16:18~16:21) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(18:12~18:21) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(19:12~19:20) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(26:9~26:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0038]
+sql:
+select  ss_customer_sk
+            ,sum(act_sales) sumsales
+      from (select ss_item_sk
+                  ,ss_ticket_number
+                  ,ss_customer_sk
+                  ,case when sr_return_quantity is not null then (ss_quantity-sr_return_quantity)*ss_sales_price
+                                                            else (ss_quantity*ss_sales_price) end act_sales
+            from store_sales left outer join store_returns on (sr_item_sk = ss_item_sk
+                                                               and sr_ticket_number = ss_ticket_number)
+                ,reason
+            where sr_reason_sk = r_reason_sk
+              and r_reason_desc = 'reason 58') t
+      group by ss_customer_sk
+      order by sumsales, ss_customer_sk
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:13~2:16) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(8:17~8:28) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:45~8:58) /test/1/catalog1/schema1/store_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:17~10:23) /test/1/catalog1/schema1/reason/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0039]
+sql:
+select  
+   count(distinct ws_order_number) as "order count"
+  ,sum(ws_ext_ship_cost) as "total shipping cost"
+  ,sum(ws_net_profit) as "total net profit"
+from
+   web_sales ws1
+  ,date_dim
+  ,customer_address
+  ,web_site
+where
+    d_date between '2002-5-01' and 
+           (cast('2002-5-01' as date) + interval 60 day)
+and ws1.ws_ship_date_sk = d_date_sk
+and ws1.ws_ship_addr_sk = ca_address_sk
+and ca_state = 'OK'
+and ws1.ws_web_site_sk = web_site_sk
+and web_company_name = 'pri'
+and exists (select *
+            from web_sales ws2
+            where ws1.ws_order_number = ws2.ws_order_number
+              and ws1.ws_warehouse_sk <> ws2.ws_warehouse_sk)
+and not exists(select *
+               from web_returns wr1
+               where ws1.ws_order_number = wr1.wr_order_number)
+order by count(distinct ws_order_number)
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:3~2:8) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:3~3:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:3~4:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(6:3~6:12) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:3~7:11) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:3~8:19) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:3~9:11) /test/1/catalog1/schema1/web_site/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(19:17~19:26) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(23:20~23:31) /test/1/catalog1/schema1/web_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(25:9~25:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0040]
+sql:
+with ws_wh as
+(select ws1.ws_order_number,ws1.ws_warehouse_sk wh1,ws2.ws_warehouse_sk wh2
+ from web_sales ws1,web_sales ws2
+ where ws1.ws_order_number = ws2.ws_order_number
+   and ws1.ws_warehouse_sk <> ws2.ws_warehouse_sk)
+ select  
+   count(distinct ws_order_number) as "order count"
+  ,sum(ws_ext_ship_cost) as "total shipping cost"
+  ,sum(ws_net_profit) as "total net profit"
+from
+   web_sales ws1
+  ,date_dim
+  ,customer_address
+  ,web_site
+where
+    d_date between '2001-4-01' and 
+           (cast('2001-4-01' as date) + interval 60 day)
+and ws1.ws_ship_date_sk = d_date_sk
+and ws1.ws_ship_addr_sk = ca_address_sk
+and ca_state = 'VA'
+and ws1.ws_web_site_sk = web_site_sk
+and web_company_name = 'pri'
+and ws1.ws_order_number in (select ws_order_number
+                            from ws_wh)
+and ws1.ws_order_number in (select wr_order_number
+                            from web_returns,ws_wh
+                            where wr_order_number = ws_wh.ws_order_number)
+order by count(distinct ws_order_number)
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:6~3:15) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:20~3:29) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(7:3~7:8) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:3~8:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:3~9:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(11:3~11:12) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:3~12:11) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:3~13:19) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(14:3~14:11) /test/1/catalog1/schema1/web_site/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(24:33~24:38) /test/1/catalog1/schema1/ws_wh/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(26:33~26:44) /test/1/catalog1/schema1/web_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(26:45~26:50) /test/1/catalog1/schema1/ws_wh/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(28:9~28:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0041]
+sql:
+select  count(*) 
+from store_sales
+    ,household_demographics 
+    ,time_dim, store
+where ss_sold_time_sk = time_dim.t_time_sk   
+    and ss_hdemo_sk = household_demographics.hd_demo_sk 
+    and ss_store_sk = s_store_sk
+    and time_dim.t_hour = 8
+    and time_dim.t_minute >= 30
+    and household_demographics.hd_dep_count = 0
+    and store.s_store_name = 'ese'
+order by count(*)
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:8~1:13) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(2:5~2:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(3:5~3:27) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:5~4:13) /test/1/catalog1/schema1/time_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:15~4:20) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(12:9~12:14) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0042]
+sql:
+with ssci as (
+select ss_customer_sk customer_sk
+      ,ss_item_sk item_sk
+from store_sales,date_dim
+where ss_sold_date_sk = d_date_sk
+  and d_month_seq between 1199 and 1199 + 11
+group by ss_customer_sk
+        ,ss_item_sk),
+csci as(
+ select cs_bill_customer_sk customer_sk
+      ,cs_item_sk item_sk
+from catalog_sales,date_dim
+where cs_sold_date_sk = d_date_sk
+  and d_month_seq between 1199 and 1199 + 11
+group by cs_bill_customer_sk
+        ,cs_item_sk)
+ select  sum(case when ssci.customer_sk is not null and csci.customer_sk is null then 1 else 0 end) store_only
+      ,sum(case when ssci.customer_sk is null and csci.customer_sk is not null then 1 else 0 end) catalog_only
+      ,sum(case when ssci.customer_sk is not null and csci.customer_sk is not null then 1 else 0 end) store_and_catalog
+from ssci full outer join csci on (ssci.customer_sk=csci.customer_sk
+                               and ssci.item_sk = csci.item_sk)
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(4:5~4:16) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(4:17~4:25) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:5~12:18) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:19~12:27) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(17:9~17:12) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(18:7~18:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(19:7~19:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(20:5~20:9) /test/1/catalog1/schema1/ssci/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(20:26~20:30) /test/1/catalog1/schema1/csci/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0043]
+sql:
+select i_item_id
+      ,i_item_desc 
+      ,i_category 
+      ,i_class 
+      ,i_current_price
+      ,sum(ss_ext_sales_price) as itemrevenue 
+      ,sum(ss_ext_sales_price)*100/sum(sum(ss_ext_sales_price)) over
+          (partition by i_class) as revenueratio
+from	
+	store_sales
+    	,item 
+    	,date_dim
+where 
+	ss_item_sk = i_item_sk 
+  	and i_category in ('Men', 'Sports', 'Jewelry')
+  	and ss_sold_date_sk = d_date_sk
+	and d_date between cast('1999-02-05' as date) 
+				and (cast('1999-02-05' as date) + interval 30 day)
+group by 
+	i_item_id
+        ,i_item_desc 
+        ,i_category
+        ,i_class
+        ,i_current_price
+order by 
+	i_category
+        ,i_class
+        ,i_item_id
+        ,i_item_desc
+        ,revenueratio;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(6:7~6:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:7~7:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:35~7:38) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:39~7:42) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(10:1~10:12) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:6~11:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:6~12:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0044]
+sql:
+select  
+   substr(w_warehouse_name,1,20)
+  ,sm_type
+  ,cc_name
+  ,sum(case when (cs_ship_date_sk - cs_sold_date_sk <= 30 ) then 1 else 0 end)  as "30 days" 
+  ,sum(case when (cs_ship_date_sk - cs_sold_date_sk > 30) and 
+                 (cs_ship_date_sk - cs_sold_date_sk <= 60) then 1 else 0 end )  as "31-60 days" 
+  ,sum(case when (cs_ship_date_sk - cs_sold_date_sk > 60) and 
+                 (cs_ship_date_sk - cs_sold_date_sk <= 90) then 1 else 0 end)  as "61-90 days" 
+  ,sum(case when (cs_ship_date_sk - cs_sold_date_sk > 90) and
+                 (cs_ship_date_sk - cs_sold_date_sk <= 120) then 1 else 0 end)  as "91-120 days" 
+  ,sum(case when (cs_ship_date_sk - cs_sold_date_sk  > 120) then 1 else 0 end)  as ">120 days" 
+from
+   catalog_sales
+  ,warehouse
+  ,ship_mode
+  ,call_center
+  ,date_dim
+where
+    d_month_seq between 1194 and 1194 + 11
+and cs_ship_date_sk   = d_date_sk
+and cs_warehouse_sk   = w_warehouse_sk
+and cs_ship_mode_sk   = sm_ship_mode_sk
+and cs_call_center_sk = cc_call_center_sk
+group by
+   substr(w_warehouse_name,1,20)
+  ,sm_type
+  ,cc_name
+order by substr(w_warehouse_name,1,20)
+        ,sm_type
+        ,cc_name
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(2:3~2:9) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(5:3~5:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(6:3~6:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(8:3~8:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(10:3~10:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(12:3~12:6) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(14:3~14:16) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(15:3~15:12) /test/1/catalog1/schema1/warehouse/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(16:3~16:12) /test/1/catalog1/schema1/ship_mode/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:3~17:14) /test/1/catalog1/schema1/call_center/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:3~18:11) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(26:3~26:9) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(29:9~29:15) /test/1/catalog1/schema1/substr/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0045]
+sql:
+with customer_total_return as
+(select sr_customer_sk as ctr_customer_sk
+,sr_store_sk as ctr_store_sk
+,sum(SR_FEE) as ctr_total_return
+from store_returns
+,date_dim
+where sr_returned_date_sk = d_date_sk
+and d_year =2000
+group by sr_customer_sk
+,sr_store_sk)
+ select  c_customer_id
+from customer_total_return ctr1
+,store
+,customer
+where ctr1.ctr_total_return > (select avg(ctr_total_return)*1.2
+from customer_total_return ctr2
+where ctr1.ctr_store_sk = ctr2.ctr_store_sk)
+and s_store_sk = ctr1.ctr_store_sk
+and s_state = 'SD'
+and ctr1.ctr_customer_sk = c_customer_sk
+order by c_customer_id
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(4:1~4:4) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:5~5:18) /test/1/catalog1/schema1/store_returns/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:1~6:9) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:5~12:26) /test/1/catalog1/schema1/customer_total_return/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:1~13:6) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(14:1~14:9) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(15:38~15:41) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(16:5~16:26) /test/1/catalog1/schema1/customer_total_return/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0046]
+sql:
+select  
+  cd_gender,
+  cd_marital_status,
+  cd_education_status,
+  count(*) cnt1,
+  cd_purchase_estimate,
+  count(*) cnt2,
+  cd_credit_rating,
+  count(*) cnt3,
+  cd_dep_count,
+  count(*) cnt4,
+  cd_dep_employed_count,
+  count(*) cnt5,
+  cd_dep_college_count,
+  count(*) cnt6
+ from
+  customer c,customer_address ca,customer_demographics
+ where
+  c.c_current_addr_sk = ca.ca_address_sk and
+  ca_county in ('Storey County','Marquette County','Warren County','Cochran County','Kandiyohi County') and
+  cd_demo_sk = c.c_current_cdemo_sk and 
+  exists (select *
+          from store_sales,date_dim
+          where c.c_customer_sk = ss_customer_sk and
+                ss_sold_date_sk = d_date_sk and
+                d_year = 2001 and
+                d_moy between 1 and 1+3) and
+   (exists (select *
+            from web_sales,date_dim
+            where c.c_customer_sk = ws_bill_customer_sk and
+                  ws_sold_date_sk = d_date_sk and
+                  d_year = 2001 and
+                  d_moy between 1 ANd 1+3) or 
+    exists (select * 
+            from catalog_sales,date_dim
+            where c.c_customer_sk = cs_ship_customer_sk and
+                  cs_sold_date_sk = d_date_sk and
+                  d_year = 2001 and
+                  d_moy between 1 and 1+3))
+ group by cd_gender,
+          cd_marital_status,
+          cd_education_status,
+          cd_purchase_estimate,
+          cd_credit_rating,
+          cd_dep_count,
+          cd_dep_employed_count,
+          cd_dep_college_count
+ order by cd_gender,
+          cd_marital_status,
+          cd_education_status,
+          cd_purchase_estimate,
+          cd_credit_rating,
+          cd_dep_count,
+          cd_dep_employed_count,
+          cd_dep_college_count
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(5:2~5:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:2~7:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(9:2~9:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(11:2~11:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(13:2~13:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(15:2~15:7) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(17:2~17:10) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:13~17:29) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:33~17:54) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(23:15~23:26) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(23:27~23:35) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:17~29:26) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:27~29:35) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(35:17~35:30) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(35:31~35:39) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0047]
+sql:
+with year_total as (
+ select c_customer_id customer_id
+       ,c_first_name customer_first_name
+       ,c_last_name customer_last_name
+       ,c_preferred_cust_flag customer_preferred_cust_flag
+       ,c_birth_country customer_birth_country
+       ,c_login customer_login
+       ,c_email_address customer_email_address
+       ,d_year dyear
+       ,sum(ss_ext_list_price-ss_ext_discount_amt) year_total
+       ,'s' sale_type
+ from customer
+     ,store_sales
+     ,date_dim
+ where c_customer_sk = ss_customer_sk
+   and ss_sold_date_sk = d_date_sk
+ group by c_customer_id
+         ,c_first_name
+         ,c_last_name
+         ,c_preferred_cust_flag 
+         ,c_birth_country
+         ,c_login
+         ,c_email_address
+         ,d_year 
+ union all
+ select c_customer_id customer_id
+       ,c_first_name customer_first_name
+       ,c_last_name customer_last_name
+       ,c_preferred_cust_flag customer_preferred_cust_flag
+       ,c_birth_country customer_birth_country
+       ,c_login customer_login
+       ,c_email_address customer_email_address
+       ,d_year dyear
+       ,sum(ws_ext_list_price-ws_ext_discount_amt) year_total
+       ,'w' sale_type
+ from customer
+     ,web_sales
+     ,date_dim
+ where c_customer_sk = ws_bill_customer_sk
+   and ws_sold_date_sk = d_date_sk
+ group by c_customer_id
+         ,c_first_name
+         ,c_last_name
+         ,c_preferred_cust_flag 
+         ,c_birth_country
+         ,c_login
+         ,c_email_address
+         ,d_year
+         )
+  select  
+                  t_s_secyear.customer_id
+                 ,t_s_secyear.customer_first_name
+                 ,t_s_secyear.customer_last_name
+                 ,t_s_secyear.customer_birth_country
+ from year_total t_s_firstyear
+     ,year_total t_s_secyear
+     ,year_total t_w_firstyear
+     ,year_total t_w_secyear
+ where t_s_secyear.customer_id = t_s_firstyear.customer_id
+         and t_s_firstyear.customer_id = t_w_secyear.customer_id
+         and t_s_firstyear.customer_id = t_w_firstyear.customer_id
+         and t_s_firstyear.sale_type = 's'
+         and t_w_firstyear.sale_type = 'w'
+         and t_s_secyear.sale_type = 's'
+         and t_w_secyear.sale_type = 'w'
+         and t_s_firstyear.dyear = 2001
+         and t_s_secyear.dyear = 2001+1
+         and t_w_firstyear.dyear = 2001
+         and t_w_secyear.dyear = 2001+1
+         and t_s_firstyear.year_total > 0
+         and t_w_firstyear.year_total > 0
+         and case when t_w_firstyear.year_total > 0 then t_w_secyear.year_total / t_w_firstyear.year_total else 0.0 end
+             > case when t_s_firstyear.year_total > 0 then t_s_secyear.year_total / t_s_firstyear.year_total else 0.0 end
+ order by t_s_secyear.customer_id
+         ,t_s_secyear.customer_first_name
+         ,t_s_secyear.customer_last_name
+         ,t_s_secyear.customer_birth_country
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(10:8~10:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(12:6~12:14) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(13:6~13:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(14:6~14:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(34:8~34:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(36:6~36:14) /test/1/catalog1/schema1/customer/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(37:6~37:15) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(38:6~38:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(55:6~55:16) /test/1/catalog1/schema1/year_total/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(56:6~56:16) /test/1/catalog1/schema1/year_total/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(57:6~57:16) /test/1/catalog1/schema1/year_total/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(58:6~58:16) /test/1/catalog1/schema1/year_total/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0048]
+sql:
+select  i_item_id
+      ,i_item_desc 
+      ,i_category 
+      ,i_class 
+      ,i_current_price
+      ,sum(ws_ext_sales_price) as itemrevenue 
+      ,sum(ws_ext_sales_price)*100/sum(sum(ws_ext_sales_price)) over
+          (partition by i_class) as revenueratio
+from	
+	web_sales
+    	,item 
+    	,date_dim
+where 
+	ws_item_sk = i_item_sk 
+  	and i_category in ('Books', 'Sports', 'Men')
+  	and ws_sold_date_sk = d_date_sk
+	and d_date between cast('1998-04-06' as date) 
+				and (cast('1998-04-06' as date) + interval 30 day)
+group by 
+	i_item_id
+        ,i_item_desc 
+        ,i_category
+        ,i_class
+        ,i_current_price
+order by 
+	i_category
+        ,i_class
+        ,i_item_id
+        ,i_item_desc
+        ,revenueratio
+limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(6:7~6:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:7~7:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:35~7:38) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(7:39~7:42) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(10:1~10:10) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(11:6~11:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(12:6~12:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0049]
+sql:
+select avg(ss_quantity)
+       ,avg(ss_ext_sales_price)
+       ,avg(ss_ext_wholesale_cost)
+       ,sum(ss_ext_wholesale_cost)
+ from store_sales
+     ,store
+     ,customer_demographics
+     ,household_demographics
+     ,customer_address
+     ,date_dim
+ where s_store_sk = ss_store_sk
+ and  ss_sold_date_sk = d_date_sk and d_year = 2001
+ and((ss_hdemo_sk=hd_demo_sk
+  and cd_demo_sk = ss_cdemo_sk
+  and cd_marital_status = 'D'
+  and cd_education_status = 'Unknown'
+  and ss_sales_price between 100.00 and 150.00
+  and hd_dep_count = 3   
+     )or
+     (ss_hdemo_sk=hd_demo_sk
+  and cd_demo_sk = ss_cdemo_sk
+  and cd_marital_status = 'S'
+  and cd_education_status = 'College'
+  and ss_sales_price between 50.00 and 100.00   
+  and hd_dep_count = 1
+     ) or 
+     (ss_hdemo_sk=hd_demo_sk
+  and cd_demo_sk = ss_cdemo_sk
+  and cd_marital_status = 'M'
+  and cd_education_status = '4 yr Degree'
+  and ss_sales_price between 150.00 and 200.00 
+  and hd_dep_count = 1  
+     ))
+ and((ss_addr_sk = ca_address_sk
+  and ca_country = 'United States'
+  and ca_state in ('SD', 'KS', 'MI')
+  and ss_net_profit between 100 and 200  
+     ) or
+     (ss_addr_sk = ca_address_sk
+  and ca_country = 'United States'
+  and ca_state in ('MO', 'ND', 'CO')
+  and ss_net_profit between 150 and 300  
+     ) or
+     (ss_addr_sk = ca_address_sk
+  and ca_country = 'United States'
+  and ca_state in ('NH', 'OH', 'TX')
+  and ss_net_profit between 50 and 250  
+     ))
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:10) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(2:8~2:11) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(3:8~3:11) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(4:8~4:11) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(5:6~5:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(6:6~6:11) /test/1/catalog1/schema1/store/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:6~7:27) /test/1/catalog1/schema1/customer_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:6~8:28) /test/1/catalog1/schema1/household_demographics/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:6~9:22) /test/1/catalog1/schema1/customer_address/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(10:6~10:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_source_files_select_024__select__0050]
+sql:
+with  cross_items as
+ (select i_item_sk ss_item_sk
+ from item,
+ (select iss.i_brand_id brand_id
+     ,iss.i_class_id class_id
+     ,iss.i_category_id category_id
+ from store_sales
+     ,item iss
+     ,date_dim d1
+ where ss_item_sk = iss.i_item_sk
+   and ss_sold_date_sk = d1.d_date_sk
+   and d1.d_year between 2000 AND 2000 + 2
+ intersect 
+ select ics.i_brand_id
+     ,ics.i_class_id
+     ,ics.i_category_id
+ from catalog_sales
+     ,item ics
+     ,date_dim d2
+ where cs_item_sk = ics.i_item_sk
+   and cs_sold_date_sk = d2.d_date_sk
+   and d2.d_year between 2000 AND 2000 + 2
+ intersect
+ select iws.i_brand_id
+     ,iws.i_class_id
+     ,iws.i_category_id
+ from web_sales
+     ,item iws
+     ,date_dim d3
+ where ws_item_sk = iws.i_item_sk
+   and ws_sold_date_sk = d3.d_date_sk
+   and d3.d_year between 2000 AND 2000 + 2)
+ t where i_brand_id = brand_id
+      and i_class_id = class_id
+      and i_category_id = category_id
+),
+ avg_sales as
+ (select avg(quantity*list_price) average_sales
+  from (select ss_quantity quantity
+             ,ss_list_price list_price
+       from store_sales
+           ,date_dim
+       where ss_sold_date_sk = d_date_sk
+         and d_year between 2000 and 2000 + 2
+       union all 
+       select cs_quantity quantity 
+             ,cs_list_price list_price
+       from catalog_sales
+           ,date_dim
+       where cs_sold_date_sk = d_date_sk
+         and d_year between 2000 and 2000 + 2 
+       union all
+       select ws_quantity quantity
+             ,ws_list_price list_price
+       from web_sales
+           ,date_dim
+       where ws_sold_date_sk = d_date_sk
+         and d_year between 2000 and 2000 + 2) x)
+  select  channel, i_brand_id,i_class_id,i_category_id,sum(sales), sum(number_sales)
+ from(
+       select 'store' channel, i_brand_id,i_class_id
+             ,i_category_id,sum(ss_quantity*ss_list_price) sales
+             , count(*) number_sales
+       from store_sales
+           ,item
+           ,date_dim
+       where ss_item_sk in (select ss_item_sk from cross_items)
+         and ss_item_sk = i_item_sk
+         and ss_sold_date_sk = d_date_sk
+         and d_year = 2000+2 
+         and d_moy = 11
+       group by i_brand_id,i_class_id,i_category_id
+       having sum(ss_quantity*ss_list_price) > (select average_sales from avg_sales)
+       union all
+       select 'catalog' channel, i_brand_id,i_class_id,i_category_id, sum(cs_quantity*cs_list_price) sales, count(*) number_sales
+       from catalog_sales
+           ,item
+           ,date_dim
+       where cs_item_sk in (select ss_item_sk from cross_items)
+         and cs_item_sk = i_item_sk
+         and cs_sold_date_sk = d_date_sk
+         and d_year = 2000+2 
+         and d_moy = 11
+       group by i_brand_id,i_class_id,i_category_id
+       having sum(cs_quantity*cs_list_price) > (select average_sales from avg_sales)
+       union all
+       select 'web' channel, i_brand_id,i_class_id,i_category_id, sum(ws_quantity*ws_list_price) sales , count(*) number_sales
+       from web_sales
+           ,item
+           ,date_dim
+       where ws_item_sk in (select ss_item_sk from cross_items)
+         and ws_item_sk = i_item_sk
+         and ws_sold_date_sk = d_date_sk
+         and d_year = 2000+2
+         and d_moy = 11
+       group by i_brand_id,i_class_id,i_category_id
+       having sum(ws_quantity*ws_list_price) > (select average_sales from avg_sales)
+ ) y
+ group by rollup (channel, i_brand_id,i_class_id,i_category_id)
+ order by channel,i_brand_id,i_class_id,i_category_id
+ limit 100;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:6~3:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(7:6~7:17) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(8:6~8:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(9:6~9:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(17:6~17:19) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(18:6~18:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(19:6~19:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(27:6~27:15) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(28:6~28:10) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(29:6~29:14) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(38:9~38:12) /test/1/catalog1/schema1/avg/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(41:12~41:23) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(42:12~42:20) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(48:12~48:25) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(49:12~49:20) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(55:12~55:21) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(56:12~56:20) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(59:55~59:58) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(59:67~59:70) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(62:28~62:31) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(63:15~63:20) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(64:12~64:23) /test/1/catalog1/schema1/store_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(65:12~65:16) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(66:12~66:20) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(67:51~67:62) /test/1/catalog1/schema1/cross_items/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(73:14~73:17) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(73:74~73:83) /test/1/catalog1/schema1/avg_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(75:70~75:73) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(75:108~75:113) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(76:12~76:25) /test/1/catalog1/schema1/catalog_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(77:12~77:16) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(78:12~78:20) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(79:51~79:62) /test/1/catalog1/schema1/cross_items/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(85:14~85:17) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(85:74~85:83) /test/1/catalog1/schema1/avg_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(87:66~87:69) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(87:105~87:110) /test/1/catalog1/schema1/count/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(88:12~88:21) /test/1/catalog1/schema1/web_sales/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(89:12~89:16) /test/1/catalog1/schema1/item/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(90:12~90:20) /test/1/catalog1/schema1/date_dim/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Table(91:51~91:62) /test/1/catalog1/schema1/cross_items/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(97:14~97:17) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(97:74~97:83) /test/1/catalog1/schema1/avg_sales/",
+      "action" : "READ"
+    }
+  ]
+}

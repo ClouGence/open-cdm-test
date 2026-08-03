@@ -1,0 +1,554 @@
+CREATE SUBSCRIPTION regress_testsub2 CONNECTION 'dbname=regress_doesnotexist' PUBLICATION testpub WITH (connect = false, enabled = true)
+;
+ALTER TEXT SEARCH CONFIGURATION romanian ADD MAPPING
+    FOR word, hword_part, hword
+	WITH romanian_stem
+;
+CREATE FUNCTION uuid_local_admin_bit(uuid) RETURNS bool AS
+$$ SELECT (('x' || substr($1::text, 25, 2))::bit(8) & '00000010') != '00000000' $$
+LANGUAGE SQL STRICT IMMUTABLE
+;
+alter view base_tab_view alter column c set default 'View default'
+;
+/*
+ * 6.31
+ * ELEMENT_TYPES view
+ */
+
+CREATE VIEW element_types AS
+    SELECT CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST(n.nspname AS sql_identifier) AS object_schema,
+           CAST(x.objname AS sql_identifier) AS object_name,
+           CAST(x.objtype AS character_data) AS object_type,
+           CAST(x.objdtdid AS sql_identifier) AS collection_type_identifier,
+           CAST(
+             CASE WHEN nbt.nspname = 'pg_catalog' THEN format_type(bt.oid, null)
+                  ELSE 'USER-DEFINED' END AS character_data) AS data_type,
+
+           CAST(null AS cardinal_number) AS character_maximum_length,
+           CAST(null AS cardinal_number) AS character_octet_length,
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+           CAST(null AS cardinal_number) AS numeric_precision,
+           CAST(null AS cardinal_number) AS numeric_precision_radix,
+           CAST(null AS cardinal_number) AS numeric_scale,
+           CAST(null AS cardinal_number) AS datetime_precision,
+           CAST(null AS character_data) AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(null AS character_data) AS domain_default, -- XXX maybe a bug in the standard
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nbt.nspname AS sql_identifier) AS udt_schema,
+           CAST(bt.typname AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST('a' || CAST(x.objdtdid AS text) AS sql_identifier) AS dtd_identifier
+
+    FROM pg_namespace n, pg_type at, pg_namespace nbt, pg_type bt,
+         (
+           /* columns, attributes */
+           SELECT c.relnamespace, CAST(c.relname AS sql_identifier),
+                  CASE WHEN c.relkind = 'c' THEN 'USER-DEFINED TYPE'::text ELSE 'TABLE'::text END,
+                  a.attnum, a.atttypid, a.attcollation
+           FROM pg_class c, pg_attribute a
+           WHERE c.oid = a.attrelid
+                 AND c.relkind IN ('r', 'v', 'f', 'c', 'p')
+                 AND attnum > 0 AND NOT attisdropped
+
+           UNION ALL
+
+           /* domains */
+           SELECT t.typnamespace, CAST(t.typname AS sql_identifier),
+                  'DOMAIN'::text, 1, t.typbasetype, t.typcollation
+           FROM pg_type t
+           WHERE t.typtype = 'd'
+
+           UNION ALL
+
+           /* parameters */
+           SELECT pronamespace,
+                  CAST(nameconcatoid(proname, oid) AS sql_identifier),
+                  'ROUTINE'::text, (ss.x).n, (ss.x).x, 0
+           FROM (SELECT p.pronamespace, p.proname, p.oid,
+                        _pg_expandarray(coalesce(p.proallargtypes, p.proargtypes::oid[])) AS x
+                 FROM pg_proc p) AS ss
+
+           UNION ALL
+
+           /* result types */
+           SELECT p.pronamespace,
+                  CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier),
+                  'ROUTINE'::text, 0, p.prorettype, 0
+           FROM pg_proc p
+
+         ) AS x (objschema, objname, objtype, objdtdid, objtypeid, objcollation)
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON x.objcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+
+    WHERE n.oid = x.objschema
+          AND at.oid = x.objtypeid
+          AND (at.typelem <> 0 AND at.typlen = -1)
+          AND at.typelem = bt.oid
+          AND nbt.oid = bt.typnamespace
+
+          AND (n.nspname, x.objname, x.objtype, CAST(x.objdtdid AS sql_identifier)) IN
+              ( SELECT object_schema, object_name, object_type, dtd_identifier
+                    FROM data_type_privileges )
+;
+CREATE TABLE base_tbl3 (a int, b int, c text)
+;
+VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_index
+;
+-- Index, fails with incorrect relation type
+CREATE INDEX tid_ind ON tid_tab(a)
+;
+CREATE SUBSCRIPTION sub1 CONNECTION 'port=15683 host=/tmp/7RF1JxeTxg dbname=postgres' PUBLICATION pub1
+;
+CREATE FUNCTION voidtest5(a int) RETURNS SETOF VOID LANGUAGE SQL AS
+$$ SELECT generate_series(1, a) $$ STABLE
+;
+ALTER TABLE attmp ADD COLUMN i char
+;
+create table idxpart22 partition of idxpart2 for values from (200) to (300)
+;
+CREATE FUNCTION transition_table_level1_ri_parent_del_func()
+  RETURNS TRIGGER
+  LANGUAGE plpgsql
+AS $$
+  DECLARE n bigint;
+  BEGIN
+    PERFORM FROM p JOIN transition_table_level2 c ON c.parent_no = p.level1_no;
+    IF FOUND THEN
+      RAISE EXCEPTION 'RI error';
+    END IF;
+    RETURN NULL;
+  END;
+$$
+;
+CREATE SUBSCRIPTION regress_testsub CONNECTION 'dbname=regress_doesnotexist' PUBLICATION testpub WITH (connect = false, disable_on_error = false)
+;
+drop function trigger_ddl_func()
+;
+CREATE TABLE "S 1"."T 4" (
+	c1 int NOT NULL,
+	c2 int NOT NULL,
+	c3 text,
+	CONSTRAINT t4_pkey PRIMARY KEY (c1)
+)
+;
+create table part_ee_ff3_1 partition of part_ee_ff3 for values from (20) to (25)
+;
+ALTER FOREIGN TABLE ft1 DROP CONSTRAINT ft1_c2positive
+;
+alter table tpart attach partition tpart_2 for values from (100) to (200)
+;
+ANALYZE public.gtest26
+;
+CREATE FUNCTION priv_testfunc6a(b int) RETURNS priv_testdomain1 LANGUAGE SQL AS $$ SELECT $1::priv_testdomain1 $$
+;
+alter table idxpart drop constraint idxpart_pkey
+;
+CREATE TABLE list_parted (
+	a text,
+	b int
+) PARTITION BY list (a)
+;
+DROP TABLE prt3_adv
+;
+DROP TABLE IF EXISTS split_table_idx.hash_part
+;
+create type digit as enum ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
+;
+CREATE TRIGGER parent_tbl_insert_trig
+  AFTER INSERT ON parent_tbl REFERENCING NEW TABLE AS new_table
+  FOR EACH STATEMENT EXECUTE PROCEDURE trigger_func()
+;
+alter table tt2 drop column d
+;
+CREATE TEMP TABLE pg_temp_14.pg_temp_26714_2 (tid pg_catalog.tid)
+;
+CREATE TEXT SEARCH DICTIONARY dump_test.alt_ts_dict1 (template=simple)
+;
+-- fails
+DROP VIEW tid_view_no_ctid
+;
+CREATE DOMAIN "public"."mynums2" AS "public"."mynums"
+;
+alter table abc add unique(name)
+;
+CREATE TABLE ab1 (a INTEGER, b INTEGER)
+;
+do $$
+begin
+  <<outermostwhile>>
+  while 1 > 0 loop
+    <<outerwhile>>
+    while 1 > 0 loop
+      <<innerwhile>>
+      while 1 > 0 loop
+        exit;
+        raise notice 'should not get here';
+      end loop;
+      raise notice 'should get here';
+      exit outermostwhile;
+      raise notice 'should not get here, either';
+    end loop;
+    raise notice 'nor here';
+  end loop;
+  raise notice 'should get here, too';
+end$$
+;
+create table join_pt1p1 partition of join_pt1 for values from (0) to (100) partition by range(b)
+;
+DROP TABLE gtest23b
+;
+CREATE PUBLICATION regress_pub5 FOR TABLE tab_upgraded2
+;
+CREATE TABLE spoolme AS SELECT g.i FROM generate_series(1, 5000) g(i)
+;
+ANALYZE public.prt1_e_p2
+;
+CREATE OR REPLACE FUNCTION test_slru_delete_all() RETURNS VOID
+  AS 'MODULE_PATHNAME', 'test_slru_delete_all' LANGUAGE C
+;
+-- no such index
+drop index nonesuch
+;
+-- similar case, but with a self-referencing FK so that parent and child
+-- rows can be affected by a single operation
+
+create temp table self_ref_trigger (
+    id int primary key,
+    parent int references self_ref_trigger,
+    data text,
+    nchildren int not null default 0
+)
+;
+ALTER TABLE temporal_mltrng3 DROP CONSTRAINT temporal_mltrng3_uq
+;
+create table family ( name char ( 8 ) , born integer , age smallint , married date , children integer )
+;
+DROP TRIGGER trig_row_after_delete ON rem1
+;
+ALTER TABLE dump_test.test_table ALTER COLUMN col2 SET STORAGE EXTERNAL
+;
+ALTER TABLE no_index_cleanup SET (vacuum_index_cleanup = false)
+;
+drop table mc3p
+;
+-- check that non-matching collations for partition bound
+-- expressions are coerced to the right collation
+
+create table test_part_coll_posix (a text) partition by range (a collate "POSIX")
+;
+------------------------------------------------------------------------------------------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION regress_testsub2 CONNECTION 'dbname=regress_doesnotexist' PUBLICATION testpub WITH (connect = false, enabled = true)
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION romanian ADD MAPPING
+    FOR word, hword_part, hword
+	WITH romanian_stem
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION uuid_local_admin_bit(uuid) RETURNS bool AS
+$$ SELECT (('x' || substr($1::text, 25, 2))::bit(8) & '00000010') != '00000000' $$
+LANGUAGE SQL STRICT IMMUTABLE
+;
+----------
+[ALTER_VIEW|ALTER_COLUMN] alter view base_tab_view alter column c set default 'View default'
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 6.31
+ * ELEMENT_TYPES view
+ */
+
+CREATE VIEW element_types AS
+    SELECT CAST(current_database() AS sql_identifier) AS object_catalog,
+           CAST(n.nspname AS sql_identifier) AS object_schema,
+           CAST(x.objname AS sql_identifier) AS object_name,
+           CAST(x.objtype AS character_data) AS object_type,
+           CAST(x.objdtdid AS sql_identifier) AS collection_type_identifier,
+           CAST(
+             CASE WHEN nbt.nspname = 'pg_catalog' THEN format_type(bt.oid, null)
+                  ELSE 'USER-DEFINED' END AS character_data) AS data_type,
+
+           CAST(null AS cardinal_number) AS character_maximum_length,
+           CAST(null AS cardinal_number) AS character_octet_length,
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+           CAST(null AS cardinal_number) AS numeric_precision,
+           CAST(null AS cardinal_number) AS numeric_precision_radix,
+           CAST(null AS cardinal_number) AS numeric_scale,
+           CAST(null AS cardinal_number) AS datetime_precision,
+           CAST(null AS character_data) AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(null AS character_data) AS domain_default, -- XXX maybe a bug in the standard
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nbt.nspname AS sql_identifier) AS udt_schema,
+           CAST(bt.typname AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST('a' || CAST(x.objdtdid AS text) AS sql_identifier) AS dtd_identifier
+
+    FROM pg_namespace n, pg_type at, pg_namespace nbt, pg_type bt,
+         (
+           /* columns, attributes */
+           SELECT c.relnamespace, CAST(c.relname AS sql_identifier),
+                  CASE WHEN c.relkind = 'c' THEN 'USER-DEFINED TYPE'::text ELSE 'TABLE'::text END,
+                  a.attnum, a.atttypid, a.attcollation
+           FROM pg_class c, pg_attribute a
+           WHERE c.oid = a.attrelid
+                 AND c.relkind IN ('r', 'v', 'f', 'c', 'p')
+                 AND attnum > 0 AND NOT attisdropped
+
+           UNION ALL
+
+           /* domains */
+           SELECT t.typnamespace, CAST(t.typname AS sql_identifier),
+                  'DOMAIN'::text, 1, t.typbasetype, t.typcollation
+           FROM pg_type t
+           WHERE t.typtype = 'd'
+
+           UNION ALL
+
+           /* parameters */
+           SELECT pronamespace,
+                  CAST(nameconcatoid(proname, oid) AS sql_identifier),
+                  'ROUTINE'::text, (ss.x).n, (ss.x).x, 0
+           FROM (SELECT p.pronamespace, p.proname, p.oid,
+                        _pg_expandarray(coalesce(p.proallargtypes, p.proargtypes::oid[])) AS x
+                 FROM pg_proc p) AS ss
+
+           UNION ALL
+
+           /* result types */
+           SELECT p.pronamespace,
+                  CAST(nameconcatoid(p.proname, p.oid) AS sql_identifier),
+                  'ROUTINE'::text, 0, p.prorettype, 0
+           FROM pg_proc p
+
+         ) AS x (objschema, objname, objtype, objdtdid, objtypeid, objcollation)
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON x.objcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+
+    WHERE n.oid = x.objschema
+          AND at.oid = x.objtypeid
+          AND (at.typelem <> 0 AND at.typlen = -1)
+          AND at.typelem = bt.oid
+          AND nbt.oid = bt.typnamespace
+
+          AND (n.nspname, x.objname, x.objtype, CAST(x.objdtdid AS sql_identifier)) IN
+              ( SELECT object_schema, object_name, object_type, dtd_identifier
+                    FROM data_type_privileges )
+;
+----------
+[CREATE_TABLE] CREATE TABLE base_tbl3 (a int, b int, c text)
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_index
+;
+----------
+[ADD_INDEX] -- Index, fails with incorrect relation type
+CREATE INDEX tid_ind ON tid_tab(a)
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION sub1 CONNECTION 'port=15683 host=/tmp/7RF1JxeTxg dbname=postgres' PUBLICATION pub1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION voidtest5(a int) RETURNS SETOF VOID LANGUAGE SQL AS
+$$ SELECT generate_series(1, a) $$ STABLE
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE attmp ADD COLUMN i char
+;
+----------
+[CREATE_TABLE] create table idxpart22 partition of idxpart2 for values from (200) to (300)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION transition_table_level1_ri_parent_del_func()
+  RETURNS TRIGGER
+  LANGUAGE plpgsql
+AS $$
+  DECLARE n bigint;
+  BEGIN
+    PERFORM FROM p JOIN transition_table_level2 c ON c.parent_no = p.level1_no;
+    IF FOUND THEN
+      RAISE EXCEPTION 'RI error';
+    END IF;
+    RETURN NULL;
+  END;
+$$
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION regress_testsub CONNECTION 'dbname=regress_doesnotexist' PUBLICATION testpub WITH (connect = false, disable_on_error = false)
+;
+----------
+[DROP_PROG_OBJ] drop function trigger_ddl_func()
+;
+----------
+[CREATE_TABLE] CREATE TABLE "S 1"."T 4" (
+	c1 int NOT NULL,
+	c2 int NOT NULL,
+	c3 text,
+	CONSTRAINT t4_pkey PRIMARY KEY (c1)
+)
+;
+----------
+[CREATE_TABLE] create table part_ee_ff3_1 partition of part_ee_ff3 for values from (20) to (25)
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] ALTER FOREIGN TABLE ft1 DROP CONSTRAINT ft1_c2positive
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] alter table tpart attach partition tpart_2 for values from (100) to (200)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.gtest26
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION priv_testfunc6a(b int) RETURNS priv_testdomain1 LANGUAGE SQL AS $$ SELECT $1::priv_testdomain1 $$
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] alter table idxpart drop constraint idxpart_pkey
+;
+----------
+[CREATE_TABLE] CREATE TABLE list_parted (
+	a text,
+	b int
+) PARTITION BY list (a)
+;
+----------
+[DROP_TABLE] DROP TABLE prt3_adv
+;
+----------
+[DROP_TABLE] DROP TABLE IF EXISTS split_table_idx.hash_part
+;
+----------
+[CREATE_TYPE] create type digit as enum ('0', '1', '2', '3', '4', '5', '6', '7', '8', '9')
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] CREATE TRIGGER parent_tbl_insert_trig
+  AFTER INSERT ON parent_tbl REFERENCING NEW TABLE AS new_table
+  FOR EACH STATEMENT EXECUTE PROCEDURE trigger_func()
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] alter table tt2 drop column d
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE pg_temp_14.pg_temp_26714_2 (tid pg_catalog.tid)
+;
+----------
+[CREATE_POLICY] CREATE TEXT SEARCH DICTIONARY dump_test.alt_ts_dict1 (template=simple)
+;
+----------
+[DROP_VIEW] -- fails
+DROP VIEW tid_view_no_ctid
+;
+----------
+[CREATE_TYPE] CREATE DOMAIN "public"."mynums2" AS "public"."mynums"
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table abc add unique(name)
+;
+----------
+[CREATE_TABLE] CREATE TABLE ab1 (a INTEGER, b INTEGER)
+;
+----------
+[BLOCK] do $$
+begin
+  <<outermostwhile>>
+  while 1 > 0 loop
+    <<outerwhile>>
+    while 1 > 0 loop
+      <<innerwhile>>
+      while 1 > 0 loop
+        exit;
+        raise notice 'should not get here';
+      end loop;
+      raise notice 'should get here';
+      exit outermostwhile;
+      raise notice 'should not get here, either';
+    end loop;
+    raise notice 'nor here';
+  end loop;
+  raise notice 'should get here, too';
+end$$
+;
+----------
+[CREATE_TABLE] create table join_pt1p1 partition of join_pt1 for values from (0) to (100) partition by range(b)
+;
+----------
+[DROP_TABLE] DROP TABLE gtest23b
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION regress_pub5 FOR TABLE tab_upgraded2
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE spoolme AS SELECT g.i FROM generate_series(1, 5000) g(i)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.prt1_e_p2
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION test_slru_delete_all() RETURNS VOID
+  AS 'MODULE_PATHNAME', 'test_slru_delete_all' LANGUAGE C
+;
+----------
+[DROP_INDEX] -- no such index
+drop index nonesuch
+;
+----------
+[CREATE_TABLE] -- similar case, but with a self-referencing FK so that parent and child
+-- rows can be affected by a single operation
+
+create temp table self_ref_trigger (
+    id int primary key,
+    parent int references self_ref_trigger,
+    data text,
+    nchildren int not null default 0
+)
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] ALTER TABLE temporal_mltrng3 DROP CONSTRAINT temporal_mltrng3_uq
+;
+----------
+[CREATE_TABLE] create table family ( name char ( 8 ) , born integer , age smallint , married date , children integer )
+;
+----------
+[DROP_TRIGGER] DROP TRIGGER trig_row_after_delete ON rem1
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE dump_test.test_table ALTER COLUMN col2 SET STORAGE EXTERNAL
+;
+----------
+[ALTER_TABLE] ALTER TABLE no_index_cleanup SET (vacuum_index_cleanup = false)
+;
+----------
+[DROP_TABLE] drop table mc3p
+;
+----------
+[CREATE_TABLE] -- check that non-matching collations for partition bound
+-- expressions are coerced to the right collation
+
+create table test_part_coll_posix (a text) partition by range (a collate "POSIX")
+;

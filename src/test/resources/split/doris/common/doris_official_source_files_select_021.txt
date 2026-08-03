@@ -1,0 +1,823 @@
+SELECT
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 2) AS ratio
+FROM
+(
+    SELECT
+        cast(repo["name"] as string),
+        CASE WHEN type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE type IN ('ForkEvent', 'WatchEvent')
+) t
+;
+SELECT
+    sum(forks) AS forks,
+    sum(stars) AS stars,
+    round(sum(stars) / sum(forks), 2) AS ratio
+FROM
+(
+    SELECT
+        sum(fork) AS forks,
+        sum(star) AS stars
+    FROM
+    (
+        SELECT
+            cast(repo["name"] as string) as repo_name,
+            CASE WHEN type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+            CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+        FROM github_events
+        WHERE type IN ('ForkEvent', 'WatchEvent')
+    ) t
+    GROUP BY repo_name
+    HAVING stars > 10
+) t2
+;
+SELECT
+    repo_name,
+    sum(num_star) AS num_stars,
+    sum(num_comment) AS num_comments
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS num_star,
+        CASE WHEN lower(cast(payload["comment"]["body"] as string)) LIKE '%apache%' THEN 1 ELSE 0 END AS num_comment
+    FROM github_events
+    WHERE (lower(cast(payload["comment"]["body"] as string)) LIKE '%apache%') OR (type = 'WatchEvent')
+) t
+GROUP BY repo_name 
+HAVING num_comments > 0
+ORDER BY num_stars DESC,num_comments DESC, repo_name ASC
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(created_at_2022) AS stars2022,
+    sum(created_at_2015) AS stars2015,
+    cast(round(sum(created_at_2022) / sum(created_at_2015), 0) as int) AS yoy
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE year(created_at) WHEN 2022 THEN 1 ELSE 0 END AS created_at_2022,
+        CASE year(created_at) WHEN 2015 THEN 1 ELSE 0 END AS created_at_2015,
+        created_at as created_at
+    FROM github_events
+    WHERE type = 'WatchEvent'
+) t
+GROUP BY  repo_name 
+HAVING (min(created_at) <= '2023-01-01 00:00:00') AND ((stars2022 >= 1) or (stars2015 >= 1))
+ORDER BY yoy DESC, repo_name 
+LIMIT 50
+;
+SELECT cast(repo["name"] as string), count() AS c, count(distinct cast(actor["login"] as string)) AS u FROM github_events WHERE type = 'IssuesEvent' AND cast(payload["action"] as string) = 'opened' GROUP BY cast(repo["name"] as string) ORDER BY c DESC, cast(repo["name"] as string) LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN cast(actor["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY c DESC, repo_name
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN cast(actor["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 10
+ORDER BY c, u, stars DESC, repo_name
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN cast(actor["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY u, c, stars DESC, 1
+LIMIT 50
+;
+SELECT cast(repo["name"] as string) as repo_name, count(), count(distinct cast(actor["login"] as string)) FROM github_events WHERE type = 'PullRequestEvent' AND cast(payload["action"] as string) = 'opened' GROUP BY cast(repo["name"] as string) ORDER BY 2,1,3 DESC LIMIT 50
+;
+SELECT cast(repo["name"] as string), count(), count(distinct cast(actor["login"] as string)) AS u FROM github_events WHERE type = 'PullRequestEvent' AND cast(payload["action"] as string) = 'opened' GROUP BY cast(repo["name"] as string) ORDER BY u DESC, 2 DESC, 1 LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(invitation) AS invitations,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN type = 'MemberEvent' THEN 1 ELSE 0 END AS invitation,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE type IN ('MemberEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 2
+ORDER BY invitations DESC, stars DESC, repo_name
+LIMIT 50
+;
+SELECT
+    repo_name,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        lower(cast(repo["name"] as string)) as repo_name,
+        CASE WHEN type = 'PushEvent' THEN cast(actor["login"] as string) ELSE NULL END AS actor_login,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events WHERE type IN ('PushEvent', 'WatchEvent') AND cast(repo["name"] as string) != '/'
+) t
+GROUP BY repo_name ORDER BY u, stars, repo_name DESC LIMIT 50
+;
+SELECT
+    repo_name,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN type = 'PushEvent' AND (cast(payload["ref"] as string) LIKE '%/master' OR cast(payload["ref"] as string) LIKE '%/main') THEN cast(actor["login"] as string) ELSE NULL END AS actor_login,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events WHERE type IN ('PushEvent', 'WatchEvent') AND cast(repo["name"] as string) != '/'
+) t
+GROUP BY repo_name ORDER BY u, repo_name DESC LIMIT 50
+;
+SELECT
+    repo_name,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN type = 'PushEvent' AND (cast(payload["ref"] as string) LIKE '%/master' OR cast(payload["ref"] as string) LIKE '%/main') THEN cast(actor["login"] as string) ELSE NULL END AS actor_login,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events WHERE type IN ('PushEvent', 'WatchEvent') AND cast(repo["name"] as string) != '/'
+) t
+GROUP BY repo_name
+HAVING stars >= 100
+ORDER BY u DESC, repo_name
+LIMIT 50;
+SELECT
+    repo_name,
+    stars
+FROM
+(
+    SELECT
+        row_number() OVER (PARTITION BY repo_name  ORDER BY stars DESC) AS rank,
+        repo_name,
+        stars
+    FROM
+    (
+        SELECT
+            cast(repo["name"] as string) as repo_name,
+            count() AS stars
+        FROM github_events
+        WHERE type = 'WatchEvent'
+        GROUP BY cast(repo["name"] as string)
+    ) t1
+) t2
+WHERE rank = 1
+ORDER BY stars DESC, repo_name, 1
+LIMIT 50
+;
+SELECT
+    repo_name,
+    stars
+FROM
+(
+    SELECT
+        row_number() OVER (PARTITION BY repo_name ORDER BY stars DESC) AS rank,
+        repo_name,
+        stars
+    FROM
+    (
+        SELECT
+            cast(repo["name"] as string) as repo_name,
+            count() AS stars
+        FROM github_events
+        WHERE type = 'WatchEvent'
+        GROUP BY cast(repo["name"] as string)
+    ) t1
+) t2
+WHERE rank = 1
+ORDER BY stars DESC, repo_name
+LIMIT 50
+;
+SELECT cast(repo["name"] as string) as repo_name, count() AS stars FROM github_events WHERE type = 'WatchEvent' GROUP BY cast(repo["name"] as string) ORDER BY stars DESC, repo_name LIMIT 50
+;
+SELECT
+    repo_name,
+    max(stars) AS daily_stars,
+    sum(stars) AS total_stars,
+    cast(round(sum(stars) / max(stars), 0) as int) AS rate
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        count() AS stars
+    FROM github_events
+    WHERE type = 'WatchEvent'
+    GROUP BY
+        repo_name
+) t
+GROUP BY repo_name
+ORDER BY rate DESC, repo_name, 1
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(created_at_2022) AS stars2022,
+    sum(created_at_2015) AS stars2015,
+    cast(round(sum(created_at_2022) / sum(created_at_2015), 0) as int) AS yoy
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE year(created_at) WHEN 2022 THEN 1 ELSE 0 END AS created_at_2022,
+        CASE year(created_at) WHEN 2015 THEN 1 ELSE 0 END AS created_at_2015,
+        created_at as created_at
+    FROM github_events
+    WHERE type = 'WatchEvent'
+) t
+GROUP BY repo_name
+HAVING (min(created_at) <= '2019-01-01 00:00:00') AND ((max(created_at) >= '2020-06-01 00:00:00') OR (stars2015 >= 2))
+ORDER BY yoy, repo_name
+LIMIT 50
+;
+SELECT
+  repo_name,
+  total_stars,
+  round(spark_stars / total_stars, 2) AS ratio
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        count(distinct cast(actor["login"] as string)) AS total_stars
+    FROM github_events
+    WHERE (type = 'WatchEvent') AND (cast(repo["name"] as string) NOT IN ('apache/spark'))
+    GROUP BY repo_name
+    HAVING total_stars >= 10
+) t1
+JOIN
+(
+    SELECT
+        count(distinct cast(actor["login"] as string)) AS spark_stars
+    FROM github_events
+    WHERE (type = 'WatchEvent') AND (cast(repo["name"] as string) IN ('apache/spark'))
+) t2
+ORDER BY ratio DESC, repo_name
+LIMIT 50
+;
+SELECT payload["commits"] FROM github_events where cast(payload["push_id"] as int) = 536740433;
+SELECT count(cast(payload["commits"] as string)) FROM github_events;
+SELECT count(cast(payload["commits"] as string)) FROM github_events WHERE cast(payload["push_id"] as int) > 100;
+SELECT count(cast(payload["issue"] as string)) FROM github_events where cast(payload["issue"]["state"] as string) = "closed";
+SELECT count(), cast(repo["name"] as string) FROM github_events WHERE type = 'WatchEvent' GROUP BY cast(repo["name"] as string) ORDER BY length(cast(repo["name"] as string)) DESC, cast(repo["name"] as string) LIMIT 50
+;
+SELECT cast(repo["name"] as string), count() FROM github_events WHERE type = 'WatchEvent' AND cast(repo["name"] as string) LIKE '%_/_%' GROUP BY cast(repo["name"] as string) ORDER BY length(cast(repo["name"] as string)) ASC, cast(repo["name"] as string) LIMIT 50
+;
+SELECT
+    concat('https://github.com/', cast(repo["name"] as string), '/pull/') AS URL,
+    count(distinct cast(actor["login"] as string)) AS authors
+FROM github_events
+WHERE (type = 'PullRequestReviewCommentEvent') AND (cast(payload["action"] as string) = 'created')
+GROUP BY
+    cast(repo["name"] as string),
+    cast(payload["issue"]["number"] as string) 
+ORDER BY authors DESC, URL ASC
+LIMIT 50
+;
+SELECT count(distinct cast(repo["name"] as string)) FROM github_events
+;
+SELECT count(distinct cast(actor["login"] as string)) FROM github_events
+;
+SELECT count(distinct cast(actor["login"] as string)) FROM github_events WHERE type = 'WatchEvent'
+;
+SELECT count(distinct cast(actor["login"] as string)) FROM github_events WHERE type = 'PushEvent'
+;
+SELECT count(distinct cast(actor["login"] as string)) FROM github_events WHERE type = 'PullRequestEvent' AND cast(payload["action"] as string) = 'opened'
+;
+SELECT cast(repo["name"] as string), count() AS stars FROM github_events WHERE type = 'WatchEvent' GROUP BY cast(repo["name"] as string) ORDER BY stars DESC, 1 LIMIT 50
+;
+SELECT dayofweek(created_at) AS day, count() AS stars FROM github_events WHERE type = 'WatchEvent' GROUP BY day ORDER BY day
+;
+SELECT cast(actor["login"] as string), count() AS stars FROM github_events WHERE type = 'WatchEvent' GROUP BY cast(actor["login"] as string) ORDER BY stars DESC, 1 LIMIT 50
+;
+SELECT cast(actor["login"] as string), count() AS stars FROM github_events WHERE type = 'WatchEvent' AND cast(actor["login"] as string) = 'cliffordfajardo' GROUP BY cast(actor["login"] as string) ORDER BY stars DESC LIMIT 50
+;
+-- database: presto; groups: with_clause; tables: nation,region; queryType: SELECT
+WITH wnation AS (SELECT nationkey, regionkey FROM tpch_tiny_nation),
+wregion AS (SELECT r_regionkey, r_name FROM tpch_tiny_region)
+select n.nationkey, r.r_regionkey from wnation n join wregion r on n.regionkey = r.r_regionkey
+where r.r_name = 'AFRICA'
+;
+-- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH w1 AS (select * from tpch_tiny_nation),
+w2 AS (select * from w1)
+select count(*) from w1, w2
+;
+-- database: presto; groups: with_clause; tables: nation,region; queryType: SELECT
+WITH wregion AS (select min(regionkey) from tpch_tiny_nation where name >= 'N')
+select r_regionkey, r_name from tpch_tiny_region where r_regionkey IN (SELECT * FROM wregion)
+;
+-- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH wnation AS (SELECT name, nationkey, regionkey FROM tpch_tiny_nation)
+SELECT n1.name, n2.name FROM wnation n1 JOIN wnation n2
+ON n1.nationkey=n2.regionkey
+;
+-- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH w1 AS (select min(nationkey) as x , max(regionkey) as y from tpch_tiny_nation),
+w2 AS (select x, y from w1)
+select count(*) count, regionkey from tpch_tiny_nation group by regionkey
+union all
+(select * from w2) order by regionkey, count
+;
+-- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH ordered AS (select nationkey a, regionkey b, name c from tpch_tiny_nation order by 1,2 limit 10)
+select * from  ordered order by 1,2 limit 5
+;
+-- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH ct AS (SELECT * FROM tpch_tiny_region) SELECT name FROM tpch_tiny_nation where nationkey = 0
+;
+-- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH nested AS (SELECT * FROM tpch_tiny_nation) SELECT count(*) FROM (select * FROM nested) as a
+;
+SELECT URL, EventDate, max(URL) FROM hits WHERE CounterID = 1704509 AND UserID = 4322253409885123546 GROUP BY URL, EventDate, EventDate ORDER BY URL, EventDate
+;
+SELECT count() FROM hits WHERE URL LIKE '%/avtomobili_s_probegom/_%__%__%__%'
+;
+SELECT count() FROM hits WHERE URL LIKE '/avtomobili_s_probegom/_%__%__%__%'
+;
+SELECT count() FROM hits WHERE URL LIKE '%_/avtomobili_s_probegom/_%__%__%__%'
+;
+SELECT count() FROM hits WHERE URL LIKE '%avtomobili%'
+;
+SELECT loyalty, count() AS c
+FROM
+(
+    SELECT UserID, CAST(((if(yandex > google, yandex / (yandex + google), 0 - google / (yandex + google))) * 10) AS TINYINT) AS loyalty
+    FROM
+    (
+        SELECT UserID, sum(if(SearchEngineID = 2, 1, 0)) AS yandex, sum(if(SearchEngineID = 3, 1, 0)) AS google
+        FROM hits
+        WHERE SearchEngineID = 2 OR SearchEngineID = 3 GROUP BY UserID HAVING yandex + google > 10
+    ) t1
+) t2
+GROUP BY loyalty
+ORDER BY loyalty
+;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 2) AS ratio
+FROM
+(
+    SELECT
+        cast(repo["name"] as string),
+        CASE WHEN type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE type IN ('ForkEvent', 'WatchEvent')
+) t
+----------
+[SELECT] SELECT
+    sum(forks) AS forks,
+    sum(stars) AS stars,
+    round(sum(stars) / sum(forks), 2) AS ratio
+FROM
+(
+    SELECT
+        sum(fork) AS forks,
+        sum(star) AS stars
+    FROM
+    (
+        SELECT
+            cast(repo["name"] as string) as repo_name,
+            CASE WHEN type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+            CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+        FROM github_events
+        WHERE type IN ('ForkEvent', 'WatchEvent')
+    ) t
+    GROUP BY repo_name
+    HAVING stars > 10
+) t2
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(num_star) AS num_stars,
+    sum(num_comment) AS num_comments
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS num_star,
+        CASE WHEN lower(cast(payload["comment"]["body"] as string)) LIKE '%apache%' THEN 1 ELSE 0 END AS num_comment
+    FROM github_events
+    WHERE (lower(cast(payload["comment"]["body"] as string)) LIKE '%apache%') OR (type = 'WatchEvent')
+) t
+GROUP BY repo_name 
+HAVING num_comments > 0
+ORDER BY num_stars DESC,num_comments DESC, repo_name ASC
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(created_at_2022) AS stars2022,
+    sum(created_at_2015) AS stars2015,
+    cast(round(sum(created_at_2022) / sum(created_at_2015), 0) as int) AS yoy
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE year(created_at) WHEN 2022 THEN 1 ELSE 0 END AS created_at_2022,
+        CASE year(created_at) WHEN 2015 THEN 1 ELSE 0 END AS created_at_2015,
+        created_at as created_at
+    FROM github_events
+    WHERE type = 'WatchEvent'
+) t
+GROUP BY  repo_name 
+HAVING (min(created_at) <= '2023-01-01 00:00:00') AND ((stars2022 >= 1) or (stars2015 >= 1))
+ORDER BY yoy DESC, repo_name 
+LIMIT 50
+----------
+[SELECT] SELECT cast(repo["name"] as string), count() AS c, count(distinct cast(actor["login"] as string)) AS u FROM github_events WHERE type = 'IssuesEvent' AND cast(payload["action"] as string) = 'opened' GROUP BY cast(repo["name"] as string) ORDER BY c DESC, cast(repo["name"] as string) LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN cast(actor["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY c DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN cast(actor["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 10
+ORDER BY c, u, stars DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (type = 'IssuesEvent') AND (cast(payload["action"] as string) = 'opened') THEN cast(actor["login"] as string) ELSE NULL END AS actor_login 
+    FROM github_events
+    WHERE type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY u, c, stars DESC, 1
+LIMIT 50
+----------
+[SELECT] SELECT cast(repo["name"] as string) as repo_name, count(), count(distinct cast(actor["login"] as string)) FROM github_events WHERE type = 'PullRequestEvent' AND cast(payload["action"] as string) = 'opened' GROUP BY cast(repo["name"] as string) ORDER BY 2,1,3 DESC LIMIT 50
+----------
+[SELECT] SELECT cast(repo["name"] as string), count(), count(distinct cast(actor["login"] as string)) AS u FROM github_events WHERE type = 'PullRequestEvent' AND cast(payload["action"] as string) = 'opened' GROUP BY cast(repo["name"] as string) ORDER BY u DESC, 2 DESC, 1 LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(invitation) AS invitations,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN type = 'MemberEvent' THEN 1 ELSE 0 END AS invitation,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE type IN ('MemberEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 2
+ORDER BY invitations DESC, stars DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        lower(cast(repo["name"] as string)) as repo_name,
+        CASE WHEN type = 'PushEvent' THEN cast(actor["login"] as string) ELSE NULL END AS actor_login,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events WHERE type IN ('PushEvent', 'WatchEvent') AND cast(repo["name"] as string) != '/'
+) t
+GROUP BY repo_name ORDER BY u, stars, repo_name DESC LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN type = 'PushEvent' AND (cast(payload["ref"] as string) LIKE '%/master' OR cast(payload["ref"] as string) LIKE '%/main') THEN cast(actor["login"] as string) ELSE NULL END AS actor_login,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events WHERE type IN ('PushEvent', 'WatchEvent') AND cast(repo["name"] as string) != '/'
+) t
+GROUP BY repo_name ORDER BY u, repo_name DESC LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE WHEN type = 'PushEvent' AND (cast(payload["ref"] as string) LIKE '%/master' OR cast(payload["ref"] as string) LIKE '%/main') THEN cast(actor["login"] as string) ELSE NULL END AS actor_login,
+        CASE WHEN type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events WHERE type IN ('PushEvent', 'WatchEvent') AND cast(repo["name"] as string) != '/'
+) t
+GROUP BY repo_name
+HAVING stars >= 100
+ORDER BY u DESC, repo_name
+LIMIT 50;
+----------
+[SELECT] SELECT
+    repo_name,
+    stars
+FROM
+(
+    SELECT
+        row_number() OVER (PARTITION BY repo_name  ORDER BY stars DESC) AS rank,
+        repo_name,
+        stars
+    FROM
+    (
+        SELECT
+            cast(repo["name"] as string) as repo_name,
+            count() AS stars
+        FROM github_events
+        WHERE type = 'WatchEvent'
+        GROUP BY cast(repo["name"] as string)
+    ) t1
+) t2
+WHERE rank = 1
+ORDER BY stars DESC, repo_name, 1
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    stars
+FROM
+(
+    SELECT
+        row_number() OVER (PARTITION BY repo_name ORDER BY stars DESC) AS rank,
+        repo_name,
+        stars
+    FROM
+    (
+        SELECT
+            cast(repo["name"] as string) as repo_name,
+            count() AS stars
+        FROM github_events
+        WHERE type = 'WatchEvent'
+        GROUP BY cast(repo["name"] as string)
+    ) t1
+) t2
+WHERE rank = 1
+ORDER BY stars DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT cast(repo["name"] as string) as repo_name, count() AS stars FROM github_events WHERE type = 'WatchEvent' GROUP BY cast(repo["name"] as string) ORDER BY stars DESC, repo_name LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    max(stars) AS daily_stars,
+    sum(stars) AS total_stars,
+    cast(round(sum(stars) / max(stars), 0) as int) AS rate
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        count() AS stars
+    FROM github_events
+    WHERE type = 'WatchEvent'
+    GROUP BY
+        repo_name
+) t
+GROUP BY repo_name
+ORDER BY rate DESC, repo_name, 1
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(created_at_2022) AS stars2022,
+    sum(created_at_2015) AS stars2015,
+    cast(round(sum(created_at_2022) / sum(created_at_2015), 0) as int) AS yoy
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        CASE year(created_at) WHEN 2022 THEN 1 ELSE 0 END AS created_at_2022,
+        CASE year(created_at) WHEN 2015 THEN 1 ELSE 0 END AS created_at_2015,
+        created_at as created_at
+    FROM github_events
+    WHERE type = 'WatchEvent'
+) t
+GROUP BY repo_name
+HAVING (min(created_at) <= '2019-01-01 00:00:00') AND ((max(created_at) >= '2020-06-01 00:00:00') OR (stars2015 >= 2))
+ORDER BY yoy, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+  repo_name,
+  total_stars,
+  round(spark_stars / total_stars, 2) AS ratio
+FROM
+(
+    SELECT
+        cast(repo["name"] as string) as repo_name,
+        count(distinct cast(actor["login"] as string)) AS total_stars
+    FROM github_events
+    WHERE (type = 'WatchEvent') AND (cast(repo["name"] as string) NOT IN ('apache/spark'))
+    GROUP BY repo_name
+    HAVING total_stars >= 10
+) t1
+JOIN
+(
+    SELECT
+        count(distinct cast(actor["login"] as string)) AS spark_stars
+    FROM github_events
+    WHERE (type = 'WatchEvent') AND (cast(repo["name"] as string) IN ('apache/spark'))
+) t2
+ORDER BY ratio DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT payload["commits"] FROM github_events where cast(payload["push_id"] as int) = 536740433;
+----------
+[SELECT] SELECT count(cast(payload["commits"] as string)) FROM github_events;
+----------
+[SELECT] SELECT count(cast(payload["commits"] as string)) FROM github_events WHERE cast(payload["push_id"] as int) > 100;
+----------
+[SELECT] SELECT count(cast(payload["issue"] as string)) FROM github_events where cast(payload["issue"]["state"] as string) = "closed";
+----------
+[SELECT] SELECT count(), cast(repo["name"] as string) FROM github_events WHERE type = 'WatchEvent' GROUP BY cast(repo["name"] as string) ORDER BY length(cast(repo["name"] as string)) DESC, cast(repo["name"] as string) LIMIT 50
+----------
+[SELECT] SELECT cast(repo["name"] as string), count() FROM github_events WHERE type = 'WatchEvent' AND cast(repo["name"] as string) LIKE '%_/_%' GROUP BY cast(repo["name"] as string) ORDER BY length(cast(repo["name"] as string)) ASC, cast(repo["name"] as string) LIMIT 50
+----------
+[SELECT] SELECT
+    concat('https://github.com/', cast(repo["name"] as string), '/pull/') AS URL,
+    count(distinct cast(actor["login"] as string)) AS authors
+FROM github_events
+WHERE (type = 'PullRequestReviewCommentEvent') AND (cast(payload["action"] as string) = 'created')
+GROUP BY
+    cast(repo["name"] as string),
+    cast(payload["issue"]["number"] as string) 
+ORDER BY authors DESC, URL ASC
+LIMIT 50
+----------
+[SELECT] SELECT count(distinct cast(repo["name"] as string)) FROM github_events
+----------
+[SELECT] SELECT count(distinct cast(actor["login"] as string)) FROM github_events
+----------
+[SELECT] SELECT count(distinct cast(actor["login"] as string)) FROM github_events WHERE type = 'WatchEvent'
+----------
+[SELECT] SELECT count(distinct cast(actor["login"] as string)) FROM github_events WHERE type = 'PushEvent'
+----------
+[SELECT] SELECT count(distinct cast(actor["login"] as string)) FROM github_events WHERE type = 'PullRequestEvent' AND cast(payload["action"] as string) = 'opened'
+----------
+[SELECT] SELECT cast(repo["name"] as string), count() AS stars FROM github_events WHERE type = 'WatchEvent' GROUP BY cast(repo["name"] as string) ORDER BY stars DESC, 1 LIMIT 50
+----------
+[SELECT] SELECT dayofweek(created_at) AS day, count() AS stars FROM github_events WHERE type = 'WatchEvent' GROUP BY day ORDER BY day
+----------
+[SELECT] SELECT cast(actor["login"] as string), count() AS stars FROM github_events WHERE type = 'WatchEvent' GROUP BY cast(actor["login"] as string) ORDER BY stars DESC, 1 LIMIT 50
+----------
+[SELECT] SELECT cast(actor["login"] as string), count() AS stars FROM github_events WHERE type = 'WatchEvent' AND cast(actor["login"] as string) = 'cliffordfajardo' GROUP BY cast(actor["login"] as string) ORDER BY stars DESC LIMIT 50
+----------
+[SELECT] -- database: presto; groups: with_clause; tables: nation,region; queryType: SELECT
+WITH wnation AS (SELECT nationkey, regionkey FROM tpch_tiny_nation),
+wregion AS (SELECT r_regionkey, r_name FROM tpch_tiny_region)
+select n.nationkey, r.r_regionkey from wnation n join wregion r on n.regionkey = r.r_regionkey
+where r.r_name = 'AFRICA'
+----------
+[SELECT] -- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH w1 AS (select * from tpch_tiny_nation),
+w2 AS (select * from w1)
+select count(*) from w1, w2
+----------
+[SELECT] -- database: presto; groups: with_clause; tables: nation,region; queryType: SELECT
+WITH wregion AS (select min(regionkey) from tpch_tiny_nation where name >= 'N')
+select r_regionkey, r_name from tpch_tiny_region where r_regionkey IN (SELECT * FROM wregion)
+----------
+[SELECT] -- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH wnation AS (SELECT name, nationkey, regionkey FROM tpch_tiny_nation)
+SELECT n1.name, n2.name FROM wnation n1 JOIN wnation n2
+ON n1.nationkey=n2.regionkey
+----------
+[SELECT] -- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH w1 AS (select min(nationkey) as x , max(regionkey) as y from tpch_tiny_nation),
+w2 AS (select x, y from w1)
+select count(*) count, regionkey from tpch_tiny_nation group by regionkey
+union all
+(select * from w2) order by regionkey, count
+----------
+[SELECT] -- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH ordered AS (select nationkey a, regionkey b, name c from tpch_tiny_nation order by 1,2 limit 10)
+select * from  ordered order by 1,2 limit 5
+----------
+[SELECT] -- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH ct AS (SELECT * FROM tpch_tiny_region) SELECT name FROM tpch_tiny_nation where nationkey = 0
+----------
+[SELECT] -- database: presto; groups: with_clause; tables: nation; queryType: SELECT
+WITH nested AS (SELECT * FROM tpch_tiny_nation) SELECT count(*) FROM (select * FROM nested) as a
+----------
+[SELECT] SELECT URL, EventDate, max(URL) FROM hits WHERE CounterID = 1704509 AND UserID = 4322253409885123546 GROUP BY URL, EventDate, EventDate ORDER BY URL, EventDate
+----------
+[SELECT] SELECT count() FROM hits WHERE URL LIKE '%/avtomobili_s_probegom/_%__%__%__%'
+----------
+[SELECT] SELECT count() FROM hits WHERE URL LIKE '/avtomobili_s_probegom/_%__%__%__%'
+----------
+[SELECT] SELECT count() FROM hits WHERE URL LIKE '%_/avtomobili_s_probegom/_%__%__%__%'
+----------
+[SELECT] SELECT count() FROM hits WHERE URL LIKE '%avtomobili%'
+----------
+[SELECT] SELECT loyalty, count() AS c
+FROM
+(
+    SELECT UserID, CAST(((if(yandex > google, yandex / (yandex + google), 0 - google / (yandex + google))) * 10) AS TINYINT) AS loyalty
+    FROM
+    (
+        SELECT UserID, sum(if(SearchEngineID = 2, 1, 0)) AS yandex, sum(if(SearchEngineID = 3, 1, 0)) AS google
+        FROM hits
+        WHERE SearchEngineID = 2 OR SearchEngineID = 3 GROUP BY UserID HAVING yandex + google > 10
+    ) t1
+) t2
+GROUP BY loyalty
+ORDER BY loyalty

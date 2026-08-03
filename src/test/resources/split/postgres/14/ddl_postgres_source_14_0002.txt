@@ -1,0 +1,618 @@
+-- test LIKE INCLUDING COMPRESSION
+CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION)
+;
+ALTER TYPE myvarchar SET (
+        send = myvarcharsend,
+        receive = myvarcharrecv
+    )
+;
+CREATE FUNCTION dump_test.ordering_func ()
+			RETURNS SETOF dump_test.ordering_table
+			LANGUAGE sql BEGIN ATOMIC
+			SELECT * FROM dump_test.ordering_table GROUP BY id; END
+;
+CREATE OR REPLACE FUNCTION earth_box(earth, float8)
+RETURNS public.cube
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN public.cube_enlarge($1, gc_to_sec($2), 3)
+;
+CREATE OR REPLACE FUNCTION polygon(circle)
+ RETURNS polygon
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN polygon(12, $1)
+;
+CREATE OR REPLACE FUNCTION translate( citext, citext, text ) RETURNS TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.translate( pg_catalog.translate( $1::text, pg_catalog.lower($2::text), $3), pg_catalog.upper($2::text), $3)
+;
+ALTER TABLE range_parted2 DETACH PARTITION part_rp CONCURRENTLY
+;
+CREATE OR REPLACE FUNCTION
+  pg_freespace(rel regclass, blkno OUT bigint, avail OUT int2)
+RETURNS SETOF RECORD
+LANGUAGE SQL PARALLEL SAFE
+BEGIN ATOMIC
+  SELECT blkno, pg_freespace($1, blkno) AS avail
+  FROM generate_series('0'::bigint, pg_relation_size($1) / current_setting('block_size'::text)::bigint - '1'::bigint) AS blkno;
+END
+;
+ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    -- these are bogus, but it's safe as long as we don't use the type:
+    analyze = ts_typanalyze,
+    subscript = raw_array_subscript_handler
+)
+;
+CREATE OR REPLACE FUNCTION bit_length(bit)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN length($1)
+;
+/* Given an index's OID and an underlying-table column number, return the
+ * column's position in the index (NULL if not there) */
+CREATE FUNCTION _pg_index_position(oid, smallint) RETURNS int
+    LANGUAGE sql STRICT STABLE
+BEGIN ATOMIC
+SELECT (ss.a).n FROM
+  (SELECT information_schema._pg_expandarray(indkey) AS a
+   FROM pg_catalog.pg_index WHERE indexrelid = $1) ss
+  WHERE (ss.a).x = $2;
+END
+;
+CREATE FUNCTION functest_S_xx(x anyarray) RETURNS anyelement
+    LANGUAGE SQL
+    RETURN x[1]
+;
+DROP DATABASE IF EXISTS split_db_probe WITH (FORCE)
+;
+CREATE VIEW limit_thousand_v_4 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST (5::bigint) ROWS WITH TIES
+;
+-- doesn't work for the default partition
+ALTER TABLE range_parted2 DETACH PARTITION part_rpd CONCURRENTLY
+;
+/* contrib/earthdistance/earthdistance--1.1--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via ALTER EXTENSION
+
+
+CREATE OR REPLACE FUNCTION earth() RETURNS float8
+LANGUAGE SQL IMMUTABLE PARALLEL SAFE
+RETURN '6378168'::float8
+;
+create function fipshash(bytea)
+    returns text
+    strict immutable parallel safe leakproof
+    return substr(encode(sha256($1), 'hex'), 1, 32)
+;
+CREATE INDEX trgm_idx ON public.test_trgm USING gist (t gist_trgm_ops (siglen='2024'))
+;
+CREATE INDEX wowidx ON test_tsvector USING gist (a tsvector_ops(siglen=484))
+;
+CREATE FUNCTION dep_req2() RETURNS text
+BEGIN ATOMIC
+  SELECT test_s_dep.dep_req1() || ' req2';
+END
+;
+CREATE FUNCTION unbounded(x int) RETURNS int LANGUAGE SQL IMMUTABLE RETURN x
+;
+create index trgm_idx on test_trgm using gist (t gist_trgm_ops(siglen=2025))
+;
+CREATE OR REPLACE FUNCTION pg_relation_size(regclass)
+ RETURNS bigint
+ LANGUAGE sql
+ PARALLEL SAFE STRICT COST 1
+RETURN pg_relation_size($1, 'main')
+;
+ALTER TABLE d_lp_fk DETACH PARTITION d_lp_fk_1 CONCURRENTLY
+;
+create index tstidx on ltreetest using gist (t gist_ltree_ops(siglen=2028))
+;
+CREATE FUNCTION ess_func(int) RETURNS text
+BEGIN ATOMIC
+  SELECT f3 FROM ess_table WHERE f1 = $1;
+END
+;
+CREATE TABLE dump_test.test_table (
+						   col1 serial primary key,
+						   col2 text COMPRESSION pglz,
+						   col3 text,
+						   col4 text,
+						   CHECK (col1 <= 1000)
+					   ) WITH (autovacuum_enabled = false, fillfactor=80)
+;
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb
+;
+ALTER TABLE gtest29 ALTER COLUMN a DROP EXPRESSION
+;
+-- works fine
+ALTER TABLE range_parted2 DETACH PARTITION part_rp CONCURRENTLY
+;
+CREATE OR REPLACE FUNCTION sec_to_gc(float8)
+RETURNS float8
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN CASE
+  WHEN $1 < '0'::float8 THEN '0'::float8
+  WHEN $1 / ('2'::float8 * earth()) > '1'::float8 THEN pi() * earth()
+  ELSE '2'::float8 * earth() * asin($1 / ('2'::float8 * earth()))
+END
+;
+create view view_of_joins_2d as select * from (tbl1 join tbl1a using (a) as x) as y
+;
+CREATE SCHEMA AUTHORIZATION CURRENT_ROLE
+  CREATE INDEX ON schema_not_existing.tab (id)
+;
+create temp view v_search as
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+select f, t, label from search_graph
+;
+CREATE FUNCTION _pg_interval_type(typid oid, mod int4) RETURNS text
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1186) /* interval */
+           THEN pg_catalog.upper(substring(pg_catalog.format_type($1, $2) similar 'interval[()0-9]* #"%#"' escape '#'))
+       ELSE null
+  END
+;
+CREATE FUNCTION _pg_index_position(oid, smallint) RETURNS int
+    LANGUAGE sql STRICT STABLE
+BEGIN ATOMIC
+SELECT (ss.a).n FROM
+  (SELECT information_schema._pg_expandarray(indkey) AS a
+   FROM pg_catalog.pg_index WHERE indexrelid = $1) ss
+  WHERE (ss.a).x = $2;
+END
+;
+-- only accept valid partitioning strategy
+CREATE TABLE partitioned (
+    a int
+) PARTITION BY MAGIC (a)
+;
+CREATE OR REPLACE FUNCTION rpad(text, integer)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN rpad($1, $2, ' ')
+;
+create index trgm_idx on test_trgm using gist (t gist_trgm_ops(siglen=0))
+;
+ALTER VIEW split_view_probe.base_view RENAME COLUMN qty TO amount
+;
+/*
+ * PostgreSQL System Functions
+ *
+ * Copyright (c) 1996-2023, PostgreSQL Global Development Group
+ *
+ * src/backend/catalog/system_functions.sql
+ *
+ * This file redefines certain built-in functions that it's impractical
+ * to fully define in pg_proc.dat.  In most cases that's because they use
+ * SQL-standard function bodies and/or default expressions.  The node
+ * tree representations of those are too unreadable, platform-dependent,
+ * and changeable to want to deal with them manually.  Hence, we put stub
+ * definitions of such functions into pg_proc.dat and then replace them
+ * here.  The stub definitions would be unnecessary were it not that we'd
+ * like these functions to have stable OIDs, the same as other built-in
+ * functions.
+ *
+ * This file also takes care of adjusting privileges for those functions
+ * that should not have the default public-EXECUTE privileges.  (However,
+ * a small number of functions that exist mainly to underlie system views
+ * are dealt with in system_views.sql, instead.)
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+
+CREATE OR REPLACE FUNCTION lpad(text, integer)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN lpad($1, $2, ' ')
+;
+ALTER SUBSCRIPTION tap_sub ADD PUBLICATION tap_pub_1
+;
+-- fail - publication used more then once
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub1, testpub1 WITH (refresh = false)
+;
+create function fipshash(text)
+    returns text
+    strict immutable parallel safe leakproof
+    return substr(encode(sha256($1::bytea), 'hex'), 1, 32)
+;
+create index _tstidx on _ltreetest using gist (t gist__ltree_ops(siglen=2025))
+;
+CREATE INDEX brinidx_multi ON brintest_multi USING brin (
+	int8col int8_minmax_multi_ops(values_per_range = 257)
+)
+;
+CREATE TABLE cmdata2 (f1 int COMPRESSION pglz)
+;
+CREATE TABLE cmdata2 (f1 text COMPRESSION pglz)
+;
+-- copy to existing table
+CREATE TABLE cmmove3(f1 text COMPRESSION pglz)
+;
+CREATE INDEX brinidx_multi ON brintest_multi USING brin (
+	int8col int8_minmax_multi_ops(values_per_range = 7)
+)
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] -- test LIKE INCLUDING COMPRESSION
+CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION)
+;
+----------
+[ALTER_TYPE] ALTER TYPE myvarchar SET (
+        send = myvarcharsend,
+        receive = myvarcharrecv
+    )
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION dump_test.ordering_func ()
+			RETURNS SETOF dump_test.ordering_table
+			LANGUAGE sql BEGIN ATOMIC
+			SELECT * FROM dump_test.ordering_table GROUP BY id; END
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION earth_box(earth, float8)
+RETURNS public.cube
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN public.cube_enlarge($1, gc_to_sec($2), 3)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION polygon(circle)
+ RETURNS polygon
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN polygon(12, $1)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION translate( citext, citext, text ) RETURNS TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.translate( pg_catalog.translate( $1::text, pg_catalog.lower($2::text), $3), pg_catalog.upper($2::text), $3)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE range_parted2 DETACH PARTITION part_rp CONCURRENTLY
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION
+  pg_freespace(rel regclass, blkno OUT bigint, avail OUT int2)
+RETURNS SETOF RECORD
+LANGUAGE SQL PARALLEL SAFE
+BEGIN ATOMIC
+  SELECT blkno, pg_freespace($1, blkno) AS avail
+  FROM generate_series('0'::bigint, pg_relation_size($1) / current_setting('block_size'::text)::bigint - '1'::bigint) AS blkno;
+END
+;
+----------
+[ALTER_TYPE] ALTER TYPE myvarchar SET (
+    send = myvarcharsend,
+    receive = myvarcharrecv,
+    typmod_in = varchartypmodin,
+    typmod_out = varchartypmodout,
+    -- these are bogus, but it's safe as long as we don't use the type:
+    analyze = ts_typanalyze,
+    subscript = raw_array_subscript_handler
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION bit_length(bit)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN length($1)
+;
+----------
+[CREATE_PROG_OBJ] /* Given an index's OID and an underlying-table column number, return the
+ * column's position in the index (NULL if not there) */
+CREATE FUNCTION _pg_index_position(oid, smallint) RETURNS int
+    LANGUAGE sql STRICT STABLE
+BEGIN ATOMIC
+SELECT (ss.a).n FROM
+  (SELECT information_schema._pg_expandarray(indkey) AS a
+   FROM pg_catalog.pg_index WHERE indexrelid = $1) ss
+  WHERE (ss.a).x = $2;
+END
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_xx(x anyarray) RETURNS anyelement
+    LANGUAGE SQL
+    RETURN x[1]
+;
+----------
+[DROP_CATALOG] DROP DATABASE IF EXISTS split_db_probe WITH (FORCE)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW limit_thousand_v_4 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST (5::bigint) ROWS WITH TIES
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- doesn't work for the default partition
+ALTER TABLE range_parted2 DETACH PARTITION part_rpd CONCURRENTLY
+;
+----------
+[CREATE_PROG_OBJ] /* contrib/earthdistance/earthdistance--1.1--1.2.sql */
+
+-- complain if script is sourced in psql, rather than via ALTER EXTENSION
+
+
+CREATE OR REPLACE FUNCTION earth() RETURNS float8
+LANGUAGE SQL IMMUTABLE PARALLEL SAFE
+RETURN '6378168'::float8
+;
+----------
+[CREATE_PROG_OBJ] create function fipshash(bytea)
+    returns text
+    strict immutable parallel safe leakproof
+    return substr(encode(sha256($1), 'hex'), 1, 32)
+;
+----------
+[ADD_INDEX] CREATE INDEX trgm_idx ON public.test_trgm USING gist (t gist_trgm_ops (siglen='2024'))
+;
+----------
+[ADD_INDEX] CREATE INDEX wowidx ON test_tsvector USING gist (a tsvector_ops(siglen=484))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION dep_req2() RETURNS text
+BEGIN ATOMIC
+  SELECT test_s_dep.dep_req1() || ' req2';
+END
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION unbounded(x int) RETURNS int LANGUAGE SQL IMMUTABLE RETURN x
+;
+----------
+[ADD_INDEX] create index trgm_idx on test_trgm using gist (t gist_trgm_ops(siglen=2025))
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION pg_relation_size(regclass)
+ RETURNS bigint
+ LANGUAGE sql
+ PARALLEL SAFE STRICT COST 1
+RETURN pg_relation_size($1, 'main')
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE d_lp_fk DETACH PARTITION d_lp_fk_1 CONCURRENTLY
+;
+----------
+[ADD_INDEX] create index tstidx on ltreetest using gist (t gist_ltree_ops(siglen=2028))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ess_func(int) RETURNS text
+BEGIN ATOMIC
+  SELECT f3 FROM ess_table WHERE f1 = $1;
+END
+;
+----------
+[CREATE_TABLE] CREATE TABLE dump_test.test_table (
+						   col1 serial primary key,
+						   col2 text COMPRESSION pglz,
+						   col3 text,
+						   col4 text,
+						   CHECK (col1 <= 1000)
+					   ) WITH (autovacuum_enabled = false, fillfactor=80)
+;
+----------
+[CREATE_VIEW(SELECT)] create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE gtest29 ALTER COLUMN a DROP EXPRESSION
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- works fine
+ALTER TABLE range_parted2 DETACH PARTITION part_rp CONCURRENTLY
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION sec_to_gc(float8)
+RETURNS float8
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN CASE
+  WHEN $1 < '0'::float8 THEN '0'::float8
+  WHEN $1 / ('2'::float8 * earth()) > '1'::float8 THEN pi() * earth()
+  ELSE '2'::float8 * earth() * asin($1 / ('2'::float8 * earth()))
+END
+;
+----------
+[CREATE_VIEW(SELECT)] create view view_of_joins_2d as select * from (tbl1 join tbl1a using (a) as x) as y
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA AUTHORIZATION CURRENT_ROLE
+  CREATE INDEX ON schema_not_existing.tab (id)
+;
+----------
+[CREATE_VIEW(SELECT)] create temp view v_search as
+with recursive search_graph(f, t, label) as (
+	select * from graph0 g
+	union all
+	select g.*
+	from graph0 g, search_graph sg
+	where g.f = sg.t
+) search depth first by f, t set seq
+select f, t, label from search_graph
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_interval_type(typid oid, mod int4) RETURNS text
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1186) /* interval */
+           THEN pg_catalog.upper(substring(pg_catalog.format_type($1, $2) similar 'interval[()0-9]* #"%#"' escape '#'))
+       ELSE null
+  END
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_index_position(oid, smallint) RETURNS int
+    LANGUAGE sql STRICT STABLE
+BEGIN ATOMIC
+SELECT (ss.a).n FROM
+  (SELECT information_schema._pg_expandarray(indkey) AS a
+   FROM pg_catalog.pg_index WHERE indexrelid = $1) ss
+  WHERE (ss.a).x = $2;
+END
+;
+----------
+[CREATE_TABLE] -- only accept valid partitioning strategy
+CREATE TABLE partitioned (
+    a int
+) PARTITION BY MAGIC (a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION rpad(text, integer)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN rpad($1, $2, ' ')
+;
+----------
+[ADD_INDEX] create index trgm_idx on test_trgm using gist (t gist_trgm_ops(siglen=0))
+;
+----------
+[RENAME_COLUMN] ALTER VIEW split_view_probe.base_view RENAME COLUMN qty TO amount
+;
+----------
+[CREATE_PROG_OBJ] /*
+ * PostgreSQL System Functions
+ *
+ * Copyright (c) 1996-2023, PostgreSQL Global Development Group
+ *
+ * src/backend/catalog/system_functions.sql
+ *
+ * This file redefines certain built-in functions that it's impractical
+ * to fully define in pg_proc.dat.  In most cases that's because they use
+ * SQL-standard function bodies and/or default expressions.  The node
+ * tree representations of those are too unreadable, platform-dependent,
+ * and changeable to want to deal with them manually.  Hence, we put stub
+ * definitions of such functions into pg_proc.dat and then replace them
+ * here.  The stub definitions would be unnecessary were it not that we'd
+ * like these functions to have stable OIDs, the same as other built-in
+ * functions.
+ *
+ * This file also takes care of adjusting privileges for those functions
+ * that should not have the default public-EXECUTE privileges.  (However,
+ * a small number of functions that exist mainly to underlie system views
+ * are dealt with in system_views.sql, instead.)
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+
+CREATE OR REPLACE FUNCTION lpad(text, integer)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN lpad($1, $2, ' ')
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION tap_sub ADD PUBLICATION tap_pub_1
+;
+----------
+[ALTER_PUB_SUB] -- fail - publication used more then once
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub1, testpub1 WITH (refresh = false)
+;
+----------
+[CREATE_PROG_OBJ] create function fipshash(text)
+    returns text
+    strict immutable parallel safe leakproof
+    return substr(encode(sha256($1::bytea), 'hex'), 1, 32)
+;
+----------
+[ADD_INDEX] create index _tstidx on _ltreetest using gist (t gist__ltree_ops(siglen=2025))
+;
+----------
+[ADD_INDEX] CREATE INDEX brinidx_multi ON brintest_multi USING brin (
+	int8col int8_minmax_multi_ops(values_per_range = 257)
+)
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmdata2 (f1 int COMPRESSION pglz)
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmdata2 (f1 text COMPRESSION pglz)
+;
+----------
+[CREATE_TABLE] -- copy to existing table
+CREATE TABLE cmmove3(f1 text COMPRESSION pglz)
+;
+----------
+[ADD_INDEX] CREATE INDEX brinidx_multi ON brintest_multi USING brin (
+	int8col int8_minmax_multi_ops(values_per_range = 7)
+)
+;

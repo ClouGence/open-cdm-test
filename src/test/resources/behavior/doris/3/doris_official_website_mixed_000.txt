@@ -1,0 +1,2902 @@
+[doris_official_website_mixed_000__create_table__0001]
+sql:
+-- Common properties: field_pattern (target path), analyzer, parser, support_phrase, etc.
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"),
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content")
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:27~2:30) /test/1/catalog1/schema1/tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0002]
+sql:
+-- v.content has both tokenized and non-tokenized inverted indexes
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0003]
+sql:
+SELECT * FROM tbl WHERE v['content'] = 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0004]
+sql:
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'pattern_*' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "pattern_*"),
+    INDEX idx_v(v) USING INVERTED -- global non-tokenized inverted index
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:30) /test/1/catalog1/schema1/tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0005]
+sql:
+SELECT * FROM tbl WHERE v['pattern_1'] MATCH 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0006]
+sql:
+SELECT * FROM tbl WHERE v['pattern_1'] = 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_schema__0007]
+sql:
+CREATE DATABASE db1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_SCHEMA": [
+    {
+      "subject": "Schema(1:16~1:19) /test/1/catalog1/db1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_user__0008]
+sql:
+CREATE USER jack@'192.%' IDENTIFIED BY 'jack_pwd';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_USER": [
+    {
+      "subject": "User(1:12~1:49) /test/1/jack@'192.%' IDENTIFIED BY 'jack_pwd'/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_user__0009]
+sql:
+CREATE USER jack@'%' IDENTIFIED BY 'jack_pwd';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_USER": [
+    {
+      "subject": "User(1:12~1:45) /test/1/jack@'%' IDENTIFIED BY 'jack_pwd'/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_role__0010]
+sql:
+CREATE ROLE role1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_ROLE": [
+    {
+      "subject": "Role(1:12~1:17) /test/1/role1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_role__0011]
+sql:
+CREATE ROLE role2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_ROLE": [
+    {
+      "subject": "Role(1:12~1:17) /test/1/role2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_role__0012]
+sql:
+CREATE ROLE my_role;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_ROLE": [
+    {
+      "subject": "Role(1:12~1:19) /test/1/my_role/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_resource_group__0013]
+sql:
+CREATE WORKLOAD GROUP g1 PROPERTIES("max_cpu_percent"="10");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_RESOURCE_GROUP": []
+}
+
+----------
+[doris_official_website_mixed_000__grant__0014]
+sql:
+GRANT SELECT_PRIV ON db1.* TO 'jack'@'192.%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Table(1:21~1:26) /test/1/catalog1/db1/*/",
+      "action" : "GRANT",
+      "target" : "User(1:30~1:44) /test/1/'jack'@'192.%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0015]
+sql:
+GRANT USAGE_PRIV ON RESOURCE 'spark_resource' TO 'jack'@'192.%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:29~1:45) /test/1/'spark_resource'/",
+      "action" : "GRANT",
+      "target" : "User(1:49~1:63) /test/1/'jack'@'192.%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0016]
+sql:
+GRANT 'role1','role2' TO 'jack'@'192.%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Role(1:6~1:13) /test/1/'role1'/",
+      "action" : "GRANT",
+      "target" : "User(1:25~1:39) /test/1/'jack'@'192.%'/"
+    },
+    {
+      "subject": "Role(1:14~1:21) /test/1/'role2'/",
+      "action" : "GRANT",
+      "target" : "User(1:25~1:39) /test/1/'jack'@'192.%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0017]
+sql:
+GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO 'jack'@'%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:35~1:39) /test/1/'g1'/",
+      "action" : "GRANT",
+      "target" : "User(1:43~1:53) /test/1/'jack'@'%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0018]
+sql:
+GRANT USAGE_PRIV ON WORKLOAD GROUP '%' TO 'jack'@'%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:35~1:38) /test/1/'%'/",
+      "action" : "GRANT",
+      "target" : "User(1:42~1:52) /test/1/'jack'@'%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0019]
+sql:
+GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO 'jack'@'%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:34~1:42) /test/1/'group1'/",
+      "action" : "GRANT",
+      "target" : "User(1:46~1:56) /test/1/'jack'@'%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0020]
+sql:
+GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO ROLE 'my_role';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:34~1:42) /test/1/'group1'/",
+      "action" : "GRANT",
+      "target" : "Role(1:51~1:60) /test/1/'my_role'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0021]
+sql:
+GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO 'jack'@'%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:34~1:42) /test/1/'vault1'/",
+      "action" : "GRANT",
+      "target" : "User(1:46~1:56) /test/1/'jack'@'%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0022]
+sql:
+GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO ROLE 'my_role';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:34~1:42) /test/1/'vault1'/",
+      "action" : "GRANT",
+      "target" : "Role(1:51~1:60) /test/1/'my_role'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0023]
+sql:
+GRANT USAGE_PRIV ON STORAGE VAULT '%' TO 'jack'@'%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:34~1:37) /test/1/'%'/",
+      "action" : "GRANT",
+      "target" : "User(1:41~1:51) /test/1/'jack'@'%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0024]
+sql:
+-- 1. Create tokenizers with different tokenization strategies
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0025]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0026]
+sql:
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0027]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0028]
+sql:
+-- 2. Create multiple indexes on the same column
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- Standard tokenizer for tokenized search
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- Keyword tokenizer for exact matching
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- edge n-gram tokenizer for auto-completion
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:21) /test/1/catalog1/schema1/articles/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0029]
+sql:
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_phone_number_tokenizer
+PROPERTIES
+(
+    "type" = "edge_ngram",
+    "min_gram" = "3",
+    "max_gram" = "10",
+    "token_chars" = "digit"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0030]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS edge_ngram_phone_number
+PROPERTIES
+(
+    "tokenizer" = "edge_ngram_phone_number_tokenizer"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0031]
+sql:
+CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "edge_ngram_phone_number")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:16) /test/1/catalog1/schema1/tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0032]
+sql:
+SELECT tokenize('13891972631', '"analyzer"="edge_ngram_phone_number"');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:15) /test/1/catalog1/schema1/tokenize/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0033]
+sql:
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS word_splitter
+PROPERTIES
+(
+    "type" = "word_delimiter",
+    "split_on_numerics" = "false",
+    "split_on_case_change" = "false"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0034]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS lowercase_delimited
+PROPERTIES
+(
+    "tokenizer" = "standard",
+    "token_filter" = "asciifolding, word_splitter, lowercase"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0035]
+sql:
+CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "lowercase_delimited")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:16) /test/1/catalog1/schema1/tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0036]
+sql:
+SELECT tokenize('The server at IP 192.168.1.15 sent a confirmation to user_123@example.com, requiring a quickResponse before the deadline.', '"analyzer"="lowercase_delimited"');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:15) /test/1/catalog1/schema1/tokenize/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0037]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES
+(
+    "tokenizer" = "keyword",
+    "token_filter" = "asciifolding, lowercase"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0038]
+sql:
+CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "keyword_lowercase")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+    "replication_allocation" = "tag.location.default: 1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:16) /test/1/catalog1/schema1/tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0039]
+sql:
+SELECT tokenize('hÉllo World', '"analyzer"="keyword_lowercase"');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:15) /test/1/catalog1/schema1/tokenize/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0040]
+sql:
+-- Example: Define a custom analyzer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "asciifolding, lowercase"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0041]
+sql:
+-- Use the custom analyzer when creating a table
+CREATE TABLE docs (
+    id BIGINT,
+    content TEXT,
+    INDEX idx_content (content) USING INVERTED PROPERTIES(
+        "analyzer" = "keyword_lowercase",
+        "support_phrase" = "true"
+    )
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:17) /test/1/catalog1/schema1/docs/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0042]
+sql:
+-- A VARIANT column with an inverted index
+CREATE TABLE test_variant_search_subcolumn (
+    id BIGINT,
+    properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+    INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+        "parser" = "unicode",
+        "lower_case" = "true",
+        "support_phrase" = "true"
+    )
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:42) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0043]
+sql:
+-- Single-term query
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0044]
+sql:
+-- AND / ALL queries
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0045]
+sql:
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:5~2:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(3:6~3:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0046]
+sql:
+-- OR query across different subcolumns
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__metadata__0047]
+sql:
+-- View the index list
+SHOW INDEX FROM document_vectors;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_000__metadata__0048]
+sql:
+-- View data scale
+SHOW DATA ALL FROM document_vectors;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_000__alter_table__0049]
+sql:
+-- Drop the index
+ALTER TABLE document_vectors DROP INDEX idx_embedding;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:28) /test/1/catalog1/schema1/document_vectors/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0050]
+sql:
+-- 常用属性：field_pattern（目标子路径）、analyzer、parser、support_phrase 等
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"),
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content")
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:27~2:30) /test/1/catalog1/schema1/tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0051]
+sql:
+-- v.content 同时具备分词与不分词的倒排索引
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0052]
+sql:
+SELECT * FROM tbl WHERE v['content'] = 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0053]
+sql:
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'pattern_*' : STRING>,
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "pattern_*"),
+    INDEX idx_v(v) USING INVERTED -- 全局指定非分词索引
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:27~1:30) /test/1/catalog1/schema1/tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0054]
+sql:
+SELECT * FROM tbl WHERE v['pattern_1'] MATCH 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0055]
+sql:
+SELECT * FROM tbl WHERE v['pattern_1'] = 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_schema__0056]
+sql:
+CREATE DATABASE db1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_SCHEMA": [
+    {
+      "subject": "Schema(1:16~1:19) /test/1/catalog1/db1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_user__0057]
+sql:
+CREATE USER jack@'192.%' IDENTIFIED BY 'jack_pwd';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_USER": [
+    {
+      "subject": "User(1:12~1:49) /test/1/jack@'192.%' IDENTIFIED BY 'jack_pwd'/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_user__0058]
+sql:
+CREATE USER jack@'%' IDENTIFIED BY 'jack_pwd';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_USER": [
+    {
+      "subject": "User(1:12~1:45) /test/1/jack@'%' IDENTIFIED BY 'jack_pwd'/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_role__0059]
+sql:
+CREATE ROLE role1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_ROLE": [
+    {
+      "subject": "Role(1:12~1:17) /test/1/role1/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_role__0060]
+sql:
+CREATE ROLE role2;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_ROLE": [
+    {
+      "subject": "Role(1:12~1:17) /test/1/role2/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_role__0061]
+sql:
+CREATE ROLE my_role;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_ROLE": [
+    {
+      "subject": "Role(1:12~1:19) /test/1/my_role/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_role__0062]
+sql:
+CREATE ROLE test_role;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_ROLE": [
+    {
+      "subject": "Role(1:12~1:21) /test/1/test_role/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_resource_group__0063]
+sql:
+CREATE WORKLOAD GROUP g1 PROPERTIES("max_cpu_percent"="10");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_RESOURCE_GROUP": []
+}
+
+----------
+[doris_official_website_mixed_000__grant__0064]
+sql:
+GRANT SELECT_PRIV ON db1.* TO 'jack'@'192.%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Table(1:21~1:26) /test/1/catalog1/db1/*/",
+      "action" : "GRANT",
+      "target" : "User(1:30~1:44) /test/1/'jack'@'192.%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0065]
+sql:
+GRANT USAGE_PRIV ON RESOURCE 'spark_resource' TO 'jack'@'192.%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:29~1:45) /test/1/'spark_resource'/",
+      "action" : "GRANT",
+      "target" : "User(1:49~1:63) /test/1/'jack'@'192.%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0066]
+sql:
+GRANT 'role1','role2' TO 'jack'@'192.%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Role(1:6~1:13) /test/1/'role1'/",
+      "action" : "GRANT",
+      "target" : "User(1:25~1:39) /test/1/'jack'@'192.%'/"
+    },
+    {
+      "subject": "Role(1:14~1:21) /test/1/'role2'/",
+      "action" : "GRANT",
+      "target" : "User(1:25~1:39) /test/1/'jack'@'192.%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0067]
+sql:
+GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO 'jack'@'%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:35~1:39) /test/1/'g1'/",
+      "action" : "GRANT",
+      "target" : "User(1:43~1:53) /test/1/'jack'@'%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0068]
+sql:
+GRANT USAGE_PRIV ON WORKLOAD GROUP '%' TO 'jack'@'%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:35~1:38) /test/1/'%'/",
+      "action" : "GRANT",
+      "target" : "User(1:42~1:52) /test/1/'jack'@'%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0069]
+sql:
+GRANT USAGE_PRIV ON WORKLOAD GROUP 'g1' TO ROLE 'test_role';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:35~1:39) /test/1/'g1'/",
+      "action" : "GRANT",
+      "target" : "Role(1:48~1:59) /test/1/'test_role'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0070]
+sql:
+GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO 'jack'@'%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:34~1:42) /test/1/'group1'/",
+      "action" : "GRANT",
+      "target" : "User(1:46~1:56) /test/1/'jack'@'%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0071]
+sql:
+GRANT USAGE_PRIV ON COMPUTE GROUP 'group1' TO ROLE 'my_role';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:34~1:42) /test/1/'group1'/",
+      "action" : "GRANT",
+      "target" : "Role(1:51~1:60) /test/1/'my_role'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0072]
+sql:
+GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO 'jack'@'%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:34~1:42) /test/1/'vault1'/",
+      "action" : "GRANT",
+      "target" : "User(1:46~1:56) /test/1/'jack'@'%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0073]
+sql:
+GRANT USAGE_PRIV ON STORAGE VAULT 'vault1' TO ROLE 'my_role';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:34~1:42) /test/1/'vault1'/",
+      "action" : "GRANT",
+      "target" : "Role(1:51~1:60) /test/1/'my_role'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0074]
+sql:
+GRANT USAGE_PRIV ON STORAGE VAULT '%' TO 'jack'@'%';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:34~1:37) /test/1/'%'/",
+      "action" : "GRANT",
+      "target" : "User(1:41~1:51) /test/1/'jack'@'%'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0075]
+sql:
+-- 1. 创建不同分词策略的分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0076]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0077]
+sql:
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0078]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0079]
+sql:
+-- 2. 在同一列上创建多个索引
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- 标准分词器用于分词搜索
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- 关键词分词器用于精确匹配
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- edge n-gram 分词器用于自动补全
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:21) /test/1/catalog1/schema1/articles/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0080]
+sql:
+-- 示例：定义自定义分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "asciifolding, lowercase"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0081]
+sql:
+-- 在建表时使用自定义分词器
+CREATE TABLE docs (
+    id BIGINT,
+    content TEXT,
+    INDEX idx_content (content) USING INVERTED PROPERTIES(
+        "analyzer" = "keyword_lowercase",
+        "support_phrase" = "true"
+    )
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:17) /test/1/catalog1/schema1/docs/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0082]
+sql:
+-- 带 VARIANT 列与倒排索引
+CREATE TABLE test_variant_search_subcolumn (
+    id BIGINT,
+    properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+    INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+        "parser" = "unicode",
+        "lower_case" = "true",
+        "support_phrase" = "true"
+    )
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:42) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0083]
+sql:
+-- 单词查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0084]
+sql:
+-- AND / ALL 查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0085]
+sql:
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:5~2:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(3:6~3:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0086]
+sql:
+-- 不同子列 OR 查询
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__metadata__0087]
+sql:
+-- 查看索引列表
+SHOW INDEX FROM document_vectors;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_000__metadata__0088]
+sql:
+-- 查看数据规模
+SHOW DATA ALL FROM document_vectors;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_000__alter_table__0089]
+sql:
+-- 删除索引
+ALTER TABLE document_vectors DROP INDEX idx_embedding;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:28) /test/1/catalog1/schema1/document_vectors/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0090]
+sql:
+-- Common properties: field_pattern (target subpath), analyzer, parser, support_phrase, etc.
+CREATE TABLE IF NOT EXISTS tbl (
+    k BIGINT,
+    v VARIANT<'content' : STRING>, -- specify concrete type for subcolumn 'content'
+    INDEX idx_tokenized(v) USING INVERTED PROPERTIES("parser" = "english", "field_pattern" = "content"), -- tokenized inverted index for 'content' with english parser
+    INDEX idx_v(v) USING INVERTED PROPERTIES("field_pattern" = "content") -- non-tokenized inverted index for 'content'
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:27~2:30) /test/1/catalog1/schema1/tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0091]
+sql:
+-- Use tokenized index
+SELECT * FROM tbl WHERE v['content'] MATCH 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0092]
+sql:
+-- Use non-tokenized index
+SELECT * FROM tbl WHERE v['content'] = 'Doris';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:17) /test/1/catalog1/schema1/tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__alter_table__0093]
+sql:
+-- 创建分支
+ALTER TABLE iceberg_tbl CREATE BRANCH b1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__insert__0094]
+sql:
+-- 写入数据到指定分支
+INSERT INTO iceberg_tbl@branch(b1) values(1, 2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0095]
+sql:
+-- 查询指定分支
+SELECT * FROM iceberg_tbl@branch(b1);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:25) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0096]
+sql:
+-- 创建用于多值列分割的 char group tokenizer
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS multi_value_tokenizer
+PROPERTIES
+(
+    "type" = "char_group",
+    "tokenize_on_chars" = "[|]",
+    "max_token_length" = "255"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0097]
+sql:
+-- 创建多值列分词器
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS multi_value_analyzer
+PROPERTIES
+(
+    "tokenizer" = "multi_value_tokenizer",
+    "token_filter" = "lowercase, asciifolding"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__select__0098]
+sql:
+SELECT tokenize('alice|123456|company', '"analyzer"="multi_value_analyzer"');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:15) /test/1/catalog1/schema1/tokenize/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0099]
+sql:
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_phone_number_tokenizer
+PROPERTIES
+(
+    "type" = "edge_ngram",
+    "min_gram" = "3",
+    "max_gram" = "10",
+    "token_chars" = "digit"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0100]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS edge_ngram_phone_number
+PROPERTIES
+(
+    "tokenizer" = "edge_ngram_phone_number_tokenizer"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0101]
+sql:
+CREATE TABLE tbl (
+    `a` bigint NOT NULL AUTO_INCREMENT(1),
+    `ch` text NULL,
+    INDEX idx_ch (`ch`) USING INVERTED PROPERTIES("support_phrase" = "true", "analyzer" = "edge_ngram_phone_number")
+) ENGINE=OLAP
+DUPLICATE KEY(`a`)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES (
+"replication_allocation" = "tag.location.default: 1"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:16) /test/1/catalog1/schema1/tbl/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0102]
+sql:
+-- Create pinyin tokenizer with multiple output formats
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS pinyin_tokenizer
+PROPERTIES (
+    "type" = "pinyin",
+    "keep_first_letter" = "true",
+    "keep_full_pinyin" = "true",
+    "keep_joined_full_pinyin" = "true",
+    "keep_original" = "true",
+    "keep_none_chinese" = "true",
+    "lowercase" = "true",
+    "remove_duplicated_term" = "true"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0103]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS pinyin_analyzer
+PROPERTIES (
+    "tokenizer" = "pinyin_tokenizer"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0104]
+sql:
+CREATE TABLE contacts (
+    id BIGINT NOT NULL AUTO_INCREMENT(1),
+    name TEXT NULL,
+    INDEX idx_name (name) USING INVERTED PROPERTIES("analyzer" = "pinyin_analyzer", "support_phrase" = "true")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:21) /test/1/catalog1/schema1/contacts/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__insert__0105]
+sql:
+INSERT INTO contacts VALUES (1, "刘德华"), (2, "张学友"), (3, "郭富城");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:20) /test/1/catalog1/schema1/contacts/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0106]
+sql:
+SELECT * FROM contacts WHERE name MATCH '刘德华';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:22) /test/1/catalog1/schema1/contacts/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0107]
+sql:
+SELECT * FROM contacts WHERE name MATCH 'liudehua';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:22) /test/1/catalog1/schema1/contacts/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0108]
+sql:
+SELECT * FROM contacts WHERE name MATCH 'liu';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:22) /test/1/catalog1/schema1/contacts/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0109]
+sql:
+SELECT * FROM contacts WHERE name MATCH 'ldh';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:22) /test/1/catalog1/schema1/contacts/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0110]
+sql:
+-- Create pinyin filter to apply after keyword tokenizer
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS pinyin_filter
+PROPERTIES (
+    "type" = "pinyin",
+    "keep_first_letter" = "true",
+    "keep_full_pinyin" = "true",
+    "keep_original" = "true",
+    "lowercase" = "true"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0111]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_pinyin
+PROPERTIES (
+    "tokenizer" = "keyword",
+    "token_filter" = "pinyin_filter"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0112]
+sql:
+CREATE TABLE stars (
+    id BIGINT NOT NULL AUTO_INCREMENT(1),
+    name TEXT NULL,
+    INDEX idx_name (name) USING INVERTED PROPERTIES("analyzer" = "keyword_pinyin")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY RANDOM BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(1:13~1:18) /test/1/catalog1/schema1/stars/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__insert__0113]
+sql:
+INSERT INTO stars VALUES (1, "刘德华"), (2, "张学友"), (3, "刘德华ABC");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:17) /test/1/catalog1/schema1/stars/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0114]
+sql:
+-- Supports multiple search modes:
+SELECT * FROM stars WHERE name MATCH '刘德华';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:19) /test/1/catalog1/schema1/stars/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0115]
+sql:
+SELECT * FROM stars WHERE name MATCH 'liu';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:19) /test/1/catalog1/schema1/stars/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0116]
+sql:
+SELECT * FROM stars WHERE name MATCH 'ldh';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:19) /test/1/catalog1/schema1/stars/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0117]
+sql:
+SELECT * FROM stars WHERE name MATCH 'zxy';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:14~1:19) /test/1/catalog1/schema1/stars/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0118]
+sql:
+-- Create analyzers with different tokenization strategies
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS std_analyzer
+PROPERTIES ("tokenizer" = "standard", "token_filter" = "lowercase");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0119]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS kw_analyzer
+PROPERTIES ("tokenizer" = "keyword", "token_filter" = "lowercase");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0120]
+sql:
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS edge_ngram_tokenizer
+PROPERTIES (
+    "type" = "edge_ngram",
+    "min_gram" = "1",
+    "max_gram" = "20",
+    "token_chars" = "letter"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0121]
+sql:
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS ngram_analyzer
+PROPERTIES ("tokenizer" = "edge_ngram_tokenizer", "token_filter" = "lowercase");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0122]
+sql:
+-- Create table with multiple indexes on same column
+CREATE TABLE articles (
+    id INT,
+    content TEXT,
+    -- Standard analyzer for tokenized search
+    INDEX idx_content_std (content) USING INVERTED
+        PROPERTIES("analyzer" = "std_analyzer", "support_phrase" = "true"),
+    -- Keyword analyzer for exact match
+    INDEX idx_content_kw (content) USING INVERTED
+        PROPERTIES("analyzer" = "kw_analyzer"),
+    -- Edge n-gram analyzer for autocomplete
+    INDEX idx_content_ngram (content) USING INVERTED
+        PROPERTIES("analyzer" = "ngram_analyzer")
+) ENGINE=OLAP
+DUPLICATE KEY(id)
+DISTRIBUTED BY HASH(id) BUCKETS 1
+PROPERTIES ("replication_allocation" = "tag.location.default: 1");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:21) /test/1/catalog1/schema1/articles/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0123]
+sql:
+-- Define a custom analyzer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS keyword_lowercase
+PROPERTIES (
+  "tokenizer" = "keyword",
+  "token_filter" = "asciifolding, lowercase"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0124]
+sql:
+-- Use the analyzer in table creation
+CREATE TABLE docs (
+  id BIGINT,
+  content TEXT,
+  INDEX idx_content (content) USING INVERTED PROPERTIES (
+    "analyzer" = "keyword_lowercase",
+    "support_phrase" = "true"
+  )
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:17) /test/1/catalog1/schema1/docs/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0125]
+sql:
+-- Table with both tokenized and untokenized indexes
+CREATE TABLE t (
+  id INT,
+  content STRING,
+  INDEX idx_untokenized(content) USING INVERTED,
+  INDEX idx_tokenized(content)  USING INVERTED PROPERTIES("parser" = "standard")
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:14) /test/1/catalog1/schema1/t/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0126]
+sql:
+-- Exact string match (uses untokenized index)
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning)')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:6) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0127]
+sql:
+-- No match for partial token with EXACT
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine)')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:6) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0128]
+sql:
+-- ANY/ALL use tokenized index
+SELECT id, content FROM t WHERE SEARCH('content:ANY(machine learning)') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:24~2:25) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:32~2:38) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0129]
+sql:
+SELECT id, content FROM t WHERE SEARCH('content:ALL(machine learning)') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:24~1:25) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:32~1:38) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0130]
+sql:
+-- Compare EXACT vs ANY
+SELECT id, content FROM t WHERE SEARCH('content:EXACT(deep learning)') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:24~2:25) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(2:32~2:38) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0131]
+sql:
+SELECT id, content FROM t WHERE SEARCH('content:ANY(deep learning)') ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(1:24~1:25) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:32~1:38) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0132]
+sql:
+-- Mixed conditions
+SELECT id, content
+FROM t
+WHERE SEARCH('content:EXACT(machine learning) OR content:ANY(intelligence)')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:6) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0133]
+sql:
+-- Simplified syntax with default field/operator
+SELECT id, tags
+FROM tag_dataset
+WHERE SEARCH('deep learning', 'tags', 'and');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:16) /test/1/catalog1/schema1/tag_dataset/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0134]
+sql:
+-- Phrase and wildcard queries in one DSL
+SELECT id, content FROM t
+WHERE SEARCH('content:"deep learning" OR content:AI*')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:24~2:25) /test/1/catalog1/schema1/t/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(3:6~3:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__create_table__0135]
+sql:
+-- VARIANT column with inverted index
+CREATE TABLE test_variant_search_subcolumn (
+  id BIGINT,
+  properties VARIANT<PROPERTIES("variant_max_subcolumns_count"="0")>,
+  INDEX idx_properties (properties) USING INVERTED PROPERTIES (
+    "parser" = "unicode",
+    "lower_case" = "true",
+    "support_phrase" = "true"
+  )
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLE": [
+    {
+      "subject": "Table(2:13~2:42) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "CREATE"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0136]
+sql:
+-- Single term
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0137]
+sql:
+-- AND / ALL
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:alpha AND properties.message:beta')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0138]
+sql:
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:ALL(alpha beta)')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:5~2:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(3:6~3:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0139]
+sql:
+-- OR across different subcolumns
+SELECT id
+FROM test_variant_search_subcolumn
+WHERE SEARCH('properties.message:hello OR properties.category:beta')
+ORDER BY id;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(3:5~3:34) /test/1/catalog1/schema1/test_variant_search_subcolumn/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(4:6~4:12) /test/1/catalog1/schema1/SEARCH/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__metadata__0140]
+sql:
+SHOW INDEX FROM document_vectors;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_000__metadata__0141]
+sql:
+SHOW DATA ALL FROM document_vectors;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "METADATA": []
+}
+
+----------
+[doris_official_website_mixed_000__alter_table__0142]
+sql:
+ALTER TABLE document_vectors DROP INDEX idx_embedding;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(1:12~1:28) /test/1/catalog1/schema1/document_vectors/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__alter_table__0143]
+sql:
+-- Create branches
+ALTER TABLE iceberg_tbl CREATE BRANCH b1;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_TABLE": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "ALTER"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__insert__0144]
+sql:
+-- Write data to a specific branch
+INSERT INTO iceberg_tbl@branch(b1) values(1, 2);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(2:12~2:23) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "INSERT"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__select__0145]
+sql:
+-- Query data from a specific branch
+SELECT * FROM iceberg_tbl@branch(b1);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Table(2:14~2:25) /test/1/catalog1/schema1/iceberg_tbl/",
+      "action" : "READ"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0146]
+sql:
+-- 1. Create a custom token filter
+CREATE INVERTED INDEX TOKEN_FILTER IF NOT EXISTS complex_word_splitter
+PROPERTIES
+(
+    "type" = "word_delimiter",
+    "type_table" = "[. => SUBWORD_DELIM], [_ => SUBWORD_DELIM]");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0147]
+sql:
+-- 2. Create a custom tokenizer
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS complex_identifier_analyzer
+PROPERTIES
+(
+    "tokenizer" = "standard",
+    "token_filter" = "complex_word_splitter, lowercase"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__select__0148]
+sql:
+SELECT TOKENIZE('apy217.39_202501260000026_526', '”analyzer“=” complex_identifier_analyzer“');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:15) /test/1/catalog1/schema1/TOKENIZE/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0149]
+sql:
+-- Create a char group tokenizer for multi-valued column splitting
+CREATE INVERTED INDEX TOKENIZER IF NOT EXISTS multi_value_tokenizer
+PROPERTIES
+(
+    "type" = "char_group",
+    "tokenize_on_chars" = "[|]",
+    "max_token_length" = "255"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__system_setting_write__0150]
+sql:
+-- Create a tokenizer for multi-valued columns
+CREATE INVERTED INDEX ANALYZER IF NOT EXISTS multi_value_analyzer
+PROPERTIES
+(
+    "tokenizer" = "multi_value_tokenizer",
+    "token_filter" = "lowercase, asciifolding"
+);
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": []
+}
+
+----------
+[doris_official_website_mixed_000__select__0151]
+sql:
+SELECT tokenize('alice|123456|company', '"analyzer"="multi_value_analyzer"');
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:15) /test/1/catalog1/schema1/tokenize/",
+      "action" : "CALL"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__insert__0152]
+sql:
+INSERT INTO iceberg_table@branch(b1) SELECT * FROM other_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "INSERT": [
+    {
+      "subject": "Table(1:12~1:25) /test/1/catalog1/schema1/iceberg_table/",
+      "action" : "INSERT",
+      "target" : "Table(1:51~1:62) /test/1/catalog1/schema1/other_table/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__merge__0153]
+sql:
+INSERT OVERWRITE TABLE iceberg_table@branch(b1) SELECT * FROM other_table;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "MERGE": [
+    {
+      "subject": "Table(1:23~1:36) /test/1/catalog1/schema1/iceberg_table/",
+      "action" : "MERGE",
+      "target" : "Table(1:62~1:73) /test/1/catalog1/schema1/other_table/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__admin__0154]
+sql:
+-- Add stateless BEs into two compute groups
+ALTER SYSTEM ADD BACKEND 'be1:9050' PROPERTIES ("tag.compute_group_name" = "etl");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN": []
+}
+
+----------
+[doris_official_website_mixed_000__admin__0155]
+sql:
+ALTER SYSTEM ADD BACKEND 'be2:9050' PROPERTIES ("tag.compute_group_name" = "bi");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN": []
+}
+
+----------
+[doris_official_website_mixed_000__admin__0156]
+sql:
+ALTER SYSTEM ADD BACKEND 'be3:9050' PROPERTIES ("tag.compute_group_name" = "bi");
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN": []
+}
+
+----------
+[doris_official_website_mixed_000__grant__0157]
+sql:
+-- Grant access
+GRANT USAGE_PRIV ON COMPUTE GROUP etl TO 'etl_user';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(2:34~2:37) /test/1/etl/",
+      "action" : "GRANT",
+      "target" : "User(2:41~2:51) /test/1/'etl_user'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__grant__0158]
+sql:
+GRANT USAGE_PRIV ON COMPUTE GROUP bi  TO 'bi_user';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Object(1:34~1:36) /test/1/bi/",
+      "action" : "GRANT",
+      "target" : "User(1:41~1:50) /test/1/'bi_user'/"
+    }
+  ]
+}
+
+----------
+[doris_official_website_mixed_000__alter_user__0159]
+sql:
+-- Set defaults (the user has to reconnect for new defaults to apply)
+SET PROPERTY FOR 'etl_user' 'default_compute_group' = 'etl';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_USER": []
+}
+
+----------
+[doris_official_website_mixed_000__alter_user__0160]
+sql:
+SET PROPERTY FOR 'bi_user'  'default_compute_group' = 'bi';
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ALTER_USER": []
+}
+
+----------
+[doris_official_website_mixed_000__admin_resource_group__0161]
+sql:
+-- One-off switch for the current session
+USE my_db@bi;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "ADMIN_RESOURCE_GROUP": []
+}
+
+----------
+[doris_official_website_mixed_000__select__0162]
+sql:
+SELECT region, SUM(amount) FROM orders WHERE dt = CURRENT_DATE() GROUP BY region;
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:15~1:18) /test/1/catalog1/schema1/SUM/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:32~1:38) /test/1/catalog1/schema1/orders/",
+      "action" : "READ"
+    },
+    {
+      "subject": "Function(1:50~1:62) /test/1/catalog1/schema1/CURRENT_DATE/",
+      "action" : "CALL"
+    }
+  ]
+}

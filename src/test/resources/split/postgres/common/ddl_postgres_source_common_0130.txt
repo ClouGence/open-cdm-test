@@ -1,0 +1,612 @@
+create or replace function stricttest() returns void as $$
+declare x record;
+begin
+  -- should fail, no rows
+  execute 'select * from foo where f1 = 0' into strict x;
+  raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
+end$$ language plpgsql
+;
+CREATE FUNCTION gin_extract_query_name(name, internal, int2, internal, internal)
+RETURNS internal
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+CREATE TEXT SEARCH DICTIONARY hunspell_num (
+                        Template=ispell,
+                        DictFile=hunspell_sample_num,
+                        AffFile=hunspell_sample_num
+)
+;
+CREATE FUNCTION bt_page_items(IN relname text, IN blkno int4,
+    OUT itemoffset smallint,
+    OUT ctid tid,
+    OUT itemlen smallint,
+    OUT nulls bool,
+    OUT vars bool,
+    OUT data text,
+    OUT dead boolean,
+    OUT htid tid,
+    OUT tids tid[])
+RETURNS SETOF record
+AS '$libdir/pageinspect', 'bt_page_items'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+ALTER TABLE test1 ADD c int NOT NULL DEFAULT 0
+;
+CREATE INDEX brin_test_bloom_a_idx ON brin_test_bloom USING brin (a) WITH (pages_per_range = 2)
+;
+-- verify foreign keys are enforced during cross-partition updates,
+-- especially on the PK side
+CREATE SCHEMA fkpart11
+  CREATE TABLE pk (a INT PRIMARY KEY, b text) PARTITION BY LIST (a)
+  CREATE TABLE fk (
+    a INT,
+    CONSTRAINT fkey FOREIGN KEY (a) REFERENCES pk(a) ON UPDATE CASCADE ON DELETE CASCADE
+  )
+  CREATE TABLE fk_parted (
+    a INT PRIMARY KEY,
+    CONSTRAINT fkey FOREIGN KEY (a) REFERENCES pk(a) ON UPDATE CASCADE ON DELETE CASCADE
+  ) PARTITION BY LIST (a)
+  CREATE TABLE fk_another (
+    a INT,
+    CONSTRAINT fkey FOREIGN KEY (a) REFERENCES fk_parted (a) ON UPDATE CASCADE ON DELETE CASCADE
+  )
+  CREATE TABLE pk1 PARTITION OF pk FOR VALUES IN (1, 2) PARTITION BY LIST (a)
+  CREATE TABLE pk2 PARTITION OF pk FOR VALUES IN (3)
+  CREATE TABLE pk3 PARTITION OF pk FOR VALUES IN (4)
+  CREATE TABLE fk1 PARTITION OF fk_parted FOR VALUES IN (1, 2)
+  CREATE TABLE fk2 PARTITION OF fk_parted FOR VALUES IN (3)
+  CREATE TABLE fk3 PARTITION OF fk_parted FOR VALUES IN (4)
+;
+-- should fail
+CREATE OR REPLACE VIEW viewtest AS
+	SELECT a FROM viewtest_tbl WHERE a <> 20
+;
+CREATE OR REPLACE FUNCTION event_trigger_report_dropped()
+ RETURNS event_trigger
+ LANGUAGE plpgsql
+AS $$
+DECLARE r record;
+BEGIN
+    FOR r IN SELECT * from pg_event_trigger_dropped_objects()
+    LOOP
+    IF NOT r.normal AND NOT r.original THEN
+        CONTINUE;
+    END IF;
+    RAISE NOTICE 'NORMAL: orig=% normal=% istemp=% type=% identity=% schema=% name=% addr=% args=%',
+        r.original, r.normal, r.is_temporary, r.object_type,
+        r.object_identity, r.schema_name, r.object_name,
+        r.address_names, r.address_args;
+    END LOOP;
+END; $$
+;
+create table p1(id int, name text)
+;
+CREATE TABLE pub_testpart1.parent1 (a int) partition by list (a)
+;
+alter table idxpart add primary key (a)
+;
+create table inhpar(f1 int primary key, f2 name) partition by range (f1)
+;
+DROP FUNCTION my_int4_sort(int4,int4)
+;
+--
+-- Test case derived from bug #9085: check * qualification of composite
+-- parameters for SQL functions
+--
+
+create temp table compos (f1 int, f2 text)
+;
+CREATE TABLE tbl (
+	a int generated always as (b::int * 2) stored,
+	b text
+)
+;
+do
+$$
+declare
+  current timestamp with time zone := '2019-03-27 08:14:01.123456789 UTC';
+begin
+  loop
+    insert into tbl_timestamp0 select i from
+      generate_series(current, current + interval '1 day', '28 seconds') i;
+    perform brin_summarize_new_values('tbl_timestamp0_d1_idx');
+    if (brin_metapage_info(get_raw_page('tbl_timestamp0_d1_idx', 0))).lastrevmappage > 1 then
+      exit;
+    end if;
+    current := current + interval '1 day';
+  end loop;
+end
+$$
+;
+create trigger trig_ins_after_3 after insert on parted2_stmt_trig
+  for each statement execute procedure trigger_notice()
+;
+create function explain_analyze(query text) returns setof text
+language plpgsql as
+$$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off, buffers off) %s',
+            query)
+    loop
+        ln := regexp_replace(ln, 'Maximum Storage: \d+', 'Maximum Storage: N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+drop table with_test
+;
+CREATE TABLE shighway (
+	surface		text
+) INHERITS (road)
+;
+ALTER TABLE inhts RENAME aa TO aaa
+;
+DROP TABLE fk_notpartitioned_pk, fk_partitioned_fk
+;
+CREATE DATABASE foobar2 ENCODING 'LATIN1' TEMPLATE template0 LOCALE 'C'
+;
+-- corner case: VALUES with no columns
+CREATE TEMP TABLE nocols()
+;
+create table some_tab (f1 int, f2 int, f3 int, check (f1 < 10) no inherit)
+;
+ANALYZE pg_temp_4.pg_temp_37896
+;
+-- ok - we don't have column list for partitioned table.
+ALTER PUBLICATION testpub6 SET (PUBLISH_VIA_PARTITION_ROOT=0)
+;
+alter table atacc2 add foreign key (id) references atacc1(a)
+;
+alter table tt14t drop column f3
+;
+VACUUM (SKIP_DATABASE_STATS, PARALLEL 0) pg_catalog.pg_depend
+;
+ALTER FOREIGN TABLE ft1 ALTER COLUMN c8 SET DATA TYPE integer
+;
+CREATE OR REPLACE FUNCTION test_slru_page_truncate(int) RETURNS VOID
+  AS 'MODULE_PATHNAME', 'test_slru_page_truncate' LANGUAGE C
+;
+ALTER TABLE pg_am ADD UNIQUE USING INDEX pg_am_name_index
+;
+CREATE OPERATOR <> (
+	PROCEDURE = isnne,
+	LEFTARG = ean13,
+	RIGHTARG = upc,
+	COMMUTATOR = <>,
+	NEGATOR = =,
+	RESTRICT = neqsel,
+	JOIN = neqjoinsel)
+;
+-- non-top-level command
+create function f1() returns int
+language plpgsql
+as $$
+begin
+  create table event_trigger_fire6 (a int);
+  return 0;
+end $$
+;
+-- test as part of prepare/execute
+CREATE FUNCTION test3() RETURNS void
+LANGUAGE plperlu
+TRANSFORM FOR TYPE hstore
+AS $$
+use Data::Dumper;
+$Data::Dumper::Sortkeys = 1;
+$Data::Dumper::Indent = 0;
+
+$rv = spi_exec_query(q{SELECT 'aa=>bb, cc=>NULL'::hstore AS col1});
+elog(INFO, Dumper($rv->{rows}[0]->{col1}));
+
+$val = {a => 1, b => 'boo', c => undef};
+$plan = spi_prepare(q{SELECT $1::text AS col1}, "hstore");
+$rv = spi_exec_prepared($plan, {}, $val);
+elog(INFO, Dumper($rv->{rows}[0]->{col1}));
+$$
+;
+-- ERROR
+ALTER FOREIGN TABLE ft1 DROP CONSTRAINT IF EXISTS no_const
+;
+create or replace function bogus_int8_text_eq(int8, text) returns boolean
+language sql as 'select $1::text = $2 and $1::text = $2'
+;
+-- UNIQUE with USING [UNIQUE] INDEX (possible but not a temporal constraint):
+CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange
+)
+;
+CREATE FUNCTION test_regex(pattern text, string text, flags text)
+RETURNS SETOF text[]
+STRICT
+AS '$libdir/test_regex' LANGUAGE C
+;
+create table gloc1 (
+  a int,
+  b int generated always as (a * 2) stored)
+;
+CREATE TABLE prt1_e_p2 PARTITION OF prt1_e FOR VALUES FROM (250) TO (500)
+;
+/*
+ * 24.12
+ * USER_MAPPING_OPTIONS view
+ */
+CREATE VIEW user_mapping_options AS
+    SELECT authorization_identifier,
+           foreign_server_catalog,
+           foreign_server_name,
+           CAST(opts.option_name AS sql_identifier) AS option_name,
+           CAST(CASE WHEN (umuser <> 0 AND authorization_identifier = current_user)
+                       OR (umuser = 0 AND pg_has_role(srvowner, 'USAGE'))
+                       OR (SELECT rolsuper FROM pg_authid WHERE rolname = current_user)
+                     THEN opts.option_value
+                     ELSE NULL END AS character_data) AS option_value
+    FROM _pg_user_mappings um,
+         pg_options_to_table(um.umoptions) opts
+;
+DROP TABLE pred_tab
+;
+create table parted_referenced (a int)
+;
+ALTER TABLE no_index_cleanup SET (vacuum_index_cleanup = auto)
+;
+CREATE OPERATOR CLASS gist_bool_ops
+DEFAULT FOR TYPE bool USING gist
+AS
+	OPERATOR	1	<  ,
+	OPERATOR	2	<= ,
+	OPERATOR	3	=  ,
+	OPERATOR	4	>= ,
+	OPERATOR	5	>  ,
+	OPERATOR	6	<> ,
+	FUNCTION	1	gbt_bool_consistent (internal, bool, int2, oid, internal),
+	FUNCTION	2	gbt_bool_union (internal, internal),
+	FUNCTION	3	gbt_bool_compress (internal),
+	FUNCTION	4	gbt_decompress (internal),
+	FUNCTION	5	gbt_bool_penalty (internal, internal, internal),
+	FUNCTION	6	gbt_bool_picksplit (internal, internal),
+	FUNCTION	7	gbt_bool_same (gbtreekey2, gbtreekey2, internal),
+	FUNCTION	9   gbt_bool_fetch (internal),
+	STORAGE		gbtreekey2
+;
+-- multiple steps in ALTER TABLE
+CREATE TABLE itest8 (f1 int)
+;
+DROP OPERATOR FAMILY IF EXISTS test_operator_family USING no_such_am
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] create or replace function stricttest() returns void as $$
+declare x record;
+begin
+  -- should fail, no rows
+  execute 'select * from foo where f1 = 0' into strict x;
+  raise notice 'x.f1 = %, x.f2 = %', x.f1, x.f2;
+end$$ language plpgsql
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gin_extract_query_name(name, internal, int2, internal, internal)
+RETURNS internal
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+----------
+[CREATE_POLICY] CREATE TEXT SEARCH DICTIONARY hunspell_num (
+                        Template=ispell,
+                        DictFile=hunspell_sample_num,
+                        AffFile=hunspell_sample_num
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION bt_page_items(IN relname text, IN blkno int4,
+    OUT itemoffset smallint,
+    OUT ctid tid,
+    OUT itemlen smallint,
+    OUT nulls bool,
+    OUT vars bool,
+    OUT data text,
+    OUT dead boolean,
+    OUT htid tid,
+    OUT tids tid[])
+RETURNS SETOF record
+AS '$libdir/pageinspect', 'bt_page_items'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE test1 ADD c int NOT NULL DEFAULT 0
+;
+----------
+[ADD_INDEX] CREATE INDEX brin_test_bloom_a_idx ON brin_test_bloom USING brin (a) WITH (pages_per_range = 2)
+;
+----------
+[CREATE_SCHEMA] -- verify foreign keys are enforced during cross-partition updates,
+-- especially on the PK side
+CREATE SCHEMA fkpart11
+  CREATE TABLE pk (a INT PRIMARY KEY, b text) PARTITION BY LIST (a)
+  CREATE TABLE fk (
+    a INT,
+    CONSTRAINT fkey FOREIGN KEY (a) REFERENCES pk(a) ON UPDATE CASCADE ON DELETE CASCADE
+  )
+  CREATE TABLE fk_parted (
+    a INT PRIMARY KEY,
+    CONSTRAINT fkey FOREIGN KEY (a) REFERENCES pk(a) ON UPDATE CASCADE ON DELETE CASCADE
+  ) PARTITION BY LIST (a)
+  CREATE TABLE fk_another (
+    a INT,
+    CONSTRAINT fkey FOREIGN KEY (a) REFERENCES fk_parted (a) ON UPDATE CASCADE ON DELETE CASCADE
+  )
+  CREATE TABLE pk1 PARTITION OF pk FOR VALUES IN (1, 2) PARTITION BY LIST (a)
+  CREATE TABLE pk2 PARTITION OF pk FOR VALUES IN (3)
+  CREATE TABLE pk3 PARTITION OF pk FOR VALUES IN (4)
+  CREATE TABLE fk1 PARTITION OF fk_parted FOR VALUES IN (1, 2)
+  CREATE TABLE fk2 PARTITION OF fk_parted FOR VALUES IN (3)
+  CREATE TABLE fk3 PARTITION OF fk_parted FOR VALUES IN (4)
+;
+----------
+[CREATE_VIEW(SELECT)] -- should fail
+CREATE OR REPLACE VIEW viewtest AS
+	SELECT a FROM viewtest_tbl WHERE a <> 20
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION event_trigger_report_dropped()
+ RETURNS event_trigger
+ LANGUAGE plpgsql
+AS $$
+DECLARE r record;
+BEGIN
+    FOR r IN SELECT * from pg_event_trigger_dropped_objects()
+    LOOP
+    IF NOT r.normal AND NOT r.original THEN
+        CONTINUE;
+    END IF;
+    RAISE NOTICE 'NORMAL: orig=% normal=% istemp=% type=% identity=% schema=% name=% addr=% args=%',
+        r.original, r.normal, r.is_temporary, r.object_type,
+        r.object_identity, r.schema_name, r.object_name,
+        r.address_names, r.address_args;
+    END LOOP;
+END; $$
+;
+----------
+[CREATE_TABLE] create table p1(id int, name text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE pub_testpart1.parent1 (a int) partition by list (a)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table idxpart add primary key (a)
+;
+----------
+[CREATE_TABLE] create table inhpar(f1 int primary key, f2 name) partition by range (f1)
+;
+----------
+[DROP_PROG_OBJ] DROP FUNCTION my_int4_sort(int4,int4)
+;
+----------
+[CREATE_TABLE] --
+-- Test case derived from bug #9085: check * qualification of composite
+-- parameters for SQL functions
+--
+
+create temp table compos (f1 int, f2 text)
+;
+----------
+[CREATE_TABLE] CREATE TABLE tbl (
+	a int generated always as (b::int * 2) stored,
+	b text
+)
+;
+----------
+[BLOCK] do
+$$
+declare
+  current timestamp with time zone := '2019-03-27 08:14:01.123456789 UTC';
+begin
+  loop
+    insert into tbl_timestamp0 select i from
+      generate_series(current, current + interval '1 day', '28 seconds') i;
+    perform brin_summarize_new_values('tbl_timestamp0_d1_idx');
+    if (brin_metapage_info(get_raw_page('tbl_timestamp0_d1_idx', 0))).lastrevmappage > 1 then
+      exit;
+    end if;
+    current := current + interval '1 day';
+  end loop;
+end
+$$
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger trig_ins_after_3 after insert on parted2_stmt_trig
+  for each statement execute procedure trigger_notice()
+;
+----------
+[CREATE_PROG_OBJ] create function explain_analyze(query text) returns setof text
+language plpgsql as
+$$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off, buffers off) %s',
+            query)
+    loop
+        ln := regexp_replace(ln, 'Maximum Storage: \d+', 'Maximum Storage: N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+----------
+[DROP_TABLE] drop table with_test
+;
+----------
+[CREATE_TABLE] CREATE TABLE shighway (
+	surface		text
+) INHERITS (road)
+;
+----------
+[RENAME_COLUMN] ALTER TABLE inhts RENAME aa TO aaa
+;
+----------
+[DROP_TABLE] DROP TABLE fk_notpartitioned_pk, fk_partitioned_fk
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE foobar2 ENCODING 'LATIN1' TEMPLATE template0 LOCALE 'C'
+;
+----------
+[CREATE_TABLE] -- corner case: VALUES with no columns
+CREATE TEMP TABLE nocols()
+;
+----------
+[CREATE_TABLE] create table some_tab (f1 int, f2 int, f3 int, check (f1 < 10) no inherit)
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_4.pg_temp_37896
+;
+----------
+[ALTER_PUB_SUB] -- ok - we don't have column list for partitioned table.
+ALTER PUBLICATION testpub6 SET (PUBLISH_VIA_PARTITION_ROOT=0)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] alter table atacc2 add foreign key (id) references atacc1(a)
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] alter table tt14t drop column f3
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, PARALLEL 0) pg_catalog.pg_depend
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER FOREIGN TABLE ft1 ALTER COLUMN c8 SET DATA TYPE integer
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION test_slru_page_truncate(int) RETURNS VOID
+  AS 'MODULE_PATHNAME', 'test_slru_page_truncate' LANGUAGE C
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE pg_am ADD UNIQUE USING INDEX pg_am_name_index
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR <> (
+	PROCEDURE = isnne,
+	LEFTARG = ean13,
+	RIGHTARG = upc,
+	COMMUTATOR = <>,
+	NEGATOR = =,
+	RESTRICT = neqsel,
+	JOIN = neqjoinsel)
+;
+----------
+[CREATE_PROG_OBJ] -- non-top-level command
+create function f1() returns int
+language plpgsql
+as $$
+begin
+  create table event_trigger_fire6 (a int);
+  return 0;
+end $$
+;
+----------
+[CREATE_PROG_OBJ] -- test as part of prepare/execute
+CREATE FUNCTION test3() RETURNS void
+LANGUAGE plperlu
+TRANSFORM FOR TYPE hstore
+AS $$
+use Data::Dumper;
+$Data::Dumper::Sortkeys = 1;
+$Data::Dumper::Indent = 0;
+
+$rv = spi_exec_query(q{SELECT 'aa=>bb, cc=>NULL'::hstore AS col1});
+elog(INFO, Dumper($rv->{rows}[0]->{col1}));
+
+$val = {a => 1, b => 'boo', c => undef};
+$plan = spi_prepare(q{SELECT $1::text AS col1}, "hstore");
+$rv = spi_exec_prepared($plan, {}, $val);
+elog(INFO, Dumper($rv->{rows}[0]->{col1}));
+$$
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] -- ERROR
+ALTER FOREIGN TABLE ft1 DROP CONSTRAINT IF EXISTS no_const
+;
+----------
+[CREATE_PROG_OBJ] create or replace function bogus_int8_text_eq(int8, text) returns boolean
+language sql as 'select $1::text = $2 and $1::text = $2'
+;
+----------
+[CREATE_TABLE] -- UNIQUE with USING [UNIQUE] INDEX (possible but not a temporal constraint):
+CREATE TABLE temporal3 (
+  id int4range,
+  valid_at daterange
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION test_regex(pattern text, string text, flags text)
+RETURNS SETOF text[]
+STRICT
+AS '$libdir/test_regex' LANGUAGE C
+;
+----------
+[CREATE_TABLE] create table gloc1 (
+  a int,
+  b int generated always as (a * 2) stored)
+;
+----------
+[CREATE_TABLE] CREATE TABLE prt1_e_p2 PARTITION OF prt1_e FOR VALUES FROM (250) TO (500)
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 24.12
+ * USER_MAPPING_OPTIONS view
+ */
+CREATE VIEW user_mapping_options AS
+    SELECT authorization_identifier,
+           foreign_server_catalog,
+           foreign_server_name,
+           CAST(opts.option_name AS sql_identifier) AS option_name,
+           CAST(CASE WHEN (umuser <> 0 AND authorization_identifier = current_user)
+                       OR (umuser = 0 AND pg_has_role(srvowner, 'USAGE'))
+                       OR (SELECT rolsuper FROM pg_authid WHERE rolname = current_user)
+                     THEN opts.option_value
+                     ELSE NULL END AS character_data) AS option_value
+    FROM _pg_user_mappings um,
+         pg_options_to_table(um.umoptions) opts
+;
+----------
+[DROP_TABLE] DROP TABLE pred_tab
+;
+----------
+[CREATE_TABLE] create table parted_referenced (a int)
+;
+----------
+[ALTER_TABLE] ALTER TABLE no_index_cleanup SET (vacuum_index_cleanup = auto)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR CLASS gist_bool_ops
+DEFAULT FOR TYPE bool USING gist
+AS
+	OPERATOR	1	<  ,
+	OPERATOR	2	<= ,
+	OPERATOR	3	=  ,
+	OPERATOR	4	>= ,
+	OPERATOR	5	>  ,
+	OPERATOR	6	<> ,
+	FUNCTION	1	gbt_bool_consistent (internal, bool, int2, oid, internal),
+	FUNCTION	2	gbt_bool_union (internal, internal),
+	FUNCTION	3	gbt_bool_compress (internal),
+	FUNCTION	4	gbt_decompress (internal),
+	FUNCTION	5	gbt_bool_penalty (internal, internal, internal),
+	FUNCTION	6	gbt_bool_picksplit (internal, internal),
+	FUNCTION	7	gbt_bool_same (gbtreekey2, gbtreekey2, internal),
+	FUNCTION	9   gbt_bool_fetch (internal),
+	STORAGE		gbtreekey2
+;
+----------
+[CREATE_TABLE] -- multiple steps in ALTER TABLE
+CREATE TABLE itest8 (f1 int)
+;
+----------
+[DROP_PROG_OBJ] DROP OPERATOR FAMILY IF EXISTS test_operator_family USING no_such_am
+;

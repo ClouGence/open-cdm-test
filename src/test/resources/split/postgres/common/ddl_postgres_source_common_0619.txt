@@ -1,0 +1,426 @@
+CREATE RULE y_rule AS ON DELETE TO y DO INSTEAD
+  INSERT INTO y VALUES(42) RETURNING *
+;
+create function tg_hub_adjustslots(hname bpchar,
+                                   oldnslots integer,
+                                   newnslots integer)
+returns integer as '
+begin
+    if newnslots = oldnslots then
+        return 0;
+    end if;
+    if newnslots < oldnslots then
+        delete from HSlot where hubname = hname and slotno > newnslots;
+	return 0;
+    end if;
+    for i in oldnslots + 1 .. newnslots loop
+        insert into HSlot (slotname, hubname, slotno, slotlink)
+		values (''HS.dummy'', hname, i, '''');
+    end loop;
+    return 0;
+end
+' language plpgsql
+;
+COMMENT ON COLUMN comment_test.id IS 'Column ''id'' on comment_test'
+;
+--
+-- Tests for SECURITY LABEL
+--
+-- @SECURITY-CONTEXT=unconfined_u:unconfined_r:sepgsql_regtest_dba_t:s0
+SECURITY LABEL ON TABLE t1
+    IS 'system_u:object_r:sepgsql_ro_table_t:s0'
+;
+ANALYZE public.gtest10a
+;
+CALL ptest5(10, b => 'Hello')
+;
+do $$
+begin
+for i in 1..10 loop
+  <<innerblock>>
+  begin
+    begin  -- unlabeled block
+      exit;
+      raise notice 'should not get here';
+    end;
+    raise notice 'should not get here, either';
+  end;
+  raise notice 'nor here';
+end loop;
+raise notice 'should get here';
+end$$
+;
+CREATE TABLE pht2 (a int, b int, c text) PARTITION BY HASH(c)
+;
+--
+-- Check conflicts between index and CHECK constraint names
+--
+CREATE TABLE tt9(c integer)
+;
+CREATE AGGREGATE myaggn09a(BASETYPE = int, SFUNC = tf1p, STYPE = int[],
+  FINALFUNC = ffnp, INITCOND = '{}')
+;
+DROP VIEW ro_view10, ro_view12, ro_view18
+;
+CREATE TABLE gtest_parent (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS (f2 * 2) STORED) PARTITION BY RANGE ((f3))
+;
+CREATE FUNCTION cube_gt(cube, cube)
+RETURNS bool
+AS '$libdir/cube'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+create table atref(b attbl check ((b).a is not null))
+;
+create index cluster_sort on clstr_4 (hundred, thousand, tenthous)
+;
+ALTER TABLE notnull_tbl1 DROP CONSTRAINT nntbl1_a
+;
+ALTER TABLE rls_ptbl ENABLE ROW LEVEL SECURITY
+;
+-- test variadic polymorphic functions
+
+create function myleast(variadic anyarray) returns anyelement as $$
+  select min($1[i]) from generate_subscripts($1,1) g(i)
+$$ language sql immutable strict
+;
+DROP TABLE pkeys
+;
+DROP CAST (priv_testdomain1 AS priv_testdomain3b)
+;
+truncate ab
+;
+ALTER TEXT SEARCH CONFIGURATION "public"."thesaurus_tst"
+    ADD MAPPING FOR "host" WITH "simple"
+;
+ALTER FOREIGN TABLE ft1 ALTER COLUMN c8 TYPE int
+;
+-- should fail
+CREATE OR REPLACE VIEW viewtest AS
+	SELECT a, b::numeric FROM viewtest_tbl
+;
+VACUUM (SKIP_DATABASE_STATS, FREEZE) pg_catalog.pg_statistic_ext
+;
+ALTER TEXT SEARCH PARSER alt_ts_prs1 RENAME TO alt_ts_prs3
+;
+-- Options
+CREATE SCHEMA import_dest2
+;
+-- NOT VALID and NOT ENFORCED foreign key on a non-partitioned table
+-- referencing a partitioned table
+CREATE TABLE fk_partitioned_pk (a int, b int, PRIMARY KEY (a, b)) PARTITION BY RANGE (a, b)
+;
+create table atacc1 (test int, test2 int, unique(test))
+;
+ALTER TABLE ONLY "public"."gtest24"
+    ADD CONSTRAINT "gtest24_pkey" PRIMARY KEY ("a")
+;
+/*
+ * 5.7
+ * YES_OR_NO domain
+ */
+
+CREATE DOMAIN yes_or_no AS character varying(3) COLLATE "C"
+    CONSTRAINT yes_or_no_check CHECK (value IN ('YES', 'NO'))
+;
+CREATE TABLE "fkpart5"."pk" (
+    "a" integer NOT NULL
+)
+PARTITION BY LIST ("a")
+;
+CREATE SUBSCRIPTION tap_sub CONNECTION 'port=29692 host=/tmp/KsgVe3OAnU dbname=postgres application_name=tap_sub' PUBLICATION tap_pub_x, tap_pub_allinschema
+;
+ALTER TABLE test_pg_dump_t1 DROP COLUMN junk
+;
+CREATE PROCEDURE "public"."ptest6"(IN "a" integer, IN "b" "anyelement")
+    LANGUAGE "sql"
+    AS $$
+SELECT NULL::int;
+$$
+;
+VACUUM (SKIP_DATABASE_STATS, FREEZE) pg_catalog.pg_user_mapping
+;
+CREATE PROCEDURE ptest6c(inout a anyelement, inout b anyelement)
+LANGUAGE SQL
+AS $$
+SELECT $1, 1;
+$$
+;
+alter table test_storage add b int default random()::int
+;
+-- works
+create trigger t before insert or update or delete on parted
+  for each row execute function parted_trigfunc()
+;
+CREATE TABLE fk4 (LIKE fk)
+;
+-- Test basic TRUNCATE functionality.
+CREATE TABLE truncate_a (col1 integer primary key)
+;
+DROP TABLE batch_table
+;
+-- fails
+CREATE COLLATION regress_pg_unicode_fast (
+  provider = builtin, locale = 'PG_UNICODE_FAST')
+;
+CREATE FUNCTION isnle(upc, ean13)
+	RETURNS boolean
+	AS 'int8le'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+CREATE MATERIALIZED VIEW s2.t2_mv AS SELECT * FROM s2.t2
+;
+CREATE FUNCTION hstore_in(cstring)
+RETURNS hstore
+AS '$libdir/hstore'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+ALTER TABLE ONLY "public"."sj"
+    ADD CONSTRAINT "sj_c_key" UNIQUE ("c")
+;
+CREATE SUBSCRIPTION regress_testsub CONNECTION 'dbname=regress_doesnotexist' PUBLICATION testpub WITH (connect = false)
+;
+ALTER TABLE ONLY "public"."prt1_m" ATTACH PARTITION "public"."prt1_m_p2" FOR VALUES FROM (250, 250) TO (500, 500)
+;
+-- plpgsql functions use materialize mode
+CREATE FUNCTION rngfunc_mat(int,int) RETURNS setof rngfunc_rescan_t AS 'begin for i in $1..$2 loop return next (i, nextval(''rngfunc_rescan_seq2'')); end loop; end;' LANGUAGE plpgsql
+;
+------------------------------------------------------------------------------------------
+[CREATE_POLICY] CREATE RULE y_rule AS ON DELETE TO y DO INSTEAD
+  INSERT INTO y VALUES(42) RETURNING *
+;
+----------
+[CREATE_PROG_OBJ] create function tg_hub_adjustslots(hname bpchar,
+                                   oldnslots integer,
+                                   newnslots integer)
+returns integer as '
+begin
+    if newnslots = oldnslots then
+        return 0;
+    end if;
+    if newnslots < oldnslots then
+        delete from HSlot where hubname = hname and slotno > newnslots;
+	return 0;
+    end if;
+    for i in oldnslots + 1 .. newnslots loop
+        insert into HSlot (slotname, hubname, slotno, slotlink)
+		values (''HS.dummy'', hname, i, '''');
+    end loop;
+    return 0;
+end
+' language plpgsql
+;
+----------
+[COMMENT_COLUMN] COMMENT ON COLUMN comment_test.id IS 'Column ''id'' on comment_test'
+;
+----------
+[UNKNOWN] --
+-- Tests for SECURITY LABEL
+--
+-- @SECURITY-CONTEXT=unconfined_u:unconfined_r:sepgsql_regtest_dba_t:s0
+SECURITY LABEL ON TABLE t1
+    IS 'system_u:object_r:sepgsql_ro_table_t:s0'
+;
+----------
+[ADMIN_TABLE] ANALYZE public.gtest10a
+;
+----------
+[CALL_PROG_OBJ] CALL ptest5(10, b => 'Hello')
+;
+----------
+[BLOCK] do $$
+begin
+for i in 1..10 loop
+  <<innerblock>>
+  begin
+    begin  -- unlabeled block
+      exit;
+      raise notice 'should not get here';
+    end;
+    raise notice 'should not get here, either';
+  end;
+  raise notice 'nor here';
+end loop;
+raise notice 'should get here';
+end$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE pht2 (a int, b int, c text) PARTITION BY HASH(c)
+;
+----------
+[CREATE_TABLE] --
+-- Check conflicts between index and CHECK constraint names
+--
+CREATE TABLE tt9(c integer)
+;
+----------
+[CREATE_PROG_OBJ] CREATE AGGREGATE myaggn09a(BASETYPE = int, SFUNC = tf1p, STYPE = int[],
+  FINALFUNC = ffnp, INITCOND = '{}')
+;
+----------
+[DROP_VIEW] DROP VIEW ro_view10, ro_view12, ro_view18
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtest_parent (f1 date NOT NULL, f2 bigint, f3 bigint GENERATED ALWAYS AS (f2 * 2) STORED) PARTITION BY RANGE ((f3))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION cube_gt(cube, cube)
+RETURNS bool
+AS '$libdir/cube'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] create table atref(b attbl check ((b).a is not null))
+;
+----------
+[ADD_INDEX] create index cluster_sort on clstr_4 (hundred, thousand, tenthous)
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] ALTER TABLE notnull_tbl1 DROP CONSTRAINT nntbl1_a
+;
+----------
+[ALTER_TABLE] ALTER TABLE rls_ptbl ENABLE ROW LEVEL SECURITY
+;
+----------
+[CREATE_PROG_OBJ] -- test variadic polymorphic functions
+
+create function myleast(variadic anyarray) returns anyelement as $$
+  select min($1[i]) from generate_subscripts($1,1) g(i)
+$$ language sql immutable strict
+;
+----------
+[DROP_TABLE] DROP TABLE pkeys
+;
+----------
+[DROP_PROG_OBJ] DROP CAST (priv_testdomain1 AS priv_testdomain3b)
+;
+----------
+[TRUNCATE_TABLE] truncate ab
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION "public"."thesaurus_tst"
+    ADD MAPPING FOR "host" WITH "simple"
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER FOREIGN TABLE ft1 ALTER COLUMN c8 TYPE int
+;
+----------
+[CREATE_VIEW(SELECT)] -- should fail
+CREATE OR REPLACE VIEW viewtest AS
+	SELECT a, b::numeric FROM viewtest_tbl
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, FREEZE) pg_catalog.pg_statistic_ext
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH PARSER alt_ts_prs1 RENAME TO alt_ts_prs3
+;
+----------
+[CREATE_SCHEMA] -- Options
+CREATE SCHEMA import_dest2
+;
+----------
+[CREATE_TABLE] -- NOT VALID and NOT ENFORCED foreign key on a non-partitioned table
+-- referencing a partitioned table
+CREATE TABLE fk_partitioned_pk (a int, b int, PRIMARY KEY (a, b)) PARTITION BY RANGE (a, b)
+;
+----------
+[CREATE_TABLE] create table atacc1 (test int, test2 int, unique(test))
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "public"."gtest24"
+    ADD CONSTRAINT "gtest24_pkey" PRIMARY KEY ("a")
+;
+----------
+[CREATE_TYPE] /*
+ * 5.7
+ * YES_OR_NO domain
+ */
+
+CREATE DOMAIN yes_or_no AS character varying(3) COLLATE "C"
+    CONSTRAINT yes_or_no_check CHECK (value IN ('YES', 'NO'))
+;
+----------
+[CREATE_TABLE] CREATE TABLE "fkpart5"."pk" (
+    "a" integer NOT NULL
+)
+PARTITION BY LIST ("a")
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION tap_sub CONNECTION 'port=29692 host=/tmp/KsgVe3OAnU dbname=postgres application_name=tap_sub' PUBLICATION tap_pub_x, tap_pub_allinschema
+;
+----------
+[ALTER_TABLE|DROP_COLUMN] ALTER TABLE test_pg_dump_t1 DROP COLUMN junk
+;
+----------
+[CREATE_PROG_OBJ] CREATE PROCEDURE "public"."ptest6"(IN "a" integer, IN "b" "anyelement")
+    LANGUAGE "sql"
+    AS $$
+SELECT NULL::int;
+$$
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, FREEZE) pg_catalog.pg_user_mapping
+;
+----------
+[CREATE_PROG_OBJ] CREATE PROCEDURE ptest6c(inout a anyelement, inout b anyelement)
+LANGUAGE SQL
+AS $$
+SELECT $1, 1;
+$$
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] alter table test_storage add b int default random()::int
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] -- works
+create trigger t before insert or update or delete on parted
+  for each row execute function parted_trigfunc()
+;
+----------
+[CREATE_TABLE] CREATE TABLE fk4 (LIKE fk)
+;
+----------
+[CREATE_TABLE] -- Test basic TRUNCATE functionality.
+CREATE TABLE truncate_a (col1 integer primary key)
+;
+----------
+[DROP_TABLE] DROP TABLE batch_table
+;
+----------
+[CREATE_POLICY] -- fails
+CREATE COLLATION regress_pg_unicode_fast (
+  provider = builtin, locale = 'PG_UNICODE_FAST')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isnle(upc, ean13)
+	RETURNS boolean
+	AS 'int8le'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW s2.t2_mv AS SELECT * FROM s2.t2
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION hstore_in(cstring)
+RETURNS hstore
+AS '$libdir/hstore'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "public"."sj"
+    ADD CONSTRAINT "sj_c_key" UNIQUE ("c")
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION regress_testsub CONNECTION 'dbname=regress_doesnotexist' PUBLICATION testpub WITH (connect = false)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE ONLY "public"."prt1_m" ATTACH PARTITION "public"."prt1_m_p2" FOR VALUES FROM (250, 250) TO (500, 500)
+;
+----------
+[CREATE_PROG_OBJ] -- plpgsql functions use materialize mode
+CREATE FUNCTION rngfunc_mat(int,int) RETURNS setof rngfunc_rescan_t AS 'begin for i in $1..$2 loop return next (i, nextval(''rngfunc_rescan_seq2'')); end loop; end;' LANGUAGE plpgsql
+;

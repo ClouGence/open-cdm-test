@@ -1,0 +1,406 @@
+-- direct partition inserts should check hash partition bound constraint
+
+-- Use hand-rolled hash functions and operator classes to get predictable
+-- result on different machines.  The hash function for int4 simply returns
+-- the sum of the values passed to it and the one for text returns the length
+-- of the non-empty string value passed to it or 0.
+
+create or replace function part_hashint4_noop(value int4, seed int8)
+returns int8 as $$
+select value + seed;
+$$ language sql immutable
+;
+VACUUM (TRUNCATE FALSE) pg_catalog.pg_language
+;
+DROP PUBLICATION pub_empty, pub_for_tab, pub_for_all_tables
+;
+analyze t_gin_test_tbl
+;
+VACUUM (SKIP_LOCKED) pg_catalog.pg_range
+;
+drop table bc
+;
+ANALYZE pg_temp_4.pg_temp_37962_2
+;
+--
+-- Test partitioning planner code
+--
+
+-- Helper function which can be used for masking out portions of EXPLAIN
+-- ANALYZE which could contain information that's not consistent on all
+-- platforms.
+create function explain_analyze(query text) returns setof text
+language plpgsql as
+$$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off, buffers off) %s',
+            query)
+    loop
+        ln := regexp_replace(ln, 'Maximum Storage: \d+', 'Maximum Storage: N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+ALTER OPERATOR FAMILY gist_int4_ops USING gist ADD
+	FUNCTION	11  (int4, int4) gbt_int4_sortsupport (internal)
+;
+-- comments on partitioned tables columns
+CREATE TABLE parted_col_comment (a int, b text) PARTITION BY LIST (a)
+;
+ALTER FUNCTION gbt_enum_union(internal, internal) PARALLEL SAFE
+;
+ALTER TABLE errtst_parent ATTACH PARTITION errtst_child_reorder FOR VALUES FROM (20) TO (30)
+;
+-- no such attribute
+alter table emp rename column nonesuchatt to newnonesuchatt
+;
+DROP TRIGGER after_upd_b_stmt_trig ON main_table
+;
+DROP VIEW my_application_name
+;
+CREATE TABLE freespace_tab (c1 int) WITH (autovacuum_enabled = off)
+;
+CREATE VIEW pg_stat_replication_slots AS
+    SELECT
+            s.slot_name,
+            s.spill_txns,
+            s.spill_count,
+            s.spill_bytes,
+            s.stream_txns,
+            s.stream_count,
+            s.stream_bytes,
+            s.total_txns,
+            s.total_bytes,
+            s.stats_reset
+    FROM pg_replication_slots as r,
+        LATERAL pg_stat_get_replication_slot(slot_name) as s
+    WHERE r.datoid IS NOT NULL
+;
+ANALYZE (SKIP_LOCKED) pg_catalog.pg_database
+;
+create trigger aaa after insert on parted_trig
+   for each row execute procedure trigger_notice('quirky', 1)
+;
+CREATE AGGREGATE myaggn03a(*) (SFUNC = stfp, STYPE = int4[],
+  FINALFUNC = ffnp, INITCOND = '{}')
+;
+ANALYZE public.gtest29
+;
+CREATE EXTENSION IF NOT EXISTS pg_trgm
+;
+ALTER OPERATOR <= (ean13, isbn13) SET (
+	RESTRICT = scalarlesel,
+	JOIN = scalarlejoinsel)
+;
+drop extension injection_points
+;
+ALTER TABLE attmp RENAME TO attmp_new
+;
+-- should pass, because existing _textrange1 is automatically renamed
+create type textrange2 as range(subtype=text, multirange_type_name=_textrange1, collation="C")
+;
+CREATE INDEX brin_test_bloom_b_idx ON brin_test_bloom USING brin (b) WITH (pages_per_range = 2)
+;
+CREATE VIEW instead_of_insert_tbl_view_2 as select ''::text as str
+;
+ALTER TABLE concur_reindex_tab ADD COLUMN c2 text
+;
+CREATE AGGREGATE myaggp09b(BASETYPE = int, SFUNC = tf1p, STYPE = int[],
+  INITCOND = '{}')
+;
+create type more_int4s as (f0 text, f1 int4, f2 int4)
+;
+ALTER OPERATOR === (boolean, boolean) SET (JOIN = non_existent_func)
+;
+--
+-- External C-functions for R-tree methods
+--
+
+-- Left/Right methods
+
+CREATE FUNCTION seg_over_left(seg, seg)
+RETURNS bool
+AS '$libdir/seg'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+create view tt25v as
+with cte as materialized (select pg_get_keywords() k)
+select (k).word from cte
+;
+ALTER TABLE regtest_ptable ALTER p DROP NOT NULL
+;
+-- but an explicitly set AM overrides it
+CREATE TABLE tableam_parted_2_heapx PARTITION OF tableam_parted_heapx FOR VALUES IN ('c', 'd') USING heap
+;
+ANALYZE public.itest5
+;
+VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_opclass
+;
+-- Normal index with text column
+CREATE INDEX concur_reindex_ind2 ON concur_reindex_tab(c2)
+;
+CREATE OPERATOR ^~ (
+        LEFTARG = lquery,
+	RIGHTARG = ltree,
+	PROCEDURE = ltq_rregex,
+	COMMUTATOR = '^~',
+	RESTRICT = contsel,
+	JOIN = contjoinsel
+)
+;
+ANALYZE pg_catalog.pg_statistic_ext_data
+;
+-- Before v15, this has no effect because parent has no triggers:
+alter table parent disable trigger all
+;
+-- various ALTER COLUMN tests
+
+-- fail, not allowed for identity columns
+ALTER TABLE itest1 ALTER COLUMN a SET DEFAULT 1
+;
+VACUUM (INDEX_CLEANUP FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_user_mapping
+;
+CREATE MATERIALIZED VIEW tid_matview AS SELECT a FROM tid_tab
+;
+VACUUM (SKIP_LOCKED) pg_catalog.pg_pltemplate
+;
+VACUUM (FULL) pg_catalog.pg_publication
+;
+ALTER INDEX pg_toast.pg_toast_28107_index RENAME TO reind_con_toast_idx
+;
+CALL test_proc8c(_a, b => _b)
+;
+COMMENT ON CONSTRAINT inv_ck ON DOMAIN constraint_comments_dom IS 'comment on invalid constraint'
+;
+------------------------------------------------------------------------------------------
+[CREATE_PROG_OBJ] -- direct partition inserts should check hash partition bound constraint
+
+-- Use hand-rolled hash functions and operator classes to get predictable
+-- result on different machines.  The hash function for int4 simply returns
+-- the sum of the values passed to it and the one for text returns the length
+-- of the non-empty string value passed to it or 0.
+
+create or replace function part_hashint4_noop(value int4, seed int8)
+returns int8 as $$
+select value + seed;
+$$ language sql immutable
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE) pg_catalog.pg_language
+;
+----------
+[DROP_PUB_SUB] DROP PUBLICATION pub_empty, pub_for_tab, pub_for_all_tables
+;
+----------
+[ADMIN_TABLE] analyze t_gin_test_tbl
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_LOCKED) pg_catalog.pg_range
+;
+----------
+[DROP_TABLE] drop table bc
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_4.pg_temp_37962_2
+;
+----------
+[CREATE_PROG_OBJ] --
+-- Test partitioning planner code
+--
+
+-- Helper function which can be used for masking out portions of EXPLAIN
+-- ANALYZE which could contain information that's not consistent on all
+-- platforms.
+create function explain_analyze(query text) returns setof text
+language plpgsql as
+$$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off, buffers off) %s',
+            query)
+    loop
+        ln := regexp_replace(ln, 'Maximum Storage: \d+', 'Maximum Storage: N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY gist_int4_ops USING gist ADD
+	FUNCTION	11  (int4, int4) gbt_int4_sortsupport (internal)
+;
+----------
+[CREATE_TABLE] -- comments on partitioned tables columns
+CREATE TABLE parted_col_comment (a int, b text) PARTITION BY LIST (a)
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_enum_union(internal, internal) PARALLEL SAFE
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE errtst_parent ATTACH PARTITION errtst_child_reorder FOR VALUES FROM (20) TO (30)
+;
+----------
+[RENAME_COLUMN] -- no such attribute
+alter table emp rename column nonesuchatt to newnonesuchatt
+;
+----------
+[DROP_TRIGGER] DROP TRIGGER after_upd_b_stmt_trig ON main_table
+;
+----------
+[DROP_VIEW] DROP VIEW my_application_name
+;
+----------
+[CREATE_TABLE] CREATE TABLE freespace_tab (c1 int) WITH (autovacuum_enabled = off)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW pg_stat_replication_slots AS
+    SELECT
+            s.slot_name,
+            s.spill_txns,
+            s.spill_count,
+            s.spill_bytes,
+            s.stream_txns,
+            s.stream_count,
+            s.stream_bytes,
+            s.total_txns,
+            s.total_bytes,
+            s.stats_reset
+    FROM pg_replication_slots as r,
+        LATERAL pg_stat_get_replication_slot(slot_name) as s
+    WHERE r.datoid IS NOT NULL
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) pg_catalog.pg_database
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger aaa after insert on parted_trig
+   for each row execute procedure trigger_notice('quirky', 1)
+;
+----------
+[CREATE_PROG_OBJ] CREATE AGGREGATE myaggn03a(*) (SFUNC = stfp, STYPE = int4[],
+  FINALFUNC = ffnp, INITCOND = '{}')
+;
+----------
+[ADMIN_TABLE] ANALYZE public.gtest29
+;
+----------
+[CREATE_LIBRARY] CREATE EXTENSION IF NOT EXISTS pg_trgm
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR <= (ean13, isbn13) SET (
+	RESTRICT = scalarlesel,
+	JOIN = scalarlejoinsel)
+;
+----------
+[DROP_LIBRARY] drop extension injection_points
+;
+----------
+[RENAME_TABLE] ALTER TABLE attmp RENAME TO attmp_new
+;
+----------
+[CREATE_POLICY] -- should pass, because existing _textrange1 is automatically renamed
+create type textrange2 as range(subtype=text, multirange_type_name=_textrange1, collation="C")
+;
+----------
+[ADD_INDEX] CREATE INDEX brin_test_bloom_b_idx ON brin_test_bloom USING brin (b) WITH (pages_per_range = 2)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW instead_of_insert_tbl_view_2 as select ''::text as str
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE concur_reindex_tab ADD COLUMN c2 text
+;
+----------
+[CREATE_PROG_OBJ] CREATE AGGREGATE myaggp09b(BASETYPE = int, SFUNC = tf1p, STYPE = int[],
+  INITCOND = '{}')
+;
+----------
+[CREATE_TYPE] create type more_int4s as (f0 text, f1 int4, f2 int4)
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR === (boolean, boolean) SET (JOIN = non_existent_func)
+;
+----------
+[CREATE_PROG_OBJ] --
+-- External C-functions for R-tree methods
+--
+
+-- Left/Right methods
+
+CREATE FUNCTION seg_over_left(seg, seg)
+RETURNS bool
+AS '$libdir/seg'
+LANGUAGE C STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] create view tt25v as
+with cte as materialized (select pg_get_keywords() k)
+select (k).word from cte
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE regtest_ptable ALTER p DROP NOT NULL
+;
+----------
+[CREATE_TABLE] -- but an explicitly set AM overrides it
+CREATE TABLE tableam_parted_2_heapx PARTITION OF tableam_parted_heapx FOR VALUES IN ('c', 'd') USING heap
+;
+----------
+[ADMIN_TABLE] ANALYZE public.itest5
+;
+----------
+[ADMIN_TABLE] VACUUM (PROCESS_TOAST FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_opclass
+;
+----------
+[ADD_INDEX] -- Normal index with text column
+CREATE INDEX concur_reindex_ind2 ON concur_reindex_tab(c2)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR ^~ (
+        LEFTARG = lquery,
+	RIGHTARG = ltree,
+	PROCEDURE = ltq_rregex,
+	COMMUTATOR = '^~',
+	RESTRICT = contsel,
+	JOIN = contjoinsel
+)
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_catalog.pg_statistic_ext_data
+;
+----------
+[ALTER_TABLE] -- Before v15, this has no effect because parent has no triggers:
+alter table parent disable trigger all
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] -- various ALTER COLUMN tests
+
+-- fail, not allowed for identity columns
+ALTER TABLE itest1 ALTER COLUMN a SET DEFAULT 1
+;
+----------
+[ADMIN_TABLE] VACUUM (INDEX_CLEANUP FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_user_mapping
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE MATERIALIZED VIEW tid_matview AS SELECT a FROM tid_tab
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_LOCKED) pg_catalog.pg_pltemplate
+;
+----------
+[ADMIN_TABLE] VACUUM (FULL) pg_catalog.pg_publication
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_28107_index RENAME TO reind_con_toast_idx
+;
+----------
+[CALL_PROG_OBJ] CALL test_proc8c(_a, b => _b)
+;
+----------
+[COMMENT_CONSTRAINT] COMMENT ON CONSTRAINT inv_ck ON DOMAIN constraint_comments_dom IS 'comment on invalid constraint'
+;

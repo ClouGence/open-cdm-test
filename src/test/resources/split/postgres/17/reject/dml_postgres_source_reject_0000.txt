@@ -1,0 +1,90 @@
+UPDATE foo SET f1 = new.f1, f3 = new.f3, f4 = new.f4 * 10
+    FROM joinme WHERE f2 = f2j AND f2 = old.f2
+    RETURNING WITH (new AS n) new.f1, n.f4
+;
+MERGE INTO ONLY split_merge18.inventory AS t
+USING (VALUES ('keep', 3, 'fresh'), ('add', 7, 'new')) AS s(sku, delta, note)
+ON t.sku = s.sku
+WHEN MATCHED AND s.delta > 0 THEN UPDATE SET qty = t.qty + s.delta, note = s.note
+WHEN NOT MATCHED BY TARGET THEN INSERT (sku, qty, note) VALUES (s.sku, s.delta, s.note)
+WHEN NOT MATCHED BY SOURCE AND t.qty < 10 THEN DELETE
+RETURNING WITH (OLD AS o, NEW AS n) merge_action() AS action, o.sku AS old_sku, n.sku AS new_sku, n.qty
+;
+INSERT INTO foo VALUES (4, 'conflict'), (5, 'ok')
+  ON CONFLICT (f1) DO UPDATE SET f2 = excluded.f2||'ed', f3 = -1
+  RETURNING WITH (OLD AS o, NEW AS n)
+            o.tableoid::regclass, o.ctid, o.*,
+            n.tableoid::regclass, n.ctid, n.*, *
+;
+DELETE FROM split_returning18.items
+WHERE code = 'b'
+RETURNING WITH (OLD AS gone, NEW AS kept) gone.id, gone.code, kept.id AS new_id
+;
+INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS x, new AS x) *
+;
+INSERT INTO foo DEFAULT VALUES RETURNING WITH (new AS foo) *
+;
+INSERT INTO split_returning18.items AS t (id, code, qty)
+VALUES (1, 'a', 12), (2, 'b', 5)
+ON CONFLICT (id) DO UPDATE SET qty = excluded.qty
+RETURNING WITH (OLD AS o, NEW AS n) o.qty AS old_qty, n.qty AS new_qty, n.code
+;
+INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS o, new AS n, old AS o) *
+;
+INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS o, new AS n, new AS n) *
+;
+UPDATE split_returning18.items
+SET qty = qty + 1
+WHERE code IN ('a', 'b')
+RETURNING WITH (OLD AS before_row, NEW AS after_row) before_row.qty AS previous_qty, after_row.qty AS current_qty, after_row.code
+;
+------------------------------------------------------------------------------------------
+[UPDATE] UPDATE foo SET f1 = new.f1, f3 = new.f3, f4 = new.f4 * 10
+    FROM joinme WHERE f2 = f2j AND f2 = old.f2
+    RETURNING WITH (new AS n) new.f1, n.f4
+;
+----------
+[MERGE|SELECT] MERGE INTO ONLY split_merge18.inventory AS t
+USING (VALUES ('keep', 3, 'fresh'), ('add', 7, 'new')) AS s(sku, delta, note)
+ON t.sku = s.sku
+WHEN MATCHED AND s.delta > 0 THEN UPDATE SET qty = t.qty + s.delta, note = s.note
+WHEN NOT MATCHED BY TARGET THEN INSERT (sku, qty, note) VALUES (s.sku, s.delta, s.note)
+WHEN NOT MATCHED BY SOURCE AND t.qty < 10 THEN DELETE
+RETURNING WITH (OLD AS o, NEW AS n) merge_action() AS action, o.sku AS old_sku, n.sku AS new_sku, n.qty
+;
+----------
+[MERGE] INSERT INTO foo VALUES (4, 'conflict'), (5, 'ok')
+  ON CONFLICT (f1) DO UPDATE SET f2 = excluded.f2||'ed', f3 = -1
+  RETURNING WITH (OLD AS o, NEW AS n)
+            o.tableoid::regclass, o.ctid, o.*,
+            n.tableoid::regclass, n.ctid, n.*, *
+;
+----------
+[DELETE] DELETE FROM split_returning18.items
+WHERE code = 'b'
+RETURNING WITH (OLD AS gone, NEW AS kept) gone.id, gone.code, kept.id AS new_id
+;
+----------
+[INSERT] INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS x, new AS x) *
+;
+----------
+[INSERT] INSERT INTO foo DEFAULT VALUES RETURNING WITH (new AS foo) *
+;
+----------
+[MERGE|SELECT] INSERT INTO split_returning18.items AS t (id, code, qty)
+VALUES (1, 'a', 12), (2, 'b', 5)
+ON CONFLICT (id) DO UPDATE SET qty = excluded.qty
+RETURNING WITH (OLD AS o, NEW AS n) o.qty AS old_qty, n.qty AS new_qty, n.code
+;
+----------
+[INSERT] INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS o, new AS n, old AS o) *
+;
+----------
+[INSERT] INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS o, new AS n, new AS n) *
+;
+----------
+[UPDATE] UPDATE split_returning18.items
+SET qty = qty + 1
+WHERE code IN ('a', 'b')
+RETURNING WITH (OLD AS before_row, NEW AS after_row) before_row.qty AS previous_qty, after_row.qty AS current_qty, after_row.code
+;

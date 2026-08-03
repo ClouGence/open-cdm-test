@@ -1,0 +1,552 @@
+ALTER PUBLICATION testpub3 ADD TABLES IN SCHEMA pub_test
+;
+ALTER PUBLICATION tap_pub_schema DROP TABLES IN SCHEMA sch1
+;
+CREATE INDEX text_idx on test__int using gist (a gist__intbig_ops(siglen = 2024))
+;
+--
+-- SQL-standard body
+--
+CREATE FUNCTION functest_S_1(a text, b date) RETURNS boolean
+    LANGUAGE SQL
+    RETURN a = 'abcd' AND b > '2001-01-01'
+;
+CREATE TABLE tab_core_types AS SELECT
+  '(11,12)'::point,
+  '(1,1),(2,2)'::line,
+  '((11,11),(12,12))'::lseg,
+  '((11,11),(13,13))'::box,
+  '((11,12),(13,13),(14,14))'::path AS openedpath,
+  '[(11,12),(13,13),(14,14)]'::path AS closedpath,
+  '((11,12),(13,13),(14,14))'::polygon,
+  '1,1,1'::circle,
+  'today'::date,
+  'now'::time,
+  'now'::timestamp,
+  'now'::timetz,
+  'now'::timestamptz,
+  '12 seconds'::interval,
+  '{"reason":"because"}'::json,
+  '{"when":"now"}'::jsonb,
+  '$.a[*] ? (@ > 2)'::jsonpath,
+  '127.0.0.1'::inet,
+  '127.0.0.0/8'::cidr,
+  '00:01:03:86:1c:ba'::macaddr8,
+  '00:01:03:86:1c:ba'::macaddr,
+  2::int2, 4::int4, 8::int8,
+  4::float4, '8'::float8, pi()::numeric,
+  'foo'::"char",
+  'c'::bpchar,
+  'abc'::varchar,
+  'name'::name,
+  'txt'::text,
+  true::bool,
+  E'\\xDEADBEEF'::bytea,
+  B'10001'::bit,
+  B'10001'::varbit AS varbit,
+  '12.34'::money,
+  'abc'::refcursor,
+  '1 2'::int2vector,
+  '1 2'::oidvector,
+  format('%I=UC/%I', USER, USER)::aclitem AS aclitem,
+  'a fat cat sat on a mat and ate a fat rat'::tsvector,
+  'fat & rat'::tsquery,
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
+  '11'::xid8,
+  'pg_class'::regclass,
+  'regtype'::regtype type,
+  'pg_monitor'::regrole,
+  'pg_class'::regclass::oid,
+  '(1,1)'::tid, '2'::xid, '3'::cid,
+  '10:20:10,14,15'::txid_snapshot,
+  '10:20:10,14,15'::pg_snapshot,
+  '16/B374D848'::pg_lsn,
+  1::information_schema.cardinal_number,
+  'l'::information_schema.character_data,
+  'n'::information_schema.sql_identifier,
+  'now'::information_schema.time_stamp,
+  'YES'::information_schema.yes_or_no,
+  '(1,2)'::int4range, '{(1,2)}'::int4multirange,
+  '(3,4)'::int8range, '{(3,4)}'::int8multirange,
+  '(3,4)'::numrange, '{(3,4)}'::nummultirange,
+  '(2020-01-02, 2021-02-03)'::daterange,
+  '{(2020-01-02, 2021-02-03)}'::datemultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tsrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tsmultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tstzrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tstzmultirange
+;
+ALTER PUBLICATION testpub_fortable DROP TABLES IN SCHEMA pub_test
+;
+ALTER PUBLICATION "dump_pub_all" ADD TABLES IN SCHEMA "pubme"
+;
+-- ok - built-in operators are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (a IS NULL)
+;
+-- fail - aggregate functions not allowed in WHERE clause
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (e < AVG(e))
+;
+-- false_positive_rate must be between 0.0001 and 0.25
+CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(false_positive_rate = 0.00009)
+)
+;
+CREATE OR REPLACE FUNCTION regexp_replace(string citext, pattern citext, replacement text) returns TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_replace( $1::text, $2::text, $3, 'i')
+;
+create temp view v_cycle2 as
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle to 'Y' default 'N' using path
+select f, t, label from search_graph
+;
+CREATE PROCEDURE "public"."ptest8"(IN "x" "text")
+    LANGUAGE "sql"
+    BEGIN ATOMIC
+END
+;
+CREATE OR REPLACE FUNCTION shobj_description(oid, name)
+ RETURNS text
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT
+BEGIN ATOMIC
+select description from pg_shdescription
+  where objoid = $1 and
+    classoid = (select oid from pg_class where relname = $2 and
+                relnamespace = 'pg_catalog'::regnamespace);
+END
+;
+-- ok - can use column list for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk (a)
+;
+CREATE FUNCTION functest_S_16(a int, b int) RETURNS void
+    LANGUAGE SQL
+    BEGIN ATOMIC
+        INSERT INTO functest1 SELECT a + $2;
+    END
+;
+CREATE PUBLICATION tap_pub_x FOR TABLE tab_rf_x WHERE (x > 10)
+;
+CREATE OR REPLACE FUNCTION "overlaps"(time, time,
+  time, interval)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, $2) overlaps ($3, ($3 + $4))
+;
+ALTER SUBSCRIPTION mysub1 ADD PUBLICATION non_existent_pub1, non_existent_pub2
+;
+CREATE FUNCTION functest_sri2() RETURNS SETOF int
+LANGUAGE SQL
+STABLE
+BEGIN ATOMIC
+    SELECT * FROM functest3;
+END
+;
+-- test bloom specific index options
+-- ndistinct must be >= -1.0
+CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(n_distinct_per_range = -1.1)
+)
+;
+CREATE PUBLICATION tap_pub_1 FOR TABLE tab_rowfilter_1 WHERE (a > 1000 AND b <> 'filtered')
+;
+CREATE OR REPLACE FUNCTION regexp_match(string citext, pattern citext, flags text) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_match( $1::text, $2::text, CASE WHEN pg_catalog.strpos($3, 'c') = 0 THEN  $3 || 'i' ELSE $3 END )
+;
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, d)
+;
+CREATE TABLE cmdata2 (f1 TEXT COMPRESSION pglz, f2 TEXT COMPRESSION lz4)
+;
+CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA pub_test
+;
+ALTER PUBLICATION "dump_pub_qual_1ct" ADD TABLE ONLY "pubme"."t0" ("c", "d") WHERE (("c" > 0))
+;
+drop database if exists abc with (force)
+;
+-- Detach and re-attach once, to stress the concurrent detach case.
+ALTER TABLE parent_tbl DETACH PARTITION foreign_tbl CONCURRENTLY
+;
+-- alter publication set multiple schema
+ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA pub_test1, pub_test2
+;
+create or replace trigger my_trig
+  after insert on parted_trig
+  for each row execute procedure funcA()
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (ROW(a, 2) IS NULL)
+;
+CREATE FUNCTION btree_test_func() RETURNS int LANGUAGE sql IMMUTABLE RETURN 0
+;
+CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION)
+;
+ALTER PUBLICATION pub2 SET TABLE gencols(a)
+;
+ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test1
+;
+CREATE PUBLICATION testpub6 FOR TABLE rf_bug WHERE (status = 'open') WITH (publish = 'insert')
+;
+CREATE OR REPLACE FUNCTION "substring"(text, text, text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN substring($1, similar_to_escape($2, $3))
+;
+CREATE TABLE ctl_table(a int PRIMARY KEY,
+  b varchar COMPRESSION pglz,
+  c int GENERATED ALWAYS AS (a * 2) STORED,
+  d bigint GENERATED ALWAYS AS IDENTITY,
+  e int DEFAULT 1)
+;
+create function psql_df_sql (x integer)
+  returns integer
+  security definer
+  begin atomic select x + 1; end
+;
+CREATE OR REPLACE FUNCTION bit_length(text)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN octet_length($1) * 8
+;
+CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(false_positive_rate = 0.26)
+)
+;
+CREATE PUBLICATION dump_pub_nsp_1ct FOR
+  TABLES IN SCHEMA pubme
+;
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl5 WHERE (a IS DOCUMENT)
+;
+create index tstidx on ltreetest using gist (t gist_ltree_ops(siglen=0))
+;
+CREATE INDEX text_idx on test__int using gist (a gist__int_ops(numranges = 252))
+;
+CREATE PUBLICATION tap_pub_parent_sync FOR TABLE tab_rowfilter_parent_sync WHERE (a > 15) WITH (publish_via_partition_root)
+;
+ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, x)
+;
+CREATE FUNCTION _pg_datetime_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1082) /* date */
+           THEN 0
+       WHEN $1 IN (1083, 1114, 1184, 1266) /* time, timestamp, same + tz */
+           THEN CASE WHEN $2 < 0 THEN 6 ELSE $2 END
+       WHEN $1 IN (1186) /* interval */
+           THEN CASE WHEN $2 < 0 OR $2 & 65535 = 65535 THEN 6 ELSE $2 & 65535 END
+       ELSE null
+  END
+;
+CREATE PUBLICATION testpub_forschema_fortable FOR TABLES IN SCHEMA pub_test1, TABLE pub_test2.tbl1
+;
+------------------------------------------------------------------------------------------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub3 ADD TABLES IN SCHEMA pub_test
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION tap_pub_schema DROP TABLES IN SCHEMA sch1
+;
+----------
+[ADD_INDEX] CREATE INDEX text_idx on test__int using gist (a gist__intbig_ops(siglen = 2024))
+;
+----------
+[CREATE_PROG_OBJ] --
+-- SQL-standard body
+--
+CREATE FUNCTION functest_S_1(a text, b date) RETURNS boolean
+    LANGUAGE SQL
+    RETURN a = 'abcd' AND b > '2001-01-01'
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE tab_core_types AS SELECT
+  '(11,12)'::point,
+  '(1,1),(2,2)'::line,
+  '((11,11),(12,12))'::lseg,
+  '((11,11),(13,13))'::box,
+  '((11,12),(13,13),(14,14))'::path AS openedpath,
+  '[(11,12),(13,13),(14,14)]'::path AS closedpath,
+  '((11,12),(13,13),(14,14))'::polygon,
+  '1,1,1'::circle,
+  'today'::date,
+  'now'::time,
+  'now'::timestamp,
+  'now'::timetz,
+  'now'::timestamptz,
+  '12 seconds'::interval,
+  '{"reason":"because"}'::json,
+  '{"when":"now"}'::jsonb,
+  '$.a[*] ? (@ > 2)'::jsonpath,
+  '127.0.0.1'::inet,
+  '127.0.0.0/8'::cidr,
+  '00:01:03:86:1c:ba'::macaddr8,
+  '00:01:03:86:1c:ba'::macaddr,
+  2::int2, 4::int4, 8::int8,
+  4::float4, '8'::float8, pi()::numeric,
+  'foo'::"char",
+  'c'::bpchar,
+  'abc'::varchar,
+  'name'::name,
+  'txt'::text,
+  true::bool,
+  E'\\xDEADBEEF'::bytea,
+  B'10001'::bit,
+  B'10001'::varbit AS varbit,
+  '12.34'::money,
+  'abc'::refcursor,
+  '1 2'::int2vector,
+  '1 2'::oidvector,
+  format('%I=UC/%I', USER, USER)::aclitem AS aclitem,
+  'a fat cat sat on a mat and ate a fat rat'::tsvector,
+  'fat & rat'::tsquery,
+  'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'::uuid,
+  '11'::xid8,
+  'pg_class'::regclass,
+  'regtype'::regtype type,
+  'pg_monitor'::regrole,
+  'pg_class'::regclass::oid,
+  '(1,1)'::tid, '2'::xid, '3'::cid,
+  '10:20:10,14,15'::txid_snapshot,
+  '10:20:10,14,15'::pg_snapshot,
+  '16/B374D848'::pg_lsn,
+  1::information_schema.cardinal_number,
+  'l'::information_schema.character_data,
+  'n'::information_schema.sql_identifier,
+  'now'::information_schema.time_stamp,
+  'YES'::information_schema.yes_or_no,
+  '(1,2)'::int4range, '{(1,2)}'::int4multirange,
+  '(3,4)'::int8range, '{(3,4)}'::int8multirange,
+  '(3,4)'::numrange, '{(3,4)}'::nummultirange,
+  '(2020-01-02, 2021-02-03)'::daterange,
+  '{(2020-01-02, 2021-02-03)}'::datemultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tsrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tsmultirange,
+  '(2020-01-02 03:04:05, 2021-02-03 06:07:08)'::tstzrange,
+  '{(2020-01-02 03:04:05, 2021-02-03 06:07:08)}'::tstzmultirange
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable DROP TABLES IN SCHEMA pub_test
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_all" ADD TABLES IN SCHEMA "pubme"
+;
+----------
+[ALTER_PUB_SUB] -- ok - built-in operators are allowed
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (a IS NULL)
+;
+----------
+[ALTER_PUB_SUB] -- fail - aggregate functions not allowed in WHERE clause
+ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl3 WHERE (e < AVG(e))
+;
+----------
+[ADD_INDEX] -- false_positive_rate must be between 0.0001 and 0.25
+CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(false_positive_rate = 0.00009)
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_replace(string citext, pattern citext, replacement text) returns TEXT
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_replace( $1::text, $2::text, $3, 'i')
+;
+----------
+[CREATE_VIEW(SELECT)] create temp view v_cycle2 as
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle to 'Y' default 'N' using path
+select f, t, label from search_graph
+;
+----------
+[CREATE_PROG_OBJ] CREATE PROCEDURE "public"."ptest8"(IN "x" "text")
+    LANGUAGE "sql"
+    BEGIN ATOMIC
+END
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION shobj_description(oid, name)
+ RETURNS text
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT
+BEGIN ATOMIC
+select description from pg_shdescription
+  where objoid = $1 and
+    classoid = (select oid from pg_class where relname = $2 and
+                relnamespace = 'pg_catalog'::regnamespace);
+END
+;
+----------
+[ALTER_PUB_SUB] -- ok - can use column list for partitioned table
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk (a)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_16(a int, b int) RETURNS void
+    LANGUAGE SQL
+    BEGIN ATOMIC
+        INSERT INTO functest1 SELECT a + $2;
+    END
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_x FOR TABLE tab_rf_x WHERE (x > 10)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "overlaps"(time, time,
+  time, interval)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, $2) overlaps ($3, ($3 + $4))
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION mysub1 ADD PUBLICATION non_existent_pub1, non_existent_pub2
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_sri2() RETURNS SETOF int
+LANGUAGE SQL
+STABLE
+BEGIN ATOMIC
+    SELECT * FROM functest3;
+END
+;
+----------
+[ADD_INDEX] -- test bloom specific index options
+-- ndistinct must be >= -1.0
+CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(n_distinct_per_range = -1.1)
+)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_1 FOR TABLE tab_rowfilter_1 WHERE (a > 1000 AND b <> 'filtered')
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_match(string citext, pattern citext, flags text) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_match( $1::text, $2::text, CASE WHEN pg_catalog.strpos($3, 'c') = 0 THEN  $3 || 'i' ELSE $3 END )
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, d)
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmdata2 (f1 TEXT COMPRESSION pglz, f2 TEXT COMPRESSION lz4)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_forschema FOR TABLES IN SCHEMA pub_test
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION "dump_pub_qual_1ct" ADD TABLE ONLY "pubme"."t0" ("c", "d") WHERE (("c" > 0))
+;
+----------
+[DROP_CATALOG] drop database if exists abc with (force)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] -- Detach and re-attach once, to stress the concurrent detach case.
+ALTER TABLE parent_tbl DETACH PARTITION foreign_tbl CONCURRENTLY
+;
+----------
+[ALTER_PUB_SUB] -- alter publication set multiple schema
+ALTER PUBLICATION testpub1_forschema SET TABLES IN SCHEMA pub_test1, pub_test2
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create or replace trigger my_trig
+  after insert on parted_trig
+  for each row execute procedure funcA()
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl1 WHERE (ROW(a, 2) IS NULL)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION btree_test_func() RETURNS int LANGUAGE sql IMMUTABLE RETURN 0
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmdata2 (LIKE cmdata1 INCLUDING COMPRESSION)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION pub2 SET TABLE gencols(a)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub1_forschema DROP TABLES IN SCHEMA pub_test1
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub6 FOR TABLE rf_bug WHERE (status = 'open') WITH (publish = 'insert')
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "substring"(text, text, text)
+ RETURNS text
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN substring($1, similar_to_escape($2, $3))
+;
+----------
+[CREATE_TABLE] CREATE TABLE ctl_table(a int PRIMARY KEY,
+  b varchar COMPRESSION pglz,
+  c int GENERATED ALWAYS AS (a * 2) STORED,
+  d bigint GENERATED ALWAYS AS IDENTITY,
+  e int DEFAULT 1)
+;
+----------
+[CREATE_PROG_OBJ] create function psql_df_sql (x integer)
+  returns integer
+  security definer
+  begin atomic select x + 1; end
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION bit_length(text)
+ RETURNS integer
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN octet_length($1) * 8
+;
+----------
+[ADD_INDEX] CREATE INDEX brinidx_bloom ON brintest_bloom USING brin (
+	byteacol bytea_bloom_ops(false_positive_rate = 0.26)
+)
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION dump_pub_nsp_1ct FOR
+  TABLES IN SCHEMA pubme
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub5 SET TABLE testpub_rf_tbl5 WHERE (a IS DOCUMENT)
+;
+----------
+[ADD_INDEX] create index tstidx on ltreetest using gist (t gist_ltree_ops(siglen=0))
+;
+----------
+[ADD_INDEX] CREATE INDEX text_idx on test__int using gist (a gist__int_ops(numranges = 252))
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION tap_pub_parent_sync FOR TABLE tab_rowfilter_parent_sync WHERE (a > 15) WITH (publish_via_partition_root)
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub_fortable ADD TABLE testpub_tbl5 (a, x)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_datetime_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (1082) /* date */
+           THEN 0
+       WHEN $1 IN (1083, 1114, 1184, 1266) /* time, timestamp, same + tz */
+           THEN CASE WHEN $2 < 0 THEN 6 ELSE $2 END
+       WHEN $1 IN (1186) /* interval */
+           THEN CASE WHEN $2 < 0 OR $2 & 65535 = 65535 THEN 6 ELSE $2 & 65535 END
+       ELSE null
+  END
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION testpub_forschema_fortable FOR TABLES IN SCHEMA pub_test1, TABLE pub_test2.tbl1
+;

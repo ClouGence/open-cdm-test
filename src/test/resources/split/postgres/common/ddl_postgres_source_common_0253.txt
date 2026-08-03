@@ -1,0 +1,672 @@
+/*
+ * text search configuration for danish language
+ *
+ * Copyright (c) 2007-2021, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * danish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY danish_stem
+	(TEMPLATE = snowball, Language = danish , StopWords=danish)
+;
+CREATE FUNCTION "public"."explain_filter"("text") RETURNS SETOF "text"
+    LANGUAGE "plpgsql"
+    AS $_$
+declare
+    ln text;
+begin
+    for ln in execute $1
+    loop
+        -- Replace any numeric word with just 'N'
+        ln := regexp_replace(ln, '\m\d+\M', 'N', 'g');
+        -- In sort output, the above won't match units-suffixed numbers
+        ln := regexp_replace(ln, '\m\d+kB', 'NkB', 'g');
+        -- Ignore text-mode buffers output because it varies depending
+        -- on the system state
+        CONTINUE WHEN (ln ~ ' +Buffers: .*');
+        -- Ignore text-mode "Planning:" line because whether it's output
+        -- varies depending on the system state
+        CONTINUE WHEN (ln = 'Planning:');
+        return next ln;
+    end loop;
+end;
+$_$
+;
+CREATE FUNCTION fx(x WSlot) RETURNS void AS $$
+BEGIN
+  GET DIAGNOSTICS x = ROW_COUNT;
+  RETURN;
+END; $$ LANGUAGE plpgsql
+;
+-- Base relation not updatable
+CREATE VIEW ro_view18 AS SELECT * FROM (VALUES(1)) AS tmp(a)
+;
+ALTER TABLE onek ADD CONSTRAINT onek_unique1_constraint UNIQUE (unique1)
+;
+CREATE TABLE "public"."brin_summarize_multi" (
+    "value" integer
+)
+WITH ("fillfactor"='10', "autovacuum_enabled"='false')
+;
+ANALYZE (SKIP_LOCKED) information_schema.sql_features
+;
+---
+-- partitioned table parent
+CREATE TABLE regtest_ptable_1 (o int, p text) PARTITION BY RANGE (o)
+;
+create rule rrule as
+  on update to vview do instead
+(
+  insert into cchild (pid, descrip)
+    select old.pid, new.descrip where old.descrip isnull;
+  update cchild set descrip = new.descrip where cchild.pid = old.pid;
+)
+;
+create trigger tg_slotlink_a after insert or update or delete
+    on WSlot for each row execute procedure tg_slotlink_a('WS')
+;
+/* src/test/modules/test_pg_dump/test_pg_dump--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE TABLE regress_pg_dump_table (
+	col1 serial,
+	col2 int check (col2 > 0)
+)
+;
+ALTER TYPE "public"."planets" ADD VALUE 'earth'
+;
+CREATE TABLE mcv_lists_arrays (
+    a TEXT[],
+    b NUMERIC[],
+    c INT[]
+)
+WITH (autovacuum_enabled = off)
+;
+/*
+ * text search configuration for basque language
+ *
+ * Copyright (c) 2007-2021, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * basque and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY basque_stem
+	(TEMPLATE = snowball, Language = basque )
+;
+-- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."gtestxx_3" INHERIT "public"."gtest1"
+;
+CREATE INDEX "brin_test_bloom_b_idx" ON "public"."brin_test_bloom" USING "brin" ("b") WITH ("pages_per_range"='2')
+;
+-- Parallel append
+
+-- Parallel queries won't necessarily get as many workers as the planner
+-- asked for.  This affects not only the "Workers Launched:" field of EXPLAIN
+-- results, but also row counts and loop counts for parallel scans, Gathers,
+-- and everything in between.  This function filters out the values we can't
+-- rely on to be stable.
+-- This removes enough info that you might wonder why bother with EXPLAIN
+-- ANALYZE at all.  The answer is that we need to see '(never executed)'
+-- notations because that's the only way to verify runtime pruning.
+create function explain_parallel_append(text) returns setof text
+language plpgsql as
+$$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off) %s',
+            $1)
+    loop
+        ln := regexp_replace(ln, 'Workers Launched: \d+', 'Workers Launched: N');
+        ln := regexp_replace(ln, 'actual rows=\d+ loops=\d+', 'actual rows=N loops=N');
+        ln := regexp_replace(ln, 'Rows Removed by Filter: \d+', 'Rows Removed by Filter: N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+CREATE TABLE test_tab (a int primary key, b bytea, c INT, d INT, e INT, f INT)
+;
+VACUUM ANALYZE vegetables
+;
+CREATE EXTENSION test_ext1
+;
+CREATE FUNCTION ghstore_consistent(internal,hstore,smallint,oid,internal)
+RETURNS bool
+AS '$libdir/hstore'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+DROP TABLE test_gist
+;
+VACUUM (PARALLEL 2) pg_catalog.pg_type
+;
+ALTER INDEX pg_toast.pg_toast_28272_index RENAME TO reind_con_toast_idx
+;
+CREATE TABLE d_lp_fk_2 PARTITION OF d_lp_fk FOR VALUES IN (2)
+;
+create function explain_memoize(query text, hide_hitmiss bool) returns setof text
+language plpgsql as
+$$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off, buffers off) %s',
+            query)
+    loop
+        if hide_hitmiss = true then
+                ln := regexp_replace(ln, 'Hits: 0', 'Hits: Zero');
+                ln := regexp_replace(ln, 'Hits: \d+', 'Hits: N');
+                ln := regexp_replace(ln, 'Misses: 0', 'Misses: Zero');
+                ln := regexp_replace(ln, 'Misses: \d+', 'Misses: N');
+        end if;
+        ln := regexp_replace(ln, 'Evictions: 0', 'Evictions: Zero');
+        ln := regexp_replace(ln, 'Evictions: \d+', 'Evictions: N');
+        ln := regexp_replace(ln, 'Memory Usage: \d+', 'Memory Usage: N');
+        ln := regexp_replace(ln, 'Heap Fetches: \d+', 'Heap Fetches: N');
+        ln := regexp_replace(ln, 'loops=\d+', 'loops=N');
+        ln := regexp_replace(ln, 'Index Searches: \d+', 'Index Searches: N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+CREATE TABLE "public"."pitest2_p2" (
+    "f1" "date" NOT NULL,
+    "f2" "text",
+    "f3" integer NOT NULL
+)
+;
+CREATE OPERATOR ^? (
+        LEFTARG = _lquery,
+	RIGHTARG = _ltree,
+	PROCEDURE = _lt_q_rregex,
+        COMMUTATOR = '^?',
+        RESTRICT = contsel,
+	JOIN = contjoinsel
+)
+;
+CREATE OPERATOR CLASS gist_macaddr_ops
+DEFAULT FOR TYPE macaddr USING gist
+AS
+	OPERATOR	1	< ,
+	OPERATOR	2	<= ,
+	OPERATOR	3	= ,
+	OPERATOR	4	>= ,
+	OPERATOR	5	> ,
+	FUNCTION	1	gbt_macad_consistent (internal, macaddr, int2, oid, internal),
+	FUNCTION	2	gbt_macad_union (internal, internal),
+	FUNCTION	3	gbt_macad_compress (internal),
+	FUNCTION	4	gbt_decompress (internal),
+	FUNCTION	5	gbt_macad_penalty (internal, internal, internal),
+	FUNCTION	6	gbt_macad_picksplit (internal, internal),
+	FUNCTION	7	gbt_macad_same (gbtreekey16, gbtreekey16, internal),
+	STORAGE		gbtreekey16
+;
+CREATE FUNCTION heap_force_freeze(reloid regclass, tids tid[])
+RETURNS VOID
+AS '$libdir/pg_surgery', 'heap_force_freeze'
+LANGUAGE C STRICT
+;
+CREATE OPERATOR >= (
+	PROCEDURE = isnge,
+	LEFTARG = ean13,
+	RIGHTARG = upc,
+	COMMUTATOR = <=,
+	NEGATOR = <,
+	RESTRICT = scalargtsel,
+	JOIN = scalargtjoinsel)
+;
+alter table atacc1 validate constraint atacc1_fkey, alter a type bigint
+;
+CREATE INDEX "qq" ON "public"."test_tsquery" USING "gist" ("keyword")
+;
+VACUUM (SKIP_LOCKED) pg_catalog.pg_publication
+;
+alter table fkpart2.fk_part_1_1 drop constraint my_fkey
+;
+DROP TABLE concur_reindex_tab
+;
+-- check that we log everything despite having a pkey
+ALTER TABLE table_without_key REPLICA IDENTITY FULL
+;
+IMPORT FOREIGN SCHEMA import_source LIMIT TO (t5)
+  FROM SERVER loopback INTO import_dest5
+;
+-- Make a relation whose size we underestimate and that also has a
+-- kind of skew that breaks our batching scheme.  We want stats to say
+-- 2 rows, but actually there are 20,000 rows with the same key.
+create table extremely_skewed (id int, t text)
+;
+drop operator class part_test_int4_ops2 using hash
+;
+IMPORT FOREIGN SCHEMA import_source LIMIT TO (t1, nonesuch, t4_part)
+  FROM SERVER loopback INTO import_dest4
+;
+CREATE TABLE notnull_inhparent (i int)
+;
+COMMENT ON CONVERSION split_conversion_probe_next.latin1_to_utf8_renamed IS NULL
+;
+DROP INDEX hash_tuplesort_idx
+;
+CREATE OR REPLACE FUNCTION event_trigger_report_dropped()
+ RETURNS event_trigger
+ LANGUAGE plpgsql
+AS $$
+DECLARE r record;
+BEGIN
+    FOR r IN SELECT * from pg_event_trigger_dropped_objects()
+    LOOP
+    RAISE NOTICE 'DROP: orig=% normal=% istemp=% type=% identity=% schema=% name=% addr=% args=%',
+        r.original, r.normal, r.is_temporary, r.object_type,
+        r.object_identity, r.schema_name, r.object_name,
+        r.address_names, r.address_args;
+    END LOOP;
+END; $$
+;
+-- nondeterministic collations
+-- (not supported with libc provider)
+do $$
+BEGIN
+  EXECUTE 'CREATE COLLATION ctest_det (locale = ' ||
+          quote_literal((SELECT collcollate FROM pg_collation WHERE
+          collname = 'en_US')) || ', deterministic = true);';
+  END
+$$
+;
+-- Test that covering partitioned indexes work in various cases
+create table covidxpart (a int, b int) partition by list (a)
+;
+ALTER TABLE split_alter_table.base_table ENABLE ALWAYS RULE base_table_notify
+;
+-- OK more than one equal column and a && column
+create table idxpart (a int4range, b int4range, c int4range, exclude USING GIST (a with =, b with =, c with &&)) partition by range (a, b)
+;
+VACUUM (TRUNCATE FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_transform
+;
+------------------------------------------------------------------------------------------
+[CREATE_POLICY] /*
+ * text search configuration for danish language
+ *
+ * Copyright (c) 2007-2021, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * danish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY danish_stem
+	(TEMPLATE = snowball, Language = danish , StopWords=danish)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."explain_filter"("text") RETURNS SETOF "text"
+    LANGUAGE "plpgsql"
+    AS $_$
+declare
+    ln text;
+begin
+    for ln in execute $1
+    loop
+        -- Replace any numeric word with just 'N'
+        ln := regexp_replace(ln, '\m\d+\M', 'N', 'g');
+        -- In sort output, the above won't match units-suffixed numbers
+        ln := regexp_replace(ln, '\m\d+kB', 'NkB', 'g');
+        -- Ignore text-mode buffers output because it varies depending
+        -- on the system state
+        CONTINUE WHEN (ln ~ ' +Buffers: .*');
+        -- Ignore text-mode "Planning:" line because whether it's output
+        -- varies depending on the system state
+        CONTINUE WHEN (ln = 'Planning:');
+        return next ln;
+    end loop;
+end;
+$_$
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION fx(x WSlot) RETURNS void AS $$
+BEGIN
+  GET DIAGNOSTICS x = ROW_COUNT;
+  RETURN;
+END; $$ LANGUAGE plpgsql
+;
+----------
+[CREATE_VIEW(SELECT)] -- Base relation not updatable
+CREATE VIEW ro_view18 AS SELECT * FROM (VALUES(1)) AS tmp(a)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE onek ADD CONSTRAINT onek_unique1_constraint UNIQUE (unique1)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."brin_summarize_multi" (
+    "value" integer
+)
+WITH ("fillfactor"='10', "autovacuum_enabled"='false')
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) information_schema.sql_features
+;
+----------
+[CREATE_TABLE] ---
+-- partitioned table parent
+CREATE TABLE regtest_ptable_1 (o int, p text) PARTITION BY RANGE (o)
+;
+----------
+[CREATE_POLICY] create rule rrule as
+  on update to vview do instead
+(
+  insert into cchild (pid, descrip)
+    select old.pid, new.descrip where old.descrip isnull;
+  update cchild set descrip = new.descrip where cchild.pid = old.pid;
+)
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create trigger tg_slotlink_a after insert or update or delete
+    on WSlot for each row execute procedure tg_slotlink_a('WS')
+;
+----------
+[CREATE_TABLE] /* src/test/modules/test_pg_dump/test_pg_dump--1.0.sql */
+
+-- complain if script is sourced in psql, rather than via CREATE EXTENSION
+
+
+CREATE TABLE regress_pg_dump_table (
+	col1 serial,
+	col2 int check (col2 > 0)
+)
+;
+----------
+[ALTER_TYPE] ALTER TYPE "public"."planets" ADD VALUE 'earth'
+;
+----------
+[CREATE_TABLE] CREATE TABLE mcv_lists_arrays (
+    a TEXT[],
+    b NUMERIC[],
+    c INT[]
+)
+WITH (autovacuum_enabled = off)
+;
+----------
+[CREATE_POLICY] /*
+ * text search configuration for basque language
+ *
+ * Copyright (c) 2007-2021, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * basque and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY basque_stem
+	(TEMPLATE = snowball, Language = basque )
+;
+----------
+[ALTER_TABLE] -- For binary upgrade, set up inheritance this way.
+ALTER TABLE ONLY "public"."gtestxx_3" INHERIT "public"."gtest1"
+;
+----------
+[ADD_INDEX] CREATE INDEX "brin_test_bloom_b_idx" ON "public"."brin_test_bloom" USING "brin" ("b") WITH ("pages_per_range"='2')
+;
+----------
+[CREATE_PROG_OBJ] -- Parallel append
+
+-- Parallel queries won't necessarily get as many workers as the planner
+-- asked for.  This affects not only the "Workers Launched:" field of EXPLAIN
+-- results, but also row counts and loop counts for parallel scans, Gathers,
+-- and everything in between.  This function filters out the values we can't
+-- rely on to be stable.
+-- This removes enough info that you might wonder why bother with EXPLAIN
+-- ANALYZE at all.  The answer is that we need to see '(never executed)'
+-- notations because that's the only way to verify runtime pruning.
+create function explain_parallel_append(text) returns setof text
+language plpgsql as
+$$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off) %s',
+            $1)
+    loop
+        ln := regexp_replace(ln, 'Workers Launched: \d+', 'Workers Launched: N');
+        ln := regexp_replace(ln, 'actual rows=\d+ loops=\d+', 'actual rows=N loops=N');
+        ln := regexp_replace(ln, 'Rows Removed by Filter: \d+', 'Rows Removed by Filter: N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_tab (a int primary key, b bytea, c INT, d INT, e INT, f INT)
+;
+----------
+[ADMIN_TABLE] VACUUM ANALYZE vegetables
+;
+----------
+[CREATE_LIBRARY] CREATE EXTENSION test_ext1
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ghstore_consistent(internal,hstore,smallint,oid,internal)
+RETURNS bool
+AS '$libdir/hstore'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[DROP_TABLE] DROP TABLE test_gist
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 2) pg_catalog.pg_type
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_28272_index RENAME TO reind_con_toast_idx
+;
+----------
+[CREATE_TABLE] CREATE TABLE d_lp_fk_2 PARTITION OF d_lp_fk FOR VALUES IN (2)
+;
+----------
+[CREATE_PROG_OBJ] create function explain_memoize(query text, hide_hitmiss bool) returns setof text
+language plpgsql as
+$$
+declare
+    ln text;
+begin
+    for ln in
+        execute format('explain (analyze, costs off, summary off, timing off, buffers off) %s',
+            query)
+    loop
+        if hide_hitmiss = true then
+                ln := regexp_replace(ln, 'Hits: 0', 'Hits: Zero');
+                ln := regexp_replace(ln, 'Hits: \d+', 'Hits: N');
+                ln := regexp_replace(ln, 'Misses: 0', 'Misses: Zero');
+                ln := regexp_replace(ln, 'Misses: \d+', 'Misses: N');
+        end if;
+        ln := regexp_replace(ln, 'Evictions: 0', 'Evictions: Zero');
+        ln := regexp_replace(ln, 'Evictions: \d+', 'Evictions: N');
+        ln := regexp_replace(ln, 'Memory Usage: \d+', 'Memory Usage: N');
+        ln := regexp_replace(ln, 'Heap Fetches: \d+', 'Heap Fetches: N');
+        ln := regexp_replace(ln, 'loops=\d+', 'loops=N');
+        ln := regexp_replace(ln, 'Index Searches: \d+', 'Index Searches: N');
+        return next ln;
+    end loop;
+end;
+$$
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."pitest2_p2" (
+    "f1" "date" NOT NULL,
+    "f2" "text",
+    "f3" integer NOT NULL
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR ^? (
+        LEFTARG = _lquery,
+	RIGHTARG = _ltree,
+	PROCEDURE = _lt_q_rregex,
+        COMMUTATOR = '^?',
+        RESTRICT = contsel,
+	JOIN = contjoinsel
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR CLASS gist_macaddr_ops
+DEFAULT FOR TYPE macaddr USING gist
+AS
+	OPERATOR	1	< ,
+	OPERATOR	2	<= ,
+	OPERATOR	3	= ,
+	OPERATOR	4	>= ,
+	OPERATOR	5	> ,
+	FUNCTION	1	gbt_macad_consistent (internal, macaddr, int2, oid, internal),
+	FUNCTION	2	gbt_macad_union (internal, internal),
+	FUNCTION	3	gbt_macad_compress (internal),
+	FUNCTION	4	gbt_decompress (internal),
+	FUNCTION	5	gbt_macad_penalty (internal, internal, internal),
+	FUNCTION	6	gbt_macad_picksplit (internal, internal),
+	FUNCTION	7	gbt_macad_same (gbtreekey16, gbtreekey16, internal),
+	STORAGE		gbtreekey16
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION heap_force_freeze(reloid regclass, tids tid[])
+RETURNS VOID
+AS '$libdir/pg_surgery', 'heap_force_freeze'
+LANGUAGE C STRICT
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR >= (
+	PROCEDURE = isnge,
+	LEFTARG = ean13,
+	RIGHTARG = upc,
+	COMMUTATOR = <=,
+	NEGATOR = <,
+	RESTRICT = scalargtsel,
+	JOIN = scalargtjoinsel)
+;
+----------
+[ALTER_TABLE|ALTER_CONSTRAINT|ALTER_COLUMN] alter table atacc1 validate constraint atacc1_fkey, alter a type bigint
+;
+----------
+[ADD_INDEX] CREATE INDEX "qq" ON "public"."test_tsquery" USING "gist" ("keyword")
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_LOCKED) pg_catalog.pg_publication
+;
+----------
+[ALTER_TABLE|DROP_CONSTRAINT] alter table fkpart2.fk_part_1_1 drop constraint my_fkey
+;
+----------
+[DROP_TABLE] DROP TABLE concur_reindex_tab
+;
+----------
+[ALTER_TABLE] -- check that we log everything despite having a pkey
+ALTER TABLE table_without_key REPLICA IDENTITY FULL
+;
+----------
+[CREATE_TABLE] IMPORT FOREIGN SCHEMA import_source LIMIT TO (t5)
+  FROM SERVER loopback INTO import_dest5
+;
+----------
+[CREATE_TABLE] -- Make a relation whose size we underestimate and that also has a
+-- kind of skew that breaks our batching scheme.  We want stats to say
+-- 2 rows, but actually there are 20,000 rows with the same key.
+create table extremely_skewed (id int, t text)
+;
+----------
+[DROP_PROG_OBJ] drop operator class part_test_int4_ops2 using hash
+;
+----------
+[CREATE_TABLE] IMPORT FOREIGN SCHEMA import_source LIMIT TO (t1, nonesuch, t4_part)
+  FROM SERVER loopback INTO import_dest4
+;
+----------
+[CREATE_TABLE] CREATE TABLE notnull_inhparent (i int)
+;
+----------
+[ALTER_POLICY] COMMENT ON CONVERSION split_conversion_probe_next.latin1_to_utf8_renamed IS NULL
+;
+----------
+[DROP_INDEX] DROP INDEX hash_tuplesort_idx
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION event_trigger_report_dropped()
+ RETURNS event_trigger
+ LANGUAGE plpgsql
+AS $$
+DECLARE r record;
+BEGIN
+    FOR r IN SELECT * from pg_event_trigger_dropped_objects()
+    LOOP
+    RAISE NOTICE 'DROP: orig=% normal=% istemp=% type=% identity=% schema=% name=% addr=% args=%',
+        r.original, r.normal, r.is_temporary, r.object_type,
+        r.object_identity, r.schema_name, r.object_name,
+        r.address_names, r.address_args;
+    END LOOP;
+END; $$
+;
+----------
+[BLOCK] -- nondeterministic collations
+-- (not supported with libc provider)
+do $$
+BEGIN
+  EXECUTE 'CREATE COLLATION ctest_det (locale = ' ||
+          quote_literal((SELECT collcollate FROM pg_collation WHERE
+          collname = 'en_US')) || ', deterministic = true);';
+  END
+$$
+;
+----------
+[CREATE_TABLE] -- Test that covering partitioned indexes work in various cases
+create table covidxpart (a int, b int) partition by list (a)
+;
+----------
+[ALTER_TABLE] ALTER TABLE split_alter_table.base_table ENABLE ALWAYS RULE base_table_notify
+;
+----------
+[CREATE_TABLE] -- OK more than one equal column and a && column
+create table idxpart (a int4range, b int4range, c int4range, exclude USING GIST (a with =, b with =, c with &&)) partition by range (a, b)
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_transform
+;

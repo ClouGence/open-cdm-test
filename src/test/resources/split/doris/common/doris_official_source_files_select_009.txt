@@ -1,0 +1,1451 @@
+SELECT repo_name, count() AS forks FROM github_events WHERE event_type = 'ForkEvent' GROUP BY repo_name ORDER BY forks DESC LIMIT 50
+;
+SELECT
+    lower(split_part(repo_name, '/', 1)) AS org,
+    count(distinct repo_name) AS repos
+FROM
+(
+    SELECT repo_name
+    FROM github_events
+    WHERE event_type = 'WatchEvent'
+    GROUP BY repo_name
+    HAVING count() >= 10
+) t
+GROUP BY org
+ORDER BY repos DESC, org ASC
+LIMIT 50
+;
+SELECT
+    lower(split_part(repo_name, '/', 1)) AS org,
+    count() AS stars
+FROM github_events
+WHERE event_type = 'WatchEvent'
+GROUP BY org
+ORDER BY stars DESC
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 3) AS ratio
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE event_type IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY forks DESC
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 3) AS ratio
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE event_type IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING (stars > 100) AND (forks > 100)
+ORDER BY ratio DESC, repo_name
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(fork) / sum(star), 2) AS ratio
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE event_type IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING (stars > 100) AND (forks > 100)
+ORDER BY ratio DESC
+LIMIT 50
+;
+SELECT
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 2) AS ratio
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE event_type IN ('ForkEvent', 'WatchEvent')
+) t
+;
+SELECT
+    sum(forks) AS forks,
+    sum(stars) AS stars,
+    round(sum(stars) / sum(forks), 2) AS ratio
+FROM
+(
+    SELECT
+        sum(fork) AS forks,
+        sum(star) AS stars
+    FROM
+    (
+        SELECT
+            repo_name,
+            CASE WHEN event_type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+            CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+        FROM github_events
+        WHERE event_type IN ('ForkEvent', 'WatchEvent')
+    ) t
+    GROUP BY repo_name
+    HAVING stars > 100
+) t2
+;
+SELECT
+    repo_name,
+    count() AS prs,
+    count(distinct actor_login) AS authors,
+    sum(additions) AS adds,
+    sum(deletions) AS dels
+FROM github_events
+WHERE (event_type = 'PullRequestEvent') AND (action = 'opened') AND (additions < 10000) AND (deletions < 10000)
+GROUP BY repo_name
+HAVING (adds / dels) < 10
+ORDER BY adds + dels DESC
+LIMIT 50
+;
+SELECT
+    repo_name,
+    count() AS pushes,
+    count(distinct actor_login) AS authors
+FROM github_events
+WHERE (event_type = 'PushEvent') AND (repo_name IN
+(
+    SELECT repo_name
+    FROM github_events
+    WHERE event_type = 'WatchEvent'
+    GROUP BY repo_name
+    ORDER BY count() DESC
+    LIMIT 10000
+))
+GROUP BY repo_name
+ORDER BY count() DESC
+LIMIT 50
+;
+SELECT repo_name, count() FROM github_events WHERE lower(body) LIKE '%clickhouse%' GROUP BY repo_name ORDER BY count() DESC, repo_name ASC LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(num_star) AS num_stars,
+    sum(num_comment) AS num_comments
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS num_star,
+        CASE WHEN lower(body) LIKE '%clickhouse%' THEN 1 ELSE 0 END AS num_comment
+    FROM github_events
+    WHERE (lower(body) LIKE '%clickhouse%') OR (event_type = 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING num_comments > 0
+ORDER BY num_stars DESC,num_comments DESC,repo_name ASC
+LIMIT 50
+;
+SELECT repo_name, count() FROM github_events WHERE lower(body) LIKE '%doris%' GROUP BY repo_name ORDER BY count() DESC, repo_name ASC LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(num_star) AS num_stars,
+    sum(num_comment) AS num_comments
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS num_star,
+        CASE WHEN lower(body) LIKE '%doris%' THEN 1 ELSE 0 END AS num_comment
+    FROM github_events
+    WHERE (lower(body) LIKE '%doris%') OR (event_type = 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING num_comments > 0
+ORDER BY num_stars DESC,num_comments DESC,repo_name ASC
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(created_at_2020) AS stars2020,
+    sum(created_at_2019) AS stars2019,
+    round(sum(created_at_2020) / sum(created_at_2019), 3) AS yoy,
+    min(created_at) AS first_seen
+FROM
+(
+    SELECT
+        repo_name,
+        CASE year(created_at) WHEN 2020 THEN 1 ELSE 0 END AS created_at_2020,
+        CASE year(created_at) WHEN 2019 THEN 1 ELSE 0 END AS created_at_2019,
+        created_at
+    FROM github_events
+    WHERE event_type = 'WatchEvent'
+) t
+GROUP BY repo_name
+HAVING (min(created_at) <= '2019-01-01 00:00:00') AND (stars2019 >= 1000)
+ORDER BY yoy DESC, repo_name
+LIMIT 50
+;
+SELECT repo_name, count() AS c, count(distinct actor_login) AS u FROM github_events WHERE event_type = 'IssuesEvent' AND action = 'opened' GROUP BY repo_name ORDER BY c DESC, repo_name LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN actor_login ELSE NULL END AS actor_login
+    FROM github_events
+    WHERE event_type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY c DESC, repo_name
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN actor_login ELSE NULL END AS actor_login
+    FROM github_events
+    WHERE event_type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 1000
+ORDER BY c DESC
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN actor_login ELSE NULL END AS actor_login
+    FROM github_events
+    WHERE event_type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY u DESC
+LIMIT 50
+;
+SELECT repo_name, count(), count(distinct actor_login) FROM github_events WHERE event_type = 'PullRequestEvent' AND action = 'opened' GROUP BY repo_name ORDER BY count() DESC LIMIT 50
+;
+SELECT repo_name, count(), count(distinct actor_login) AS u FROM github_events WHERE event_type = 'PullRequestEvent' AND action = 'opened' GROUP BY repo_name ORDER BY u DESC, 2 DESC LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(invitation) AS invitations,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'MemberEvent' THEN 1 ELSE 0 END AS invitation,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE event_type IN ('MemberEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 100
+ORDER BY invitations DESC, stars DESC
+LIMIT 50
+;
+SELECT
+    repo_name,
+    sum(created_at_2020) AS stars2020,
+    sum(created_at_2019) AS stars2019,
+    round(sum(created_at_2020) / sum(created_at_2019), 3) AS yoy,
+    min(created_at) AS first_seen
+FROM
+(
+    SELECT
+        repo_name,
+        CASE year(created_at) WHEN 2020 THEN 1 ELSE 0 END AS created_at_2020,
+        CASE year(created_at) WHEN 2019 THEN 1 ELSE 0 END AS created_at_2019,
+        created_at
+    FROM github_events
+    WHERE event_type = 'WatchEvent'
+) t
+GROUP BY repo_name
+HAVING (min(created_at) <= '2019-01-01 00:00:00') AND (max(created_at) >= '2020-06-01 00:00:00') AND (stars2019 >= 1000)
+ORDER BY yoy,repo_name
+LIMIT 50
+;
+SELECT
+  repo_name,
+  count() AS stars
+FROM github_events
+WHERE (event_type = 'WatchEvent') AND (actor_login IN
+(
+    SELECT actor_login
+    FROM github_events
+    WHERE (event_type = 'WatchEvent') AND (repo_name IN ('ClickHouse/ClickHouse', 'yandex/ClickHouse'))
+)) AND (repo_name NOT IN ('ClickHouse/ClickHouse', 'yandex/ClickHouse'))
+GROUP BY repo_name
+ORDER BY stars DESC, repo_name DESC
+LIMIT 50
+;
+SELECT
+    repo_name,
+    count()
+FROM github_events
+WHERE (event_type = 'WatchEvent') AND (actor_login IN
+(
+    SELECT actor_login
+    FROM github_events
+    WHERE (event_type = 'PullRequestEvent') AND (action = 'opened')
+))
+GROUP BY repo_name
+ORDER BY count() DESC
+LIMIT 50
+;
+SELECT
+    repo_name,
+    count()
+FROM github_events
+WHERE (event_type = 'WatchEvent') AND (actor_login IN
+(
+    SELECT actor_login
+    FROM github_events
+    WHERE (event_type = 'PullRequestEvent') AND (action = 'opened')
+    GROUP BY actor_login
+    HAVING count() >= 10
+))
+GROUP BY repo_name
+ORDER BY count() DESC
+LIMIT 50
+;
+SELECT count(), repo_name FROM github_events WHERE event_type = 'WatchEvent' GROUP BY repo_name ORDER BY length(repo_name) DESC, repo_name LIMIT 50
+;
+SELECT repo_name, count() FROM github_events WHERE event_type = 'WatchEvent' AND repo_name LIKE '%_/_%' GROUP BY repo_name ORDER BY length(repo_name) ASC, repo_name LIMIT 50
+;
+SELECT
+    concat('https://github.com/', repo_name, '/pull/', CAST(number AS STRING)) AS URL,
+    count(distinct actor_login) AS authors
+FROM github_events
+WHERE (event_type = 'PullRequestReviewCommentEvent') AND (action = 'created')
+GROUP BY
+    repo_name,
+    number
+ORDER BY authors DESC, URL ASC
+LIMIT 50
+;
+SELECT count(distinct actor_login) FROM github_events
+;
+SELECT count(distinct actor_login) FROM github_events WHERE event_type = 'WatchEvent'
+;
+SELECT count(distinct actor_login) FROM github_events WHERE event_type = 'PushEvent'
+;
+SELECT count(distinct actor_login) FROM github_events WHERE event_type = 'PullRequestEvent' AND action = 'opened'
+;
+SELECT repo_name, count() AS stars FROM github_events WHERE event_type = 'WatchEvent' GROUP BY repo_name ORDER BY stars DESC LIMIT 50
+;
+SELECT dayofweek(created_at) AS day, count() AS stars FROM github_events WHERE event_type = 'WatchEvent' GROUP BY day ORDER BY day
+;
+SELECT actor_login, count() AS stars FROM github_events WHERE event_type = 'WatchEvent' GROUP BY actor_login ORDER BY stars DESC LIMIT 50
+;
+SELECT actor_login, count() AS stars FROM github_events WHERE event_type = 'WatchEvent' AND actor_login = 'alexey-milovidov' GROUP BY actor_login ORDER BY stars DESC LIMIT 50
+;
+SELECT
+    repo_name,
+    count() AS stars
+FROM github_events
+WHERE (event_type = 'WatchEvent') AND (repo_name IN
+(
+    SELECT repo_name
+    FROM github_events
+    WHERE (event_type = 'WatchEvent') AND (actor_login = 'alexey-milovidov')
+))
+GROUP BY repo_name
+ORDER BY stars DESC
+LIMIT 50
+;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+
+SELECT SUM(LO_EXTENDEDPRICE * LO_DISCOUNT) AS revenue
+FROM lineorder_flat
+WHERE
+    LO_ORDERDATE >= 19930101
+    AND LO_ORDERDATE <= 19931231
+    AND LO_DISCOUNT BETWEEN 1 AND 3
+    AND LO_QUANTITY < 25;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q1.2
+SELECT SUM(LO_EXTENDEDPRICE * LO_DISCOUNT) AS revenue
+FROM lineorder_flat
+WHERE
+    LO_ORDERDATE >= 19940101
+    AND LO_ORDERDATE <= 19940131
+    AND LO_DISCOUNT BETWEEN 4 AND 6
+    AND LO_QUANTITY BETWEEN 26 AND 35;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q1.3
+SELECT SUM(LO_EXTENDEDPRICE * LO_DISCOUNT) AS revenue
+FROM lineorder_flat
+WHERE
+    weekofyear(LO_ORDERDATE) = 6
+    AND LO_ORDERDATE >= 19940101
+    AND LO_ORDERDATE <= 19941231
+    AND LO_DISCOUNT BETWEEN 5 AND 7
+    AND LO_QUANTITY BETWEEN 26 AND 35;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q2.1
+SELECT
+    SUM(LO_REVENUE), (LO_ORDERDATE DIV 10000) AS YEAR,
+    P_BRAND
+FROM lineorder_flat
+WHERE P_CATEGORY = 'MFGR#12' AND S_REGION = 'AMERICA'
+GROUP BY YEAR, P_BRAND
+ORDER BY YEAR, P_BRAND;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q2.2
+SELECT
+    SUM(LO_REVENUE), (LO_ORDERDATE DIV 10000) AS YEAR,
+    P_BRAND
+FROM lineorder_flat
+WHERE
+    P_BRAND >= 'MFGR#2221'
+    AND P_BRAND <= 'MFGR#2228'
+    AND S_REGION = 'ASIA'
+GROUP BY YEAR, P_BRAND
+ORDER BY YEAR, P_BRAND;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q2.3
+SELECT
+    SUM(LO_REVENUE), (LO_ORDERDATE DIV 10000) AS YEAR,
+    P_BRAND
+FROM lineorder_flat
+WHERE
+    P_BRAND = 'MFGR#2239'
+    AND S_REGION = 'EUROPE'
+GROUP BY YEAR, P_BRAND
+ORDER BY YEAR, P_BRAND;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q3.1
+SELECT
+    C_NATION,
+    S_NATION, (LO_ORDERDATE DIV 10000) AS YEAR,
+    SUM(LO_REVENUE) AS revenue
+FROM lineorder_flat
+WHERE
+    C_REGION = 'ASIA'
+    AND S_REGION = 'ASIA'
+    AND LO_ORDERDATE >= 19920101
+    AND LO_ORDERDATE <= 19971231
+GROUP BY C_NATION, S_NATION, YEAR
+ORDER BY YEAR ASC, revenue DESC;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q3.2
+SELECT
+    C_CITY,
+    S_CITY, (LO_ORDERDATE DIV 10000) AS YEAR,
+    SUM(LO_REVENUE) AS revenue
+FROM lineorder_flat
+WHERE
+    C_NATION = 'UNITED STATES'
+    AND S_NATION = 'UNITED STATES'
+    AND LO_ORDERDATE >= 19920101
+    AND LO_ORDERDATE <= 19971231
+GROUP BY C_CITY, S_CITY, YEAR
+ORDER BY YEAR ASC, revenue DESC;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q3.3
+SELECT
+    C_CITY,
+    S_CITY, (LO_ORDERDATE DIV 10000) AS YEAR,
+    SUM(LO_REVENUE) AS revenue
+FROM lineorder_flat
+WHERE
+    C_CITY IN ('UNITED KI1', 'UNITED KI5')
+    AND S_CITY IN ('UNITED KI1', 'UNITED KI5')
+    AND LO_ORDERDATE >= 19920101
+    AND LO_ORDERDATE <= 19971231
+GROUP BY C_CITY, S_CITY, YEAR
+ORDER BY YEAR ASC, revenue DESC;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q3.4
+SELECT
+    C_CITY,
+    S_CITY, (LO_ORDERDATE DIV 10000) AS YEAR,
+    SUM(LO_REVENUE) AS revenue
+FROM lineorder_flat
+WHERE
+    C_CITY IN ('UNITED KI1', 'UNITED KI5')
+    AND S_CITY IN ('UNITED KI1', 'UNITED KI5')
+    AND LO_ORDERDATE >= 19971201
+    AND LO_ORDERDATE <= 19971231
+GROUP BY C_CITY, S_CITY, YEAR
+ORDER BY YEAR ASC, revenue DESC;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q4.1
+SELECT (LO_ORDERDATE DIV 10000) AS YEAR,
+    C_NATION,
+    SUM(LO_REVENUE - LO_SUPPLYCOST) AS profit
+FROM lineorder_flat
+WHERE
+    C_REGION = 'AMERICA'
+    AND S_REGION = 'AMERICA'
+    AND P_MFGR IN ('MFGR#1', 'MFGR#2')
+GROUP BY YEAR, C_NATION
+ORDER BY YEAR ASC, C_NATION ASC;
+-- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q4.2
+SELECT (LO_ORDERDATE DIV 10000) AS YEAR,
+    S_NATION,
+    P_CATEGORY,
+    SUM(LO_REVENUE - LO_SUPPLYCOST) AS profit
+FROM lineorder_flat
+WHERE
+    C_REGION = 'AMERICA'
+    AND S_REGION = 'AMERICA'
+    AND LO_ORDERDATE >= 19970101
+    AND LO_ORDERDATE <= 19981231
+    AND P_MFGR IN ('MFGR#1', 'MFGR#2')
+GROUP BY YEAR, S_NATION, P_CATEGORY
+ORDER BY
+    YEAR ASC,
+    S_NATION ASC,
+    P_CATEGORY ASC;
+------------------------------------------------------------------------------------------
+[SELECT] SELECT repo_name, count() AS forks FROM github_events WHERE event_type = 'ForkEvent' GROUP BY repo_name ORDER BY forks DESC LIMIT 50
+----------
+[SELECT] SELECT
+    lower(split_part(repo_name, '/', 1)) AS org,
+    count(distinct repo_name) AS repos
+FROM
+(
+    SELECT repo_name
+    FROM github_events
+    WHERE event_type = 'WatchEvent'
+    GROUP BY repo_name
+    HAVING count() >= 10
+) t
+GROUP BY org
+ORDER BY repos DESC, org ASC
+LIMIT 50
+----------
+[SELECT] SELECT
+    lower(split_part(repo_name, '/', 1)) AS org,
+    count() AS stars
+FROM github_events
+WHERE event_type = 'WatchEvent'
+GROUP BY org
+ORDER BY stars DESC
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 3) AS ratio
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE event_type IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY forks DESC
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 3) AS ratio
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE event_type IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING (stars > 100) AND (forks > 100)
+ORDER BY ratio DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(fork) / sum(star), 2) AS ratio
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE event_type IN ('ForkEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING (stars > 100) AND (forks > 100)
+ORDER BY ratio DESC
+LIMIT 50
+----------
+[SELECT] SELECT
+    sum(fork) AS forks,
+    sum(star) AS stars,
+    round(sum(star) / sum(fork), 2) AS ratio
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE event_type IN ('ForkEvent', 'WatchEvent')
+) t
+----------
+[SELECT] SELECT
+    sum(forks) AS forks,
+    sum(stars) AS stars,
+    round(sum(stars) / sum(forks), 2) AS ratio
+FROM
+(
+    SELECT
+        sum(fork) AS forks,
+        sum(star) AS stars
+    FROM
+    (
+        SELECT
+            repo_name,
+            CASE WHEN event_type = 'ForkEvent' THEN 1 ELSE 0 END AS fork,
+            CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+        FROM github_events
+        WHERE event_type IN ('ForkEvent', 'WatchEvent')
+    ) t
+    GROUP BY repo_name
+    HAVING stars > 100
+) t2
+----------
+[SELECT] SELECT
+    repo_name,
+    count() AS prs,
+    count(distinct actor_login) AS authors,
+    sum(additions) AS adds,
+    sum(deletions) AS dels
+FROM github_events
+WHERE (event_type = 'PullRequestEvent') AND (action = 'opened') AND (additions < 10000) AND (deletions < 10000)
+GROUP BY repo_name
+HAVING (adds / dels) < 10
+ORDER BY adds + dels DESC
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    count() AS pushes,
+    count(distinct actor_login) AS authors
+FROM github_events
+WHERE (event_type = 'PushEvent') AND (repo_name IN
+(
+    SELECT repo_name
+    FROM github_events
+    WHERE event_type = 'WatchEvent'
+    GROUP BY repo_name
+    ORDER BY count() DESC
+    LIMIT 10000
+))
+GROUP BY repo_name
+ORDER BY count() DESC
+LIMIT 50
+----------
+[SELECT] SELECT repo_name, count() FROM github_events WHERE lower(body) LIKE '%clickhouse%' GROUP BY repo_name ORDER BY count() DESC, repo_name ASC LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(num_star) AS num_stars,
+    sum(num_comment) AS num_comments
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS num_star,
+        CASE WHEN lower(body) LIKE '%clickhouse%' THEN 1 ELSE 0 END AS num_comment
+    FROM github_events
+    WHERE (lower(body) LIKE '%clickhouse%') OR (event_type = 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING num_comments > 0
+ORDER BY num_stars DESC,num_comments DESC,repo_name ASC
+LIMIT 50
+----------
+[SELECT] SELECT repo_name, count() FROM github_events WHERE lower(body) LIKE '%doris%' GROUP BY repo_name ORDER BY count() DESC, repo_name ASC LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(num_star) AS num_stars,
+    sum(num_comment) AS num_comments
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS num_star,
+        CASE WHEN lower(body) LIKE '%doris%' THEN 1 ELSE 0 END AS num_comment
+    FROM github_events
+    WHERE (lower(body) LIKE '%doris%') OR (event_type = 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING num_comments > 0
+ORDER BY num_stars DESC,num_comments DESC,repo_name ASC
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(created_at_2020) AS stars2020,
+    sum(created_at_2019) AS stars2019,
+    round(sum(created_at_2020) / sum(created_at_2019), 3) AS yoy,
+    min(created_at) AS first_seen
+FROM
+(
+    SELECT
+        repo_name,
+        CASE year(created_at) WHEN 2020 THEN 1 ELSE 0 END AS created_at_2020,
+        CASE year(created_at) WHEN 2019 THEN 1 ELSE 0 END AS created_at_2019,
+        created_at
+    FROM github_events
+    WHERE event_type = 'WatchEvent'
+) t
+GROUP BY repo_name
+HAVING (min(created_at) <= '2019-01-01 00:00:00') AND (stars2019 >= 1000)
+ORDER BY yoy DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT repo_name, count() AS c, count(distinct actor_login) AS u FROM github_events WHERE event_type = 'IssuesEvent' AND action = 'opened' GROUP BY repo_name ORDER BY c DESC, repo_name LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN actor_login ELSE NULL END AS actor_login
+    FROM github_events
+    WHERE event_type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY c DESC, repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN actor_login ELSE NULL END AS actor_login
+    FROM github_events
+    WHERE event_type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 1000
+ORDER BY c DESC
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(issue_created) AS c,
+    count(distinct actor_login) AS u,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN 1 ELSE 0 END AS issue_created,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star,
+        CASE WHEN (event_type = 'IssuesEvent') AND (action = 'opened') THEN actor_login ELSE NULL END AS actor_login
+    FROM github_events
+    WHERE event_type IN ('IssuesEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+ORDER BY u DESC
+LIMIT 50
+----------
+[SELECT] SELECT repo_name, count(), count(distinct actor_login) FROM github_events WHERE event_type = 'PullRequestEvent' AND action = 'opened' GROUP BY repo_name ORDER BY count() DESC LIMIT 50
+----------
+[SELECT] SELECT repo_name, count(), count(distinct actor_login) AS u FROM github_events WHERE event_type = 'PullRequestEvent' AND action = 'opened' GROUP BY repo_name ORDER BY u DESC, 2 DESC LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(invitation) AS invitations,
+    sum(star) AS stars
+FROM
+(
+    SELECT
+        repo_name,
+        CASE WHEN event_type = 'MemberEvent' THEN 1 ELSE 0 END AS invitation,
+        CASE WHEN event_type = 'WatchEvent' THEN 1 ELSE 0 END AS star
+    FROM github_events
+    WHERE event_type IN ('MemberEvent', 'WatchEvent')
+) t
+GROUP BY repo_name
+HAVING stars >= 100
+ORDER BY invitations DESC, stars DESC
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    sum(created_at_2020) AS stars2020,
+    sum(created_at_2019) AS stars2019,
+    round(sum(created_at_2020) / sum(created_at_2019), 3) AS yoy,
+    min(created_at) AS first_seen
+FROM
+(
+    SELECT
+        repo_name,
+        CASE year(created_at) WHEN 2020 THEN 1 ELSE 0 END AS created_at_2020,
+        CASE year(created_at) WHEN 2019 THEN 1 ELSE 0 END AS created_at_2019,
+        created_at
+    FROM github_events
+    WHERE event_type = 'WatchEvent'
+) t
+GROUP BY repo_name
+HAVING (min(created_at) <= '2019-01-01 00:00:00') AND (max(created_at) >= '2020-06-01 00:00:00') AND (stars2019 >= 1000)
+ORDER BY yoy,repo_name
+LIMIT 50
+----------
+[SELECT] SELECT
+  repo_name,
+  count() AS stars
+FROM github_events
+WHERE (event_type = 'WatchEvent') AND (actor_login IN
+(
+    SELECT actor_login
+    FROM github_events
+    WHERE (event_type = 'WatchEvent') AND (repo_name IN ('ClickHouse/ClickHouse', 'yandex/ClickHouse'))
+)) AND (repo_name NOT IN ('ClickHouse/ClickHouse', 'yandex/ClickHouse'))
+GROUP BY repo_name
+ORDER BY stars DESC, repo_name DESC
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    count()
+FROM github_events
+WHERE (event_type = 'WatchEvent') AND (actor_login IN
+(
+    SELECT actor_login
+    FROM github_events
+    WHERE (event_type = 'PullRequestEvent') AND (action = 'opened')
+))
+GROUP BY repo_name
+ORDER BY count() DESC
+LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    count()
+FROM github_events
+WHERE (event_type = 'WatchEvent') AND (actor_login IN
+(
+    SELECT actor_login
+    FROM github_events
+    WHERE (event_type = 'PullRequestEvent') AND (action = 'opened')
+    GROUP BY actor_login
+    HAVING count() >= 10
+))
+GROUP BY repo_name
+ORDER BY count() DESC
+LIMIT 50
+----------
+[SELECT] SELECT count(), repo_name FROM github_events WHERE event_type = 'WatchEvent' GROUP BY repo_name ORDER BY length(repo_name) DESC, repo_name LIMIT 50
+----------
+[SELECT] SELECT repo_name, count() FROM github_events WHERE event_type = 'WatchEvent' AND repo_name LIKE '%_/_%' GROUP BY repo_name ORDER BY length(repo_name) ASC, repo_name LIMIT 50
+----------
+[SELECT] SELECT
+    concat('https://github.com/', repo_name, '/pull/', CAST(number AS STRING)) AS URL,
+    count(distinct actor_login) AS authors
+FROM github_events
+WHERE (event_type = 'PullRequestReviewCommentEvent') AND (action = 'created')
+GROUP BY
+    repo_name,
+    number
+ORDER BY authors DESC, URL ASC
+LIMIT 50
+----------
+[SELECT] SELECT count(distinct actor_login) FROM github_events
+----------
+[SELECT] SELECT count(distinct actor_login) FROM github_events WHERE event_type = 'WatchEvent'
+----------
+[SELECT] SELECT count(distinct actor_login) FROM github_events WHERE event_type = 'PushEvent'
+----------
+[SELECT] SELECT count(distinct actor_login) FROM github_events WHERE event_type = 'PullRequestEvent' AND action = 'opened'
+----------
+[SELECT] SELECT repo_name, count() AS stars FROM github_events WHERE event_type = 'WatchEvent' GROUP BY repo_name ORDER BY stars DESC LIMIT 50
+----------
+[SELECT] SELECT dayofweek(created_at) AS day, count() AS stars FROM github_events WHERE event_type = 'WatchEvent' GROUP BY day ORDER BY day
+----------
+[SELECT] SELECT actor_login, count() AS stars FROM github_events WHERE event_type = 'WatchEvent' GROUP BY actor_login ORDER BY stars DESC LIMIT 50
+----------
+[SELECT] SELECT actor_login, count() AS stars FROM github_events WHERE event_type = 'WatchEvent' AND actor_login = 'alexey-milovidov' GROUP BY actor_login ORDER BY stars DESC LIMIT 50
+----------
+[SELECT] SELECT
+    repo_name,
+    count() AS stars
+FROM github_events
+WHERE (event_type = 'WatchEvent') AND (repo_name IN
+(
+    SELECT repo_name
+    FROM github_events
+    WHERE (event_type = 'WatchEvent') AND (actor_login = 'alexey-milovidov')
+))
+GROUP BY repo_name
+ORDER BY stars DESC
+LIMIT 50
+----------
+[SELECT] SELECT SUM(LO_EXTENDEDPRICE * LO_DISCOUNT) AS revenue
+FROM lineorder_flat
+WHERE
+    LO_ORDERDATE >= 19930101
+    AND LO_ORDERDATE <= 19931231
+    AND LO_DISCOUNT BETWEEN 1 AND 3
+    AND LO_QUANTITY < 25;
+----------
+[SELECT] -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q1.2
+SELECT SUM(LO_EXTENDEDPRICE * LO_DISCOUNT) AS revenue
+FROM lineorder_flat
+WHERE
+    LO_ORDERDATE >= 19940101
+    AND LO_ORDERDATE <= 19940131
+    AND LO_DISCOUNT BETWEEN 4 AND 6
+    AND LO_QUANTITY BETWEEN 26 AND 35;
+----------
+[SELECT] -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q1.3
+SELECT SUM(LO_EXTENDEDPRICE * LO_DISCOUNT) AS revenue
+FROM lineorder_flat
+WHERE
+    weekofyear(LO_ORDERDATE) = 6
+    AND LO_ORDERDATE >= 19940101
+    AND LO_ORDERDATE <= 19941231
+    AND LO_DISCOUNT BETWEEN 5 AND 7
+    AND LO_QUANTITY BETWEEN 26 AND 35;
+----------
+[SELECT] -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q2.1
+SELECT
+    SUM(LO_REVENUE), (LO_ORDERDATE DIV 10000) AS YEAR,
+    P_BRAND
+FROM lineorder_flat
+WHERE P_CATEGORY = 'MFGR#12' AND S_REGION = 'AMERICA'
+GROUP BY YEAR, P_BRAND
+ORDER BY YEAR, P_BRAND;
+----------
+[SELECT] -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q2.2
+SELECT
+    SUM(LO_REVENUE), (LO_ORDERDATE DIV 10000) AS YEAR,
+    P_BRAND
+FROM lineorder_flat
+WHERE
+    P_BRAND >= 'MFGR#2221'
+    AND P_BRAND <= 'MFGR#2228'
+    AND S_REGION = 'ASIA'
+GROUP BY YEAR, P_BRAND
+ORDER BY YEAR, P_BRAND;
+----------
+[SELECT] -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q2.3
+SELECT
+    SUM(LO_REVENUE), (LO_ORDERDATE DIV 10000) AS YEAR,
+    P_BRAND
+FROM lineorder_flat
+WHERE
+    P_BRAND = 'MFGR#2239'
+    AND S_REGION = 'EUROPE'
+GROUP BY YEAR, P_BRAND
+ORDER BY YEAR, P_BRAND;
+----------
+[SELECT] -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q3.1
+SELECT
+    C_NATION,
+    S_NATION, (LO_ORDERDATE DIV 10000) AS YEAR,
+    SUM(LO_REVENUE) AS revenue
+FROM lineorder_flat
+WHERE
+    C_REGION = 'ASIA'
+    AND S_REGION = 'ASIA'
+    AND LO_ORDERDATE >= 19920101
+    AND LO_ORDERDATE <= 19971231
+GROUP BY C_NATION, S_NATION, YEAR
+ORDER BY YEAR ASC, revenue DESC;
+----------
+[SELECT] -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q3.2
+SELECT
+    C_CITY,
+    S_CITY, (LO_ORDERDATE DIV 10000) AS YEAR,
+    SUM(LO_REVENUE) AS revenue
+FROM lineorder_flat
+WHERE
+    C_NATION = 'UNITED STATES'
+    AND S_NATION = 'UNITED STATES'
+    AND LO_ORDERDATE >= 19920101
+    AND LO_ORDERDATE <= 19971231
+GROUP BY C_CITY, S_CITY, YEAR
+ORDER BY YEAR ASC, revenue DESC;
+----------
+[SELECT] -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q3.3
+SELECT
+    C_CITY,
+    S_CITY, (LO_ORDERDATE DIV 10000) AS YEAR,
+    SUM(LO_REVENUE) AS revenue
+FROM lineorder_flat
+WHERE
+    C_CITY IN ('UNITED KI1', 'UNITED KI5')
+    AND S_CITY IN ('UNITED KI1', 'UNITED KI5')
+    AND LO_ORDERDATE >= 19920101
+    AND LO_ORDERDATE <= 19971231
+GROUP BY C_CITY, S_CITY, YEAR
+ORDER BY YEAR ASC, revenue DESC;
+----------
+[SELECT] -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q3.4
+SELECT
+    C_CITY,
+    S_CITY, (LO_ORDERDATE DIV 10000) AS YEAR,
+    SUM(LO_REVENUE) AS revenue
+FROM lineorder_flat
+WHERE
+    C_CITY IN ('UNITED KI1', 'UNITED KI5')
+    AND S_CITY IN ('UNITED KI1', 'UNITED KI5')
+    AND LO_ORDERDATE >= 19971201
+    AND LO_ORDERDATE <= 19971231
+GROUP BY C_CITY, S_CITY, YEAR
+ORDER BY YEAR ASC, revenue DESC;
+----------
+[SELECT] -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q4.1
+SELECT (LO_ORDERDATE DIV 10000) AS YEAR,
+    C_NATION,
+    SUM(LO_REVENUE - LO_SUPPLYCOST) AS profit
+FROM lineorder_flat
+WHERE
+    C_REGION = 'AMERICA'
+    AND S_REGION = 'AMERICA'
+    AND P_MFGR IN ('MFGR#1', 'MFGR#2')
+GROUP BY YEAR, C_NATION
+ORDER BY YEAR ASC, C_NATION ASC;
+----------
+[SELECT] -- Licensed to the Apache Software Foundation (ASF) under one
+-- or more contributor license agreements.  See the NOTICE file
+-- distributed with this work for additional information
+-- regarding copyright ownership.  The ASF licenses this file
+-- to you under the Apache License, Version 2.0 (the
+-- "License"); you may not use this file except in compliance
+-- with the License.  You may obtain a copy of the License at
+--
+--   http://www.apache.org/licenses/LICENSE-2.0
+--
+-- Unless required by applicable law or agreed to in writing,
+-- software distributed under the License is distributed on an
+-- "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+-- KIND, either express or implied.  See the License for the
+-- specific language governing permissions and limitations
+-- under the License.
+--Q4.2
+SELECT (LO_ORDERDATE DIV 10000) AS YEAR,
+    S_NATION,
+    P_CATEGORY,
+    SUM(LO_REVENUE - LO_SUPPLYCOST) AS profit
+FROM lineorder_flat
+WHERE
+    C_REGION = 'AMERICA'
+    AND S_REGION = 'AMERICA'
+    AND LO_ORDERDATE >= 19970101
+    AND LO_ORDERDATE <= 19981231
+    AND P_MFGR IN ('MFGR#1', 'MFGR#2')
+GROUP BY YEAR, S_NATION, P_CATEGORY
+ORDER BY
+    YEAR ASC,
+    S_NATION ASC,
+    P_CATEGORY ASC;

@@ -1,0 +1,726 @@
+CREATE TABLE tab_settings_flags AS SELECT name, category,
+    'EXPLAIN'          = ANY(flags) AS explain,
+    'NO_RESET'         = ANY(flags) AS no_reset,
+    'NO_RESET_ALL'     = ANY(flags) AS no_reset_all,
+    'NOT_IN_SAMPLE'    = ANY(flags) AS not_in_sample,
+    'RUNTIME_COMPUTED' = ANY(flags) AS runtime_computed
+  FROM pg_show_all_settings() AS psas,
+    pg_settings_get_flags(psas.name) AS flags
+;
+CREATE TABLE tab_settings_flags AS SELECT name, category,
+    'EXPLAIN'          = ANY(flags) AS explain,
+    'NO_RESET_ALL'     = ANY(flags) AS no_reset_all,
+    'NOT_IN_SAMPLE'    = ANY(flags) AS not_in_sample,
+    'RUNTIME_COMPUTED' = ANY(flags) AS runtime_computed
+  FROM pg_show_all_settings() AS psas,
+    pg_settings_get_flags(psas.name) AS flags
+;
+ALTER TABLE cmdata ALTER COLUMN f1 SET COMPRESSION lz4
+;
+CREATE OR REPLACE FUNCTION "overlaps"(timestamp, interval,
+  timestamp, interval)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, ($3 + $4))
+;
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub1, testpub1 WITH (refresh = false)
+;
+CREATE OR REPLACE FUNCTION path_contain_pt(path, point)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN on_ppath($2, $1)
+;
+CREATE OR REPLACE FUNCTION ll_to_earth(float8, float8)
+RETURNS earth
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN public.cube(public.cube(public.cube(
+    earth() * cos(radians($1)) * cos(radians($2))),
+    earth() * cos(radians($1)) * sin(radians($2))),
+    earth() * sin(radians($1)))::earth
+;
+create index on btree_tall_tbl (id int4_ops(foo=1))
+;
+CREATE OR REPLACE FUNCTION pg_sleep_for(interval)
+ RETURNS void
+ LANGUAGE sql
+ PARALLEL SAFE STRICT COST 1
+RETURN pg_sleep(extract(epoch from clock_timestamp() + $1) -
+                extract(epoch from clock_timestamp()))
+;
+CREATE TABLE cmdata1(f1 TEXT COMPRESSION lz4)
+;
+CREATE INDEX ON more__int using gist (a gist__int_ops(numranges = 252))
+;
+CREATE FUNCTION functest_S_xx(x date) RETURNS boolean
+    LANGUAGE SQL
+    RETURN x > 1
+;
+ALTER TABLE badcompresstbl ALTER a SET COMPRESSION I_Do_Not_Exist_Compression
+;
+CREATE OR REPLACE FUNCTION regexp_match(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_match( $1::text, $2::text, 'i' )
+;
+create or replace trigger my_trig
+  before insert on my_table
+  for each row execute procedure funcB()
+;
+-- reverse-listing of various special function syntaxes required by SQL
+
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb,
+  CURRENT_DATE as cd,
+  (select * from CURRENT_DATE) as cd2,
+  CURRENT_TIME as ct,
+  (select * from CURRENT_TIME) as ct2,
+  CURRENT_TIME (1) as ct3,
+  (select * from CURRENT_TIME (1)) as ct4,
+  CURRENT_TIMESTAMP as ct5,
+  (select * from CURRENT_TIMESTAMP) as ct6,
+  CURRENT_TIMESTAMP (1) as ct7,
+  (select * from CURRENT_TIMESTAMP (1)) as ct8,
+  LOCALTIME as lt1,
+  (select * from LOCALTIME) as lt2,
+  LOCALTIME (1) as lt3,
+  (select * from LOCALTIME (1)) as lt4,
+  LOCALTIMESTAMP as lt5,
+  (select * from LOCALTIMESTAMP) as lt6,
+  LOCALTIMESTAMP (1) as lt7,
+  (select * from LOCALTIMESTAMP (1)) as lt8,
+  CURRENT_CATALOG as ca,
+  (select * from CURRENT_CATALOG) as ca2,
+  CURRENT_ROLE as cr,
+  (select * from CURRENT_ROLE) as cr2,
+  CURRENT_SCHEMA as cs,
+  (select * from CURRENT_SCHEMA) as cs2,
+  CURRENT_USER as cu,
+  (select * from CURRENT_USER) as cu2,
+  USER as us,
+  (select * from USER) as us2,
+  SESSION_USER seu,
+  (select * from SESSION_USER) as seu2,
+  SYSTEM_USER as su,
+  (select * from SYSTEM_USER) as su2
+;
+CREATE OR REPLACE FUNCTION "overlaps"(timestamptz, interval,
+  timestamptz, timestamptz)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;
+CREATE OR REPLACE FUNCTION regexp_split_to_array(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_split_to_array( $1::text, $2::text, 'i' )
+;
+ALTER TYPE hstore SET (
+  SUBSCRIPT = hstore_subscript_handler
+)
+;
+-- these functions encapsulate knowledge about the encoding of typmod:
+
+CREATE FUNCTION _pg_char_max_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $2 = -1 /* default typmod */
+       THEN null
+       WHEN $1 IN (1042, 1043) /* char, varchar */
+       THEN $2 - 4
+       WHEN $1 IN (1560, 1562) /* bit, varbit */
+       THEN $2
+       ELSE null
+  END
+;
+CREATE FUNCTION functest_S_xxx(x int) RETURNS int
+    LANGUAGE SQL
+    AS $$ SELECT x * 2 $$
+    RETURN x * 3
+;
+CREATE SCHEMA regress_schema_1 AUTHORIZATION CURRENT_ROLE
+  CREATE SEQUENCE schema_not_existing.seq
+;
+ALTER TABLE parent_tbl DETACH PARTITION foreign_tbl CONCURRENTLY
+;
+CREATE FUNCTION _pg_char_max_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $2 = -1 /* default typmod */
+       THEN null
+       WHEN $1 IN (1042, 1043) /* char, varchar */
+       THEN $2 - 4
+       WHEN $1 IN (1560, 1562) /* bit, varbit */
+       THEN $2
+       ELSE null
+  END
+;
+-- test ruleutils and view expansion
+create temp view v_cycle1 as
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select f, t, label from search_graph
+;
+CREATE FUNCTION _pg_char_octet_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (25, 1042, 1043) /* text, char, varchar */
+       THEN CASE WHEN $2 = -1 /* default typmod */
+                 THEN CAST(2^30 AS integer)
+                 ELSE information_schema._pg_char_max_length($1, $2) *
+                      pg_catalog.pg_encoding_max_length((SELECT encoding FROM pg_catalog.pg_database WHERE datname = pg_catalog.current_database()))
+            END
+       ELSE null
+  END
+;
+alter table d4_primary detach partition d4_primary1 concurrently
+;
+CREATE OR REPLACE FUNCTION timestamptz(date, time)
+ RETURNS timestamptz
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN cast(($1 + $2) as timestamptz)
+;
+CREATE OR REPLACE FUNCTION age(timestamp)
+ RETURNS interval
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN age(cast(current_date as timestamp), $1)
+;
+CREATE VIEW "public"."limit_thousand_v_3" AS
+ SELECT "onek"."thousand"
+   FROM "public"."onek"
+  WHERE ("onek"."thousand" < 995)
+  ORDER BY "onek"."thousand"
+ FETCH FIRST ((NULL::integer + 1)) ROWS WITH TIES
+;
+-- fail - publication used more than once
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub1, testpub1 WITH (refresh = false)
+;
+-- fail - all publications are deleted
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub, testpub1, testpub2 WITH (refresh = false)
+;
+ALTER TABLE d3_listp DETACH PARTITION d3_listp1 FINALIZE
+;
+-- try setting compression for incompressible data type
+CREATE TABLE cmdata2 (f1 int COMPRESSION pglz)
+;
+CREATE OR REPLACE FUNCTION regexp_matches(string citext, pattern citext, flags text) RETURNS SETOF TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE ROWS 10
+RETURN pg_catalog.regexp_matches( $1::text, $2::text, CASE WHEN pg_catalog.strpos($3, 'c') = 0 THEN  $3 || 'i' ELSE $3 END )
+;
+alter table "catalog1".schema1."test" alter column "a1" drop expression if exists
+;
+-- fail - publication does not exist in subscription
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub3 WITH (refresh = false)
+;
+CREATE VIEW "public"."limit_thousand_v_1" AS
+ SELECT "thousand"
+   FROM "public"."onek"
+  WHERE ("thousand" < 995)
+  ORDER BY "thousand"
+ OFFSET 10
+ FETCH FIRST (5) ROWS WITH TIES
+;
+-- test that trigger can be replaced by another one
+-- at the same level of partition table
+create or replace trigger my_trig
+  after insert on parted_trig
+  for each row execute procedure funcA()
+;
+ALTER SUBSCRIPTION tap_sub DROP PUBLICATION tap_pub_1
+;
+CREATE OR REPLACE FUNCTION trunc(numeric)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN trunc($1, 0)
+;
+-- fails
+CREATE VIEW limit_thousand_v_3 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST (NULL+1) ROWS WITH TIES
+;
+CREATE VIEW "public"."limit_thousand_v_4" AS
+ SELECT "thousand"
+   FROM "public"."onek"
+  WHERE ("thousand" < 995)
+  ORDER BY "thousand"
+ FETCH FIRST ((5)::bigint) ROWS WITH TIES
+;
+-- test alter compression method
+ALTER TABLE cmdata ALTER COLUMN f1 SET COMPRESSION lz4
+;
+ALTER TYPE myvarchar SET (storage = extended)
+;
+ALTER TRIGGER c ON a NO DEPENDS ON EXTENSION test_ext5
+;
+CREATE FUNCTION _pg_numeric_scale(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (21, 23, 20) THEN 0
+       WHEN $1 IN (1700) THEN
+            CASE WHEN $2 = -1
+                 THEN null
+                 ELSE ($2 - 4) & 65535
+                 END
+       ELSE null
+  END
+;
+CREATE FUNCTION _pg_numeric_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE $1
+         WHEN 21 /*int2*/ THEN 16
+         WHEN 23 /*int4*/ THEN 32
+         WHEN 20 /*int8*/ THEN 64
+         WHEN 1700 /*numeric*/ THEN
+              CASE WHEN $2 = -1
+                   THEN null
+                   ELSE (($2 - 4) >> 16) & 65535
+                   END
+         WHEN 700 /*float4*/ THEN 24 /*FLT_MANT_DIG*/
+         WHEN 701 /*float8*/ THEN 53 /*DBL_MANT_DIG*/
+         ELSE null
+  END
+;
+CREATE OR REPLACE FUNCTION log(numeric)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN log(10, $1)
+;
+-- polymorphic arguments not allowed in this form
+CREATE FUNCTION functest_S_xx(x anyarray) RETURNS anyelement
+    LANGUAGE SQL
+    RETURN x[1]
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE|SELECT] CREATE TABLE tab_settings_flags AS SELECT name, category,
+    'EXPLAIN'          = ANY(flags) AS explain,
+    'NO_RESET'         = ANY(flags) AS no_reset,
+    'NO_RESET_ALL'     = ANY(flags) AS no_reset_all,
+    'NOT_IN_SAMPLE'    = ANY(flags) AS not_in_sample,
+    'RUNTIME_COMPUTED' = ANY(flags) AS runtime_computed
+  FROM pg_show_all_settings() AS psas,
+    pg_settings_get_flags(psas.name) AS flags
+;
+----------
+[CREATE_TABLE|SELECT] CREATE TABLE tab_settings_flags AS SELECT name, category,
+    'EXPLAIN'          = ANY(flags) AS explain,
+    'NO_RESET_ALL'     = ANY(flags) AS no_reset_all,
+    'NOT_IN_SAMPLE'    = ANY(flags) AS not_in_sample,
+    'RUNTIME_COMPUTED' = ANY(flags) AS runtime_computed
+  FROM pg_show_all_settings() AS psas,
+    pg_settings_get_flags(psas.name) AS flags
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE cmdata ALTER COLUMN f1 SET COMPRESSION lz4
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "overlaps"(timestamp, interval,
+  timestamp, interval)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, ($3 + $4))
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub1, testpub1 WITH (refresh = false)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION path_contain_pt(path, point)
+ RETURNS boolean
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN on_ppath($2, $1)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION ll_to_earth(float8, float8)
+RETURNS earth
+LANGUAGE SQL
+IMMUTABLE STRICT
+PARALLEL SAFE
+RETURN public.cube(public.cube(public.cube(
+    earth() * cos(radians($1)) * cos(radians($2))),
+    earth() * cos(radians($1)) * sin(radians($2))),
+    earth() * sin(radians($1)))::earth
+;
+----------
+[ADD_INDEX] create index on btree_tall_tbl (id int4_ops(foo=1))
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION pg_sleep_for(interval)
+ RETURNS void
+ LANGUAGE sql
+ PARALLEL SAFE STRICT COST 1
+RETURN pg_sleep(extract(epoch from clock_timestamp() + $1) -
+                extract(epoch from clock_timestamp()))
+;
+----------
+[CREATE_TABLE] CREATE TABLE cmdata1(f1 TEXT COMPRESSION lz4)
+;
+----------
+[ADD_INDEX] CREATE INDEX ON more__int using gist (a gist__int_ops(numranges = 252))
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_xx(x date) RETURNS boolean
+    LANGUAGE SQL
+    RETURN x > 1
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE badcompresstbl ALTER a SET COMPRESSION I_Do_Not_Exist_Compression
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_match(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_match( $1::text, $2::text, 'i' )
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] create or replace trigger my_trig
+  before insert on my_table
+  for each row execute procedure funcB()
+;
+----------
+[CREATE_VIEW(SELECT)] -- reverse-listing of various special function syntaxes required by SQL
+
+create view tt201v as
+select
+  ('2022-12-01'::date + '1 day'::interval) at time zone 'UTC' as atz,
+  extract(day from now()) as extr,
+  (now(), '1 day'::interval) overlaps
+    (current_timestamp(2), '1 day'::interval) as o,
+  'foo' is normalized isn,
+  'foo' is nfkc normalized isnn,
+  normalize('foo') as n,
+  normalize('foo', nfkd) as nfkd,
+  overlay('foo' placing 'bar' from 2) as ovl,
+  overlay('foo' placing 'bar' from 2 for 3) as ovl2,
+  position('foo' in 'foobar') as p,
+  substring('foo' from 2 for 3) as s,
+  substring('foo' similar 'f' escape '#') as ss,
+  substring('foo' from 'oo') as ssf,  -- historically-permitted abuse
+  trim(' ' from ' foo ') as bt,
+  trim(leading ' ' from ' foo ') as lt,
+  trim(trailing ' foo ') as rt,
+  trim(E'\\000'::bytea from E'\\000Tom\\000'::bytea) as btb,
+  trim(leading E'\\000'::bytea from E'\\000Tom\\000'::bytea) as ltb,
+  trim(trailing E'\\000'::bytea from E'\\000Tom\\000'::bytea) as rtb,
+  CURRENT_DATE as cd,
+  (select * from CURRENT_DATE) as cd2,
+  CURRENT_TIME as ct,
+  (select * from CURRENT_TIME) as ct2,
+  CURRENT_TIME (1) as ct3,
+  (select * from CURRENT_TIME (1)) as ct4,
+  CURRENT_TIMESTAMP as ct5,
+  (select * from CURRENT_TIMESTAMP) as ct6,
+  CURRENT_TIMESTAMP (1) as ct7,
+  (select * from CURRENT_TIMESTAMP (1)) as ct8,
+  LOCALTIME as lt1,
+  (select * from LOCALTIME) as lt2,
+  LOCALTIME (1) as lt3,
+  (select * from LOCALTIME (1)) as lt4,
+  LOCALTIMESTAMP as lt5,
+  (select * from LOCALTIMESTAMP) as lt6,
+  LOCALTIMESTAMP (1) as lt7,
+  (select * from LOCALTIMESTAMP (1)) as lt8,
+  CURRENT_CATALOG as ca,
+  (select * from CURRENT_CATALOG) as ca2,
+  CURRENT_ROLE as cr,
+  (select * from CURRENT_ROLE) as cr2,
+  CURRENT_SCHEMA as cs,
+  (select * from CURRENT_SCHEMA) as cs2,
+  CURRENT_USER as cu,
+  (select * from CURRENT_USER) as cu2,
+  USER as us,
+  (select * from USER) as us2,
+  SESSION_USER seu,
+  (select * from SESSION_USER) as seu2,
+  SYSTEM_USER as su,
+  (select * from SYSTEM_USER) as su2
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION "overlaps"(timestamptz, interval,
+  timestamptz, timestamptz)
+ RETURNS boolean
+ LANGUAGE sql
+ STABLE PARALLEL SAFE COST 1
+RETURN ($1, ($1 + $2)) overlaps ($3, $4)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_split_to_array(string citext, pattern citext) RETURNS TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE
+RETURN pg_catalog.regexp_split_to_array( $1::text, $2::text, 'i' )
+;
+----------
+[ALTER_TYPE] ALTER TYPE hstore SET (
+  SUBSCRIPT = hstore_subscript_handler
+)
+;
+----------
+[CREATE_PROG_OBJ] -- these functions encapsulate knowledge about the encoding of typmod:
+
+CREATE FUNCTION _pg_char_max_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $2 = -1 /* default typmod */
+       THEN null
+       WHEN $1 IN (1042, 1043) /* char, varchar */
+       THEN $2 - 4
+       WHEN $1 IN (1560, 1562) /* bit, varbit */
+       THEN $2
+       ELSE null
+  END
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION functest_S_xxx(x int) RETURNS int
+    LANGUAGE SQL
+    AS $$ SELECT x * 2 $$
+    RETURN x * 3
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA regress_schema_1 AUTHORIZATION CURRENT_ROLE
+  CREATE SEQUENCE schema_not_existing.seq
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE parent_tbl DETACH PARTITION foreign_tbl CONCURRENTLY
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_char_max_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $2 = -1 /* default typmod */
+       THEN null
+       WHEN $1 IN (1042, 1043) /* char, varchar */
+       THEN $2 - 4
+       WHEN $1 IN (1560, 1562) /* bit, varbit */
+       THEN $2
+       ELSE null
+  END
+;
+----------
+[CREATE_VIEW(SELECT)] -- test ruleutils and view expansion
+create temp view v_cycle1 as
+with recursive search_graph(f, t, label) as (
+	select * from graph g
+	union all
+	select g.*
+	from graph g, search_graph sg
+	where g.f = sg.t
+) cycle f, t set is_cycle using path
+select f, t, label from search_graph
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_char_octet_length(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (25, 1042, 1043) /* text, char, varchar */
+       THEN CASE WHEN $2 = -1 /* default typmod */
+                 THEN CAST(2^30 AS integer)
+                 ELSE information_schema._pg_char_max_length($1, $2) *
+                      pg_catalog.pg_encoding_max_length((SELECT encoding FROM pg_catalog.pg_database WHERE datname = pg_catalog.current_database()))
+            END
+       ELSE null
+  END
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] alter table d4_primary detach partition d4_primary1 concurrently
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION timestamptz(date, time)
+ RETURNS timestamptz
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN cast(($1 + $2) as timestamptz)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION age(timestamp)
+ RETURNS interval
+ LANGUAGE sql
+ STABLE PARALLEL SAFE STRICT COST 1
+RETURN age(cast(current_date as timestamp), $1)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."limit_thousand_v_3" AS
+ SELECT "onek"."thousand"
+   FROM "public"."onek"
+  WHERE ("onek"."thousand" < 995)
+  ORDER BY "onek"."thousand"
+ FETCH FIRST ((NULL::integer + 1)) ROWS WITH TIES
+;
+----------
+[ALTER_PUB_SUB] -- fail - publication used more than once
+ALTER SUBSCRIPTION regress_testsub ADD PUBLICATION testpub1, testpub1 WITH (refresh = false)
+;
+----------
+[ALTER_PUB_SUB] -- fail - all publications are deleted
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub, testpub1, testpub2 WITH (refresh = false)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE d3_listp DETACH PARTITION d3_listp1 FINALIZE
+;
+----------
+[CREATE_TABLE] -- try setting compression for incompressible data type
+CREATE TABLE cmdata2 (f1 int COMPRESSION pglz)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION regexp_matches(string citext, pattern citext, flags text) RETURNS SETOF TEXT[]
+LANGUAGE SQL IMMUTABLE STRICT PARALLEL SAFE ROWS 10
+RETURN pg_catalog.regexp_matches( $1::text, $2::text, CASE WHEN pg_catalog.strpos($3, 'c') = 0 THEN  $3 || 'i' ELSE $3 END )
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table "catalog1".schema1."test" alter column "a1" drop expression if exists
+;
+----------
+[ALTER_PUB_SUB] -- fail - publication does not exist in subscription
+ALTER SUBSCRIPTION regress_testsub DROP PUBLICATION testpub3 WITH (refresh = false)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."limit_thousand_v_1" AS
+ SELECT "thousand"
+   FROM "public"."onek"
+  WHERE ("thousand" < 995)
+  ORDER BY "thousand"
+ OFFSET 10
+ FETCH FIRST (5) ROWS WITH TIES
+;
+----------
+[CREATE_TRIGGER(CALL_PROG_OBJ)] -- test that trigger can be replaced by another one
+-- at the same level of partition table
+create or replace trigger my_trig
+  after insert on parted_trig
+  for each row execute procedure funcA()
+;
+----------
+[ALTER_PUB_SUB] ALTER SUBSCRIPTION tap_sub DROP PUBLICATION tap_pub_1
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION trunc(numeric)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN trunc($1, 0)
+;
+----------
+[CREATE_VIEW(SELECT)] -- fails
+CREATE VIEW limit_thousand_v_3 AS SELECT thousand FROM onek WHERE thousand < 995
+		ORDER BY thousand FETCH FIRST (NULL+1) ROWS WITH TIES
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."limit_thousand_v_4" AS
+ SELECT "thousand"
+   FROM "public"."onek"
+  WHERE ("thousand" < 995)
+  ORDER BY "thousand"
+ FETCH FIRST ((5)::bigint) ROWS WITH TIES
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] -- test alter compression method
+ALTER TABLE cmdata ALTER COLUMN f1 SET COMPRESSION lz4
+;
+----------
+[ALTER_TYPE] ALTER TYPE myvarchar SET (storage = extended)
+;
+----------
+[ALTER_TRIGGER] ALTER TRIGGER c ON a NO DEPENDS ON EXTENSION test_ext5
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_numeric_scale(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE WHEN $1 IN (21, 23, 20) THEN 0
+       WHEN $1 IN (1700) THEN
+            CASE WHEN $2 = -1
+                 THEN null
+                 ELSE ($2 - 4) & 65535
+                 END
+       ELSE null
+  END
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION _pg_numeric_precision(typid oid, typmod int4) RETURNS integer
+    LANGUAGE sql
+    IMMUTABLE
+    PARALLEL SAFE
+    RETURNS NULL ON NULL INPUT
+RETURN
+  CASE $1
+         WHEN 21 /*int2*/ THEN 16
+         WHEN 23 /*int4*/ THEN 32
+         WHEN 20 /*int8*/ THEN 64
+         WHEN 1700 /*numeric*/ THEN
+              CASE WHEN $2 = -1
+                   THEN null
+                   ELSE (($2 - 4) >> 16) & 65535
+                   END
+         WHEN 700 /*float4*/ THEN 24 /*FLT_MANT_DIG*/
+         WHEN 701 /*float8*/ THEN 53 /*DBL_MANT_DIG*/
+         ELSE null
+  END
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION log(numeric)
+ RETURNS numeric
+ LANGUAGE sql
+ IMMUTABLE PARALLEL SAFE STRICT COST 1
+RETURN log(10, $1)
+;
+----------
+[CREATE_PROG_OBJ] -- polymorphic arguments not allowed in this form
+CREATE FUNCTION functest_S_xx(x anyarray) RETURNS anyelement
+    LANGUAGE SQL
+    RETURN x[1]
+;

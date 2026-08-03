@@ -1,0 +1,1148 @@
+SELECT * FROM S3 (
+      "uri" = "s3://your_bucket/path/to/tvf_test/test.parquet",
+      "format" = "parquet",
+      "s3.endpoint" = "s3.us-east-1.amazonaws.com",
+      "s3.region" = "us-east-1",
+      "s3.role_arn" = "<your-bucket-role-arn>",
+      "s3.external_id" = "<your-external-id>"      -- option parameter
+  )
+;
+SELECT * FROM S3 (
+      "uri" = "s3://your_bucket/path/to/tvf_test/test.parquet",
+      "format" = "parquet",
+      "s3.endpoint" = "s3.us-east-1.amazonaws.com",
+      "s3.region" = "us-east-1"
+  )
+;
+SELECT
+    c,
+    CAST(AI_GENERATE(CONCAT('Please score the relevance of the following document content to Apache Doris, with a floating-point number from 0 to 10, output only the score. Document:', c)) AS DOUBLE) AS score
+FROM doc_pool ORDER BY score DESC LIMIT 10;
+SELECT
+    c.candidate_id, c.name,
+    j.job_id, j.title
+FROM candidate_profiles AS c
+JOIN job_requirements AS j
+WHERE AI_FILTER(CONCAT('Does the following candidate self-introduction match the job description?', 
+                'Job: ', j.jd_text, ' Candidate: ', c.self_intro));
+-- Keyword search (any keyword match)
+SELECT * FROM docs WHERE content MATCH_ANY 'apache doris database';
+
+-- Require all keywords
+SELECT * FROM docs WHERE content MATCH_ALL 'real-time analytics OLAP';
+
+-- Exact phrase
+SELECT * FROM docs WHERE content MATCH_PHRASE 'inverted index';
+
+-- Phrase with slop (allow up to 2 words between terms)
+SELECT * FROM docs WHERE content MATCH_PHRASE 'machine learning ~2';
+
+-- Prefix matching
+SELECT * FROM docs WHERE content MATCH_PHRASE_PREFIX 'data ware';  -- matches "data warehouse", "data warehousing"
+;
+-- Simple keyword search
+SELECT * FROM docs WHERE content MATCH_ANY 'apache doris';
+
+-- Phrase search
+SELECT * FROM docs WHERE content MATCH_PHRASE 'full text search';
+
+-- Boolean query with SEARCH
+SELECT * FROM docs
+WHERE SEARCH('title:apache AND (category:database OR tags:ANY(sql nosql))');
+
+-- Relevance-based ranking
+SELECT id, title, score() AS relevance
+FROM docs
+WHERE content MATCH_ANY 'real-time analytics OLAP'
+ORDER BY relevance DESC
+LIMIT 10;
+SELECT * FROM docs WHERE search('apple banana',
+  '{"default_field":"title","default_operator":"and","mode":"lucene"}');
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(python javascript)');
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(machine learning tutorial)');
+
+-- Edge case: single value behaves like a term query
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(python)');
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(machine learning)');
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(programming tutorial)');
+
+-- Edge case: single value behaves like a term query
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(python)');
+-- Basic Lucene mode
+SELECT * FROM docs WHERE search('apple AND banana',
+  '{"default_field":"title","mode":"lucene"}');
+
+-- With minimum_should_match
+SELECT * FROM docs WHERE search('apple AND banana OR cherry',
+  '{"default_field":"title","mode":"lucene","minimum_should_match":1}');
+SELECT id, title FROM search_test_basic
+WHERE SEARCH('firstname:Chris*');
+
+-- Using the default field parameter
+SELECT id, firstname FROM people
+WHERE SEARCH('Chris*', 'firstname');
+-- Search for value containing space as single term
+SELECT * FROM docs WHERE search('title:First\\ Value');
+
+-- Search for value with parentheses
+SELECT * FROM docs WHERE search('title:hello\\(world\\)');
+
+-- Search for value with colon
+SELECT * FROM docs WHERE search('title:key\\:value');
+-- Range filters via SQL
+SELECT * FROM t WHERE created_at >= '2024-01-01';
+-- Allow up to 3 terms between keyword1 and keyword2
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3';
+-- Last term as prefix
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1 key';
+
+-- Single-term prefix match
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1';
+-- Examples
+SELECT * FROM t WHERE price >= 100 AND price < 200;          -- range
+SELECT * FROM t WHERE tags IN ('a','b','c');                  -- set
+SELECT * FROM t WHERE array_contains(attributes, 'color');    -- arrays
+;
+-- Equivalent to SHOW CACHE HOTSPOT "/" before version 3.0.4
+WITH t1 AS (
+  SELECT
+    cluster_id,
+    cluster_name,
+    table_id,
+    table_name,
+    insert_day,
+    SUM(query_per_day) AS query_per_day_total,
+    SUM(query_per_week) AS query_per_week_total
+  FROM __internal_schema.cloud_cache_hotspot
+  GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+  cluster_id AS ComputeGroupId,
+  cluster_name AS ComputeGroupName,
+  table_id AS TableId,
+  table_name AS TableName
+FROM (
+  SELECT
+    ROW_NUMBER() OVER (
+      PARTITION BY cluster_id
+      ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+    ) AS dr2,
+    *
+  FROM t1
+) t2
+WHERE dr2 = 1;
+-- Equivalent to SHOW CACHE HOTSPOT '/compute_group_name0' before version 3.0.4
+WITH t1 AS (
+  SELECT
+    cluster_id,
+    cluster_name,
+    table_id,
+    table_name,
+    insert_day,
+    SUM(query_per_day) AS query_per_day_total,
+    SUM(query_per_week) AS query_per_week_total
+  FROM __internal_schema.cloud_cache_hotspot
+  WHERE cluster_name = "compute_group_name0" -- Replace with the actual compute group name, e.g., "default_compute_group"
+  GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+  cluster_id AS ComputeGroupId,
+  cluster_name AS ComputeGroupName,
+  table_id AS TableId,
+  table_name AS TableName
+FROM (
+  SELECT
+    ROW_NUMBER() OVER (
+      PARTITION BY cluster_id
+      ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+    ) AS dr2,
+    *
+  FROM t1
+) t2
+WHERE dr2 = 1;
+-- Equivalent to SHOW CACHE HOTSPOT '/compute_group_name0/regression_test_cloud_load_copy_into_tpch_sf1_p1.customer' before version 3.0.4
+SELECT
+  partition_id AS PartitionId,
+  partition_name AS PartitionName
+FROM __internal_schema.cloud_cache_hotspot
+WHERE
+  cluster_name = "compute_group_name0" -- Replace with the actual compute group name, e.g., "default_compute_group"
+  AND table_name = "regression_test_cloud_load_copy_into_tpch_sf1_p1.customer" -- Replace with the actual database table name, e.g., "db1.t1"
+GROUP BY
+  cluster_id,
+  cluster_name,
+  table_id,
+  table_name,
+  partition_id,
+  partition_name;
+SELECT * FROM your_table_name WHERE message **MATCH_ANY** 'error 404'  
+ORDER BY ts DESC LIMIT 10;
+SELECT * FROM your_table_name WHERE message **MATCH_ALL** 'image faq'  
+ORDER BY ts DESC LIMIT 10;
+SELECT * FROM your_table_name WHERE message **MATCH_PHRASE** 'image faq'  
+ORDER BY ts DESC LIMIT 10;
+-- Analyze the order volume and sales revenue of each category
+SELECT 
+    p.category_name,
+    p.brand_name,
+    COUNT(DISTINCT o.order_id) as order_count,
+    SUM(o.quantity) as total_quantity,
+    SUM(o.actual_price * o.quantity) as total_amount
+FROM orders o
+LEFT JOIN products p ON o.product_id = p.product_id
+WHERE o.order_time >= '2024-02-22 00:00:00'
+GROUP BY p.category_name, p.brand_name
+ORDER BY total_amount DESC;
+SELECT l_linenumber,
+o_custkey,
+o_orderdate
+FROM mv_5
+WHERE o_orderdate = '2023-10-18';
+SELECT l_linenumber,
+        o_custkey,
+        o_orderdate
+ FROM lineitem
+ LEFT OUTER JOIN orders
+ ON l_orderkey = o_orderkey
+ WHERE l_linenumber > 2;
+SELECT l_linenumber,
+        o_custkey,
+        o_orderdate
+ FROM lineitem
+ LEFT OUTER JOIN orders
+ ON l_orderkey = o_orderkey
+ WHERE l_linenumber > 2 and o_orderdate = '2023-10-19';
+SELECT l_linenumber,
+       o_custkey
+FROM lineitem
+INNER JOIN orders ON l_orderkey = o_orderkey
+WHERE l_linenumber > 1 and o_orderdate = '2023-10-18';
+-- Hit mv1
+   select 
+       abs(k1)+k2+1,
+       sum(abs(k2+2)+k3+3) 
+   from 
+       d_table 
+   group by 
+       abs(k1)+k2+1;
+       
+   -- Hit mv1
+   select 
+       bin(abs(k1)+k2+1),
+       sum(abs(k2+2)+k3+3) 
+   from 
+       d_table 
+   group by 
+       bin(abs(k1)+k2+1);
+   
+   -- Hit mv2
+   select 
+       year(k4) + month(k4) 
+   from 
+       d_table 
+   where 
+       year(k4) = 2020;
+   
+   -- Hit table d_table but not hit mv2, because where condition does not match
+   select 
+       year(k4),
+       month(k4) 
+   from 
+       d_table;
+-- First execution: cache miss, results are computed and cached
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+
+-- Second execution: cache hit, results are served directly from cache
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+explain shape plan
+    select
+        nation,
+        o_year,
+        sum(amount) as sum_profit
+    from
+        (
+            select
+                /*+ leading(orders shuffle {lineitem shuffle part} shuffle {supplier broadcast nation} shuffle partsupp) */
+                n_name as nation,
+                extract(year from o_orderdate) as o_year,
+                l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity as amount
+            from
+                part,
+                supplier,
+                lineitem,
+                partsupp,
+                orders,
+                nation
+            where
+                s_suppkey = l_suppkey
+                and ps_suppkey = l_suppkey
+                and ps_partkey = l_partkey
+                and p_partkey = l_partkey
+                and o_orderkey = l_orderkey
+                and s_nationkey = n_nationkey
+                and p_name like '%green%'
+        ) as profit
+    group by
+        nation,
+        o_year
+    order by
+        nation,
+        o_year desc;
+explain select *
+from 
+    (
+        -- The t1 table is hash-distributed by c1, and after the GROUP BY operator, it still maintains the hash distribution by c1.
+        select c1 as c1, sum(c2) as c2
+        from t1
+        group by c1 
+    ) tx
+join 
+    (
+        -- The t2 table is hash-distributed by c1, but after the GROUP BY operator, the data is redistributed to be hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c1 = ty.c2;
+explain select *
+from 
+    (
+        -- The t1 table is initially hash-distributed by c1, but after the GROUP BY operator, the data distribution changes to be hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t1
+        group by c2 
+    ) tx
+join 
+    (
+        -- The t2 table is initially hash-distributed by c1, but after the GROUP BY operator, the data distribution changes to be hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c2 = ty.c2;
+SELECT    
+    year(d_date),    
+    i_category,    
+    SUM(ss_net_paid) AS total_sum,    
+    GROUPING(year(d_date)),    
+    GROUPING(i_category),    
+    GROUPING_ID(year(d_date), i_category)    
+FROM    
+    store_sales,    
+    date_dim d1,    
+    item,    
+    customer_address ca     
+WHERE    
+    d1.d_date_sk = ss_sold_date_sk    
+    AND i_item_sk = ss_item_sk    
+    AND ss_addr_sk = ca_address_sk    
+    AND i_category IN ('Books', 'Electronics')    
+    AND year(d_date) IN (1998, 1999)    
+    AND ca_state IN ('LA', 'AK')    
+GROUP BY CUBE(year(d_date), i_category);
+SELECT k1, k2, SUM(k3) FROM t GROUP BY k1, k2  
+  UNION ALL  
+  SELECT k1, NULL, SUM(k3) FROM t GROUP BY k1  
+  UNION ALL  
+  SELECT NULL, k2, SUM(k3) FROM t GROUP BY k2  
+  UNION ALL  
+  SELECT NULL, NULL, SUM(k3) FROM t;
+-- Scalar subquery, when t2 is an empty table, the subquery returns the scalar value null    
+select * from t1 where t1.c1 > (select sum(t2.c1) from t2);    
+    
+-- Non-scalar subquery, when t2 is an empty table, the subquery returns an empty set (0 rows)    
+select * from t1 where t1.c1 in (select t2.c1 from t2);
+-- Correlated subquery, the subquery internally uses the column t1.c2 from the outer table    
+select * from t1 where t1.c1 in (select t2.c1 from t2 where t2.c2 = t1.c2);    
+    
+-- Non-correlated subquery, the subquery internally does not use any columns from the outer table t1    
+select * from t1 where t1.c1 in (select t2.c1 from tt2);
+-- Single aggregate function without GROUP BY, supported    
+select * from t1 where t1.c1 < (select max(t2.c1) from t2 where t1.c2 = t2.c2);    
+    
+-- Equivalent rewritten SQL as follows:    
+select t1.* from t1 inner join (select t2.c2 as c2, max(t2.c1) as c1 from t2 group by t2.c2) tx on t1.c1 < tx.c1 and t1.c2 = tx.c2;    
+    
+-- Non-equality condition, not supported    
+select * from t1 where t1.c1 = (select max(t2.c1) from t2 where t1.c2 > t2.c2);    
+    
+-- No aggregate function, not supported    
+select * from t1 where t1.c1 = (select t2.c1 from t2 where t1.c2 = t2.c2);    
+    
+-- With aggregate function but includes GROUP BY, not supported    
+select * from t1 where t1.c1 = (select max(t2.c1) from t2 where t1.c2 = t2.c2 group by t2.c2);
+-- With LIMIT but no OFFSET, supported    
+select * from t1 where exists (select t2.c1 from t2 where t1.c2 = t2.c2 limit 2);    
+    
+-- Equivalent rewritten SQL as follows:    
+select * from t1 left semi join t2 on t1.c2 = t2.c2;    
+    
+-- With OFFSET and LIMIT, not supported    
+select * from t1 where exists (select t2.c1 from t2 where t1.c2 = t2.c2 limit 2, 3);
+select   
+        t1.c1   
+    from   
+        t1   
+    where not exists (  
+        select   
+            t2.c1   
+        from   
+            t2   
+        where not exists (  
+            select   
+                t3.c1   
+            from   
+                t3   
+            where   
+                t3.c2 = t2.c2 and t3.c1 = t1.c1  
+        )  
+    );
+SELECT py_add_three(10, 20, 30) AS sum_result; -- Result: 60
+SELECT py_reverse('hello') AS reversed; -- Result: olleh
+SELECT py_is_prime(17) AS is_prime; -- Result: true
+;
+-- UDF: Called for each row
+SELECT id, py_upper(name) FROM users;
+
+-- UDAF: Called once per group
+SELECT category, py_sum(amount) FROM sales GROUP BY category;
+SELECT
+        i_category,
+        year(d_date),
+        month(d_date),
+        sum(ss_net_paid) as total_sales,
+        sum(sum(ss_net_paid)) over(partition by i_category order by year(d_date),month(d_date) ROWS UNBOUNDED PRECEDING) cum_sales
+FROM 
+        store_sales,
+        date_dim d1,
+        item
+WHERE 
+        d1.d_date_sk = ss_sold_date_sk
+        and i_item_sk = ss_item_sk
+        and year(d_date) =2000
+        and i_category in ('Books','Electronics')
+GROUP BY         
+        i_category,
+        year(d_date),
+        month(d_date)
+;
+SELECT
+        i_category,
+        year(d_date),
+        month(d_date),
+        sum(ss_net_paid) as total_sales,
+        avg(sum(ss_net_paid)) over(order by year(d_date),month(d_date) ROWS 2 PRECEDING) avg
+FROM 
+        store_sales,
+        date_dim d1,
+        item
+WHERE 
+        d1.d_date_sk = ss_sold_date_sk
+        and i_item_sk = ss_item_sk
+        and year(d_date) =2000
+        and i_category='Books'
+GROUP BY         
+        i_category,
+        year(d_date),
+        month(d_date)
+;
+SELECT  
+        i_category,  
+        YEAR(d_date) AS year,  
+        MONTH(d_date) AS month,  
+        SUM(ss_net_paid) AS total_sales,  
+        AVG(SUM(ss_net_paid)) OVER (ORDER BY YEAR(d_date), MONTH(d_date) ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS avg_sales  
+FROM   
+        store_sales,  
+        date_dim d1,  
+        item  
+WHERE   
+        d1.d_date_sk = ss_sold_date_sk  
+        AND i_item_sk = ss_item_sk  
+        AND YEAR(d_date) = 2000  
+        AND i_category = 'Books'  
+GROUP BY           
+        i_category,  
+        YEAR(d_date),  
+        MONTH(d_date)
+;
+SELECT year, category, total_sum FROM (  
+    SELECT  
+        YEAR(d_date) AS year,  
+        i_category AS category,  
+        SUM(ss_net_paid) AS total_sum,  
+        MAX(SUM(ss_net_paid)) OVER (PARTITION BY YEAR(d_date)) AS max_sales  
+    FROM  
+        store_sales,  
+        date_dim d1,  
+        item  
+    WHERE  
+        d1.d_date_sk = ss_sold_date_sk  
+        AND i_item_sk = ss_item_sk  
+        AND YEAR(d_date) IN (1998, 1999)  
+    GROUP BY  
+        YEAR(d_date), i_category   
+) t  
+WHERE total_sum = max_sales;
+SELECT i_category AS categ, i_class AS sub_categ, i_item_id   
+FROM  
+    (  
+    SELECT   
+        i_item_id, i_class, i_category, SUM(ss_net_paid) AS sales,  
+        SUM(SUM(ss_net_paid)) OVER (PARTITION BY i_category) AS cat_sales,  
+        SUM(SUM(ss_net_paid)) OVER (PARTITION BY i_class) AS sub_cat_sales,  
+        RANK() OVER (PARTITION BY i_class ORDER BY SUM(ss_net_paid)) AS rank_in_line  
+    FROM   
+        store_sales,  
+        item  
+    WHERE  
+        i_item_sk = ss_item_sk  
+    GROUP BY i_class, i_category, i_item_id  
+    ) t  
+WHERE sub_cat_sales > 0.2 * cat_sales AND rank_in_line <= 5;
+SELECT TOKENIZE('مرحبا بالعالم Hello 世界', '"parser"="icu"');
+-- Results: ["مرحبا", "بالعالم", "Hello", "世界"]
+
+SELECT TOKENIZE('มนไมเปนไปตามความตองการ', '"parser"="icu"');
+-- Results: ["มน", "ไมเปน", "ไป", "ตาม", "ความ", "ตองการ"]
+;
+-- English text tokenization
+SELECT TOKENIZE('Hello World! This is a test.', '"parser"="basic"');
+-- Results: ["hello", "world", "this", "is", "a", "test"]
+
+-- Chinese text tokenization
+SELECT TOKENIZE('你好世界', '"parser"="basic"');
+-- Results: ["你", "好", "世", "界"]
+
+-- Mixed-language tokenization
+SELECT TOKENIZE('Hello你好World世界', '"parser"="basic"');
+-- Results: ["hello", "你", "好", "world", "世", "界"]
+
+-- Handling numbers and special characters
+SELECT TOKENIZE('GET /images/hm_bg.jpg HTTP/1.0', '"parser"="basic"');
+-- Results: ["get", "images", "hm", "bg", "jpg", "http", "1", "0"]
+
+-- Processing long numeric sequences
+SELECT TOKENIZE('12345678901234567890', '"parser"="basic"');
+-- Results: ["12345678901234567890"]
+;
+-- Term Queries
+SELECT * FROM docs WHERE search('title:apache');
+
+-- ANY: Matches any one of the specified values
+SELECT * FROM docs WHERE search('tags:ANY(java python golang)');
+
+-- ALL: Requires all specified values to be present simultaneously
+SELECT * FROM docs WHERE search('tags:ALL(machine learning)');
+
+-- Boolean logic with multiple fields
+SELECT * FROM docs
+WHERE search('(title:Doris OR content:database) AND NOT category:archived');
+
+-- Combined with structured filtering (structured conditions do not affect scoring)
+SELECT * FROM docs
+WHERE search('title:apache') AND publish_date >= '2025-01-01';
+SELECT TOKENIZE('مرحبا بالعالم Hello 世界', '"parser"="icu"');
+-- Result: ["مرحبا", "بالعالم", "Hello", "世界"]
+
+SELECT TOKENIZE('มนไมเปนไปตามความตองการ', '"parser"="icu"');
+-- Result: ["มน", "ไมเปน", "ไป", "ตาม", "ความ", "ตองการ"]
+;
+------------------------------------------------------------------------------------------
+[SELECT|DATA_IMPORT] SELECT * FROM S3 (
+      "uri" = "s3://your_bucket/path/to/tvf_test/test.parquet",
+      "format" = "parquet",
+      "s3.endpoint" = "s3.us-east-1.amazonaws.com",
+      "s3.region" = "us-east-1",
+      "s3.role_arn" = "<your-bucket-role-arn>",
+      "s3.external_id" = "<your-external-id>"      -- option parameter
+  )
+----------
+[SELECT|DATA_IMPORT] SELECT * FROM S3 (
+      "uri" = "s3://your_bucket/path/to/tvf_test/test.parquet",
+      "format" = "parquet",
+      "s3.endpoint" = "s3.us-east-1.amazonaws.com",
+      "s3.region" = "us-east-1"
+  )
+----------
+[SELECT] SELECT
+    c,
+    CAST(AI_GENERATE(CONCAT('Please score the relevance of the following document content to Apache Doris, with a floating-point number from 0 to 10, output only the score. Document:', c)) AS DOUBLE) AS score
+FROM doc_pool ORDER BY score DESC LIMIT 10;
+----------
+[SELECT] SELECT
+    c.candidate_id, c.name,
+    j.job_id, j.title
+FROM candidate_profiles AS c
+JOIN job_requirements AS j
+WHERE AI_FILTER(CONCAT('Does the following candidate self-introduction match the job description?', 
+                'Job: ', j.jd_text, ' Candidate: ', c.self_intro));
+----------
+[SELECT] -- Keyword search (any keyword match)
+SELECT * FROM docs WHERE content MATCH_ANY 'apache doris database';
+----------
+[SELECT] -- Require all keywords
+SELECT * FROM docs WHERE content MATCH_ALL 'real-time analytics OLAP';
+----------
+[SELECT] -- Exact phrase
+SELECT * FROM docs WHERE content MATCH_PHRASE 'inverted index';
+----------
+[SELECT] -- Phrase with slop (allow up to 2 words between terms)
+SELECT * FROM docs WHERE content MATCH_PHRASE 'machine learning ~2';
+----------
+[SELECT] -- Prefix matching
+SELECT * FROM docs WHERE content MATCH_PHRASE_PREFIX 'data ware';
+----------
+[SELECT] -- Simple keyword search
+SELECT * FROM docs WHERE content MATCH_ANY 'apache doris';
+----------
+[SELECT] -- Phrase search
+SELECT * FROM docs WHERE content MATCH_PHRASE 'full text search';
+----------
+[SELECT] -- Boolean query with SEARCH
+SELECT * FROM docs
+WHERE SEARCH('title:apache AND (category:database OR tags:ANY(sql nosql))');
+----------
+[SELECT] -- Relevance-based ranking
+SELECT id, title, score() AS relevance
+FROM docs
+WHERE content MATCH_ANY 'real-time analytics OLAP'
+ORDER BY relevance DESC
+LIMIT 10;
+----------
+[SELECT] SELECT * FROM docs WHERE search('apple banana',
+  '{"default_field":"title","default_operator":"and","mode":"lucene"}');
+----------
+[SELECT] SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(python javascript)');
+----------
+[SELECT] SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(machine learning tutorial)');
+----------
+[SELECT] -- Edge case: single value behaves like a term query
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ANY(python)');
+----------
+[SELECT] SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(machine learning)');
+----------
+[SELECT] SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(programming tutorial)');
+----------
+[SELECT] -- Edge case: single value behaves like a term query
+SELECT id, title FROM search_test_basic WHERE SEARCH('tags:ALL(python)');
+----------
+[SELECT] -- Basic Lucene mode
+SELECT * FROM docs WHERE search('apple AND banana',
+  '{"default_field":"title","mode":"lucene"}');
+----------
+[SELECT] -- With minimum_should_match
+SELECT * FROM docs WHERE search('apple AND banana OR cherry',
+  '{"default_field":"title","mode":"lucene","minimum_should_match":1}');
+----------
+[SELECT] SELECT id, title FROM search_test_basic
+WHERE SEARCH('firstname:Chris*');
+----------
+[SELECT] -- Using the default field parameter
+SELECT id, firstname FROM people
+WHERE SEARCH('Chris*', 'firstname');
+----------
+[SELECT] -- Search for value containing space as single term
+SELECT * FROM docs WHERE search('title:First\\ Value');
+----------
+[SELECT] -- Search for value with parentheses
+SELECT * FROM docs WHERE search('title:hello\\(world\\)');
+----------
+[SELECT] -- Search for value with colon
+SELECT * FROM docs WHERE search('title:key\\:value');
+----------
+[SELECT] -- Range filters via SQL
+SELECT * FROM t WHERE created_at >= '2024-01-01';
+----------
+[SELECT] -- Allow up to 3 terms between keyword1 and keyword2
+SELECT * FROM table_name WHERE content MATCH_PHRASE 'keyword1 keyword2 ~3';
+----------
+[SELECT] -- Last term as prefix
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1 key';
+----------
+[SELECT] -- Single-term prefix match
+SELECT * FROM table_name WHERE content MATCH_PHRASE_PREFIX 'keyword1';
+----------
+[SELECT] -- Examples
+SELECT * FROM t WHERE price >= 100 AND price < 200;
+----------
+[SELECT] -- range
+SELECT * FROM t WHERE tags IN ('a','b','c');
+----------
+[SELECT] -- set
+SELECT * FROM t WHERE array_contains(attributes, 'color');
+----------
+[SELECT] -- Equivalent to SHOW CACHE HOTSPOT "/" before version 3.0.4
+WITH t1 AS (
+  SELECT
+    cluster_id,
+    cluster_name,
+    table_id,
+    table_name,
+    insert_day,
+    SUM(query_per_day) AS query_per_day_total,
+    SUM(query_per_week) AS query_per_week_total
+  FROM __internal_schema.cloud_cache_hotspot
+  GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+  cluster_id AS ComputeGroupId,
+  cluster_name AS ComputeGroupName,
+  table_id AS TableId,
+  table_name AS TableName
+FROM (
+  SELECT
+    ROW_NUMBER() OVER (
+      PARTITION BY cluster_id
+      ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+    ) AS dr2,
+    *
+  FROM t1
+) t2
+WHERE dr2 = 1;
+----------
+[SELECT] -- Equivalent to SHOW CACHE HOTSPOT '/compute_group_name0' before version 3.0.4
+WITH t1 AS (
+  SELECT
+    cluster_id,
+    cluster_name,
+    table_id,
+    table_name,
+    insert_day,
+    SUM(query_per_day) AS query_per_day_total,
+    SUM(query_per_week) AS query_per_week_total
+  FROM __internal_schema.cloud_cache_hotspot
+  WHERE cluster_name = "compute_group_name0" -- Replace with the actual compute group name, e.g., "default_compute_group"
+  GROUP BY cluster_id, cluster_name, table_id, table_name, insert_day
+)
+SELECT
+  cluster_id AS ComputeGroupId,
+  cluster_name AS ComputeGroupName,
+  table_id AS TableId,
+  table_name AS TableName
+FROM (
+  SELECT
+    ROW_NUMBER() OVER (
+      PARTITION BY cluster_id
+      ORDER BY insert_day DESC, query_per_day_total DESC, query_per_week_total DESC
+    ) AS dr2,
+    *
+  FROM t1
+) t2
+WHERE dr2 = 1;
+----------
+[SELECT] -- Equivalent to SHOW CACHE HOTSPOT '/compute_group_name0/regression_test_cloud_load_copy_into_tpch_sf1_p1.customer' before version 3.0.4
+SELECT
+  partition_id AS PartitionId,
+  partition_name AS PartitionName
+FROM __internal_schema.cloud_cache_hotspot
+WHERE
+  cluster_name = "compute_group_name0" -- Replace with the actual compute group name, e.g., "default_compute_group"
+  AND table_name = "regression_test_cloud_load_copy_into_tpch_sf1_p1.customer" -- Replace with the actual database table name, e.g., "db1.t1"
+GROUP BY
+  cluster_id,
+  cluster_name,
+  table_id,
+  table_name,
+  partition_id,
+  partition_name;
+----------
+[SELECT] SELECT * FROM your_table_name WHERE message **MATCH_ANY** 'error 404'  
+ORDER BY ts DESC LIMIT 10;
+----------
+[SELECT] SELECT * FROM your_table_name WHERE message **MATCH_ALL** 'image faq'  
+ORDER BY ts DESC LIMIT 10;
+----------
+[SELECT] SELECT * FROM your_table_name WHERE message **MATCH_PHRASE** 'image faq'  
+ORDER BY ts DESC LIMIT 10;
+----------
+[SELECT] -- Analyze the order volume and sales revenue of each category
+SELECT 
+    p.category_name,
+    p.brand_name,
+    COUNT(DISTINCT o.order_id) as order_count,
+    SUM(o.quantity) as total_quantity,
+    SUM(o.actual_price * o.quantity) as total_amount
+FROM orders o
+LEFT JOIN products p ON o.product_id = p.product_id
+WHERE o.order_time >= '2024-02-22 00:00:00'
+GROUP BY p.category_name, p.brand_name
+ORDER BY total_amount DESC;
+----------
+[SELECT] SELECT l_linenumber,
+o_custkey,
+o_orderdate
+FROM mv_5
+WHERE o_orderdate = '2023-10-18';
+----------
+[SELECT] SELECT l_linenumber,
+        o_custkey,
+        o_orderdate
+ FROM lineitem
+ LEFT OUTER JOIN orders
+ ON l_orderkey = o_orderkey
+ WHERE l_linenumber > 2;
+----------
+[SELECT] SELECT l_linenumber,
+        o_custkey,
+        o_orderdate
+ FROM lineitem
+ LEFT OUTER JOIN orders
+ ON l_orderkey = o_orderkey
+ WHERE l_linenumber > 2 and o_orderdate = '2023-10-19';
+----------
+[SELECT] SELECT l_linenumber,
+       o_custkey
+FROM lineitem
+INNER JOIN orders ON l_orderkey = o_orderkey
+WHERE l_linenumber > 1 and o_orderdate = '2023-10-18';
+----------
+[SELECT] select 
+       abs(k1)+k2+1,
+       sum(abs(k2+2)+k3+3) 
+   from 
+       d_table 
+   group by 
+       abs(k1)+k2+1;
+----------
+[SELECT] select 
+       bin(abs(k1)+k2+1),
+       sum(abs(k2+2)+k3+3) 
+   from 
+       d_table 
+   group by 
+       bin(abs(k1)+k2+1);
+----------
+[SELECT] select 
+       year(k4) + month(k4) 
+   from 
+       d_table 
+   where 
+       year(k4) = 2020;
+----------
+[SELECT] select 
+       year(k4),
+       month(k4) 
+   from 
+       d_table;
+----------
+[SELECT] -- First execution: cache miss, results are computed and cached
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+----------
+[SELECT] -- Second execution: cache hit, results are served directly from cache
+SELECT region, SUM(revenue), COUNT(*)
+FROM orders
+WHERE dt = '2024-01-15' AND status = 'completed'
+GROUP BY region;
+----------
+[SELECT] explain shape plan
+    select
+        nation,
+        o_year,
+        sum(amount) as sum_profit
+    from
+        (
+            select
+                /*+ leading(orders shuffle {lineitem shuffle part} shuffle {supplier broadcast nation} shuffle partsupp) */
+                n_name as nation,
+                extract(year from o_orderdate) as o_year,
+                l_extendedprice * (1 - l_discount) - ps_supplycost * l_quantity as amount
+            from
+                part,
+                supplier,
+                lineitem,
+                partsupp,
+                orders,
+                nation
+            where
+                s_suppkey = l_suppkey
+                and ps_suppkey = l_suppkey
+                and ps_partkey = l_partkey
+                and p_partkey = l_partkey
+                and o_orderkey = l_orderkey
+                and s_nationkey = n_nationkey
+                and p_name like '%green%'
+        ) as profit
+    group by
+        nation,
+        o_year
+    order by
+        nation,
+        o_year desc;
+----------
+[SELECT] explain select *
+from 
+    (
+        -- The t1 table is hash-distributed by c1, and after the GROUP BY operator, it still maintains the hash distribution by c1.
+        select c1 as c1, sum(c2) as c2
+        from t1
+        group by c1 
+    ) tx
+join 
+    (
+        -- The t2 table is hash-distributed by c1, but after the GROUP BY operator, the data is redistributed to be hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c1 = ty.c2;
+----------
+[SELECT] explain select *
+from 
+    (
+        -- The t1 table is initially hash-distributed by c1, but after the GROUP BY operator, the data distribution changes to be hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t1
+        group by c2 
+    ) tx
+join 
+    (
+        -- The t2 table is initially hash-distributed by c1, but after the GROUP BY operator, the data distribution changes to be hash-distributed by c2.
+        select c2 as c2, sum(c1) as c1
+        from t2
+        group by c2 
+    ) ty
+on tx.c2 = ty.c2;
+----------
+[SELECT] SELECT    
+    year(d_date),    
+    i_category,    
+    SUM(ss_net_paid) AS total_sum,    
+    GROUPING(year(d_date)),    
+    GROUPING(i_category),    
+    GROUPING_ID(year(d_date), i_category)    
+FROM    
+    store_sales,    
+    date_dim d1,    
+    item,    
+    customer_address ca     
+WHERE    
+    d1.d_date_sk = ss_sold_date_sk    
+    AND i_item_sk = ss_item_sk    
+    AND ss_addr_sk = ca_address_sk    
+    AND i_category IN ('Books', 'Electronics')    
+    AND year(d_date) IN (1998, 1999)    
+    AND ca_state IN ('LA', 'AK')    
+GROUP BY CUBE(year(d_date), i_category);
+----------
+[SELECT] SELECT k1, k2, SUM(k3) FROM t GROUP BY k1, k2  
+  UNION ALL  
+  SELECT k1, NULL, SUM(k3) FROM t GROUP BY k1  
+  UNION ALL  
+  SELECT NULL, k2, SUM(k3) FROM t GROUP BY k2  
+  UNION ALL  
+  SELECT NULL, NULL, SUM(k3) FROM t;
+----------
+[SELECT] -- Scalar subquery, when t2 is an empty table, the subquery returns the scalar value null    
+select * from t1 where t1.c1 > (select sum(t2.c1) from t2);
+----------
+[SELECT] -- Non-scalar subquery, when t2 is an empty table, the subquery returns an empty set (0 rows)    
+select * from t1 where t1.c1 in (select t2.c1 from t2);
+----------
+[SELECT] -- Correlated subquery, the subquery internally uses the column t1.c2 from the outer table    
+select * from t1 where t1.c1 in (select t2.c1 from t2 where t2.c2 = t1.c2);
+----------
+[SELECT] -- Non-correlated subquery, the subquery internally does not use any columns from the outer table t1    
+select * from t1 where t1.c1 in (select t2.c1 from tt2);
+----------
+[SELECT] -- Single aggregate function without GROUP BY, supported    
+select * from t1 where t1.c1 < (select max(t2.c1) from t2 where t1.c2 = t2.c2);
+----------
+[SELECT] -- Equivalent rewritten SQL as follows:    
+select t1.* from t1 inner join (select t2.c2 as c2, max(t2.c1) as c1 from t2 group by t2.c2) tx on t1.c1 < tx.c1 and t1.c2 = tx.c2;
+----------
+[SELECT] -- Non-equality condition, not supported    
+select * from t1 where t1.c1 = (select max(t2.c1) from t2 where t1.c2 > t2.c2);
+----------
+[SELECT] -- No aggregate function, not supported    
+select * from t1 where t1.c1 = (select t2.c1 from t2 where t1.c2 = t2.c2);
+----------
+[SELECT] -- With aggregate function but includes GROUP BY, not supported    
+select * from t1 where t1.c1 = (select max(t2.c1) from t2 where t1.c2 = t2.c2 group by t2.c2);
+----------
+[SELECT] -- With LIMIT but no OFFSET, supported    
+select * from t1 where exists (select t2.c1 from t2 where t1.c2 = t2.c2 limit 2);
+----------
+[SELECT] -- Equivalent rewritten SQL as follows:    
+select * from t1 left semi join t2 on t1.c2 = t2.c2;
+----------
+[SELECT] -- With OFFSET and LIMIT, not supported    
+select * from t1 where exists (select t2.c1 from t2 where t1.c2 = t2.c2 limit 2, 3);
+----------
+[SELECT] select   
+        t1.c1   
+    from   
+        t1   
+    where not exists (  
+        select   
+            t2.c1   
+        from   
+            t2   
+        where not exists (  
+            select   
+                t3.c1   
+            from   
+                t3   
+            where   
+                t3.c2 = t2.c2 and t3.c1 = t1.c1  
+        )  
+    );
+----------
+[SELECT] SELECT py_add_three(10, 20, 30) AS sum_result;
+----------
+[SELECT] -- Result: 60
+SELECT py_reverse('hello') AS reversed;
+----------
+[SELECT] -- Result: olleh
+SELECT py_is_prime(17) AS is_prime;
+----------
+[SELECT] -- UDF: Called for each row
+SELECT id, py_upper(name) FROM users;
+----------
+[SELECT] -- UDAF: Called once per group
+SELECT category, py_sum(amount) FROM sales GROUP BY category;
+----------
+[SELECT] SELECT
+        i_category,
+        year(d_date),
+        month(d_date),
+        sum(ss_net_paid) as total_sales,
+        sum(sum(ss_net_paid)) over(partition by i_category order by year(d_date),month(d_date) ROWS UNBOUNDED PRECEDING) cum_sales
+FROM 
+        store_sales,
+        date_dim d1,
+        item
+WHERE 
+        d1.d_date_sk = ss_sold_date_sk
+        and i_item_sk = ss_item_sk
+        and year(d_date) =2000
+        and i_category in ('Books','Electronics')
+GROUP BY         
+        i_category,
+        year(d_date),
+        month(d_date)
+----------
+[SELECT] SELECT
+        i_category,
+        year(d_date),
+        month(d_date),
+        sum(ss_net_paid) as total_sales,
+        avg(sum(ss_net_paid)) over(order by year(d_date),month(d_date) ROWS 2 PRECEDING) avg
+FROM 
+        store_sales,
+        date_dim d1,
+        item
+WHERE 
+        d1.d_date_sk = ss_sold_date_sk
+        and i_item_sk = ss_item_sk
+        and year(d_date) =2000
+        and i_category='Books'
+GROUP BY         
+        i_category,
+        year(d_date),
+        month(d_date)
+----------
+[SELECT] SELECT  
+        i_category,  
+        YEAR(d_date) AS year,  
+        MONTH(d_date) AS month,  
+        SUM(ss_net_paid) AS total_sales,  
+        AVG(SUM(ss_net_paid)) OVER (ORDER BY YEAR(d_date), MONTH(d_date) ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS avg_sales  
+FROM   
+        store_sales,  
+        date_dim d1,  
+        item  
+WHERE   
+        d1.d_date_sk = ss_sold_date_sk  
+        AND i_item_sk = ss_item_sk  
+        AND YEAR(d_date) = 2000  
+        AND i_category = 'Books'  
+GROUP BY           
+        i_category,  
+        YEAR(d_date),  
+        MONTH(d_date)
+----------
+[SELECT] SELECT year, category, total_sum FROM (  
+    SELECT  
+        YEAR(d_date) AS year,  
+        i_category AS category,  
+        SUM(ss_net_paid) AS total_sum,  
+        MAX(SUM(ss_net_paid)) OVER (PARTITION BY YEAR(d_date)) AS max_sales  
+    FROM  
+        store_sales,  
+        date_dim d1,  
+        item  
+    WHERE  
+        d1.d_date_sk = ss_sold_date_sk  
+        AND i_item_sk = ss_item_sk  
+        AND YEAR(d_date) IN (1998, 1999)  
+    GROUP BY  
+        YEAR(d_date), i_category   
+) t  
+WHERE total_sum = max_sales;
+----------
+[SELECT] SELECT i_category AS categ, i_class AS sub_categ, i_item_id   
+FROM  
+    (  
+    SELECT   
+        i_item_id, i_class, i_category, SUM(ss_net_paid) AS sales,  
+        SUM(SUM(ss_net_paid)) OVER (PARTITION BY i_category) AS cat_sales,  
+        SUM(SUM(ss_net_paid)) OVER (PARTITION BY i_class) AS sub_cat_sales,  
+        RANK() OVER (PARTITION BY i_class ORDER BY SUM(ss_net_paid)) AS rank_in_line  
+    FROM   
+        store_sales,  
+        item  
+    WHERE  
+        i_item_sk = ss_item_sk  
+    GROUP BY i_class, i_category, i_item_id  
+    ) t  
+WHERE sub_cat_sales > 0.2 * cat_sales AND rank_in_line <= 5;
+----------
+[SELECT] SELECT TOKENIZE('مرحبا بالعالم Hello 世界', '"parser"="icu"');
+----------
+[SELECT] SELECT TOKENIZE('มนไมเปนไปตามความตองการ', '"parser"="icu"');
+----------
+[SELECT] -- English text tokenization
+SELECT TOKENIZE('Hello World! This is a test.', '"parser"="basic"');
+----------
+[SELECT] -- Chinese text tokenization
+SELECT TOKENIZE('你好世界', '"parser"="basic"');
+----------
+[SELECT] -- Mixed-language tokenization
+SELECT TOKENIZE('Hello你好World世界', '"parser"="basic"');
+----------
+[SELECT] -- Handling numbers and special characters
+SELECT TOKENIZE('GET /images/hm_bg.jpg HTTP/1.0', '"parser"="basic"');
+----------
+[SELECT] -- Processing long numeric sequences
+SELECT TOKENIZE('12345678901234567890', '"parser"="basic"');
+----------
+[SELECT] -- Term Queries
+SELECT * FROM docs WHERE search('title:apache');
+----------
+[SELECT] -- ANY: Matches any one of the specified values
+SELECT * FROM docs WHERE search('tags:ANY(java python golang)');
+----------
+[SELECT] -- ALL: Requires all specified values to be present simultaneously
+SELECT * FROM docs WHERE search('tags:ALL(machine learning)');
+----------
+[SELECT] -- Boolean logic with multiple fields
+SELECT * FROM docs
+WHERE search('(title:Doris OR content:database) AND NOT category:archived');
+----------
+[SELECT] -- Combined with structured filtering (structured conditions do not affect scoring)
+SELECT * FROM docs
+WHERE search('title:apache') AND publish_date >= '2025-01-01';
+----------
+[SELECT] SELECT TOKENIZE('مرحبا بالعالم Hello 世界', '"parser"="icu"');
+----------
+[SELECT] SELECT TOKENIZE('มนไมเปนไปตามความตองการ', '"parser"="icu"');

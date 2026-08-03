@@ -1,0 +1,740 @@
+DO $$
+DECLARE
+	objtype text;
+	names	text[];
+	args	text[];
+BEGIN
+	FOR objtype IN VALUES
+		('table'), ('index'), ('sequence'), ('view'),
+		('materialized view'), ('foreign table'),
+		('table column'), ('foreign table column'),
+		('aggregate'), ('function'), ('procedure'), ('type'), ('cast'),
+		('table constraint'), ('domain constraint'), ('conversion'), ('default value'),
+		('operator'), ('operator class'), ('operator family'), ('rule'), ('trigger'),
+		('text search parser'), ('text search dictionary'),
+		('text search template'), ('text search configuration'),
+		('policy'), ('user mapping'), ('default acl'), ('transform'),
+		('operator of access method'), ('function of access method'),
+		('publication namespace'), ('publication relation')
+	LOOP
+		FOR names IN VALUES ('{eins}'), ('{addr_nsp, zwei}'), ('{eins, zwei, drei}')
+		LOOP
+			FOR args IN VALUES ('{}'), ('{integer}')
+			LOOP
+				BEGIN
+					PERFORM pg_get_object_address(objtype, names, args);
+				EXCEPTION WHEN OTHERS THEN
+						RAISE WARNING 'error for %,%,%: %', objtype, names, args, sqlerrm;
+				END;
+			END LOOP;
+		END LOOP;
+	END LOOP;
+END;
+$$
+;
+CREATE FUNCTION "public"."equipment"("public"."hobbies_r") RETURNS SETOF "public"."equipment_r"
+    LANGUAGE "sql"
+    AS $_$select * from equipment_r where hobby = $1.name$_$
+;
+CREATE TEMP TABLE pg_temp_9.pg_temp_37998_2 (tid pg_catalog.tid)
+;
+create index test_partitioned_hash_index on test_partitioned using hash(a)
+;
+ALTER TABLE pg_temp_9.z ADD CONSTRAINT z_pkey PRIMARY KEY (aa, b)
+;
+ALTER TABLE varlena_bug ALTER column v SET storage plain
+;
+-- test: invalid use of composite expression in scalar-returning function
+create or replace function compos() returns int as $$
+begin
+  return (1, 'hello')::compostype;
+end;
+$$ language plpgsql
+;
+CREATE TABLE "public"."sj_t1" (
+    "id" integer NOT NULL,
+    "a" integer
+)
+;
+create function return_text_input(text) returns text as $$
+begin
+	return $1;
+end;
+$$ language plpgsql stable
+;
+create table wide as select generate_series(1, 2) as id, rpad('', 320000, 'x') as t
+;
+CREATE TABLE shoelace_log (
+        sl_name    char(10),      
+        sl_avail   integer,       
+        log_who    name,          
+        log_when   timestamp      
+    )
+;
+-- OK
+
+drop table ddtest2
+;
+CREATE FUNCTION gbt_int4_consistent(internal,int4,int2,oid,internal)
+RETURNS bool
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+CREATE FUNCTION ean13_in(cstring)
+	RETURNS ean13
+	AS '$libdir/isn'
+	LANGUAGE C
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+ALTER TABLE test_tsvector SET (parallel_workers = 2)
+;
+ALTER TABLE pg_toast.pg_toast_28489 RENAME TO reind_con_toast
+;
+/*
+ * 5.29
+ * DOMAINS view
+ */
+
+CREATE VIEW domains AS
+    SELECT CAST(current_database() AS sql_identifier) AS domain_catalog,
+           CAST(nt.nspname AS sql_identifier) AS domain_schema,
+           CAST(t.typname AS sql_identifier) AS domain_name,
+
+           CAST(
+             CASE WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                  WHEN nbt.nspname = 'pg_catalog' THEN format_type(t.typbasetype, null)
+                  ELSE 'USER-DEFINED' END
+             AS character_data)
+             AS data_type,
+
+           CAST(
+             _pg_char_max_length(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS character_maximum_length,
+
+           CAST(
+             _pg_char_octet_length(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS character_octet_length,
+
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+
+           CAST(
+             _pg_numeric_precision(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_precision,
+
+           CAST(
+             _pg_numeric_precision_radix(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_precision_radix,
+
+           CAST(
+             _pg_numeric_scale(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_scale,
+
+           CAST(
+             _pg_datetime_precision(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS datetime_precision,
+
+           CAST(
+             _pg_interval_type(t.typbasetype, t.typtypmod)
+             AS character_data)
+             AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(t.typdefault AS character_data) AS domain_default,
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nbt.nspname AS sql_identifier) AS udt_schema,
+           CAST(bt.typname AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(1 AS sql_identifier) AS dtd_identifier
+
+    FROM (pg_type t JOIN pg_namespace nt ON t.typnamespace = nt.oid)
+         JOIN (pg_type bt JOIN pg_namespace nbt ON bt.typnamespace = nbt.oid)
+           ON (t.typbasetype = bt.oid AND t.typtype = 'd')
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON t.typcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+
+    WHERE (pg_has_role(t.typowner, 'USAGE')
+           OR has_type_privilege(t.oid, 'USAGE'))
+;
+drop index patest2i
+;
+--
+-- composite types
+--
+
+CREATE TYPE test_type AS (a int)
+;
+-- stage objects for pg_dump tests
+CREATE SCHEMA pubme CREATE TABLE t0 (c int, d int) CREATE TABLE t1 (c int)
+;
+CREATE TABLE "public"."view_base_table" (
+    "key" integer NOT NULL,
+    "data" character varying(20)
+)
+;
+CREATE RULE rule_1 AS
+  ON INSERT
+  TO datatype_table
+  DO NOTHING
+;
+create rule shipped_view_insert as on insert to shipped_view do instead
+    insert into shipped values('wt', new.ordnum, new.partnum, new.value)
+;
+drop table uv_pt, uv_pt1, uv_pt11
+;
+ANALYZE pg_temp_32.pg_temp_28237
+;
+ALTER FUNCTION functest_E_1(int) LEAKPROOF
+;
+ALTER INDEX pg_toast.pg_toast_30569_index RENAME TO reind_con_toast_idx
+;
+CREATE FUNCTION interval_dist(interval, interval)
+RETURNS interval
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+create table t(a integer, b integer)
+;
+create table coll_pruning (a text collate "C") partition by list (a)
+;
+create domain jsb_i_gt_1 as int check (value > 1)
+;
+DROP TRIGGER after_upd_b_row_trig ON main_table
+;
+alter table def_view_test alter column c1 set default 45
+;
+--Test text search dictionaries and configurations
+
+-- Test ISpell dictionary with ispell affix file
+CREATE TEXT SEARCH DICTIONARY ispell (
+                        Template=ispell,
+                        DictFile=ispell_sample,
+                        AffFile=ispell_sample
+)
+;
+DROP TABLE attmp_new
+;
+CREATE OPERATOR < (
+	PROCEDURE = isnlt,
+	LEFTARG = issn,
+	RIGHTARG = ean13,
+	COMMUTATOR = >,
+	NEGATOR = >=,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+create table dom_table (x inotnull)
+;
+-- test with statement level triggers
+create or replace function parted_conflict_update_func() returns trigger as $$
+declare
+    r record;
+begin
+ for r in select * from inserted loop
+	raise notice 'a = %, b = %, c = %', r.a, r.b, r.c;
+ end loop;
+ return new;
+end;
+$$ language plpgsql
+;
+create rule irule3 as on insert to inserttest2 do also
+  insert into inserttestb (f4[1].if1, f4[1].if2[2])
+  select new.f1, new.f2
+;
+CREATE AGGREGATE "public"."sum_int_randomrestart"(integer) (
+    SFUNC = "int4pl",
+    STYPE = integer,
+    MSFUNC = "int4pl",
+    MINVFUNC = "public"."sum_int_randrestart_minvfunc",
+    MSTYPE = integer
+)
+;
+CREATE DATABASE dropme
+;
+DROP TABLE testpub_rf_schema2.testpub_rf_tbl6
+;
+ANALYZE pg_temp_18.pg_temp_27200_2
+;
+CREATE OR REPLACE FUNCTION transition_table_base_upd_func()
+  RETURNS trigger
+  LANGUAGE plpgsql
+AS $$
+DECLARE
+  t text;
+  l text;
+BEGIN
+  t = '';
+  FOR l IN EXECUTE
+           $q$
+             EXPLAIN (TIMING off, COSTS off, VERBOSE on)
+             SELECT * FROM oldtable ot FULL JOIN newtable nt USING (id)
+           $q$ LOOP
+    t = t || l || E'\n';
+  END LOOP;
+
+  RAISE INFO '%', t;
+  RETURN new;
+END;
+$$
+;
+ANALYZE plt1_adv
+;
+/*
+ * 5.77
+ * VIEW_COLUMN_USAGE
+ */
+
+CREATE VIEW view_column_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS view_catalog,
+           CAST(nv.nspname AS sql_identifier) AS view_schema,
+           CAST(v.relname AS sql_identifier) AS view_name,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nt.nspname AS sql_identifier) AS table_schema,
+           CAST(t.relname AS sql_identifier) AS table_name,
+           CAST(a.attname AS sql_identifier) AS column_name
+
+    FROM pg_namespace nv, pg_class v, pg_depend dv,
+         pg_depend dt, pg_class t, pg_namespace nt,
+         pg_attribute a
+
+    WHERE nv.oid = v.relnamespace
+          AND v.relkind = 'v'
+          AND v.oid = dv.refobjid
+          AND dv.refclassid = 'pg_catalog.pg_class'::regclass
+          AND dv.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dv.deptype = 'i'
+          AND dv.objid = dt.objid
+          AND dv.refobjid <> dt.refobjid
+          AND dt.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dt.refclassid = 'pg_catalog.pg_class'::regclass
+          AND dt.refobjid = t.oid
+          AND t.relnamespace = nt.oid
+          AND t.relkind IN ('r', 'v', 'f', 'p')
+          AND t.oid = a.attrelid
+          AND dt.refobjsubid = a.attnum
+          AND pg_has_role(t.relowner, 'USAGE')
+;
+CREATE TABLE counter(i int)
+;
+drop table p_t1
+;
+CREATE TABLE rules_parted_table_1 PARTITION OF rules_parted_table FOR VALUES IN (1)
+;
+-- Force an index build using buffering.
+create index gist_tbl_box_index_forcing_buffering on gist_tbl using gist (p)
+  with (buffering=on, fillfactor=50)
+;
+------------------------------------------------------------------------------------------
+[BLOCK] DO $$
+DECLARE
+	objtype text;
+	names	text[];
+	args	text[];
+BEGIN
+	FOR objtype IN VALUES
+		('table'), ('index'), ('sequence'), ('view'),
+		('materialized view'), ('foreign table'),
+		('table column'), ('foreign table column'),
+		('aggregate'), ('function'), ('procedure'), ('type'), ('cast'),
+		('table constraint'), ('domain constraint'), ('conversion'), ('default value'),
+		('operator'), ('operator class'), ('operator family'), ('rule'), ('trigger'),
+		('text search parser'), ('text search dictionary'),
+		('text search template'), ('text search configuration'),
+		('policy'), ('user mapping'), ('default acl'), ('transform'),
+		('operator of access method'), ('function of access method'),
+		('publication namespace'), ('publication relation')
+	LOOP
+		FOR names IN VALUES ('{eins}'), ('{addr_nsp, zwei}'), ('{eins, zwei, drei}')
+		LOOP
+			FOR args IN VALUES ('{}'), ('{integer}')
+			LOOP
+				BEGIN
+					PERFORM pg_get_object_address(objtype, names, args);
+				EXCEPTION WHEN OTHERS THEN
+						RAISE WARNING 'error for %,%,%: %', objtype, names, args, sqlerrm;
+				END;
+			END LOOP;
+		END LOOP;
+	END LOOP;
+END;
+$$
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."equipment"("public"."hobbies_r") RETURNS SETOF "public"."equipment_r"
+    LANGUAGE "sql"
+    AS $_$select * from equipment_r where hobby = $1.name$_$
+;
+----------
+[CREATE_TABLE] CREATE TEMP TABLE pg_temp_9.pg_temp_37998_2 (tid pg_catalog.tid)
+;
+----------
+[ADD_INDEX] create index test_partitioned_hash_index on test_partitioned using hash(a)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE pg_temp_9.z ADD CONSTRAINT z_pkey PRIMARY KEY (aa, b)
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE varlena_bug ALTER column v SET storage plain
+;
+----------
+[CREATE_PROG_OBJ] -- test: invalid use of composite expression in scalar-returning function
+create or replace function compos() returns int as $$
+begin
+  return (1, 'hello')::compostype;
+end;
+$$ language plpgsql
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."sj_t1" (
+    "id" integer NOT NULL,
+    "a" integer
+)
+;
+----------
+[CREATE_PROG_OBJ] create function return_text_input(text) returns text as $$
+begin
+	return $1;
+end;
+$$ language plpgsql stable
+;
+----------
+[CREATE_TABLE|SELECT] create table wide as select generate_series(1, 2) as id, rpad('', 320000, 'x') as t
+;
+----------
+[CREATE_TABLE] CREATE TABLE shoelace_log (
+        sl_name    char(10),      
+        sl_avail   integer,       
+        log_who    name,          
+        log_when   timestamp      
+    )
+;
+----------
+[DROP_TABLE] -- OK
+
+drop table ddtest2
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_int4_consistent(internal,int4,int2,oid,internal)
+RETURNS bool
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION ean13_in(cstring)
+	RETURNS ean13
+	AS '$libdir/isn'
+	LANGUAGE C
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[ALTER_TABLE] ALTER TABLE test_tsvector SET (parallel_workers = 2)
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_28489 RENAME TO reind_con_toast
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 5.29
+ * DOMAINS view
+ */
+
+CREATE VIEW domains AS
+    SELECT CAST(current_database() AS sql_identifier) AS domain_catalog,
+           CAST(nt.nspname AS sql_identifier) AS domain_schema,
+           CAST(t.typname AS sql_identifier) AS domain_name,
+
+           CAST(
+             CASE WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                  WHEN nbt.nspname = 'pg_catalog' THEN format_type(t.typbasetype, null)
+                  ELSE 'USER-DEFINED' END
+             AS character_data)
+             AS data_type,
+
+           CAST(
+             _pg_char_max_length(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS character_maximum_length,
+
+           CAST(
+             _pg_char_octet_length(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS character_octet_length,
+
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+
+           CAST(
+             _pg_numeric_precision(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_precision,
+
+           CAST(
+             _pg_numeric_precision_radix(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_precision_radix,
+
+           CAST(
+             _pg_numeric_scale(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS numeric_scale,
+
+           CAST(
+             _pg_datetime_precision(t.typbasetype, t.typtypmod)
+             AS cardinal_number)
+             AS datetime_precision,
+
+           CAST(
+             _pg_interval_type(t.typbasetype, t.typtypmod)
+             AS character_data)
+             AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(t.typdefault AS character_data) AS domain_default,
+
+           CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nbt.nspname AS sql_identifier) AS udt_schema,
+           CAST(bt.typname AS sql_identifier) AS udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(1 AS sql_identifier) AS dtd_identifier
+
+    FROM (pg_type t JOIN pg_namespace nt ON t.typnamespace = nt.oid)
+         JOIN (pg_type bt JOIN pg_namespace nbt ON bt.typnamespace = nbt.oid)
+           ON (t.typbasetype = bt.oid AND t.typtype = 'd')
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON t.typcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+
+    WHERE (pg_has_role(t.typowner, 'USAGE')
+           OR has_type_privilege(t.oid, 'USAGE'))
+;
+----------
+[DROP_INDEX] drop index patest2i
+;
+----------
+[CREATE_TYPE] --
+-- composite types
+--
+
+CREATE TYPE test_type AS (a int)
+;
+----------
+[CREATE_SCHEMA] -- stage objects for pg_dump tests
+CREATE SCHEMA pubme CREATE TABLE t0 (c int, d int) CREATE TABLE t1 (c int)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."view_base_table" (
+    "key" integer NOT NULL,
+    "data" character varying(20)
+)
+;
+----------
+[CREATE_POLICY] CREATE RULE rule_1 AS
+  ON INSERT
+  TO datatype_table
+  DO NOTHING
+;
+----------
+[CREATE_POLICY] create rule shipped_view_insert as on insert to shipped_view do instead
+    insert into shipped values('wt', new.ordnum, new.partnum, new.value)
+;
+----------
+[DROP_TABLE] drop table uv_pt, uv_pt1, uv_pt11
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_32.pg_temp_28237
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION functest_E_1(int) LEAKPROOF
+;
+----------
+[RENAME_INDEX] ALTER INDEX pg_toast.pg_toast_30569_index RENAME TO reind_con_toast_idx
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION interval_dist(interval, interval)
+RETURNS interval
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE STRICT
+;
+----------
+[CREATE_TABLE] create table t(a integer, b integer)
+;
+----------
+[CREATE_TABLE] create table coll_pruning (a text collate "C") partition by list (a)
+;
+----------
+[CREATE_TYPE] create domain jsb_i_gt_1 as int check (value > 1)
+;
+----------
+[DROP_TRIGGER] DROP TRIGGER after_upd_b_row_trig ON main_table
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table def_view_test alter column c1 set default 45
+;
+----------
+[CREATE_POLICY] --Test text search dictionaries and configurations
+
+-- Test ISpell dictionary with ispell affix file
+CREATE TEXT SEARCH DICTIONARY ispell (
+                        Template=ispell,
+                        DictFile=ispell_sample,
+                        AffFile=ispell_sample
+)
+;
+----------
+[DROP_TABLE] DROP TABLE attmp_new
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR < (
+	PROCEDURE = isnlt,
+	LEFTARG = issn,
+	RIGHTARG = ean13,
+	COMMUTATOR = >,
+	NEGATOR = >=,
+	RESTRICT = scalarltsel,
+	JOIN = scalarltjoinsel)
+;
+----------
+[CREATE_TABLE] create table dom_table (x inotnull)
+;
+----------
+[CREATE_PROG_OBJ] -- test with statement level triggers
+create or replace function parted_conflict_update_func() returns trigger as $$
+declare
+    r record;
+begin
+ for r in select * from inserted loop
+	raise notice 'a = %, b = %, c = %', r.a, r.b, r.c;
+ end loop;
+ return new;
+end;
+$$ language plpgsql
+;
+----------
+[CREATE_POLICY] create rule irule3 as on insert to inserttest2 do also
+  insert into inserttestb (f4[1].if1, f4[1].if2[2])
+  select new.f1, new.f2
+;
+----------
+[CREATE_PROG_OBJ] CREATE AGGREGATE "public"."sum_int_randomrestart"(integer) (
+    SFUNC = "int4pl",
+    STYPE = integer,
+    MSFUNC = "int4pl",
+    MINVFUNC = "public"."sum_int_randrestart_minvfunc",
+    MSTYPE = integer
+)
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE dropme
+;
+----------
+[DROP_TABLE] DROP TABLE testpub_rf_schema2.testpub_rf_tbl6
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_18.pg_temp_27200_2
+;
+----------
+[CREATE_PROG_OBJ] CREATE OR REPLACE FUNCTION transition_table_base_upd_func()
+  RETURNS trigger
+  LANGUAGE plpgsql
+AS $$
+DECLARE
+  t text;
+  l text;
+BEGIN
+  t = '';
+  FOR l IN EXECUTE
+           $q$
+             EXPLAIN (TIMING off, COSTS off, VERBOSE on)
+             SELECT * FROM oldtable ot FULL JOIN newtable nt USING (id)
+           $q$ LOOP
+    t = t || l || E'\n';
+  END LOOP;
+
+  RAISE INFO '%', t;
+  RETURN new;
+END;
+$$
+;
+----------
+[ADMIN_TABLE] ANALYZE plt1_adv
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 5.77
+ * VIEW_COLUMN_USAGE
+ */
+
+CREATE VIEW view_column_usage AS
+    SELECT DISTINCT
+           CAST(current_database() AS sql_identifier) AS view_catalog,
+           CAST(nv.nspname AS sql_identifier) AS view_schema,
+           CAST(v.relname AS sql_identifier) AS view_name,
+           CAST(current_database() AS sql_identifier) AS table_catalog,
+           CAST(nt.nspname AS sql_identifier) AS table_schema,
+           CAST(t.relname AS sql_identifier) AS table_name,
+           CAST(a.attname AS sql_identifier) AS column_name
+
+    FROM pg_namespace nv, pg_class v, pg_depend dv,
+         pg_depend dt, pg_class t, pg_namespace nt,
+         pg_attribute a
+
+    WHERE nv.oid = v.relnamespace
+          AND v.relkind = 'v'
+          AND v.oid = dv.refobjid
+          AND dv.refclassid = 'pg_catalog.pg_class'::regclass
+          AND dv.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dv.deptype = 'i'
+          AND dv.objid = dt.objid
+          AND dv.refobjid <> dt.refobjid
+          AND dt.classid = 'pg_catalog.pg_rewrite'::regclass
+          AND dt.refclassid = 'pg_catalog.pg_class'::regclass
+          AND dt.refobjid = t.oid
+          AND t.relnamespace = nt.oid
+          AND t.relkind IN ('r', 'v', 'f', 'p')
+          AND t.oid = a.attrelid
+          AND dt.refobjsubid = a.attnum
+          AND pg_has_role(t.relowner, 'USAGE')
+;
+----------
+[CREATE_TABLE] CREATE TABLE counter(i int)
+;
+----------
+[DROP_TABLE] drop table p_t1
+;
+----------
+[CREATE_TABLE] CREATE TABLE rules_parted_table_1 PARTITION OF rules_parted_table FOR VALUES IN (1)
+;
+----------
+[ADD_INDEX] -- Force an index build using buffering.
+create index gist_tbl_box_index_forcing_buffering on gist_tbl using gist (p)
+  with (buffering=on, fillfactor=50)
+;

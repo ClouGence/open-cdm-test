@@ -1,0 +1,111 @@
+ALTER TABLE books SET TIFLASH REPLICA 1;
+ALTER TABLE orders SET TIFLASH REPLICA 1;
+SELECT * FROM information_schema.tiflash_replica WHERE TABLE_SCHEMA = 'bookshop' and TABLE_NAME = 'books';
+WITH orders_group_by_month AS (
+    SELECT
+        b.type AS book_type,
+        DATE_FORMAT(ordered_at, '%Y-%c') AS month,
+        COUNT(*) AS orders
+    FROM orders o
+    LEFT JOIN books b ON o.book_id = b.id
+    WHERE b.type IS NOT NULL
+    GROUP BY book_type, month
+), acc AS (
+    SELECT
+        book_type,
+        month,
+        SUM(orders) OVER(PARTITION BY book_type ORDER BY book_type, month ASC) as acc
+    FROM orders_group_by_month
+    ORDER BY book_type, month ASC
+)
+SELECT * FROM acc;
+SELECT * FROM information_schema.tiflash_replica WHERE TABLE_SCHEMA = 'bookshop' and TABLE_NAME = 'orders';
+WITH orders_group_by_month AS (
+  SELECT DATE_FORMAT(ordered_at, '%Y-%c') AS month, COUNT(*) AS orders
+  FROM orders
+  WHERE book_id = 3461722937
+  GROUP BY 1
+)
+SELECT
+month,
+SUM(orders) OVER(ORDER BY month ASC) as acc
+FROM orders_group_by_month
+ORDER BY month ASC;
+WITH orders_group_by_month AS (
+    SELECT
+        /*+ read_from_storage(tikv[o]) */
+        b.type AS book_type,
+        DATE_FORMAT(ordered_at, '%Y-%c') AS month,
+        COUNT(*) AS orders
+    FROM orders o
+    LEFT JOIN books b ON o.book_id = b.id
+    WHERE b.type IS NOT NULL
+    GROUP BY book_type, month
+), acc AS (
+    SELECT
+        book_type,
+        month,
+        SUM(orders) OVER(PARTITION BY book_type ORDER BY book_type, month ASC) as acc
+    FROM orders_group_by_month mo
+    ORDER BY book_type, month ASC
+)
+SELECT * FROM acc;
+------------------------------------------------------------------------------------------
+[ALTER_TABLE] ALTER TABLE books SET TIFLASH REPLICA 1;
+----------
+[ALTER_TABLE] ALTER TABLE orders SET TIFLASH REPLICA 1;
+----------
+[SELECT] SELECT * FROM information_schema.tiflash_replica WHERE TABLE_SCHEMA = 'bookshop' and TABLE_NAME = 'books';
+----------
+[SELECT] WITH orders_group_by_month AS (
+    SELECT
+        b.type AS book_type,
+        DATE_FORMAT(ordered_at, '%Y-%c') AS month,
+        COUNT(*) AS orders
+    FROM orders o
+    LEFT JOIN books b ON o.book_id = b.id
+    WHERE b.type IS NOT NULL
+    GROUP BY book_type, month
+), acc AS (
+    SELECT
+        book_type,
+        month,
+        SUM(orders) OVER(PARTITION BY book_type ORDER BY book_type, month ASC) as acc
+    FROM orders_group_by_month
+    ORDER BY book_type, month ASC
+)
+SELECT * FROM acc;
+----------
+[SELECT] SELECT * FROM information_schema.tiflash_replica WHERE TABLE_SCHEMA = 'bookshop' and TABLE_NAME = 'orders';
+----------
+[SELECT] WITH orders_group_by_month AS (
+  SELECT DATE_FORMAT(ordered_at, '%Y-%c') AS month, COUNT(*) AS orders
+  FROM orders
+  WHERE book_id = 3461722937
+  GROUP BY 1
+)
+SELECT
+month,
+SUM(orders) OVER(ORDER BY month ASC) as acc
+FROM orders_group_by_month
+ORDER BY month ASC;
+----------
+[SELECT] WITH orders_group_by_month AS (
+    SELECT
+        /*+ read_from_storage(tikv[o]) */
+        b.type AS book_type,
+        DATE_FORMAT(ordered_at, '%Y-%c') AS month,
+        COUNT(*) AS orders
+    FROM orders o
+    LEFT JOIN books b ON o.book_id = b.id
+    WHERE b.type IS NOT NULL
+    GROUP BY book_type, month
+), acc AS (
+    SELECT
+        book_type,
+        month,
+        SUM(orders) OVER(PARTITION BY book_type ORDER BY book_type, month ASC) as acc
+    FROM orders_group_by_month mo
+    ORDER BY book_type, month ASC
+)
+SELECT * FROM acc;

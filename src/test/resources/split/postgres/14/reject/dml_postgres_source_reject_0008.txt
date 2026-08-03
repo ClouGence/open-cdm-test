@@ -1,0 +1,360 @@
+MERGE INTO document d
+USING (SELECT 14 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge10 '
+WHEN NOT MATCHED THEN
+	INSERT VALUES (14, 11, 1, 'regress_rls_bob', 'new novel')
+RETURNING *
+;
+MERGE INTO pa_target t
+  USING (SELECT 1 as key, 'pa_merge2a' as val) s
+  ON s.key = t.key
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+	UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+  WHEN NOT MATCHED BY SOURCE THEN
+	UPDATE set key = t.key + 1, val = t.val || ' source not matched by pa_merge2a'
+  RETURNING merge_action(), old, new, t.*
+;
+MERGE INTO pa_target t
+  USING (SELECT '2017-01-15' AS slogts, * FROM pa_source WHERE sid < 10) s
+  ON t.tid = s.sid
+  WHEN MATCHED THEN
+    UPDATE SET balance = balance + delta, val = val || ' updated by merge'
+  WHEN NOT MATCHED THEN
+    INSERT VALUES (slogts::timestamp, sid, delta, 'inserted by merge')
+  RETURNING merge_action(), t.*
+;
+explain (analyze, timing off, summary off, costs off, buffers off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN NOT MATCHED BY SOURCE AND t.a < 10 THEN
+	DELETE
+WHEN NOT MATCHED BY TARGET AND s.a < 20 THEN
+	INSERT VALUES (a, b)
+;
+MERGE INTO rw_view2 t
+  USING (VALUES (4, 'r4'), (5, 'r5'), (6, 'r6')) AS v(a,b) ON aaa = v.a
+  WHEN MATCHED AND aaa = 4 THEN DELETE
+  WHEN MATCHED THEN UPDATE SET bbb = v.b
+  WHEN NOT MATCHED THEN INSERT (aaa) VALUES (v.a)
+  WHEN NOT MATCHED BY SOURCE THEN UPDATE SET bbb = 'Not matched by source'
+  RETURNING merge_action(), v.*, t.*
+;
+MERGE INTO bug18634v t USING bug18634s s ON s.a = t.a
+  WHEN MATCHED THEN UPDATE SET b = s.b
+  WHEN NOT MATCHED BY SOURCE THEN DELETE
+  RETURNING merge_action(), s.c, t.*
+;
+MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN NOT MATCHED BY SOURCE AND t.balance = 100 THEN
+    DELETE
+;
+explain (analyze, timing off, summary off, costs off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN NOT MATCHED BY SOURCE and t.a < 10 THEN
+	DELETE
+;
+MERGE INTO target t
+  USING (SELECT 1 as key, 'merge2a' as val) s
+  ON s.key = t.key
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+	UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+  WHEN NOT MATCHED BY SOURCE THEN
+	UPDATE set key = t.key + 1, val = t.val || ' source not matched by merge2a'
+  RETURNING merge_action(), t.*
+;
+explain (analyze, timing off, summary off, costs off, buffers off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN NOT MATCHED BY SOURCE and t.a < 10 THEN
+	DELETE
+;
+MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid AND t.tid = 1
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid + 1, balance = balance + delta, val = val || ' updated by merge'
+  RETURNING merge_action(), old, new, t.*
+;
+MERGE INTO rw_view1 t
+  USING (VALUES (0, 'ROW 0'), (1, 'ROW 1'),
+                (2, 'ROW 2'), (3, 'ROW 3')) AS v(a,b) ON t.a = v.a
+  WHEN MATCHED AND t.a <= 1 THEN UPDATE SET b = v.b
+  WHEN MATCHED THEN DELETE
+  WHEN NOT MATCHED AND a > 0 THEN INSERT (a) VALUES (v.a)
+  RETURNING merge_action(), v.*, t.*
+;
+-- but not OK if RETURNING is used
+MERGE INTO document d
+USING (SELECT 14 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge9 '
+WHEN NOT MATCHED THEN
+	INSERT VALUES (14, 44, 1, 'regress_rls_bob', 'new manga')
+RETURNING *
+;
+MERGE INTO pg_class c
+USING (SELECT 'pg_depend'::regclass AS oid) AS j
+ON j.oid = c.oid
+WHEN MATCHED THEN
+	UPDATE SET reltuples = reltuples + 1
+RETURNING j.oid
+;
+merge into part_abc_view pt
+using (select stable_one() + 1 as pid) as q join part_abc_2 pt2 on (q.pid = pt2.a) on pt.a = stable_one() + 2
+when not matched then insert values (1, 'd', false) returning pt.a
+;
+merge into part_abc_view pt
+using (select stable_one() + 2 as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+MERGE INTO rw_view2 t
+  USING (SELECT x, 'R'||x FROM generate_series(0,3) x) AS s(a,b) ON t.a = s.a
+  WHEN MATCHED AND t.a <= 1 THEN DELETE
+  WHEN MATCHED THEN UPDATE SET b = s.b
+  WHEN NOT MATCHED AND s.a > 0 THEN INSERT VALUES (s.a, s.b)
+  RETURNING merge_action(), s.*, t.*
+;
+merge into part_abc_view pt
+using (select stable_one() as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+UPDATE foo SET f1 = new.f1, f3 = new.f3, f4 = new.f4 * 10
+    FROM joinme WHERE f2 = f2j AND f2 = old.f2
+    RETURNING WITH (new AS n) new.f1, n.f4
+;
+MERGE INTO ONLY split_merge18.inventory AS t
+USING (VALUES ('keep', 3, 'fresh'), ('add', 7, 'new')) AS s(sku, delta, note)
+ON t.sku = s.sku
+WHEN MATCHED AND s.delta > 0 THEN UPDATE SET qty = t.qty + s.delta, note = s.note
+WHEN NOT MATCHED BY TARGET THEN INSERT (sku, qty, note) VALUES (s.sku, s.delta, s.note)
+WHEN NOT MATCHED BY SOURCE AND t.qty < 10 THEN DELETE
+RETURNING WITH (OLD AS o, NEW AS n) merge_action() AS action, o.sku AS old_sku, n.sku AS new_sku, n.qty
+;
+INSERT INTO foo VALUES (4, 'conflict'), (5, 'ok')
+  ON CONFLICT (f1) DO UPDATE SET f2 = excluded.f2||'ed', f3 = -1
+  RETURNING WITH (OLD AS o, NEW AS n)
+            o.tableoid::regclass, o.ctid, o.*,
+            n.tableoid::regclass, n.ctid, n.*, *
+;
+DELETE FROM split_returning18.items
+WHERE code = 'b'
+RETURNING WITH (OLD AS gone, NEW AS kept) gone.id, gone.code, kept.id AS new_id
+;
+INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS x, new AS x) *
+;
+INSERT INTO foo DEFAULT VALUES RETURNING WITH (new AS foo) *
+;
+INSERT INTO split_returning18.items AS t (id, code, qty)
+VALUES (1, 'a', 12), (2, 'b', 5)
+ON CONFLICT (id) DO UPDATE SET qty = excluded.qty
+RETURNING WITH (OLD AS o, NEW AS n) o.qty AS old_qty, n.qty AS new_qty, n.code
+;
+INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS o, new AS n, old AS o) *
+;
+INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS o, new AS n, new AS n) *
+;
+UPDATE split_returning18.items
+SET qty = qty + 1
+WHERE code IN ('a', 'b')
+RETURNING WITH (OLD AS before_row, NEW AS after_row) before_row.qty AS previous_qty, after_row.qty AS current_qty, after_row.code
+;
+------------------------------------------------------------------------------------------
+[MERGE|SELECT] MERGE INTO document d
+USING (SELECT 14 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge10 '
+WHEN NOT MATCHED THEN
+	INSERT VALUES (14, 11, 1, 'regress_rls_bob', 'new novel')
+RETURNING *
+;
+----------
+[MERGE|SELECT] MERGE INTO pa_target t
+  USING (SELECT 1 as key, 'pa_merge2a' as val) s
+  ON s.key = t.key
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+	UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+  WHEN NOT MATCHED BY SOURCE THEN
+	UPDATE set key = t.key + 1, val = t.val || ' source not matched by pa_merge2a'
+  RETURNING merge_action(), old, new, t.*
+;
+----------
+[MERGE|SELECT] MERGE INTO pa_target t
+  USING (SELECT '2017-01-15' AS slogts, * FROM pa_source WHERE sid < 10) s
+  ON t.tid = s.sid
+  WHEN MATCHED THEN
+    UPDATE SET balance = balance + delta, val = val || ' updated by merge'
+  WHEN NOT MATCHED THEN
+    INSERT VALUES (slogts::timestamp, sid, delta, 'inserted by merge')
+  RETURNING merge_action(), t.*
+;
+----------
+[MERGE] explain (analyze, timing off, summary off, costs off, buffers off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN NOT MATCHED BY SOURCE AND t.a < 10 THEN
+	DELETE
+WHEN NOT MATCHED BY TARGET AND s.a < 20 THEN
+	INSERT VALUES (a, b)
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t
+  USING (VALUES (4, 'r4'), (5, 'r5'), (6, 'r6')) AS v(a,b) ON aaa = v.a
+  WHEN MATCHED AND aaa = 4 THEN DELETE
+  WHEN MATCHED THEN UPDATE SET bbb = v.b
+  WHEN NOT MATCHED THEN INSERT (aaa) VALUES (v.a)
+  WHEN NOT MATCHED BY SOURCE THEN UPDATE SET bbb = 'Not matched by source'
+  RETURNING merge_action(), v.*, t.*
+;
+----------
+[MERGE] MERGE INTO bug18634v t USING bug18634s s ON s.a = t.a
+  WHEN MATCHED THEN UPDATE SET b = s.b
+  WHEN NOT MATCHED BY SOURCE THEN DELETE
+  RETURNING merge_action(), s.c, t.*
+;
+----------
+[MERGE] MERGE INTO wq_target t
+USING wq_source s ON t.tid = s.sid
+WHEN NOT MATCHED BY SOURCE AND t.balance = 100 THEN
+    DELETE
+;
+----------
+[MERGE] explain (analyze, timing off, summary off, costs off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN NOT MATCHED BY SOURCE and t.a < 10 THEN
+	DELETE
+;
+----------
+[MERGE|SELECT] MERGE INTO target t
+  USING (SELECT 1 as key, 'merge2a' as val) s
+  ON s.key = t.key
+  WHEN NOT MATCHED THEN
+	INSERT VALUES (s.key, s.val)
+  WHEN MATCHED THEN
+	UPDATE set key = t.key + 1, val = t.val || ' updated by ' || s.val
+  WHEN NOT MATCHED BY SOURCE THEN
+	UPDATE set key = t.key + 1, val = t.val || ' source not matched by merge2a'
+  RETURNING merge_action(), t.*
+;
+----------
+[MERGE] explain (analyze, timing off, summary off, costs off, buffers off) 
+MERGE INTO ex_mtarget t USING ex_msource s ON t.a = s.a
+WHEN NOT MATCHED BY SOURCE and t.a < 10 THEN
+	DELETE
+;
+----------
+[MERGE] MERGE INTO pa_target t
+  USING pa_source s
+  ON t.tid = s.sid AND t.tid = 1
+  WHEN MATCHED THEN
+    UPDATE SET tid = tid + 1, balance = balance + delta, val = val || ' updated by merge'
+  RETURNING merge_action(), old, new, t.*
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view1 t
+  USING (VALUES (0, 'ROW 0'), (1, 'ROW 1'),
+                (2, 'ROW 2'), (3, 'ROW 3')) AS v(a,b) ON t.a = v.a
+  WHEN MATCHED AND t.a <= 1 THEN UPDATE SET b = v.b
+  WHEN MATCHED THEN DELETE
+  WHEN NOT MATCHED AND a > 0 THEN INSERT (a) VALUES (v.a)
+  RETURNING merge_action(), v.*, t.*
+;
+----------
+[MERGE|SELECT] -- but not OK if RETURNING is used
+MERGE INTO document d
+USING (SELECT 14 as sdid) s
+ON did = s.sdid
+WHEN MATCHED THEN
+	UPDATE SET dnotes = dnotes || ' notes added by merge9 '
+WHEN NOT MATCHED THEN
+	INSERT VALUES (14, 44, 1, 'regress_rls_bob', 'new manga')
+RETURNING *
+;
+----------
+[MERGE|SELECT] MERGE INTO pg_class c
+USING (SELECT 'pg_depend'::regclass AS oid) AS j
+ON j.oid = c.oid
+WHEN MATCHED THEN
+	UPDATE SET reltuples = reltuples + 1
+RETURNING j.oid
+;
+----------
+[MERGE|SELECT] merge into part_abc_view pt
+using (select stable_one() + 1 as pid) as q join part_abc_2 pt2 on (q.pid = pt2.a) on pt.a = stable_one() + 2
+when not matched then insert values (1, 'd', false) returning pt.a
+;
+----------
+[MERGE|SELECT] merge into part_abc_view pt
+using (select stable_one() + 2 as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+----------
+[MERGE|SELECT] MERGE INTO rw_view2 t
+  USING (SELECT x, 'R'||x FROM generate_series(0,3) x) AS s(a,b) ON t.a = s.a
+  WHEN MATCHED AND t.a <= 1 THEN DELETE
+  WHEN MATCHED THEN UPDATE SET b = s.b
+  WHEN NOT MATCHED AND s.a > 0 THEN INSERT VALUES (s.a, s.b)
+  RETURNING merge_action(), s.*, t.*
+;
+----------
+[MERGE|SELECT] merge into part_abc_view pt
+using (select stable_one() as pid) as q join part_abc_1 pt1 on (q.pid = pt1.a) on pt.a = pt1.a
+when matched then delete returning pt.a
+;
+----------
+[UPDATE] UPDATE foo SET f1 = new.f1, f3 = new.f3, f4 = new.f4 * 10
+    FROM joinme WHERE f2 = f2j AND f2 = old.f2
+    RETURNING WITH (new AS n) new.f1, n.f4
+;
+----------
+[MERGE|SELECT] MERGE INTO ONLY split_merge18.inventory AS t
+USING (VALUES ('keep', 3, 'fresh'), ('add', 7, 'new')) AS s(sku, delta, note)
+ON t.sku = s.sku
+WHEN MATCHED AND s.delta > 0 THEN UPDATE SET qty = t.qty + s.delta, note = s.note
+WHEN NOT MATCHED BY TARGET THEN INSERT (sku, qty, note) VALUES (s.sku, s.delta, s.note)
+WHEN NOT MATCHED BY SOURCE AND t.qty < 10 THEN DELETE
+RETURNING WITH (OLD AS o, NEW AS n) merge_action() AS action, o.sku AS old_sku, n.sku AS new_sku, n.qty
+;
+----------
+[MERGE] INSERT INTO foo VALUES (4, 'conflict'), (5, 'ok')
+  ON CONFLICT (f1) DO UPDATE SET f2 = excluded.f2||'ed', f3 = -1
+  RETURNING WITH (OLD AS o, NEW AS n)
+            o.tableoid::regclass, o.ctid, o.*,
+            n.tableoid::regclass, n.ctid, n.*, *
+;
+----------
+[DELETE] DELETE FROM split_returning18.items
+WHERE code = 'b'
+RETURNING WITH (OLD AS gone, NEW AS kept) gone.id, gone.code, kept.id AS new_id
+;
+----------
+[INSERT] INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS x, new AS x) *
+;
+----------
+[INSERT] INSERT INTO foo DEFAULT VALUES RETURNING WITH (new AS foo) *
+;
+----------
+[MERGE|SELECT] INSERT INTO split_returning18.items AS t (id, code, qty)
+VALUES (1, 'a', 12), (2, 'b', 5)
+ON CONFLICT (id) DO UPDATE SET qty = excluded.qty
+RETURNING WITH (OLD AS o, NEW AS n) o.qty AS old_qty, n.qty AS new_qty, n.code
+;
+----------
+[INSERT] INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS o, new AS n, old AS o) *
+;
+----------
+[INSERT] INSERT INTO foo DEFAULT VALUES RETURNING WITH (old AS o, new AS n, new AS n) *
+;
+----------
+[UPDATE] UPDATE split_returning18.items
+SET qty = qty + 1
+WHERE code IN ('a', 'b')
+RETURNING WITH (OLD AS before_row, NEW AS after_row) before_row.qty AS previous_qty, after_row.qty AS current_qty, after_row.code
+;

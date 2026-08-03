@@ -1,0 +1,430 @@
+CREATE TABLE gtest28a (
+  a int,
+  b int,
+  c int,
+  x int GENERATED ALWAYS AS (b * 2) STORED
+)
+;
+create table test_pg_index_toast_table (a int)
+;
+ALTER FUNCTION gbt_oid_consistent(internal, oid, smallint, oid, internal) PARALLEL SAFE
+;
+-- A NO INHERIT constraint should not be looked for in children during VALIDATE CONSTRAINT
+create table parent_noinh_convalid (a int)
+;
+CREATE INDEX t11_a_idx ON t11(a)
+;
+--
+-- Try a GIN index with a lot of items with same key. (GIN creates a posting
+-- tree when there are enough duplicates)
+--
+CREATE TABLE array_gin_test (a int[])
+;
+create table pp_lp2 partition of pp_lp for values in(2)
+;
+CREATE FUNCTION get_default_test() RETURNS SETOF default_test_row AS '
+  SELECT * FROM default_test;
+' LANGUAGE SQL
+;
+CREATE VIEW instead_of_insert_tbl_view AS SELECT ''::text AS str
+;
+-- Check that views are rejected
+CREATE VIEW test_view AS SELECT 1
+;
+CREATE UNIQUE INDEX bttest_unique_idx
+						ON int4tbl
+						USING btree (i int4_unique_ops)
+						WITH (deduplicate_items = off)
+;
+CREATE FUNCTION gbt_cash_sortsupport(internal)
+RETURNS void
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE PARALLEL SAFE STRICT
+;
+TRUNCATE tid_tab
+;
+CREATE INDEX test_replica_identity_hash ON test_replica_identity USING hash (nonkey)
+;
+CREATE INDEX idx_char ON test_char USING gin (i)
+;
+ANALYZE pg_temp_9.pg_temp_25621
+;
+-- parenthesized syntax for ANALYZE
+ANALYZE (VERBOSE) does_not_exist
+;
+ALTER TABLE attmp_array2 RENAME TO _attmp_array
+;
+--
+-- We have a few function definitions in here, too.
+-- At some point there might be enough to justify breaking them out into
+-- a separate "system_functions.sql" file.
+--
+
+-- Tsearch debug function.  Defined here because it'd be pretty unwieldy
+-- to put it into pg_proc.h
+
+CREATE FUNCTION ts_debug(IN config regconfig, IN document text,
+    OUT alias text,
+    OUT description text,
+    OUT token text,
+    OUT dictionaries regdictionary[],
+    OUT dictionary regdictionary,
+    OUT lexemes text[])
+RETURNS SETOF record AS
+$$
+SELECT
+    tt.alias AS alias,
+    tt.description AS description,
+    parse.token AS token,
+    ARRAY ( SELECT m.mapdict::pg_catalog.regdictionary
+            FROM pg_catalog.pg_ts_config_map AS m
+            WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+            ORDER BY m.mapseqno )
+    AS dictionaries,
+    ( SELECT mapdict::pg_catalog.regdictionary
+      FROM pg_catalog.pg_ts_config_map AS m
+      WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+      ORDER BY pg_catalog.ts_lexize(mapdict, parse.token) IS NULL, m.mapseqno
+      LIMIT 1
+    ) AS dictionary,
+    ( SELECT pg_catalog.ts_lexize(mapdict, parse.token)
+      FROM pg_catalog.pg_ts_config_map AS m
+      WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+      ORDER BY pg_catalog.ts_lexize(mapdict, parse.token) IS NULL, m.mapseqno
+      LIMIT 1
+    ) AS lexemes
+FROM pg_catalog.ts_parse(
+        (SELECT cfgparser FROM pg_catalog.pg_ts_config WHERE oid = $1 ), $2
+    ) AS parse,
+     pg_catalog.ts_token_type(
+        (SELECT cfgparser FROM pg_catalog.pg_ts_config WHERE oid = $1 )
+    ) AS tt
+WHERE tt.tokid = parse.tokid
+$$
+LANGUAGE SQL STRICT STABLE PARALLEL SAFE
+;
+create table loct1 (a int check (a in (1)), b text)
+;
+CREATE DATABASE "regression\""\	 !""#$%&'()*+,-\\""\\\"
+;
+CREATE VIEW gstest_view AS select a, b, grouping(a,b), sum(c), count(*), max(c)
+  from gstest2 group by rollup ((a,b,c),(c,d))
+;
+create temp table cc (f1 cantcompare)
+;
+ALTER TABLE testschema.part SET TABLESPACE regress_tblspace
+;
+VACUUM (TRUNCATE FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_attribute
+;
+CREATE FUNCTION digest(bytea, text)
+RETURNS bytea
+AS '$libdir/pgcrypto', 'pg_digest'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+VACUUM (PARALLEL 0) pg_catalog.pg_largeobject_metadata
+;
+-- fail - user-defined collations are not allowed
+CREATE COLLATION user_collation FROM "C"
+;
+CREATE OPERATOR FAMILY dump_test.op_family USING btree
+;
+-- Try changing indisclustered
+ALTER TABLE clstr_tst CLUSTER ON clstr_tst_b_c
+;
+-- check we didn't screw with main/toast tuple visibility
+VACUUM FREEZE indtoasttest
+;
+ALTER EXTENSION pg_stat_statements DROP VIEW pg_stat_statements
+;
+ALTER TABLE pg_toast.pg_toast_33047 RENAME TO reind_con_toast
+;
+VACUUM (VERBOSE, FREEZE, PARALLEL 0) vac_horizon_floor_table
+;
+CREATE TABLE "public"."past_inh_parent" (
+)
+;
+EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
+  CREATE MATERIALIZED VIEW matview_ine_tab AS
+    SELECT 1 / 0 WITH NO DATA
+;
+alter table atacc1 alter a drop not null
+;
+--return composite data type.
+create type comp as (a int, b int)
+;
+CREATE SUBSCRIPTION tap_sub CONNECTION 'port=25924 host=/tmp/rS_vYiqeQB dbname=postgres application_name=tap_sub' PUBLICATION tap_pub WITH (streaming = on)
+;
+--
+-- regression test for bug #18522 (merge-right-anti-join in inner_unique cases)
+--
+
+create temp table tbl_ra(a int unique, b int)
+;
+ALTER EXTENSION test_pg_dump DROP FUNCTION test_pg_dump(int)
+;
+CREATE TABLE float4tmp (a float4)
+;
+DROP TABLE pg_temp_4.pg_temp_29539_2, pg_temp_4.pg_temp_29539
+;
+VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_publication_namespace
+;
+CREATE OPERATOR <= (
+	LEFTARG = cube, RIGHTARG = cube, PROCEDURE = cube_le,
+	COMMUTATOR = '>=', NEGATOR = '>',
+	RESTRICT = scalarltsel, JOIN = scalarltjoinsel
+)
+;
+/*
+ * 6. EXCLUDE constraint.
+ */
+CREATE TABLE tbl_gist (c1 int, c2 int, c3 int, c4 box, EXCLUDE USING gist (c4 WITH &&) INCLUDE (c1, c2, c3))
+;
+DROP SEQUENCE functest1 CASCADE
+;
+CREATE TABLE plt2_adv_p1 PARTITION OF plt2_adv FOR VALUES IN ('0002', '0003')
+;
+alter table idxpart0 alter column a drop not null
+;
+ALTER OPERATOR ^? (ltree, _lquery)
+  SET (RESTRICT = matchingsel, JOIN = matchingjoinsel)
+;
+------------------------------------------------------------------------------------------
+[CREATE_TABLE] CREATE TABLE gtest28a (
+  a int,
+  b int,
+  c int,
+  x int GENERATED ALWAYS AS (b * 2) STORED
+)
+;
+----------
+[CREATE_TABLE] create table test_pg_index_toast_table (a int)
+;
+----------
+[ALTER_PROG_OBJ] ALTER FUNCTION gbt_oid_consistent(internal, oid, smallint, oid, internal) PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] -- A NO INHERIT constraint should not be looked for in children during VALIDATE CONSTRAINT
+create table parent_noinh_convalid (a int)
+;
+----------
+[ADD_INDEX] CREATE INDEX t11_a_idx ON t11(a)
+;
+----------
+[CREATE_TABLE] --
+-- Try a GIN index with a lot of items with same key. (GIN creates a posting
+-- tree when there are enough duplicates)
+--
+CREATE TABLE array_gin_test (a int[])
+;
+----------
+[CREATE_TABLE] create table pp_lp2 partition of pp_lp for values in(2)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION get_default_test() RETURNS SETOF default_test_row AS '
+  SELECT * FROM default_test;
+' LANGUAGE SQL
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW instead_of_insert_tbl_view AS SELECT ''::text AS str
+;
+----------
+[CREATE_VIEW(SELECT)] -- Check that views are rejected
+CREATE VIEW test_view AS SELECT 1
+;
+----------
+[ADD_INDEX] CREATE UNIQUE INDEX bttest_unique_idx
+						ON int4tbl
+						USING btree (i int4_unique_ops)
+						WITH (deduplicate_items = off)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gbt_cash_sortsupport(internal)
+RETURNS void
+AS '$libdir/btree_gist'
+LANGUAGE C IMMUTABLE PARALLEL SAFE STRICT
+;
+----------
+[TRUNCATE_TABLE] TRUNCATE tid_tab
+;
+----------
+[ADD_INDEX] CREATE INDEX test_replica_identity_hash ON test_replica_identity USING hash (nonkey)
+;
+----------
+[ADD_INDEX] CREATE INDEX idx_char ON test_char USING gin (i)
+;
+----------
+[ADMIN_TABLE] ANALYZE pg_temp_9.pg_temp_25621
+;
+----------
+[ADMIN_TABLE] -- parenthesized syntax for ANALYZE
+ANALYZE (VERBOSE) does_not_exist
+;
+----------
+[RENAME_TABLE] ALTER TABLE attmp_array2 RENAME TO _attmp_array
+;
+----------
+[CREATE_PROG_OBJ] --
+-- We have a few function definitions in here, too.
+-- At some point there might be enough to justify breaking them out into
+-- a separate "system_functions.sql" file.
+--
+
+-- Tsearch debug function.  Defined here because it'd be pretty unwieldy
+-- to put it into pg_proc.h
+
+CREATE FUNCTION ts_debug(IN config regconfig, IN document text,
+    OUT alias text,
+    OUT description text,
+    OUT token text,
+    OUT dictionaries regdictionary[],
+    OUT dictionary regdictionary,
+    OUT lexemes text[])
+RETURNS SETOF record AS
+$$
+SELECT
+    tt.alias AS alias,
+    tt.description AS description,
+    parse.token AS token,
+    ARRAY ( SELECT m.mapdict::pg_catalog.regdictionary
+            FROM pg_catalog.pg_ts_config_map AS m
+            WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+            ORDER BY m.mapseqno )
+    AS dictionaries,
+    ( SELECT mapdict::pg_catalog.regdictionary
+      FROM pg_catalog.pg_ts_config_map AS m
+      WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+      ORDER BY pg_catalog.ts_lexize(mapdict, parse.token) IS NULL, m.mapseqno
+      LIMIT 1
+    ) AS dictionary,
+    ( SELECT pg_catalog.ts_lexize(mapdict, parse.token)
+      FROM pg_catalog.pg_ts_config_map AS m
+      WHERE m.mapcfg = $1 AND m.maptokentype = parse.tokid
+      ORDER BY pg_catalog.ts_lexize(mapdict, parse.token) IS NULL, m.mapseqno
+      LIMIT 1
+    ) AS lexemes
+FROM pg_catalog.ts_parse(
+        (SELECT cfgparser FROM pg_catalog.pg_ts_config WHERE oid = $1 ), $2
+    ) AS parse,
+     pg_catalog.ts_token_type(
+        (SELECT cfgparser FROM pg_catalog.pg_ts_config WHERE oid = $1 )
+    ) AS tt
+WHERE tt.tokid = parse.tokid
+$$
+LANGUAGE SQL STRICT STABLE PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] create table loct1 (a int check (a in (1)), b text)
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE "regression\""\	 !""#$%&'()*+,-\\""\\\"
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW gstest_view AS select a, b, grouping(a,b), sum(c), count(*), max(c)
+  from gstest2 group by rollup ((a,b,c),(c,d))
+;
+----------
+[CREATE_TABLE] create temp table cc (f1 cantcompare)
+;
+----------
+[ALTER_TABLE] ALTER TABLE testschema.part SET TABLESPACE regress_tblspace
+;
+----------
+[ADMIN_TABLE] VACUUM (TRUNCATE FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_attribute
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION digest(bytea, text)
+RETURNS bytea
+AS '$libdir/pgcrypto', 'pg_digest'
+LANGUAGE C IMMUTABLE STRICT PARALLEL SAFE
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 0) pg_catalog.pg_largeobject_metadata
+;
+----------
+[CREATE_POLICY] -- fail - user-defined collations are not allowed
+CREATE COLLATION user_collation FROM "C"
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR FAMILY dump_test.op_family USING btree
+;
+----------
+[ALTER_TABLE] -- Try changing indisclustered
+ALTER TABLE clstr_tst CLUSTER ON clstr_tst_b_c
+;
+----------
+[ADMIN_TABLE] -- check we didn't screw with main/toast tuple visibility
+VACUUM FREEZE indtoasttest
+;
+----------
+[ALTER_LIBRARY] ALTER EXTENSION pg_stat_statements DROP VIEW pg_stat_statements
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_33047 RENAME TO reind_con_toast
+;
+----------
+[ADMIN_TABLE] VACUUM (VERBOSE, FREEZE, PARALLEL 0) vac_horizon_floor_table
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."past_inh_parent" (
+)
+;
+----------
+[CREATE_VIEW] EXPLAIN (ANALYZE, COSTS OFF, SUMMARY OFF, TIMING OFF)
+  CREATE MATERIALIZED VIEW matview_ine_tab AS
+    SELECT 1 / 0 WITH NO DATA
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table atacc1 alter a drop not null
+;
+----------
+[CREATE_TYPE] --return composite data type.
+create type comp as (a int, b int)
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION tap_sub CONNECTION 'port=25924 host=/tmp/rS_vYiqeQB dbname=postgres application_name=tap_sub' PUBLICATION tap_pub WITH (streaming = on)
+;
+----------
+[CREATE_TABLE] --
+-- regression test for bug #18522 (merge-right-anti-join in inner_unique cases)
+--
+
+create temp table tbl_ra(a int unique, b int)
+;
+----------
+[ALTER_LIBRARY] ALTER EXTENSION test_pg_dump DROP FUNCTION test_pg_dump(int)
+;
+----------
+[CREATE_TABLE] CREATE TABLE float4tmp (a float4)
+;
+----------
+[DROP_TABLE] DROP TABLE pg_temp_4.pg_temp_29539_2, pg_temp_4.pg_temp_29539
+;
+----------
+[ADMIN_TABLE] VACUUM (SKIP_DATABASE_STATS, ANALYZE) pg_catalog.pg_publication_namespace
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR <= (
+	LEFTARG = cube, RIGHTARG = cube, PROCEDURE = cube_le,
+	COMMUTATOR = '>=', NEGATOR = '>',
+	RESTRICT = scalarltsel, JOIN = scalarltjoinsel
+)
+;
+----------
+[CREATE_TABLE] /*
+ * 6. EXCLUDE constraint.
+ */
+CREATE TABLE tbl_gist (c1 int, c2 int, c3 int, c4 box, EXCLUDE USING gist (c4 WITH &&) INCLUDE (c1, c2, c3))
+;
+----------
+[DROP_SEQUENCE] DROP SEQUENCE functest1 CASCADE
+;
+----------
+[CREATE_TABLE] CREATE TABLE plt2_adv_p1 PARTITION OF plt2_adv FOR VALUES IN ('0002', '0003')
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] alter table idxpart0 alter column a drop not null
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR ^? (ltree, _lquery)
+  SET (RESTRICT = matchingsel, JOIN = matchingjoinsel)
+;

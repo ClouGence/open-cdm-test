@@ -1,0 +1,676 @@
+DROP SCHEMA drop_schema_test1 CASCADE
+;
+-- These are for testing replacement of a shell type/operator, which works
+-- enough like an implicit OR REPLACE to be important to check.
+
+CREATE TYPE test_ext_type AS ENUM('x', 'y')
+;
+ALTER TABLE list_parted2 DETACH PARTITION part_5
+;
+CREATE TABLE plt1_adv_p1_null PARTITION OF plt1_adv FOR VALUES IN (NULL, '0001', '0003')
+;
+--
+-- crosstab()
+--
+CREATE TABLE ct(id int, rowclass text, rowid text, attribute text, val text)
+;
+CREATE OPERATOR >= (
+	LEFTARG = seg,
+	RIGHTARG = seg,
+	PROCEDURE = seg_ge,
+	COMMUTATOR = '<=',
+	NEGATOR = '<',
+	RESTRICT = scalargtsel,
+	JOIN = scalargtjoinsel
+)
+;
+ANALYZE public.itest11
+;
+--
+-- Create partitioned table that does not allow bulk insertions, to test bugs
+-- related to the reuse of BulkInsertState across partitions (only done when
+-- not using bulk insert).  Switching between partitions often makes it more
+-- likely to encounter these bugs, so we just switch on roughly every insert
+-- by having an even/odd number partition and inserting evenly distributed
+-- data.
+--
+CREATE TABLE parted_si (
+  id int not null,
+  data text not null,
+  -- prevent use of bulk insert by having a volatile function
+  rand float8 not null default random()
+)
+PARTITION BY LIST((id % 2))
+;
+CREATE PUBLICATION alice FOR TABLE alice.unpartitioned
+  WITH (publish_via_partition_root = true)
+;
+VACUUM (INDEX_CLEANUP FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_attribute
+;
+ANALYZE (SKIP_LOCKED) pg_catalog.pg_ts_config_map
+;
+ALTER TABLE ONLY "public"."spgist_box_tbl" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."spgist_box_tbl_id_seq"'::"regclass")
+;
+DROP RULE test_rule_exists ON no_such_schema.no_such_table
+;
+CREATE INDEX tbl_gist_idx ON public.tbl_gist USING gist (c4) INCLUDE (c1, c3)
+;
+create table p1(ff1 int)
+;
+CREATE FUNCTION "public"."ks_test_uniform_random_bigint_in_range"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+  n int := 1000;        -- Number of samples
+  c float8 := 1.94947;  -- Critical value for 99.9% confidence
+  ok boolean;
+BEGIN
+  ok := (
+    WITH samples AS (
+      SELECT random(0, 999999999999) / 1000000000000.0 r FROM generate_series(1, n) ORDER BY 1
+    ), indexed_samples AS (
+      SELECT (row_number() OVER())-1.0 i, r FROM samples
+    )
+    SELECT max(abs(i/n-r)) < c / sqrt(n) FROM indexed_samples
+  );
+  RETURN ok;
+END
+$$
+;
+CREATE FUNCTION gin_extract_value_bpchar(bpchar, internal)
+RETURNS internal
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+CREATE TABLE reloptions_test2(i INT) WITH (fillfactor=true)
+;
+CREATE TABLE "public"."defpart_attach_test_2" (
+    "a" integer
+)
+;
+---
+--- CREATE_DOMAIN
+---
+CREATE DOMAIN domainvarchar VARCHAR(5)
+;
+alter table extremely_skewed set (autovacuum_enabled = 'false')
+;
+CREATE FUNCTION pgstatindex(IN relname text,
+    OUT version INT,
+    OUT tree_level INT,
+    OUT index_size BIGINT,
+    OUT root_block_no BIGINT,
+    OUT internal_pages BIGINT,
+    OUT leaf_pages BIGINT,
+    OUT empty_pages BIGINT,
+    OUT deleted_pages BIGINT,
+    OUT avg_leaf_density FLOAT8,
+    OUT leaf_fragmentation FLOAT8)
+AS '$libdir/pgstattuple', 'pgstatindex'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+create table idxpart (a int unique, b int) partition by range (a)
+;
+-- repeat expansive tests for index built using insertions
+TRUNCATE bttest_multi
+;
+-- fails
+
+ALTER TYPE test_type ALTER ATTRIBUTE b SET DATA TYPE varchar
+;
+CREATE TABLE test_having (a int, b int, c char(8), d char)
+;
+VACUUM (INDEX_CLEANUP FALSE) pg_catalog.pg_publication_rel
+;
+-- fail, not enough privileges
+CREATE SUBSCRIPTION regress_testsub CONNECTION 'dbname=regress_doesnotexist' PUBLICATION testpub WITH (connect = false)
+;
+COMMENT ON INDEX ctlt1_b_key IS 'index b_key'
+;
+CREATE POLICY p2 ON y2 USING (a % 3 = 0)
+;
+CREATE TABLE errtst_child_reorder (
+    data int NOT NULL DEFAULT 0,
+    shdata int not null,
+    partid int not null,
+    CONSTRAINT shdata_small CHECK(shdata < 3),
+    CHECK(data < 10)
+)
+;
+ANALYZE public.prt1_l_p3_p2
+;
+CREATE VIEW attributes AS
+    SELECT CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nc.nspname AS sql_identifier) AS udt_schema,
+           CAST(c.relname AS sql_identifier) AS udt_name,
+           CAST(a.attname AS sql_identifier) AS attribute_name,
+           CAST(a.attnum AS cardinal_number) AS ordinal_position,
+           CAST(pg_get_expr(ad.adbin, ad.adrelid) AS character_data) AS attribute_default,
+           CAST(CASE WHEN a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) THEN 'NO' ELSE 'YES' END
+             AS yes_or_no)
+             AS is_nullable, -- This column was apparently removed between SQL:2003 and SQL:2008.
+
+           CAST(
+             CASE WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                  WHEN nt.nspname = 'pg_catalog' THEN format_type(a.atttypid, null)
+                  ELSE 'USER-DEFINED' END
+             AS character_data)
+             AS data_type,
+
+           CAST(
+             _pg_char_max_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_maximum_length,
+
+           CAST(
+             _pg_char_octet_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_octet_length,
+
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+
+           CAST(
+             _pg_numeric_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision,
+
+           CAST(
+             _pg_numeric_precision_radix(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision_radix,
+
+           CAST(
+             _pg_numeric_scale(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_scale,
+
+           CAST(
+             _pg_datetime_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS datetime_precision,
+
+           CAST(
+             _pg_interval_type(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS character_data)
+             AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(current_database() AS sql_identifier) AS attribute_udt_catalog,
+           CAST(nt.nspname AS sql_identifier) AS attribute_udt_schema,
+           CAST(t.typname AS sql_identifier) AS attribute_udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(a.attnum AS sql_identifier) AS dtd_identifier,
+           CAST('NO' AS yes_or_no) AS is_derived_reference_attribute
+
+    FROM (pg_attribute a LEFT JOIN pg_attrdef ad ON attrelid = adrelid AND attnum = adnum)
+         JOIN (pg_class c JOIN pg_namespace nc ON (c.relnamespace = nc.oid)) ON a.attrelid = c.oid
+         JOIN (pg_type t JOIN pg_namespace nt ON (t.typnamespace = nt.oid)) ON a.atttypid = t.oid
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON a.attcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+
+    WHERE a.attnum > 0 AND NOT a.attisdropped
+          AND c.relkind IN ('c')
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_type_privilege(c.reltype, 'USAGE'))
+;
+CREATE OR REPLACE RULE voo_u AS ON UPDATE TO voo DO INSTEAD
+  UPDATE foo SET f1 = new.f1, f2 = new.f2 WHERE f1 = old.f1
+  RETURNING f1, f2
+;
+CREATE VIEW s1.t2_view AS (
+				SELECT i*2, t FROM s1.t2
+			)
+;
+ALTER INDEX tbl_idx ALTER COLUMN 3 SET STATISTICS 1000
+;
+CREATE OPERATOR split_maint.## (
+    FUNCTION = split_maint.add_amount,
+    LEFTARG = numeric,
+    RIGHTARG = numeric
+)
+;
+alter table uv_pt attach partition uv_pt1 for values from (1, 2) to (1, 10)
+;
+CREATE AGGREGATE "public"."myaggp10b"(integer) (
+    SFUNC = "public"."tfp",
+    STYPE = integer[],
+    INITCOND = '{}'
+)
+;
+VACUUM (DISABLE_PAGE_SKIPPING, SKIP_DATABASE_STATS) pg_catalog.pg_foreign_server
+;
+create table parted_stmt_trig (a int) partition by list (a)
+;
+drop table dep_priv_test
+;
+/*
+ * text search configuration for danish language
+ *
+ * Copyright (c) 2007-2019, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * danish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY danish_stem
+	(TEMPLATE = snowball, Language = danish , StopWords=danish)
+;
+CREATE DATABASE test_db_1 STRATEGY WAL_LOG TEMPLATE template1
+;
+do 'declare c int = 0;
+begin
+  while (select count(*) from pg_replication_slots where active_pid = '
+    '39385'
+  ') > 0 loop c := c + 1; perform pg_sleep(0.01); end loop;
+  raise log ''slot test looped % times'', c;
+end'
+;
+CREATE POLICY p3 ON document FOR UPDATE
+  USING (cid = (SELECT cid from category WHERE cname = 'novel'))
+  WITH CHECK (dauthor = current_user)
+;
+create table agg_group_2 as
+select * from
+  (values (100), (300), (500)) as r(a),
+  lateral (
+    select (g/2)::numeric as c1,
+           array_agg(g::numeric) as c2,
+	   count(*) as c3
+    from agg_data_2k
+    where g < r.a
+    group by g/2) as s
+;
+CREATE PROCEDURE dump_test.ptest1(a int)
+					   LANGUAGE SQL AS $$ INSERT INTO dump_test.test_table (col1) VALUES (a) $$
+;
+CREATE TABLE "public"."itest14" (
+    "id" integer NOT NULL
+)
+;
+ALTER TABLE ONLY "public"."test_range_excl"
+    ADD CONSTRAINT "test_range_excl_room_during_excl" EXCLUDE USING "gist" ("room" WITH =, "during" WITH &&)
+;
+------------------------------------------------------------------------------------------
+[DROP_SCHEMA] DROP SCHEMA drop_schema_test1 CASCADE
+;
+----------
+[CREATE_TYPE] -- These are for testing replacement of a shell type/operator, which works
+-- enough like an implicit OR REPLACE to be important to check.
+
+CREATE TYPE test_ext_type AS ENUM('x', 'y')
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] ALTER TABLE list_parted2 DETACH PARTITION part_5
+;
+----------
+[CREATE_TABLE] CREATE TABLE plt1_adv_p1_null PARTITION OF plt1_adv FOR VALUES IN (NULL, '0001', '0003')
+;
+----------
+[CREATE_TABLE] --
+-- crosstab()
+--
+CREATE TABLE ct(id int, rowclass text, rowid text, attribute text, val text)
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR >= (
+	LEFTARG = seg,
+	RIGHTARG = seg,
+	PROCEDURE = seg_ge,
+	COMMUTATOR = '<=',
+	NEGATOR = '<',
+	RESTRICT = scalargtsel,
+	JOIN = scalargtjoinsel
+)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.itest11
+;
+----------
+[CREATE_TABLE] --
+-- Create partitioned table that does not allow bulk insertions, to test bugs
+-- related to the reuse of BulkInsertState across partitions (only done when
+-- not using bulk insert).  Switching between partitions often makes it more
+-- likely to encounter these bugs, so we just switch on roughly every insert
+-- by having an even/odd number partition and inserting evenly distributed
+-- data.
+--
+CREATE TABLE parted_si (
+  id int not null,
+  data text not null,
+  -- prevent use of bulk insert by having a volatile function
+  rand float8 not null default random()
+)
+PARTITION BY LIST((id % 2))
+;
+----------
+[CREATE_PUB_SUB] CREATE PUBLICATION alice FOR TABLE alice.unpartitioned
+  WITH (publish_via_partition_root = true)
+;
+----------
+[ADMIN_TABLE] VACUUM (INDEX_CLEANUP FALSE, SKIP_DATABASE_STATS) pg_catalog.pg_attribute
+;
+----------
+[ADMIN_TABLE] ANALYZE (SKIP_LOCKED) pg_catalog.pg_ts_config_map
+;
+----------
+[ALTER_TABLE|ALTER_COLUMN] ALTER TABLE ONLY "public"."spgist_box_tbl" ALTER COLUMN "id" SET DEFAULT "nextval"('"public"."spgist_box_tbl_id_seq"'::"regclass")
+;
+----------
+[DROP_POLICY] DROP RULE test_rule_exists ON no_such_schema.no_such_table
+;
+----------
+[ADD_INDEX] CREATE INDEX tbl_gist_idx ON public.tbl_gist USING gist (c4) INCLUDE (c1, c3)
+;
+----------
+[CREATE_TABLE] create table p1(ff1 int)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION "public"."ks_test_uniform_random_bigint_in_range"() RETURNS boolean
+    LANGUAGE "plpgsql"
+    AS $$
+DECLARE
+  n int := 1000;        -- Number of samples
+  c float8 := 1.94947;  -- Critical value for 99.9% confidence
+  ok boolean;
+BEGIN
+  ok := (
+    WITH samples AS (
+      SELECT random(0, 999999999999) / 1000000000000.0 r FROM generate_series(1, n) ORDER BY 1
+    ), indexed_samples AS (
+      SELECT (row_number() OVER())-1.0 i, r FROM samples
+    )
+    SELECT max(abs(i/n-r)) < c / sqrt(n) FROM indexed_samples
+  );
+  RETURN ok;
+END
+$$
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION gin_extract_value_bpchar(bpchar, internal)
+RETURNS internal
+AS '$libdir/btree_gin'
+LANGUAGE C STRICT IMMUTABLE
+;
+----------
+[CREATE_TABLE] CREATE TABLE reloptions_test2(i INT) WITH (fillfactor=true)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."defpart_attach_test_2" (
+    "a" integer
+)
+;
+----------
+[CREATE_TYPE] ---
+--- CREATE_DOMAIN
+---
+CREATE DOMAIN domainvarchar VARCHAR(5)
+;
+----------
+[ALTER_TABLE] alter table extremely_skewed set (autovacuum_enabled = 'false')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION pgstatindex(IN relname text,
+    OUT version INT,
+    OUT tree_level INT,
+    OUT index_size BIGINT,
+    OUT root_block_no BIGINT,
+    OUT internal_pages BIGINT,
+    OUT leaf_pages BIGINT,
+    OUT empty_pages BIGINT,
+    OUT deleted_pages BIGINT,
+    OUT avg_leaf_density FLOAT8,
+    OUT leaf_fragmentation FLOAT8)
+AS '$libdir/pgstattuple', 'pgstatindex'
+LANGUAGE C STRICT PARALLEL SAFE
+;
+----------
+[CREATE_TABLE] create table idxpart (a int unique, b int) partition by range (a)
+;
+----------
+[TRUNCATE_TABLE] -- repeat expansive tests for index built using insertions
+TRUNCATE bttest_multi
+;
+----------
+[ALTER_TYPE] -- fails
+
+ALTER TYPE test_type ALTER ATTRIBUTE b SET DATA TYPE varchar
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_having (a int, b int, c char(8), d char)
+;
+----------
+[ADMIN_TABLE] VACUUM (INDEX_CLEANUP FALSE) pg_catalog.pg_publication_rel
+;
+----------
+[CREATE_PUB_SUB] -- fail, not enough privileges
+CREATE SUBSCRIPTION regress_testsub CONNECTION 'dbname=regress_doesnotexist' PUBLICATION testpub WITH (connect = false)
+;
+----------
+[COMMENT_INDEX] COMMENT ON INDEX ctlt1_b_key IS 'index b_key'
+;
+----------
+[CREATE_POLICY] CREATE POLICY p2 ON y2 USING (a % 3 = 0)
+;
+----------
+[CREATE_TABLE] CREATE TABLE errtst_child_reorder (
+    data int NOT NULL DEFAULT 0,
+    shdata int not null,
+    partid int not null,
+    CONSTRAINT shdata_small CHECK(shdata < 3),
+    CHECK(data < 10)
+)
+;
+----------
+[ADMIN_TABLE] ANALYZE public.prt1_l_p3_p2
+;
+----------
+[CREATE_VIEW(SELECT,METADATA)] CREATE VIEW attributes AS
+    SELECT CAST(current_database() AS sql_identifier) AS udt_catalog,
+           CAST(nc.nspname AS sql_identifier) AS udt_schema,
+           CAST(c.relname AS sql_identifier) AS udt_name,
+           CAST(a.attname AS sql_identifier) AS attribute_name,
+           CAST(a.attnum AS cardinal_number) AS ordinal_position,
+           CAST(pg_get_expr(ad.adbin, ad.adrelid) AS character_data) AS attribute_default,
+           CAST(CASE WHEN a.attnotnull OR (t.typtype = 'd' AND t.typnotnull) THEN 'NO' ELSE 'YES' END
+             AS yes_or_no)
+             AS is_nullable, -- This column was apparently removed between SQL:2003 and SQL:2008.
+
+           CAST(
+             CASE WHEN t.typelem <> 0 AND t.typlen = -1 THEN 'ARRAY'
+                  WHEN nt.nspname = 'pg_catalog' THEN format_type(a.atttypid, null)
+                  ELSE 'USER-DEFINED' END
+             AS character_data)
+             AS data_type,
+
+           CAST(
+             _pg_char_max_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_maximum_length,
+
+           CAST(
+             _pg_char_octet_length(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS character_octet_length,
+
+           CAST(null AS sql_identifier) AS character_set_catalog,
+           CAST(null AS sql_identifier) AS character_set_schema,
+           CAST(null AS sql_identifier) AS character_set_name,
+
+           CAST(CASE WHEN nco.nspname IS NOT NULL THEN current_database() END AS sql_identifier) AS collation_catalog,
+           CAST(nco.nspname AS sql_identifier) AS collation_schema,
+           CAST(co.collname AS sql_identifier) AS collation_name,
+
+           CAST(
+             _pg_numeric_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision,
+
+           CAST(
+             _pg_numeric_precision_radix(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_precision_radix,
+
+           CAST(
+             _pg_numeric_scale(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS numeric_scale,
+
+           CAST(
+             _pg_datetime_precision(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS cardinal_number)
+             AS datetime_precision,
+
+           CAST(
+             _pg_interval_type(_pg_truetypid(a, t), _pg_truetypmod(a, t))
+             AS character_data)
+             AS interval_type,
+           CAST(null AS cardinal_number) AS interval_precision,
+
+           CAST(current_database() AS sql_identifier) AS attribute_udt_catalog,
+           CAST(nt.nspname AS sql_identifier) AS attribute_udt_schema,
+           CAST(t.typname AS sql_identifier) AS attribute_udt_name,
+
+           CAST(null AS sql_identifier) AS scope_catalog,
+           CAST(null AS sql_identifier) AS scope_schema,
+           CAST(null AS sql_identifier) AS scope_name,
+
+           CAST(null AS cardinal_number) AS maximum_cardinality,
+           CAST(a.attnum AS sql_identifier) AS dtd_identifier,
+           CAST('NO' AS yes_or_no) AS is_derived_reference_attribute
+
+    FROM (pg_attribute a LEFT JOIN pg_attrdef ad ON attrelid = adrelid AND attnum = adnum)
+         JOIN (pg_class c JOIN pg_namespace nc ON (c.relnamespace = nc.oid)) ON a.attrelid = c.oid
+         JOIN (pg_type t JOIN pg_namespace nt ON (t.typnamespace = nt.oid)) ON a.atttypid = t.oid
+         LEFT JOIN (pg_collation co JOIN pg_namespace nco ON (co.collnamespace = nco.oid))
+           ON a.attcollation = co.oid AND (nco.nspname, co.collname) <> ('pg_catalog', 'default')
+
+    WHERE a.attnum > 0 AND NOT a.attisdropped
+          AND c.relkind IN ('c')
+          AND (pg_has_role(c.relowner, 'USAGE')
+               OR has_type_privilege(c.reltype, 'USAGE'))
+;
+----------
+[CREATE_POLICY] CREATE OR REPLACE RULE voo_u AS ON UPDATE TO voo DO INSTEAD
+  UPDATE foo SET f1 = new.f1, f2 = new.f2 WHERE f1 = old.f1
+  RETURNING f1, f2
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW s1.t2_view AS (
+				SELECT i*2, t FROM s1.t2
+			)
+;
+----------
+[ALTER_INDEX|ALTER_COLUMN] ALTER INDEX tbl_idx ALTER COLUMN 3 SET STATISTICS 1000
+;
+----------
+[CREATE_PROG_OBJ] CREATE OPERATOR split_maint.## (
+    FUNCTION = split_maint.add_amount,
+    LEFTARG = numeric,
+    RIGHTARG = numeric
+)
+;
+----------
+[ALTER_TABLE|ALTER_PARTITION] alter table uv_pt attach partition uv_pt1 for values from (1, 2) to (1, 10)
+;
+----------
+[CREATE_PROG_OBJ] CREATE AGGREGATE "public"."myaggp10b"(integer) (
+    SFUNC = "public"."tfp",
+    STYPE = integer[],
+    INITCOND = '{}'
+)
+;
+----------
+[ADMIN_TABLE] VACUUM (DISABLE_PAGE_SKIPPING, SKIP_DATABASE_STATS) pg_catalog.pg_foreign_server
+;
+----------
+[CREATE_TABLE] create table parted_stmt_trig (a int) partition by list (a)
+;
+----------
+[DROP_TABLE] drop table dep_priv_test
+;
+----------
+[CREATE_POLICY] /*
+ * text search configuration for danish language
+ *
+ * Copyright (c) 2007-2019, PostgreSQL Global Development Group
+ *
+ * src/backend/snowball/snowball.sql.in
+ *
+ * danish and certain other macros are replaced for each language;
+ * see the Makefile for details.
+ *
+ * Note: this file is read in single-user -j mode, which means that the
+ * command terminator is semicolon-newline-newline; whenever the backend
+ * sees that, it stops and executes what it's got.  If you write a lot of
+ * statements without empty lines between, they'll all get quoted to you
+ * in any error message about one of them, so don't do that.  Also, you
+ * cannot write a semicolon immediately followed by an empty line in a
+ * string literal (including a function body!) or a multiline comment.
+ */
+
+CREATE TEXT SEARCH DICTIONARY danish_stem
+	(TEMPLATE = snowball, Language = danish , StopWords=danish)
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE test_db_1 STRATEGY WAL_LOG TEMPLATE template1
+;
+----------
+[BLOCK] do 'declare c int = 0;
+begin
+  while (select count(*) from pg_replication_slots where active_pid = '
+    '39385'
+  ') > 0 loop c := c + 1; perform pg_sleep(0.01); end loop;
+  raise log ''slot test looped % times'', c;
+end'
+;
+----------
+[CREATE_POLICY] CREATE POLICY p3 ON document FOR UPDATE
+  USING (cid = (SELECT cid from category WHERE cname = 'novel'))
+  WITH CHECK (dauthor = current_user)
+;
+----------
+[CREATE_TABLE|SELECT] create table agg_group_2 as
+select * from
+  (values (100), (300), (500)) as r(a),
+  lateral (
+    select (g/2)::numeric as c1,
+           array_agg(g::numeric) as c2,
+	   count(*) as c3
+    from agg_data_2k
+    where g < r.a
+    group by g/2) as s
+;
+----------
+[CREATE_PROG_OBJ] CREATE PROCEDURE dump_test.ptest1(a int)
+					   LANGUAGE SQL AS $$ INSERT INTO dump_test.test_table (col1) VALUES (a) $$
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."itest14" (
+    "id" integer NOT NULL
+)
+;
+----------
+[ALTER_TABLE|ADD_CONSTRAINT] ALTER TABLE ONLY "public"."test_range_excl"
+    ADD CONSTRAINT "test_range_excl_room_during_excl" EXCLUDE USING "gist" ("room" WITH =, "during" WITH &&)
+;

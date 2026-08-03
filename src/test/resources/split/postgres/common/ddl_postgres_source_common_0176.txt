@@ -1,0 +1,654 @@
+/*
+ * 5.68
+ * TRIGGER_COLUMN_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.69
+ * TRIGGER_PERIOD_USAGE view
+ */
+
+-- feature not supported
+
+
+/*
+ * 5.70
+ * TRIGGER_ROUTINE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.71
+ * TRIGGER_SEQUENCE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.72
+ * TRIGGER_TABLE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.73
+ * TRIGGERS view
+ */
+
+CREATE VIEW triggers AS
+    SELECT CAST(current_database() AS sql_identifier) AS trigger_catalog,
+           CAST(n.nspname AS sql_identifier) AS trigger_schema,
+           CAST(t.tgname AS sql_identifier) AS trigger_name,
+           CAST(em.text AS character_data) AS event_manipulation,
+           CAST(current_database() AS sql_identifier) AS event_object_catalog,
+           CAST(n.nspname AS sql_identifier) AS event_object_schema,
+           CAST(c.relname AS sql_identifier) AS event_object_table,
+           CAST(
+             -- To determine action order, partition by schema, table,
+             -- event_manipulation (INSERT/DELETE/UPDATE), ROW/STATEMENT (1),
+             -- BEFORE/AFTER (66), then order by trigger name.  It's preferable
+             -- to partition by view output columns, so that query constraints
+             -- can be pushed down below the window function.
+             rank() OVER (PARTITION BY CAST(n.nspname AS sql_identifier),
+                                       CAST(c.relname AS sql_identifier),
+                                       em.num,
+                                       t.tgtype & 1,
+                                       t.tgtype & 66
+                                       ORDER BY t.tgname)
+             AS cardinal_number) AS action_order,
+           CAST(
+             CASE WHEN pg_has_role(c.relowner, 'USAGE')
+               THEN (regexp_match(pg_get_triggerdef(t.oid), E'.{35,} WHEN \\((.+)\\) EXECUTE FUNCTION'))[1]
+               ELSE null END
+             AS character_data) AS action_condition,
+           CAST(
+             substring(pg_get_triggerdef(t.oid) from
+                       position('EXECUTE FUNCTION' in substring(pg_get_triggerdef(t.oid) from 48)) + 47)
+             AS character_data) AS action_statement,
+           CAST(
+             -- hard-wired reference to TRIGGER_TYPE_ROW
+             CASE t.tgtype & 1 WHEN 1 THEN 'ROW' ELSE 'STATEMENT' END
+             AS character_data) AS action_orientation,
+           CAST(
+             -- hard-wired refs to TRIGGER_TYPE_BEFORE, TRIGGER_TYPE_INSTEAD
+             CASE t.tgtype & 66 WHEN 2 THEN 'BEFORE' WHEN 64 THEN 'INSTEAD OF' ELSE 'AFTER' END
+             AS character_data) AS action_timing,
+           CAST(tgoldtable AS sql_identifier) AS action_reference_old_table,
+           CAST(tgnewtable AS sql_identifier) AS action_reference_new_table,
+           CAST(null AS sql_identifier) AS action_reference_old_row,
+           CAST(null AS sql_identifier) AS action_reference_new_row,
+           CAST(null AS time_stamp) AS created
+
+    FROM pg_namespace n, pg_class c, pg_trigger t,
+         -- hard-wired refs to TRIGGER_TYPE_INSERT, TRIGGER_TYPE_DELETE,
+         -- TRIGGER_TYPE_UPDATE; we intentionally omit TRIGGER_TYPE_TRUNCATE
+         (VALUES (4, 'INSERT'),
+                 (8, 'DELETE'),
+                 (16, 'UPDATE')) AS em (num, text)
+
+    WHERE n.oid = c.relnamespace
+          AND c.oid = t.tgrelid
+          AND t.tgtype & em.num <> 0
+          AND NOT t.tgisinternal
+          AND (NOT pg_is_other_temp_schema(n.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'INSERT, UPDATE, REFERENCES') )
+;
+-- OK with equals and &&, and equals is the partition key
+create table idxpart (a int4range, b int4range) partition by range (a)
+;
+CREATE VIEW street AS
+   SELECT r.name, r.thepath, c.cname AS cname
+   FROM ONLY road r, real_city c
+   WHERE c.outline ## r.thepath
+;
+ALTER OPERATOR FAMILY gist_int8_ops USING gist ADD
+	FUNCTION	11  (int8, int8) gbt_int8_sortsupport (internal)
+;
+alter index parted_conflict_a_idx attach partition parted_conflict_1_a_idx
+;
+CREATE TABLE s2.t2(id integer)
+;
+CREATE TABLE "public"."line_tbl" (
+    "s" "line"
+)
+;
+DROP SCHEMA test_ext CASCADE
+;
+CREATE CONVERSION alt_conv1 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8
+;
+create type rngfunc_type as (f1 numeric(35,6), f2 numeric(35,2))
+;
+alter operator family integer_ops using hash add
+  operator 1 = (int8, int8alias1)
+;
+CREATE TABLE "public"."alpha_pos" (
+    "a" double precision,
+    "b" integer,
+    "c" "text"
+)
+PARTITION BY LIST ("c")
+;
+CALL transaction_test9()
+;
+CREATE SCHEMA pgss_schema_2
+;
+CREATE DATABASE regression_src
+;
+CREATE FUNCTION test_bloomfilter(power integer,
+    nelements bigint,
+    seed integer DEFAULT -1,
+    tests integer DEFAULT 1)
+RETURNS pg_catalog.void STRICT
+AS 'MODULE_PATHNAME' LANGUAGE C
+;
+CREATE TABLE gtestm (
+  a int PRIMARY KEY,
+  b int GENERATED ALWAYS AS (a * 2) STORED
+)
+;
+CREATE INDEX "gin_test_idx" ON "public"."gin_test_tbl" USING "gin" ("i") WITH ("gin_pending_list_limit"='4096', "fastupdate"='off')
+;
+CREATE TABLE test_replica_identity5 (a int not null, b int, c int,
+	PRIMARY KEY (b, c))
+;
+CREATE SUBSCRIPTION tap_sub_A_B
+	CONNECTION 'port=31667 host=/tmp/EP7K8mZqpu dbname=postgres application_name=tap_sub_A_B'
+	PUBLICATION tap_pub_B
+	WITH (origin = none, copy_data = off)
+;
+--    N    P        P    N
+-- should ERROR: tf1p(int[],anyelement) not matched by tf1p(anyarray,int)
+CREATE AGGREGATE myaggp11a(BASETYPE = anyelement, SFUNC = tf1p, STYPE = int[],
+  FINALFUNC = ffp, INITCOND = '{}')
+;
+CREATE FUNCTION myvarcharsend(myvarchar) RETURNS bytea
+LANGUAGE internal STABLE PARALLEL SAFE STRICT AS 'varcharsend'
+;
+analyze stts_t1
+;
+CREATE TABLE "public"."notnull_part1_3_upg" (
+    "a" integer,
+    "b" integer
+)
+;
+CREATE FUNCTION isngt(upc, ean13)
+	RETURNS boolean
+	AS 'int8gt'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+ALTER TEXT SEARCH CONFIGURATION "public"."synonym_tst"
+    ADD MAPPING FOR "host" WITH "simple"
+;
+create or replace function rls_f() returns setof rls_t
+  stable language sql
+  as $$ select * from (select * from rls_t) _ $$
+;
+CREATE FUNCTION isnge(issn13, ean13)
+	RETURNS boolean
+	AS 'int8ge'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+ALTER TABLE pg_toast.pg_toast_28283 RENAME TO reind_con_toast
+;
+ANALYZE agg_sort_order
+;
+CREATE TABLE "public"."time_tbl" (
+    "f1" time(2) without time zone
+)
+;
+-- ************************************************************
+-- * BEFORE INSERT or UPDATE on IFace
+-- *	- set the slotname to IF.sysname.ifname
+-- ************************************************************
+create function tg_iface_biu() returns trigger as $$
+declare
+    sname	text;
+    sysrec	record;
+begin
+    select into sysrec * from system where name = new.sysname;
+    if not found then
+        raise exception $q$system "%" does not exist$q$, new.sysname;
+    end if;
+    sname := 'IF.' || new.sysname;
+    sname := sname || '.';
+    sname := sname || new.ifname;
+    if length(sname) > 20 then
+        raise exception 'IFace slotname "%" too long (20 char max)', sname;
+    end if;
+    new.slotname := sname;
+    return new;
+end;
+$$ language plpgsql
+;
+CREATE FUNCTION int44out(city_budget)
+   RETURNS cstring
+   AS '/src/src/test/regress/regress.so'
+   LANGUAGE C STRICT IMMUTABLE
+;
+-- Check that typmod imposed by a composite type is honored
+create type rngfunc_type as (f1 numeric(35,6), f2 numeric(35,2))
+;
+VACUUM (PARALLEL 2) pg_catalog.pg_db_role_setting
+;
+ALTER TABLE pg_temp_11.pg_temp_41070_2 ADD COLUMN newdata pg_temp_11.pg_temp_41070
+;
+ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk
+;
+DROP TABLE ctas_nodata_4
+;
+create type xy_tuple AS (x int, y int)
+;
+--
+-- For backwards compatibility, define a function named lo_oid.
+--
+-- The other functions that formerly existed are not needed because
+-- the implicit casts between a domain and its underlying type handle them.
+--
+CREATE FUNCTION lo_oid(lo) RETURNS pg_catalog.oid AS
+'SELECT $1::pg_catalog.oid' LANGUAGE SQL STRICT IMMUTABLE PARALLEL SAFE
+;
+create or replace function pleast(numeric)
+returns numeric as $$
+begin
+  raise notice 'non-variadic function called';
+  return $1;
+end;
+$$ language plpgsql immutable strict
+;
+-- Partitions of this partitioned table inherit default AM at creation
+-- time.
+CREATE TABLE am_partitioned_5p1 PARTITION OF am_partitioned_5p
+  FOR VALUES WITH (MODULUS 10, REMAINDER 1)
+;
+VACUUM (ANALYZE) pg_catalog.pg_seclabel
+;
+create function compresult(int8) returns two_int8s language plpgsql as
+$$ declare r record; begin r := row($1,$1); return r; end $$
+;
+-- test user-defined window function with named args and default args
+CREATE FUNCTION nth_value_def(val anyelement, n integer = 1) RETURNS anyelement
+  LANGUAGE internal WINDOW IMMUTABLE STRICT AS 'window_nth_value'
+;
+CREATE VIEW "public"."rtest_vview1" AS
+ SELECT "x"."a",
+    "x"."b"
+   FROM "public"."rtest_view1" "x"
+  WHERE (0 < ( SELECT "count"(*) AS "count"
+           FROM "public"."rtest_view2" "y"
+          WHERE ("y"."a" = "x"."a")))
+;
+ANALYZE public.hub
+;
+ALTER EXTENSION hstore_plperl DROP TRANSFORM FOR hstore LANGUAGE plperl
+;
+CREATE TABLE plt1_adv_p1 PARTITION OF plt1_adv FOR VALUES IN ('0001')
+;
+CALL test_proc1()
+;
+------------------------------------------------------------------------------------------
+[CREATE_VIEW(SELECT,METADATA)] /*
+ * 5.68
+ * TRIGGER_COLUMN_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.69
+ * TRIGGER_PERIOD_USAGE view
+ */
+
+-- feature not supported
+
+
+/*
+ * 5.70
+ * TRIGGER_ROUTINE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.71
+ * TRIGGER_SEQUENCE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.72
+ * TRIGGER_TABLE_USAGE view
+ */
+
+-- not tracked by PostgreSQL
+
+
+/*
+ * 5.73
+ * TRIGGERS view
+ */
+
+CREATE VIEW triggers AS
+    SELECT CAST(current_database() AS sql_identifier) AS trigger_catalog,
+           CAST(n.nspname AS sql_identifier) AS trigger_schema,
+           CAST(t.tgname AS sql_identifier) AS trigger_name,
+           CAST(em.text AS character_data) AS event_manipulation,
+           CAST(current_database() AS sql_identifier) AS event_object_catalog,
+           CAST(n.nspname AS sql_identifier) AS event_object_schema,
+           CAST(c.relname AS sql_identifier) AS event_object_table,
+           CAST(
+             -- To determine action order, partition by schema, table,
+             -- event_manipulation (INSERT/DELETE/UPDATE), ROW/STATEMENT (1),
+             -- BEFORE/AFTER (66), then order by trigger name.  It's preferable
+             -- to partition by view output columns, so that query constraints
+             -- can be pushed down below the window function.
+             rank() OVER (PARTITION BY CAST(n.nspname AS sql_identifier),
+                                       CAST(c.relname AS sql_identifier),
+                                       em.num,
+                                       t.tgtype & 1,
+                                       t.tgtype & 66
+                                       ORDER BY t.tgname)
+             AS cardinal_number) AS action_order,
+           CAST(
+             CASE WHEN pg_has_role(c.relowner, 'USAGE')
+               THEN (regexp_match(pg_get_triggerdef(t.oid), E'.{35,} WHEN \\((.+)\\) EXECUTE FUNCTION'))[1]
+               ELSE null END
+             AS character_data) AS action_condition,
+           CAST(
+             substring(pg_get_triggerdef(t.oid) from
+                       position('EXECUTE FUNCTION' in substring(pg_get_triggerdef(t.oid) from 48)) + 47)
+             AS character_data) AS action_statement,
+           CAST(
+             -- hard-wired reference to TRIGGER_TYPE_ROW
+             CASE t.tgtype & 1 WHEN 1 THEN 'ROW' ELSE 'STATEMENT' END
+             AS character_data) AS action_orientation,
+           CAST(
+             -- hard-wired refs to TRIGGER_TYPE_BEFORE, TRIGGER_TYPE_INSTEAD
+             CASE t.tgtype & 66 WHEN 2 THEN 'BEFORE' WHEN 64 THEN 'INSTEAD OF' ELSE 'AFTER' END
+             AS character_data) AS action_timing,
+           CAST(tgoldtable AS sql_identifier) AS action_reference_old_table,
+           CAST(tgnewtable AS sql_identifier) AS action_reference_new_table,
+           CAST(null AS sql_identifier) AS action_reference_old_row,
+           CAST(null AS sql_identifier) AS action_reference_new_row,
+           CAST(null AS time_stamp) AS created
+
+    FROM pg_namespace n, pg_class c, pg_trigger t,
+         -- hard-wired refs to TRIGGER_TYPE_INSERT, TRIGGER_TYPE_DELETE,
+         -- TRIGGER_TYPE_UPDATE; we intentionally omit TRIGGER_TYPE_TRUNCATE
+         (VALUES (4, 'INSERT'),
+                 (8, 'DELETE'),
+                 (16, 'UPDATE')) AS em (num, text)
+
+    WHERE n.oid = c.relnamespace
+          AND c.oid = t.tgrelid
+          AND t.tgtype & em.num <> 0
+          AND NOT t.tgisinternal
+          AND (NOT pg_is_other_temp_schema(n.oid))
+          AND (pg_has_role(c.relowner, 'USAGE')
+               -- SELECT privilege omitted, per SQL standard
+               OR has_table_privilege(c.oid, 'INSERT, UPDATE, DELETE, TRUNCATE, REFERENCES, TRIGGER')
+               OR has_any_column_privilege(c.oid, 'INSERT, UPDATE, REFERENCES') )
+;
+----------
+[CREATE_TABLE] -- OK with equals and &&, and equals is the partition key
+create table idxpart (a int4range, b int4range) partition by range (a)
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW street AS
+   SELECT r.name, r.thepath, c.cname AS cname
+   FROM ONLY road r, real_city c
+   WHERE c.outline ## r.thepath
+;
+----------
+[ALTER_PROG_OBJ] ALTER OPERATOR FAMILY gist_int8_ops USING gist ADD
+	FUNCTION	11  (int8, int8) gbt_int8_sortsupport (internal)
+;
+----------
+[ALTER_INDEX] alter index parted_conflict_a_idx attach partition parted_conflict_1_a_idx
+;
+----------
+[CREATE_TABLE] CREATE TABLE s2.t2(id integer)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."line_tbl" (
+    "s" "line"
+)
+;
+----------
+[DROP_SCHEMA] DROP SCHEMA test_ext CASCADE
+;
+----------
+[CREATE_POLICY] CREATE CONVERSION alt_conv1 FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8
+;
+----------
+[CREATE_TYPE] create type rngfunc_type as (f1 numeric(35,6), f2 numeric(35,2))
+;
+----------
+[ALTER_PROG_OBJ] alter operator family integer_ops using hash add
+  operator 1 = (int8, int8alias1)
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."alpha_pos" (
+    "a" double precision,
+    "b" integer,
+    "c" "text"
+)
+PARTITION BY LIST ("c")
+;
+----------
+[CALL_PROG_OBJ] CALL transaction_test9()
+;
+----------
+[CREATE_SCHEMA] CREATE SCHEMA pgss_schema_2
+;
+----------
+[CREATE_CATALOG] CREATE DATABASE regression_src
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION test_bloomfilter(power integer,
+    nelements bigint,
+    seed integer DEFAULT -1,
+    tests integer DEFAULT 1)
+RETURNS pg_catalog.void STRICT
+AS 'MODULE_PATHNAME' LANGUAGE C
+;
+----------
+[CREATE_TABLE] CREATE TABLE gtestm (
+  a int PRIMARY KEY,
+  b int GENERATED ALWAYS AS (a * 2) STORED
+)
+;
+----------
+[ADD_INDEX] CREATE INDEX "gin_test_idx" ON "public"."gin_test_tbl" USING "gin" ("i") WITH ("gin_pending_list_limit"='4096', "fastupdate"='off')
+;
+----------
+[CREATE_TABLE] CREATE TABLE test_replica_identity5 (a int not null, b int, c int,
+	PRIMARY KEY (b, c))
+;
+----------
+[CREATE_PUB_SUB] CREATE SUBSCRIPTION tap_sub_A_B
+	CONNECTION 'port=31667 host=/tmp/EP7K8mZqpu dbname=postgres application_name=tap_sub_A_B'
+	PUBLICATION tap_pub_B
+	WITH (origin = none, copy_data = off)
+;
+----------
+[CREATE_PROG_OBJ] --    N    P        P    N
+-- should ERROR: tf1p(int[],anyelement) not matched by tf1p(anyarray,int)
+CREATE AGGREGATE myaggp11a(BASETYPE = anyelement, SFUNC = tf1p, STYPE = int[],
+  FINALFUNC = ffp, INITCOND = '{}')
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION myvarcharsend(myvarchar) RETURNS bytea
+LANGUAGE internal STABLE PARALLEL SAFE STRICT AS 'varcharsend'
+;
+----------
+[ADMIN_TABLE] analyze stts_t1
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."notnull_part1_3_upg" (
+    "a" integer,
+    "b" integer
+)
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isngt(upc, ean13)
+	RETURNS boolean
+	AS 'int8gt'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[ALTER_POLICY] ALTER TEXT SEARCH CONFIGURATION "public"."synonym_tst"
+    ADD MAPPING FOR "host" WITH "simple"
+;
+----------
+[CREATE_PROG_OBJ] create or replace function rls_f() returns setof rls_t
+  stable language sql
+  as $$ select * from (select * from rls_t) _ $$
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION isnge(issn13, ean13)
+	RETURNS boolean
+	AS 'int8ge'
+	LANGUAGE 'internal'
+	IMMUTABLE STRICT
+	PARALLEL SAFE
+;
+----------
+[RENAME_TABLE] ALTER TABLE pg_toast.pg_toast_28283 RENAME TO reind_con_toast
+;
+----------
+[ADMIN_TABLE] ANALYZE agg_sort_order
+;
+----------
+[CREATE_TABLE] CREATE TABLE "public"."time_tbl" (
+    "f1" time(2) without time zone
+)
+;
+----------
+[CREATE_PROG_OBJ] -- ************************************************************
+-- * BEFORE INSERT or UPDATE on IFace
+-- *	- set the slotname to IF.sysname.ifname
+-- ************************************************************
+create function tg_iface_biu() returns trigger as $$
+declare
+    sname	text;
+    sysrec	record;
+begin
+    select into sysrec * from system where name = new.sysname;
+    if not found then
+        raise exception $q$system "%" does not exist$q$, new.sysname;
+    end if;
+    sname := 'IF.' || new.sysname;
+    sname := sname || '.';
+    sname := sname || new.ifname;
+    if length(sname) > 20 then
+        raise exception 'IFace slotname "%" too long (20 char max)', sname;
+    end if;
+    new.slotname := sname;
+    return new;
+end;
+$$ language plpgsql
+;
+----------
+[CREATE_PROG_OBJ] CREATE FUNCTION int44out(city_budget)
+   RETURNS cstring
+   AS '/src/src/test/regress/regress.so'
+   LANGUAGE C STRICT IMMUTABLE
+;
+----------
+[CREATE_TYPE] -- Check that typmod imposed by a composite type is honored
+create type rngfunc_type as (f1 numeric(35,6), f2 numeric(35,2))
+;
+----------
+[ADMIN_TABLE] VACUUM (PARALLEL 2) pg_catalog.pg_db_role_setting
+;
+----------
+[ALTER_TABLE|ADD_COLUMN] ALTER TABLE pg_temp_11.pg_temp_41070_2 ADD COLUMN newdata pg_temp_11.pg_temp_41070
+;
+----------
+[ALTER_PUB_SUB] ALTER PUBLICATION testpub6 SET TABLE rf_tbl_abcd_part_pk
+;
+----------
+[DROP_TABLE] DROP TABLE ctas_nodata_4
+;
+----------
+[CREATE_TYPE] create type xy_tuple AS (x int, y int)
+;
+----------
+[CREATE_PROG_OBJ] --
+-- For backwards compatibility, define a function named lo_oid.
+--
+-- The other functions that formerly existed are not needed because
+-- the implicit casts between a domain and its underlying type handle them.
+--
+CREATE FUNCTION lo_oid(lo) RETURNS pg_catalog.oid AS
+'SELECT $1::pg_catalog.oid' LANGUAGE SQL STRICT IMMUTABLE PARALLEL SAFE
+;
+----------
+[CREATE_PROG_OBJ] create or replace function pleast(numeric)
+returns numeric as $$
+begin
+  raise notice 'non-variadic function called';
+  return $1;
+end;
+$$ language plpgsql immutable strict
+;
+----------
+[CREATE_TABLE] -- Partitions of this partitioned table inherit default AM at creation
+-- time.
+CREATE TABLE am_partitioned_5p1 PARTITION OF am_partitioned_5p
+  FOR VALUES WITH (MODULUS 10, REMAINDER 1)
+;
+----------
+[ADMIN_TABLE] VACUUM (ANALYZE) pg_catalog.pg_seclabel
+;
+----------
+[CREATE_PROG_OBJ] create function compresult(int8) returns two_int8s language plpgsql as
+$$ declare r record; begin r := row($1,$1); return r; end $$
+;
+----------
+[CREATE_PROG_OBJ] -- test user-defined window function with named args and default args
+CREATE FUNCTION nth_value_def(val anyelement, n integer = 1) RETURNS anyelement
+  LANGUAGE internal WINDOW IMMUTABLE STRICT AS 'window_nth_value'
+;
+----------
+[CREATE_VIEW(SELECT)] CREATE VIEW "public"."rtest_vview1" AS
+ SELECT "x"."a",
+    "x"."b"
+   FROM "public"."rtest_view1" "x"
+  WHERE (0 < ( SELECT "count"(*) AS "count"
+           FROM "public"."rtest_view2" "y"
+          WHERE ("y"."a" = "x"."a")))
+;
+----------
+[ADMIN_TABLE] ANALYZE public.hub
+;
+----------
+[ALTER_LIBRARY] ALTER EXTENSION hstore_plperl DROP TRANSFORM FOR hstore LANGUAGE plperl
+;
+----------
+[CREATE_TABLE] CREATE TABLE plt1_adv_p1 PARTITION OF plt1_adv FOR VALUES IN ('0001')
+;
+----------
+[CALL_PROG_OBJ] CALL test_proc1()
+;
