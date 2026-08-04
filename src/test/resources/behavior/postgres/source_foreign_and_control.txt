@@ -1,0 +1,232 @@
+[create_fdw_handler]
+sql:
+CREATE FOREIGN DATA WRAPPER test_fdw HANDLER test_fdw_handler
+levels:
+/test/1/catalog1/schema1
+expect:
+{"SYSTEM_SETTING_WRITE": [
+  {"subject": {"value":"ForeignDataWrapper(1:28~1:36) /test/1/catalog1/test_fdw/","catalog":"catalog1","schema":null,"objectName":"test_fdw"}, "action":"CREATE", "target":"Function(1:45~1:61) /test/1/catalog1/schema1/test_fdw_handler/"},
+  {"subject":"ForeignDataWrapper(1:28~1:36) /test/1/catalog1/test_fdw/", "action":"UNSAFE"}
+]}
+----------
+[create_foreign_server]
+sql:
+CREATE SERVER loopback_nopw FOREIGN DATA WRAPPER postgres_fdw
+levels:
+/test/1/catalog1/schema1
+expect:
+{"SYSTEM_SETTING_WRITE": [
+  {"subject": {"value":"ForeignServer(1:14~1:27) /test/1/catalog1/loopback_nopw/","catalog":"catalog1","schema":null,"objectName":"loopback_nopw"}, "action":"CREATE", "target":"ForeignDataWrapper(1:49~1:61) /test/1/catalog1/postgres_fdw/"}
+]}
+----------
+[alter_foreign_server]
+sql:
+ALTER SERVER split_dummy_server VERSION '1.1' OPTIONS (SET host '127.0.0.1', ADD port '5432')
+levels:
+/test/1/catalog1/schema1
+expect:
+{"SYSTEM_SETTING_WRITE": [
+  {"subject":"ForeignServer(1:13~1:31) /test/1/catalog1/split_dummy_server/", "action":"ALTER"}
+]}
+----------
+[create_foreign_table]
+sql:
+CREATE FOREIGN TABLE tbl () SERVER file_server OPTIONS (format 'xml')
+levels:
+/test/1/catalog1/schema1
+expect:
+{"CREATE_TABLE": [
+  {"subject":"Table(1:21~1:24) /test/1/catalog1/schema1/tbl/", "action":"CREATE", "target":"ForeignServer(1:35~1:46) /test/1/catalog1/file_server/"}
+]}
+----------
+[import_foreign_schema]
+sql:
+IMPORT FOREIGN SCHEMA s1 FROM SERVER s9 INTO public
+levels:
+/test/1/catalog1/schema1
+expect:
+{"CREATE_TABLE": [
+  {"subject":"Schema(1:45~1:51) /test/1/catalog1/public/", "action":"IMPORT", "target":["ForeignSchema(1:22~1:24) /test/1/catalog1/s1/","ForeignServer(1:37~1:39) /test/1/catalog1/s9/"]}
+]}
+----------
+[create_user_mapping]
+sql:
+CREATE USER MAPPING FOR current_user SERVER s7
+levels:
+/test/1/catalog1/schema1
+expect:
+{"GRANT": [
+  {"subject": {"value":"UserMapping(1:24~1:36) /test/1/catalog1/current_user@s7/","catalog":"catalog1","schema":null,"objectName":"current_user@s7"}, "action":"CREATE", "target":["User(1:24~1:36) /test/1/current_user/","ForeignServer(1:44~1:46) /test/1/catalog1/s7/"]}
+]}
+----------
+[alter_user_mapping]
+sql:
+ALTER USER MAPPING FOR public SERVER fdtest OPTIONS (SET user 'alice')
+levels:
+/test/1/catalog1/schema1
+expect:
+{"GRANT": [
+  {"subject":"UserMapping(1:23~1:29) /test/1/catalog1/public@fdtest/", "action":"ALTER", "target":["User(1:23~1:29) /test/1/public/","ForeignServer(1:37~1:43) /test/1/catalog1/fdtest/"]}
+]}
+----------
+[drop_user_mapping]
+sql:
+DROP USER MAPPING FOR regress_testrolx SERVER sv9
+levels:
+/test/1/catalog1/schema1
+expect:
+{"REVOKE": [
+  {"subject":"UserMapping(1:22~1:38) /test/1/catalog1/regress_testrolx@sv9/", "action":"DROP", "target":["User(1:22~1:38) /test/1/regress_testrolx/","ForeignServer(1:46~1:49) /test/1/catalog1/sv9/"]}
+]}
+----------
+[create_rule]
+sql:
+create rule qqq as on update to copydml_test do also delete from copydml_test
+levels:
+/test/1/catalog1/schema1
+expect:
+{"CREATE_POLICY": [
+  {"subject": {"value":"Rule(1:12~1:15) /test/1/catalog1/schema1/qqq/","catalog":"catalog1","schema":"schema1","objectName":"qqq"}, "action":"CREATE", "target":["Table(1:32~1:44) /test/1/catalog1/schema1/copydml_test/","Table(1:65~1:77) /test/1/catalog1/schema1/copydml_test/"]},
+  {"subject":"Rule(1:12~1:15) /test/1/catalog1/schema1/qqq/", "action":"UNSAFE"}
+]}
+----------
+[declare_cursor]
+sql:
+DECLARE split_cursor_dirs SCROLL CURSOR WITHOUT HOLD FOR SELECT id, note FROM split_cursor_next.items ORDER BY id
+levels:
+/test/1/catalog1/schema1
+expect:
+{"SELECT": [
+  {"subject": {"value":"Cursor(1:8~1:25) /test/1/catalog1/split_cursor_dirs/","catalog":"catalog1","schema":null,"objectName":"split_cursor_dirs"}, "action":"CREATE", "target":"Table(1:78~1:101) /test/1/catalog1/split_cursor_next/items/"}
+]}
+----------
+[fetch_cursor]
+sql:
+FETCH NEXT FROM split_cursor_dirs
+levels:
+/test/1/catalog1/schema1
+expect:
+{"SELECT": [
+  {"subject":"Cursor(1:16~1:33) /test/1/catalog1/split_cursor_dirs/", "action":"READ"}
+]}
+----------
+[move_cursor]
+sql:
+MOVE FORWARD 2 FROM split_cursor_dirs
+levels:
+/test/1/catalog1/schema1
+expect:
+{"SELECT": [
+  {"subject":"Cursor(1:20~1:37) /test/1/catalog1/split_cursor_dirs/", "action":"MOVE"}
+]}
+----------
+[close_cursor]
+sql:
+CLOSE cursor_stats_2
+levels:
+/test/1/catalog1/schema1
+expect:
+{"SELECT": [
+  {"subject":"Cursor(1:6~1:20) /test/1/catalog1/cursor_stats_2/", "action":"DROP"}
+]}
+----------
+[create_access_method]
+sql:
+CREATE ACCESS METHOD split_btree_probe TYPE INDEX HANDLER bthandler
+levels:
+/test/1/catalog1/schema1
+expect:
+{"SYSTEM_SETTING_WRITE": [
+  {"subject": {"value":"AccessMethod(1:21~1:38) /test/1/catalog1/split_btree_probe/","catalog":"catalog1","schema":null,"objectName":"split_btree_probe"}, "action":"CREATE", "target":"Function(1:58~1:67) /test/1/catalog1/schema1/bthandler/"},
+  {"subject":"AccessMethod(1:21~1:38) /test/1/catalog1/split_btree_probe/", "action":"UNSAFE"}
+]}
+----------
+[create_conversion]
+sql:
+CREATE CONVERSION myconv FOR 'LATIN1' TO 'UTF8' FROM iso8859_1_to_utf8
+levels:
+/test/1/catalog1/schema1
+expect:
+{"CREATE_POLICY": [
+  {"subject": {"value":"Conversion(1:18~1:24) /test/1/catalog1/schema1/myconv/","catalog":"catalog1","schema":"schema1","objectName":"myconv"}, "action":"CREATE", "target":"Function(1:53~1:70) /test/1/catalog1/schema1/iso8859_1_to_utf8/"}
+]}
+----------
+[create_cast]
+sql:
+CREATE CAST (timestamptz AS interval) WITH FUNCTION age(timestamptz) AS ASSIGNMENT
+levels:
+/test/1/catalog1/schema1
+expect:
+{"CREATE_PROG_OBJ": [
+  {"subject": {"value":"Cast(1:0~1:82) /test/1/catalog1/schema1/timestamptz->interval/","catalog":"catalog1","schema":"schema1","objectName":"timestamptz->interval"}, "action":"CREATE", "target":["Type(1:13~1:24) /test/1/catalog1/schema1/timestamptz/","Type(1:28~1:36) /test/1/catalog1/schema1/interval/","Function(1:52~1:55) /test/1/catalog1/schema1/age/"]}
+]}
+----------
+[drop_cast]
+sql:
+DROP CAST (text AS text)
+levels:
+/test/1/catalog1/schema1
+expect:
+{"DROP_PROG_OBJ": [
+  {"subject":"Cast(1:0~1:24) /test/1/catalog1/schema1/text->text/", "action":"DROP"}
+]}
+----------
+[savepoint]
+sql:
+SAVEPOINT rescue_me
+levels:
+/test/1/catalog1/schema1
+expect:
+{"TRANSACTION": [
+  {"subject": {"value":"Savepoint(1:10~1:19) /test/1/catalog1/rescue_me/","catalog":"catalog1","schema":null,"objectName":"rescue_me"}, "action":"CREATE"}
+]}
+----------
+[rollback_savepoint]
+sql:
+ROLLBACK TO SAVEPOINT rescue_me
+levels:
+/test/1/catalog1/schema1
+expect:
+{"TRANSACTION": [
+  {"subject":"Savepoint(1:22~1:31) /test/1/catalog1/rescue_me/", "action":"RESET"}
+]}
+----------
+[prepare_transaction]
+sql:
+PREPARE TRANSACTION 'test_prepared#3'
+levels:
+/test/1/catalog1/schema1
+expect:
+{"TRANSACTION": [
+  {"subject": {"value":"Transaction(1:20~1:37) /test/1/catalog1/test_prepared#3/","catalog":"catalog1","schema":null,"objectName":"test_prepared#3"}, "action":"CREATE"}
+]}
+----------
+[commit_prepared]
+sql:
+COMMIT PREPARED 'test'
+levels:
+/test/1/catalog1/schema1
+expect:
+{"TRANSACTION": [
+  {"subject":"Transaction(1:16~1:22) /test/1/catalog1/test/", "action":"STOP"}
+]}
+----------
+[explain_without_execution]
+sql:
+EXPLAIN (VERBOSE, COSTS OFF) SELECT * FROM int8_tbl
+levels:
+/test/1/catalog1/schema1
+expect:
+{"PERFORMANCE": [
+  {"subject":"Query(1:0~1:51) /test/1/catalog1/", "action":"ANALYZE", "target":"Table(1:43~1:51) /test/1/catalog1/schema1/int8_tbl/"}
+]}
+----------
+[explain_analyze_update]
+sql:
+EXPLAIN (ANALYZE, COSTS OFF) UPDATE copydml_test SET f1 = f1 + 1
+levels:
+/test/1/catalog1/schema1
+expect:
+{"UPDATE": [
+  {"subject":"Table(1:36~1:48) /test/1/catalog1/schema1/copydml_test/", "action":"UPDATE"}
+]}

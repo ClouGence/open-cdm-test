@@ -1,0 +1,474 @@
+[function_and_table_read]
+sql:
+SELECT sum(id), public.f_score(id) FROM src
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SELECT": [
+    {
+      "subject": "Function(1:7~1:10) /test/1/catalog1/schema1/sum/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Function(1:16~1:30) /test/1/catalog1/public/f_score/",
+      "action" : "CALL"
+    },
+    {
+      "subject": "Table(1:40~1:43) /test/1/catalog1/schema1/src/",
+      "action" : "READ"
+    }
+  ]
+}
+----------
+[show_config]
+sql:
+SHOW work_mem
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_VARIABLE_RW": [
+    {
+      "subject": "ConfigKey(1:5~1:13) /test/1/work_mem/",
+      "action" : "READ"
+    }
+  ]
+}
+----------
+[set_config]
+sql:
+SET work_mem TO '64MB'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:4~1:12) /test/1/work_mem/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+----------
+[reset_config]
+sql:
+RESET work_mem
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SESSION_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:6~1:14) /test/1/work_mem/",
+      "action" : "RESET"
+    }
+  ]
+}
+----------
+[create_user]
+sql:
+CREATE USER alice
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_USER": [
+    {
+      "subject": "User(1:12~1:17) /test/1/alice/",
+      "action" : "CREATE"
+    }
+  ]
+}
+----------
+[create_role]
+sql:
+CREATE ROLE app_reader
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_ROLE": [
+    {
+      "subject": "Role(1:12~1:22) /test/1/app_reader/",
+      "action" : "CREATE"
+    }
+  ]
+}
+----------
+[drop_user]
+sql:
+DROP USER alice, bob
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "DROP_USER": [
+    {
+      "subject": "User(1:10~1:15) /test/1/alice/",
+      "action" : "DROP"
+    },
+    {
+      "subject": "User(1:17~1:20) /test/1/bob/",
+      "action" : "DROP"
+    }
+  ]
+}
+----------
+[create_tablespace]
+sql:
+CREATE TABLESPACE fastspace OWNER alice LOCATION '/srv/pg/fastspace'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TABLESPACE": [
+    {
+      "subject": "Tablespace(1:18~1:27) /test/1/fastspace/",
+      "action" : "CREATE",
+      "target" : [
+        "UserOrRole(1:34~1:39) /test/1/alice/",
+        "File(1:49~1:68) /test/1/srv/pg/fastspace/"
+      ]
+    }
+  ]
+}
+----------
+[copy_from_file]
+sql:
+COPY dst FROM '/tmp/input.csv' WITH (FORMAT csv)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "DATA_IMPORT": [
+    {
+      "subject": {
+        "value"     : "Table(1:5~1:8) /test/1/catalog1/schema1/dst/",
+        "catalog"   : "catalog1",
+        "schema"    : "schema1",
+        "objectName": "dst"
+      },
+      "action" : "IMPORT",
+      "target" : {
+        "value"     : "File(1:14~1:30) /test/1/tmp/input.csv/",
+        "catalog"   : null,
+        "schema"    : null,
+        "objectName": "tmp/input.csv"
+      }
+    }
+  ]
+}
+----------
+[copy_query_to_file]
+sql:
+COPY (SELECT * FROM src) TO '/tmp/output.csv' WITH (FORMAT csv)
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "DATA_EXPORT": [
+    {
+      "subject": "File(1:28~1:45) /test/1/tmp/output.csv/",
+      "action" : "EXPORT",
+      "target" : "Table(1:20~1:23) /test/1/catalog1/schema1/src/"
+    }
+  ]
+}
+----------
+[copy_program_is_unsafe]
+sql:
+COPY dst FROM PROGRAM 'cat /tmp/input.csv'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "DATA_IMPORT": [
+    {
+      "subject": "Table(1:5~1:8) /test/1/catalog1/schema1/dst/",
+      "action" : "IMPORT",
+      "target" : "ProgramObject(1:22~1:42) /test/1/cat /tmp/input.csv/"
+    },
+    {
+      "subject": "ProgramObject(1:22~1:42) /test/1/cat /tmp/input.csv/",
+      "action" : "UNSAFE"
+    }
+  ]
+}
+----------
+[comment_table]
+sql:
+COMMENT ON TABLE datatype_table IS 'This table should contain all native datatypes'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "COMMENT_TABLE": [
+    {
+      "subject": "Table(1:17~1:31) /test/1/catalog1/schema1/datatype_table/",
+      "action" : "ALTER"
+    }
+  ]
+}
+----------
+[comment_column_targets_table]
+sql:
+COMMENT ON COLUMN "public"."comment_test_child"."id" IS 'Column id'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "COMMENT_COLUMN" : [ {
+    "subject" : "Column(1:48~1:52) /test/1/catalog1/public/comment_test_child/id/",
+    "action" : "ALTER",
+    "target" : "Table(1:18~1:47) /test/1/catalog1/public/comment_test_child/"
+  } ]
+}
+----------
+[comment_function]
+sql:
+COMMENT ON FUNCTION c_function_test() IS 'FUNCTION test'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "COMMENT_PROG_OBJ": [
+    {
+      "subject": "Function(1:20~1:35) /test/1/catalog1/schema1/c_function_test/",
+      "action" : "ALTER"
+    }
+  ]
+}
+----------
+[comment_database]
+sql:
+COMMENT ON DATABASE "postgres" IS 'default administrative connection database'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "COMMENT_CATALOG": [
+    {
+      "subject": "Catalog(1:20~1:30) /test/1/postgres/",
+      "action" : "ALTER"
+    }
+  ]
+}
+----------
+[rename_database]
+sql:
+ALTER DATABASE split_db_probe RENAME TO split_db_renamed
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "RENAME_CATALOG": [
+    {
+      "subject": "Catalog(1:15~1:29) /test/1/split_db_probe/",
+      "action" : "RENAME",
+      "target" : "Catalog(1:40~1:56) /test/1/split_db_renamed/"
+    }
+  ]
+}
+----------
+[rename_schema]
+sql:
+ALTER SCHEMA test_ns_schema_1 RENAME TO test_ns_schema_renamed
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "RENAME_SCHEMA": [
+    {
+      "subject": "Schema(1:13~1:29) /test/1/catalog1/test_ns_schema_1/",
+      "action" : "RENAME",
+      "target" : "Schema(1:40~1:62) /test/1/catalog1/test_ns_schema_renamed/"
+    }
+  ]
+}
+----------
+[rename_column_targets_table]
+sql:
+ALTER TABLE a_star RENAME COLUMN foo TO aa
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "RENAME_COLUMN" : [ {
+    "subject" : "Column(1:33~1:36) /test/1/catalog1/schema1/a_star/foo/",
+    "action" : "RENAME",
+    "target" : [ "Column(1:40~1:42) /test/1/catalog1/schema1/a_star/aa/", "Table(1:12~1:18) /test/1/catalog1/schema1/a_star/" ]
+  } ]
+}
+----------
+[grant_table]
+sql:
+GRANT INSERT ON cp_test TO regress_cp_user1
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Table(1:16~1:23) /test/1/catalog1/schema1/cp_test/",
+      "action" : "GRANT",
+      "target" : "UserOrRole(1:27~1:43) /test/1/regress_cp_user1/"
+    }
+  ]
+}
+----------
+[revoke_table]
+sql:
+REVOKE SELECT ON rls_tbl FROM regress_rls_alice
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "REVOKE": [
+    {
+      "subject": "Table(1:17~1:24) /test/1/catalog1/schema1/rls_tbl/",
+      "action" : "REVOKE",
+      "target" : "UserOrRole(1:30~1:47) /test/1/regress_rls_alice/"
+    }
+  ]
+}
+----------
+[grant_role]
+sql:
+GRANT regress_priv_role TO regress_priv_user1
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "GRANT": [
+    {
+      "subject": "Role(1:6~1:23) /test/1/regress_priv_role/",
+      "action" : "GRANT",
+      "target" : "UserOrRole(1:27~1:45) /test/1/regress_priv_user1/"
+    }
+  ]
+}
+----------
+[revoke_role]
+sql:
+REVOKE regress_priv_group2 FROM regress_priv_user5
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "REVOKE": [
+    {
+      "subject": "Role(1:7~1:26) /test/1/regress_priv_group2/",
+      "action" : "REVOKE",
+      "target" : "UserOrRole(1:32~1:50) /test/1/regress_priv_user5/"
+    }
+  ]
+}
+----------
+[create_function_is_second_order_unsafe]
+sql:
+CREATE FUNCTION test1arr(val jsonb) RETURNS int
+LANGUAGE plpythonu
+TRANSFORM FOR TYPE jsonb
+AS $$
+assert isinstance(val, dict)
+return len(val)
+$$
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_PROG_OBJ": [
+    {
+      "subject": "Function(1:16~1:24) /test/1/catalog1/schema1/test1arr/",
+      "action" : "CREATE"
+    },
+    {
+      "subject": "Function(1:16~1:24) /test/1/catalog1/schema1/test1arr/",
+      "action" : "UNSAFE"
+    }
+  ]
+}
+----------
+[create_trigger_is_second_order_unsafe]
+sql:
+CREATE TRIGGER t BEFORE INSERT ON addr_nsp.gentable FOR EACH ROW EXECUTE PROCEDURE addr_nsp.trig()
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "CREATE_TRIGGER": [
+    {
+      "subject": "Trigger(1:15~1:16) /test/1/catalog1/schema1/t/",
+      "action" : "CREATE",
+      "target" : [
+        "Table(1:34~1:51) /test/1/catalog1/addr_nsp/gentable/",
+        "Function(1:83~1:96) /test/1/catalog1/addr_nsp/trig/"
+      ]
+    },
+    {
+      "subject": "Trigger(1:15~1:16) /test/1/catalog1/schema1/t/",
+      "action" : "UNSAFE"
+    }
+  ]
+}
+----------
+[do_block_is_unsafe]
+sql:
+DO LANGUAGE plpgsql 'BEGIN COPY copy1 FROM ''/src/src/pl/plpgsql/src/data/copy1.data''; END'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "UNSAFE": [
+    {
+      "subject": "ProgramObject(1:0~1:92) /test/1/",
+      "action" : "UNSAFE"
+    }
+  ]
+}
+----------
+[load_library_is_unsafe]
+sql:
+LOAD 'pgoutput'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "UNSAFE": [
+    {
+      "subject": "Library(1:5~1:15) /test/1/pgoutput/",
+      "action" : "UNSAFE"
+    }
+  ]
+}
+----------
+[alter_system_set]
+sql:
+ALTER SYSTEM SET synchronous_standby_names = 'ANY 2(standby1, standby2)'
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:17~1:42) /test/1/synchronous_standby_names/",
+      "action" : "CONFIGURE"
+    }
+  ]
+}
+----------
+[alter_system_reset]
+sql:
+ALTER SYSTEM RESET ignore_system_indexes
+levels:
+/test/1/catalog1/schema1
+expect:
+{
+  "SYSTEM_SETTING_WRITE": [
+    {
+      "subject": "ConfigKey(1:19~1:40) /test/1/ignore_system_indexes/",
+      "action" : "RESET"
+    }
+  ]
+}

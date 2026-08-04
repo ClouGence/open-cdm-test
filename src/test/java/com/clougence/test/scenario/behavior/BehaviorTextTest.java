@@ -20,11 +20,11 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.clougence.clouddm.sdk.sql.analysis.behavior.*;
+import com.clougence.schema.umi.struts.UmiTypes;
 import com.clougence.test.framework.resource.TextCaseSupport;
 import com.clougence.test.framework.resource.TextCaseSupport.CaseBlock;
 import com.clougence.test.framework.testcase.TextCaseDescriptor;
-import com.clougence.clouddm.sdk.sql.analysis.behavior.*;
-import com.clougence.schema.umi.struts.UmiTypes;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.core.JsonToken;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -42,7 +42,7 @@ public final class BehaviorTextTest {
         return TextCaseSupport.loadBlocks(resourcePath).stream().map(BehaviorTextTest::parseOneCase).toList();
     }
 
-    private static TestCase parseOneCase(CaseBlock block) {
+    public static TestCase parseOneCase(CaseBlock block) {
         TestCase testCase = new TestCase(block);
         String body = block.body();
         int sqlIdx = body.indexOf("sql:");
@@ -78,7 +78,7 @@ public final class BehaviorTextTest {
         }
     }
 
-    private static Map<UmiTypes, Object> parseLevels(String levelsPath, String caseName) {
+    static Map<UmiTypes, Object> parseLevels(String levelsPath, String caseName) {
         String normalized = levelsPath.strip();
         if (!normalized.startsWith("/")) {
             throw new IllegalArgumentException("Invalid levels path in " + caseName + ": " + levelsPath);
@@ -118,6 +118,7 @@ public final class BehaviorTextTest {
             failures.add(prefix(testCase) + " analysisBehavior must not return null");
             return failures;
         }
+        verifyActualObjectRanges(testCase, actual, baseLine, baseColumn, failures);
         if (expected.size() != actual.size()) {
             failures.add(prefix(testCase) + ".size: expected=" + expected.size() + ", actual=" + actual.size());
             return failures;
@@ -126,6 +127,108 @@ public final class BehaviorTextTest {
             verifyStatement(prefix(testCase) + "[" + i + "]", expected.get(i), actual.get(i), permissionVerifier, failures);
         }
         return failures;
+    }
+
+    /**
+     * Validates source coordinates independently from the recorded expectation.
+     *
+     * <p>A snapshot can reproduce the same bad range as the implementation that created it.
+     * This check instead projects every runtime range back into the original SQL and, for
+     * physical named objects, requires the selected text to contain the structured object name.</p>
+     */
+    private static void verifyActualObjectRanges(TestCase testCase, List<StatementBehavior> statements, int baseLine, int baseColumn, List<String> failures) {
+        for (int statementIndex = 0; statementIndex < statements.size(); statementIndex++) {
+            StatementBehavior statement = statements.get(statementIndex);
+            if (statement.getRelations() == null) {
+                continue;
+            }
+            for (int relationIndex = 0; relationIndex < statement.getRelations().size(); relationIndex++) {
+                BehaviorRelation relation = statement.getRelations().get(relationIndex);
+                String label = prefix(testCase) + "[" + statementIndex + "].relations[" + relationIndex + "]";
+                verifyActualObjectRange(label + ".subject", testCase.sql, baseLine, baseColumn, relation.getSubject(), failures);
+                if (relation.getTarget() != null) {
+                    for (int targetIndex = 0; targetIndex < relation.getTarget().size(); targetIndex++) {
+                        verifyActualObjectRange(label + ".target[" + targetIndex + "]", testCase.sql, baseLine, baseColumn, relation.getTarget().get(targetIndex), failures);
+                    }
+                }
+            }
+        }
+    }
+
+    private static void verifyActualObjectRange(String label, String sql, int baseLine, int baseColumn, BehaviorObject object, List<String> failures) {
+        if (object == null) {
+            failures.add(label + ": actual BehaviorObject is null");
+            return;
+        }
+        String[] lines = sql.replace("\r\n", "\n").replace('\r', '\n').split("\n", -1);
+        int startLine = object.getStartLine() - baseLine;
+        int endLine = object.getEndLine() - baseLine;
+        if (startLine < 0 || endLine < startLine || endLine >= lines.length) {
+            failures.add(label + ".codeLine is outside SQL: " + object.getStartLine() + ":" + object.getStartColumn() + "~" + object.getEndLine() + ":" + object.getEndColumn());
+            return;
+        }
+        int startColumn = object.getStartColumn() - (startLine == 0 ? baseColumn : 0);
+        int endColumn = object.getEndColumn() - (endLine == 0 ? baseColumn : 0);
+        int startLineColumns = lines[startLine].codePointCount(0, lines[startLine].length());
+        int endLineColumns = lines[endLine].codePointCount(0, lines[endLine].length());
+        if (startColumn < 0 || startColumn > startLineColumns || endColumn < 0 || endColumn > endLineColumns || startLine == endLine && endColumn <= startColumn) {
+            failures.add(label + ".codeLine is outside SQL columns: " + object.getStartLine() + ":" + object.getStartColumn() + "~" + object.getEndLine() + ":"
+                         + object.getEndColumn());
+            return;
+        }
+        int startChar = lines[startLine].offsetByCodePoints(0, startColumn);
+        int endChar = lines[endLine].offsetByCodePoints(0, endColumn);
+        String selected = selectedText(lines, startLine, startChar, endLine, endChar);
+        String physicalName = physicalObjectName(object);
+        if (physicalName != null && !containsIdentifier(selected, physicalName, object.getObjectType())) {
+            failures.add(label + ".codeLine does not cover objectName '" + physicalName + "': " + selected);
+        }
+    }
+
+    private static String selectedText(String[] lines, int startLine, int startColumn, int endLine, int endColumn) {
+        if (startLine == endLine) {
+            return lines[startLine].substring(startColumn, endColumn);
+        }
+        StringBuilder selected = new StringBuilder(lines[startLine].substring(startColumn));
+        for (int line = startLine + 1; line < endLine; line++) {
+            selected.append('\n').append(lines[line]);
+        }
+        return selected.append('\n').append(lines[endLine], 0, endColumn).toString();
+    }
+
+    private static String physicalObjectName(BehaviorObject object) {
+        ObjectName name = object.getObjectName();
+        if (name == null || object.getObjectType() == TargetType.ConfigKey || object.getObjectType() == TargetType.Cast || object.getObjectType() == TargetType.UserMapping) {
+            return null;
+        }
+        if (name.getObjectName() != null && !name.getObjectName().isBlank()) {
+            return name.getObjectName();
+        }
+        if (object.getObjectType() == TargetType.Schema && name.getSchema() != null) {
+            return name.getSchema();
+        }
+        if (object.getObjectType() == TargetType.Catalog && name.getCatalog() != null) {
+            return name.getCatalog();
+        }
+        return null;
+    }
+
+    private static boolean containsIdentifier(String selected, String name, TargetType type) {
+        String source = selected.toLowerCase(Locale.ROOT);
+        String expected = name.toLowerCase(Locale.ROOT);
+        if (type == TargetType.File) {
+            int separator = Math.max(expected.lastIndexOf('/'), expected.lastIndexOf('\\'));
+            expected = separator < 0 ? expected : expected.substring(separator + 1);
+        }
+        if (source.contains(expected)) {
+            return true;
+        }
+        String unquoted = source.replace("''", "'").replace("``", "`");
+        return identifierComparable(unquoted).contains(identifierComparable(expected));
+    }
+
+    private static String identifierComparable(String value) {
+        return value.replace("`", "").replace("\"", "").replace("'", "").replace("[", "").replace("]", "");
     }
 
     private static List<ExpectedStatement> parseExpectedStatements(String expectJson) throws IOException {
@@ -203,7 +306,7 @@ public final class BehaviorTextTest {
 
         JsonNode expectedTarget = expected.get("target");
         List<BehaviorObject> actualTarget = actual.getTarget();
-        if (expectedTarget != null && expectedTarget.isTextual()) {
+        if (expectedTarget != null && (expectedTarget.isTextual() || expectedTarget.isObject())) {
             if (actualTarget == null || actualTarget.size() != 1) {
                 failures.add(label + ".target.size: expected=1, actual=" + (actualTarget == null ? "null" : actualTarget.size() + " " + summarize(actualTarget)));
                 return;
@@ -212,7 +315,7 @@ public final class BehaviorTextTest {
             return;
         }
         if (expectedTarget == null || !expectedTarget.isArray() || expectedTarget.size() < 2) {
-            failures.add(label + ".target must be a string for one object or an array for multiple objects");
+            failures.add(label + ".target must be a string/object for one object or an array for multiple objects");
             return;
         }
         if (actualTarget == null || expectedTarget.size() != actualTarget.size()) {
@@ -378,6 +481,22 @@ public final class BehaviorTextTest {
 
         public String sql() {
             return sql;
+        }
+
+        public Map<UmiTypes, Object> levels() {
+            return levels;
+        }
+
+        public String expectJson() {
+            return expectJson;
+        }
+
+        public int baseLine() {
+            return baseLine;
+        }
+
+        public int baseColumn() {
+            return baseColumn;
         }
 
         public String displayName() {
